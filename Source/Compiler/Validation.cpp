@@ -3025,7 +3025,7 @@ namespace h::compiler
 
         std::optional<h::Type_reference> const expected_type = 
             !parameters.function_declaration->type.output_parameter_types.empty() ?
-            std::optional<h::Type_reference>{parameters.function_declaration->type.output_parameter_types[0]} :
+            get_underlying_type(parameters.declaration_database, parameters.function_declaration->type.output_parameter_types[0]) :
             std::optional<h::Type_reference>{std::nullopt};
 
         if (expression.expression.has_value())

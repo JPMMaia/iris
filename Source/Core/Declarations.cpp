@@ -342,6 +342,18 @@ namespace h
                 return type_reference;
             }
         }
+        if (std::holds_alternative<Pointer_type>(type_reference.data))
+        {
+            Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
+            if (data.element_type.empty())
+                return type_reference;
+
+            std::optional<Type_reference> const underlying_element_type = get_underlying_type(declaration_database, data.element_type[0]);
+            if (!underlying_element_type.has_value())
+                return create_pointer_type_type_reference({}, data.is_mutable);
+
+            return create_pointer_type_type_reference({underlying_element_type.value()}, data.is_mutable);
+        }
         else
         {
             return type_reference;
