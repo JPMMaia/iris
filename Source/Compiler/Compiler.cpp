@@ -1058,7 +1058,7 @@ namespace h::compiler
         Compilation_options const& compilation_options
     )
     {
-        if (!compilation_options.debug)
+        if (!compilation_options.debug || !core_module.source_file_path.has_value())
             return nullptr;
 
         llvm_module.addModuleFlag(
