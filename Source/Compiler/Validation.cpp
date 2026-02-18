@@ -3905,6 +3905,25 @@ namespace h::compiler
         );
     }
 
+    static bool is_declaration_value_computable_at_compile_time(Declaration const& declaration)
+    {
+        if (std::holds_alternative<h::Enum_declaration const*>(declaration.data))
+        {
+            return true;
+        }
+        else if (std::holds_alternative<h::Global_variable_declaration const*>(declaration.data))
+        {
+            h::Global_variable_declaration const& global_variable_declaration = *std::get<h::Global_variable_declaration const*>(declaration.data);
+            return !global_variable_declaration.is_mutable;
+        }
+        else if (std::holds_alternative<h::Function_declaration const*>(declaration.data))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     bool is_computable_at_compile_time(
         h::Module const& core_module,
         h::compiler::Scope const& scope,
@@ -3937,13 +3956,7 @@ namespace h::compiler
                         access_expression.member_name
                     );
                     if (declaration.has_value())
-                    {
-                        if (std::holds_alternative<h::Global_variable_declaration const*>(declaration->data))
-                        {
-                            h::Global_variable_declaration const& global_variable_declaration = *std::get<h::Global_variable_declaration const*>(declaration->data);
-                            return !global_variable_declaration.is_mutable;
-                        }
-                    }
+                        return is_declaration_value_computable_at_compile_time(declaration.value());
                 }
             }
         }
@@ -4031,10 +4044,19 @@ namespace h::compiler
         {
             h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
             Variable const* const variable = find_variable_from_scope(scope, variable_expression.name);
-            if (variable == nullptr)
-                return false;
+            if (variable != nullptr)
+                return variable->is_compile_time;
 
-            return variable->is_compile_time;
+            std::optional<Declaration> const declaration = find_declaration(
+                declaration_database,
+                core_module.name,
+                variable_expression.name
+            );
+
+            if (declaration.has_value())
+                return is_declaration_value_computable_at_compile_time(declaration.value());
+            
+            return false;
         }
 
         return false;

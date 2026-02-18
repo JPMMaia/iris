@@ -397,6 +397,8 @@ function get_value() -> (result: Int32)
 
 var my_global_0 = 0;
 var my_global_1 = get_value();
+var my_global_2 = get_value;
+var my_global_3 = [0, 1, 2];
 )";
 
         std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
