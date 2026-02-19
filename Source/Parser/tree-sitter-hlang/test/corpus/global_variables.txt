@@ -6,6 +6,7 @@ module Global_variables;
 
 var my_global_variable_0 = 1.0f32;
 mutable my_global_variable_1 = 1.0f32;
+macro my_global_variable_2 = 1.0f32;
 
 export function use_global_variables(parameter: Float32) -> ()
 {
@@ -22,7 +23,7 @@ export function use_global_variables(parameter: Float32) -> ()
           (Identifier)))))
   (Declaration
     (Global_variable
-      (Global_variable_mutability)
+      (Global_variable_type)
       (Global_variable_name
         (Identifier))
       (Generic_expression_or_instantiate
@@ -31,7 +32,16 @@ export function use_global_variables(parameter: Float32) -> ()
             (Number))))))
   (Declaration
     (Global_variable
-      (Global_variable_mutability)
+      (Global_variable_type)
+      (Global_variable_name
+        (Identifier))
+      (Generic_expression_or_instantiate
+        (Generic_expression
+          (Expression_constant
+            (Number))))))
+  (Declaration
+    (Global_variable
+      (Global_variable_type)
       (Global_variable_name
         (Identifier))
       (Generic_expression_or_instantiate

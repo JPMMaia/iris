@@ -142,6 +142,29 @@ namespace h::json
     }
 
     export template<>
+        bool read_enum(Global_variable_type& output, std::string_view const value)
+    {
+        if (value == "Constant")
+        {
+            output = Global_variable_type::Constant;
+            return true;
+        }
+        else if (value == "Mutable")
+        {
+            output = Global_variable_type::Mutable;
+            return true;
+        }
+        else if (value == "Macro")
+        {
+            output = Global_variable_type::Macro;
+            return true;
+        }
+
+        std::cerr << std::format("Failed to read enum 'Global_variable_type' with value '{}'\n", value);
+        return false;
+    }
+
+    export template<>
         bool read_enum(Linkage& output, std::string_view const value)
     {
         if (value == "External")
@@ -366,6 +389,13 @@ namespace h::json
         if (type == "Fundamental_type")
         {
             Fundamental_type enum_value;
+            read_enum(enum_value, value);
+            return static_cast<int>(enum_value);
+        }
+
+        if (type == "Global_variable_type")
+        {
+            Global_variable_type enum_value;
             read_enum(enum_value, value);
             return static_cast<int>(enum_value);
         }
@@ -1366,13 +1396,13 @@ namespace h::json
             };
         }
 
-        if (key == "is_mutable")
+        if (key == "global_type")
         {
 
             return Stack_state
             {
-                .pointer = &parent->is_mutable,
-                .type = "bool",
+                .pointer = &parent->global_type,
+                .type = "Global_variable_type",
                 .get_next_state = nullptr,
             };
         }

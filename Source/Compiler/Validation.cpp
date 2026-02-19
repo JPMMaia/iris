@@ -3450,14 +3450,14 @@ namespace h::compiler
                         )
                     };
                 }
-                else if (is_constant_global_variable(parameters.core_module.name, operand_expression, parameters.declaration_database))
+                else if (is_macro_global_variable(parameters.core_module.name, operand_expression, parameters.declaration_database))
                 {
                     return
                     {
                         create_error_diagnostic(
                             parameters.core_module.source_file_path,
                             create_sub_source_range(source_range, 0, 1),
-                            "Cannot take address of a global constant."
+                            "Cannot take address of a global macro."
                         )
                     };
                 }
@@ -3914,7 +3914,7 @@ namespace h::compiler
         else if (std::holds_alternative<h::Global_variable_declaration const*>(declaration.data))
         {
             h::Global_variable_declaration const& global_variable_declaration = *std::get<h::Global_variable_declaration const*>(declaration.data);
-            return !global_variable_declaration.is_mutable;
+            return global_variable_declaration.global_type != Global_variable_type::Mutable;
         }
         else if (std::holds_alternative<h::Function_declaration const*>(declaration.data))
         {
@@ -4105,7 +4105,7 @@ namespace h::compiler
         if (global_variable == nullptr)
             return false;
 
-        return !global_variable->is_mutable;
+        return global_variable->global_type == h::Global_variable_type::Constant;
     }
 
     bool is_mutable_global_variable(
@@ -4122,7 +4122,24 @@ namespace h::compiler
         if (global_variable == nullptr)
             return false;
 
-        return global_variable->is_mutable;
+        return global_variable->global_type == h::Global_variable_type::Mutable;
+    }
+
+    bool is_macro_global_variable(
+        std::string_view const current_module_name,
+        h::Expression const& expression,
+        Declaration_database const& declaration_database
+    )
+    {
+        Global_variable_declaration const* const global_variable = get_global_variable(
+            current_module_name,
+            expression,
+            declaration_database
+        );
+        if (global_variable == nullptr)
+            return false;
+
+        return global_variable->global_type == h::Global_variable_type::Macro;
     }
 
     std::optional<h::Source_range> get_statement_source_range(

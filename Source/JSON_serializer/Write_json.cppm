@@ -100,6 +100,24 @@ namespace h::json
         throw std::runtime_error{ "Failed to write enum 'Fundamental_type'!\n" };
     }
 
+    export std::string_view write_enum(Global_variable_type const value)
+    {
+        if (value == Global_variable_type::Constant)
+        {
+            return "Constant";
+        }
+        else if (value == Global_variable_type::Mutable)
+        {
+            return "Mutable";
+        }
+        else if (value == Global_variable_type::Macro)
+        {
+            return "Macro";
+        }
+
+        throw std::runtime_error{ "Failed to write enum 'Global_variable_type'!\n" };
+    }
+
     export std::string_view write_enum(Linkage const value)
     {
         if (value == Linkage::External)
@@ -1243,8 +1261,11 @@ namespace h::json
         write_optional_object(writer, "type", output.type);
         writer.Key("initial_value");
         write_object(writer, output.initial_value);
-        writer.Key("is_mutable");
-        writer.Bool(output.is_mutable);
+        writer.Key("global_type");
+        {
+            std::string_view const enum_value_string = write_enum(output.global_type);
+            writer.String(enum_value_string.data(), enum_value_string.size());
+        }
         write_optional(writer, "comment", output.comment);
         write_optional_object(writer, "source_location", output.source_location);
         writer.EndObject();

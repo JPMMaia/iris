@@ -1617,11 +1617,14 @@ static const My_flags g_global = 0x800000000ULL;
     };
 
     char const* const expected_llvm_ir = R"(
+@g_global = global i64 34359738368
+
 ; Function Attrs: convergent
 define void @Constant_expressions_run() #0 {
 entry:
   %v0 = alloca i64, align 8
-  store i64 34359738368, ptr %v0, align 8
+  %0 = load i64, ptr @g_global, align 8
+  store i64 %0, ptr %v0, align 8
   ret void
 }
 
@@ -4984,6 +4987,8 @@ float my_global = 0.0f;
     };
 
     char const* const expected_llvm_ir = R"(
+@Global_variables_my_global_constant_0 = global float 1.000000e+00
+@Global_variables_my_global_constant_1 = global float 1.000000e+00
 @Global_variables_my_global_variable_0 = global float 1.000000e+00
 @my_global = global float 0.000000e+00
 
@@ -4995,16 +5000,21 @@ entry:
   %b = alloca ptr, align 8
   %c = alloca float, align 4
   %d = alloca float, align 4
+  %e = alloca float, align 4
   store float %"arguments[0].parameter", ptr %parameter, align 4
-  %0 = load float, ptr @Global_variables_my_global_variable_0, align 4
-  %1 = fadd float 2.000000e+00, %0
-  %2 = load float, ptr %parameter, align 4
-  %3 = fadd float %1, %2
-  store float %3, ptr %a, align 4
+  %0 = load float, ptr @Global_variables_my_global_constant_0, align 4
+  %1 = load float, ptr @Global_variables_my_global_constant_1, align 4
+  %2 = fadd float %0, %1
+  %3 = load float, ptr @Global_variables_my_global_variable_0, align 4
+  %4 = fadd float %2, %3
+  %5 = load float, ptr %parameter, align 4
+  %6 = fadd float %4, %5
+  store float %6, ptr %a, align 4
   store ptr @Global_variables_my_global_variable_0, ptr %b, align 8
   store float 2.000000e+00, ptr %c, align 4
-  %4 = load float, ptr @my_global, align 4
-  store float %4, ptr %d, align 4
+  %7 = load float, ptr @my_global, align 4
+  store float %7, ptr %d, align 4
+  store float 1.000000e+00, ptr %e, align 4
   ret void
 }
 

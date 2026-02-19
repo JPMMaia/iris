@@ -358,13 +358,20 @@ namespace h
     export bool operator==(Statement const& lhs, Statement const& rhs);
 #endif
 
+    export enum class Global_variable_type
+    {
+        Constant = 0,
+        Mutable,
+        Macro
+    };
+
     export struct Global_variable_declaration
     {
         std::pmr::string name;
         std::optional<std::pmr::string> unique_name;
         std::optional<Type_reference> type;
         Statement initial_value;
-        bool is_mutable;
+        Global_variable_type global_type;
         std::optional<std::pmr::string> comment;
         std::optional<Source_range_location> source_location;
 

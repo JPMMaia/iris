@@ -290,7 +290,7 @@ namespace h::binary_serializer
         serialize(serializer, value.unique_name);
         serialize(serializer, value.type);
         serialize(serializer, value.initial_value);
-        serialize(serializer, value.is_mutable);
+        serialize(serializer, value.global_type);
         serialize(serializer, value.comment);
         serialize(serializer, value.source_location);
     }
@@ -302,7 +302,7 @@ namespace h::binary_serializer
         deserialize(deserializer, value.unique_name);
         deserialize(deserializer, value.type);
         deserialize(deserializer, value.initial_value);
-        deserialize(deserializer, value.is_mutable);
+        deserialize(deserializer, value.global_type);
         deserialize(deserializer, value.comment);
         deserialize(deserializer, value.source_location);
     }

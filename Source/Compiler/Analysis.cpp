@@ -1112,7 +1112,7 @@ namespace h::compiler
                                         return Type_info
                                         {
                                             .type = global_variable_declaration.type.value(),
-                                            .is_mutable = global_variable_declaration.is_mutable,
+                                            .is_mutable = global_variable_declaration.global_type == Global_variable_type::Mutable,
                                         };    
                                     }
 
@@ -1123,7 +1123,7 @@ namespace h::compiler
                                     return Type_info
                                     {
                                         .type = std::move(value_type.value()),
-                                        .is_mutable = global_variable_declaration.is_mutable,
+                                        .is_mutable = global_variable_declaration.global_type == Global_variable_type::Mutable,
                                     };
                                 }
 
@@ -1874,7 +1874,7 @@ namespace h::compiler
                             return Type_info
                             {
                                 .type = global_variable_declaration.type.value(),
-                                .is_mutable = global_variable_declaration.is_mutable,
+                                .is_mutable = global_variable_declaration.global_type == Global_variable_type::Mutable,
                             };
                         }
 
@@ -1885,7 +1885,7 @@ namespace h::compiler
                         return Type_info
                         {
                             .type = std::move(type.value()),
-                            .is_mutable = global_variable_declaration.is_mutable,
+                            .is_mutable = global_variable_declaration.global_type == Global_variable_type::Mutable,
                         };
                     }
                     else if (std::holds_alternative<Function_declaration const*>(declaration_optional->data))

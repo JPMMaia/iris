@@ -95,7 +95,7 @@ namespace h::compiler
         Expression_parameters const& parameters
     )
     {
-        if (!global_variable_declaration.is_mutable)
+        if (global_variable_declaration.global_type == Global_variable_type::Macro)
         {
             Expression_parameters new_parameters = parameters;
             new_parameters.expression_type = global_variable_declaration.type;
@@ -3532,7 +3532,7 @@ namespace h::compiler
                 {
                     Global_variable_declaration const& global_variable_declaration = *declaration.value();
 
-                    if (global_variable_declaration.is_mutable)
+                    if (global_variable_declaration.global_type != Global_variable_type::Macro)
                     {
                         std::optional<Value_and_type> const global_variable = get_global_variable_value_and_type(
                             parameters.core_module,

@@ -895,7 +895,7 @@ namespace h::compiler
 
             for (Global_variable_declaration const& global_variable_declaration : global_variable_declarations)
             {
-                if (!global_variable_declaration.is_mutable)
+                if (global_variable_declaration.global_type == Global_variable_type::Macro)
                     continue;
 
                 std::string const mangled_name = mangle_name(core_module, global_variable_declaration.name, global_variable_declaration.unique_name);

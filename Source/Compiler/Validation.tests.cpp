@@ -416,17 +416,19 @@ var my_global_3 = [0, 1, 2];
         test_validate_module(input, {}, expected_diagnostics);
     }
 
-    TEST_CASE("Validates that pointers to global constants do not exist", "[Validation][Global_variable]")
+    TEST_CASE("Validates that pointers to global macros do not exist", "[Validation][Global_variable]")
     {
         std::string_view const input = R"(module Test;
 
 mutable my_global_0 = 0;
 var my_global_1 = 0;
+macro my_global_2 = 0;
 
 function run() -> ()
 {
     var a = &my_global_0;
     var b = &my_global_1;
+    var c = &my_global_2;
 }
 )";
 
@@ -434,10 +436,10 @@ function run() -> ()
         {
             h::compiler::Diagnostic
             {
-                .range = create_source_range(9, 13, 9, 14),
+                .range = create_source_range(11, 13, 11, 14),
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
-                .message = "Cannot take address of a global constant.",
+                .message = "Cannot take address of a global macro.",
                 .related_information = {},
             }
         };

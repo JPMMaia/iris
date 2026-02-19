@@ -1155,7 +1155,7 @@ namespace h::c
         }
     }
 
-    std::optional<h::Global_variable_declaration> create_global_variable_declaration(C_declarations const& declarations, CXCursor const cursor)
+    std::optional<h::Global_variable_declaration> create_global_variable_declaration(C_declarations const& declarations, CXCursor const cursor, bool const is_macro)
     {
         String const cursor_spelling = { clang_getCursorSpelling(cursor) };
         std::string_view const variable_name = cursor_spelling.string_view();
@@ -1173,13 +1173,17 @@ namespace h::c
 
         std::optional<h::Statement> initial_value = get_global_variable_initial_value(cursor, type_reference.value());
 
+        h::Global_variable_type const global_type =
+            is_macro ? h::Global_variable_type::Macro :
+            (is_const ? h::Global_variable_type::Constant : h::Global_variable_type::Mutable);
+
         return h::Global_variable_declaration
         {
             .name = std::pmr::string{variable_name},
             .unique_name = std::pmr::string{variable_name},
             .type = std::move(*type_reference),
             .initial_value = initial_value.has_value() ? std::move(*initial_value) : h::Statement{},
-            .is_mutable = !is_const,
+            .global_type = global_type,
             .comment = std::nullopt,
             .source_location = cursor_location.source_location,
         };
@@ -2553,7 +2557,7 @@ namespace h::c
 
                 if (variable_name.starts_with(special_prefix))
                 {
-                    std::optional<h::Global_variable_declaration> declaration = create_global_variable_declaration(*declarations, current_cursor);
+                    std::optional<h::Global_variable_declaration> declaration = create_global_variable_declaration(*declarations, current_cursor, true);
                     if (declaration.has_value())
                     {
                         declaration->name = variable_name.substr(special_prefix.size());
@@ -2655,7 +2659,7 @@ namespace h::c
             }
             else if (cursor_kind == CXCursor_VarDecl)
             {
-                std::optional<h::Global_variable_declaration> declaration = create_global_variable_declaration(*declarations, current_cursor);
+                std::optional<h::Global_variable_declaration> declaration = create_global_variable_declaration(*declarations, current_cursor, false);
                 if (declaration.has_value())
                     declarations->global_variable_declarations.push_back(std::move(*declaration));
             }

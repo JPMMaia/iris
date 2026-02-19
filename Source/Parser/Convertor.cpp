@@ -1069,10 +1069,16 @@ namespace h::parser
     {
         h::Global_variable_declaration output = {};
 
-        std::optional<Parse_node> const mutability_node = get_child_node(tree, node, 0);
-        if (mutability_node.has_value())
+        std::optional<Parse_node> const global_type_node = get_child_node(tree, node, 0);
+        if (global_type_node.has_value())
         {
-            output.is_mutable = get_node_value(tree, mutability_node.value()) == "mutable";
+            std::string_view const type_value = get_node_value(tree, global_type_node.value());
+            if (type_value == "mutable")
+                output.global_type = h::Global_variable_type::Mutable;
+            else if (type_value == "macro")
+                output.global_type = h::Global_variable_type::Macro;
+            else
+                output.global_type = h::Global_variable_type::Constant;
         }
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, 1);

@@ -723,7 +723,7 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "Global_variable_mutability"
+          "name": "Global_variable_type"
         },
         {
           "type": "SYMBOL",
@@ -768,7 +768,7 @@
       "type": "SYMBOL",
       "name": "Identifier"
     },
-    "Global_variable_mutability": {
+    "Global_variable_type": {
       "type": "CHOICE",
       "members": [
         {
@@ -778,6 +778,10 @@
         {
           "type": "STRING",
           "value": "mutable"
+        },
+        {
+          "type": "STRING",
+          "value": "macro"
         }
       ]
     },

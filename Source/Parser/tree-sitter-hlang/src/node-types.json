@@ -1716,11 +1716,11 @@
           "named": true
         },
         {
-          "type": "Global_variable_mutability",
+          "type": "Global_variable_name",
           "named": true
         },
         {
-          "type": "Global_variable_name",
+          "type": "Global_variable_type",
           "named": true
         },
         {
@@ -1729,11 +1729,6 @@
         }
       ]
     }
-  },
-  {
-    "type": "Global_variable_mutability",
-    "named": true,
-    "fields": {}
   },
   {
     "type": "Global_variable_name",
@@ -1749,6 +1744,11 @@
         }
       ]
     }
+  },
+  {
+    "type": "Global_variable_type",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "Identifier_with_dots",
@@ -2660,6 +2660,10 @@
   },
   {
     "type": "in",
+    "named": false
+  },
+  {
+    "type": "macro",
     "named": false
   },
   {

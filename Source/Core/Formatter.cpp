@@ -2029,7 +2029,14 @@ namespace h
         Format_options const& options
     )
     {
-        add_text(buffer, declaration.is_mutable ? "mutable " : "var ");
+        if (declaration.global_type == h::Global_variable_type::Constant)
+            add_text(buffer, "var");
+        else if (declaration.global_type == h::Global_variable_type::Mutable)
+            add_text(buffer, "mutable");
+        else if (declaration.global_type == h::Global_variable_type::Macro)
+            add_text(buffer, "macro");
+
+        add_text(buffer, " ");
         add_text(buffer, declaration.name);
 
         if (declaration.type.has_value())
