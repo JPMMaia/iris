@@ -851,6 +851,7 @@ namespace h::compiler
         std::span<Function_declaration const> const function_declarations,
         std::optional<std::span<std::pmr::string const> const> const functions_to_add,
         std::span<Global_variable_declaration const> const global_variable_declarations,
+        Enum_value_constants const& enum_value_constants,
         Type_database& type_database,
         Declaration_database& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -916,7 +917,7 @@ namespace h::compiler
                     .core_module_dependencies = core_module_dependencies,
                     .declaration_database = declaration_database,
                     .type_database = type_database,
-                    .enum_value_constants = {},
+                    .enum_value_constants = enum_value_constants,
                     .blocks = {},
                     .defer_expressions_per_block = {},
                     .function_declaration = {},
@@ -1014,6 +1015,7 @@ namespace h::compiler
         Declaration_database& declaration_database,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
+        Enum_value_constants const& enum_value_constants,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -1039,6 +1041,7 @@ namespace h::compiler
                     core_module_dependency.export_declarations.function_declarations,
                     alias_import_location->usages,
                     core_module_dependency.export_declarations.global_variable_declarations,
+                    enum_value_constants,
                     type_database,
                     declaration_database,
                     temporaries_allocator
@@ -1165,12 +1168,6 @@ namespace h::compiler
         llvm_module->setTargetTriple(target_triple);
         llvm_module->setDataLayout(llvm_data_layout);
 
-        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.export_declarations.function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, type_database, declaration_database, {});
-        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.internal_declarations.function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, type_database, declaration_database, {});
-        add_instance_call_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, {});
-
-        add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, core_module, core_module_dependencies, {});
-
         Enum_value_constants const enum_value_constants = create_enum_value_constants_map(
             llvm_context,
             llvm_data_layout,
@@ -1182,6 +1179,12 @@ namespace h::compiler
             type_database,
             {}
         );
+
+        add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, core_module, core_module_dependencies, enum_value_constants, {});
+        
+        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.export_declarations.function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, {});
+        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.internal_declarations.function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, {});
+        add_instance_call_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, {});
 
         std::unique_ptr<Debug_info> debug_info = create_debug_info(
             llvm_data_layout,

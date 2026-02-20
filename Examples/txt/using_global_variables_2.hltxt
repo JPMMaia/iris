@@ -1,0 +1,15 @@
+module Global_variables_2;
+
+import my_module as my_module;
+
+var my_global_array = [
+    my_module.foo
+];
+
+enum My_enum
+{
+    Value_0,
+    Value_1,
+}
+
+var my_global_array_2 = My_enum.Value_1;

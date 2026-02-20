@@ -1344,6 +1344,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_0 = internal constant [3 x i8] c"%d\00"
 
 ; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
 define void @Break_expressions_run_breaks(i32 noundef %"arguments[0].size") #0 {
 entry:
   %size = alloca i32, align 4
@@ -1488,9 +1491,6 @@ entry:
   %1 = call i32 (ptr, ...) @printf(ptr noundef @global_0, i32 noundef %0)
   ret void
 }
-
-; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -1734,6 +1734,9 @@ Vector2i add(Vector2i lhs, Vector2i rhs);
 %struct.Vector2i = type {{ i32, i32 }}
 
 ; Function Attrs: convergent
+declare i64 @add(i64 noundef, i64 noundef) #0
+
+; Function Attrs: convergent
 define i32 @Debug_information_run() #0 !dbg !3 {{
 entry:
   %a = alloca %struct.Vector2i, align 4, !dbg !8
@@ -1767,9 +1770,6 @@ entry:
   %16 = add i32 %13, %15, !dbg !11
   ret i32 %16, !dbg !20
 }}
-
-; Function Attrs: convergent
-declare i64 @add(i64 noundef, i64 noundef) #0
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
 declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
@@ -3114,6 +3114,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_0 = internal constant [3 x i8] c"%d\00"
 
 ; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
 define void @For_loop_expressions_run_for_loops() #0 {
 entry:
   %index = alloca i32, align 4
@@ -3213,9 +3216,6 @@ entry:
   ret void
 }
 
-; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
-
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
@@ -3287,14 +3287,14 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_0 = internal constant [13 x i8] c"Hello world!\00"
 
 ; Function Attrs: convergent
+declare i32 @puts(ptr noundef) #0
+
+; Function Attrs: convergent
 define i32 @hello_world_main() #0 {
 entry:
   %0 = call i32 @puts(ptr noundef @global_0)
   ret i32 0
 }
-
-; Function Attrs: convergent
-declare i32 @puts(ptr noundef) #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -3323,6 +3323,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_8 = internal constant [5 x i8] c"zero\00"
 @global_9 = internal constant [5 x i8] c"true\00"
 @global_10 = internal constant [6 x i8] c"false\00"
+
+; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
 
 ; Function Attrs: convergent
 define void @If_expressions_run_ifs(i32 noundef %"arguments[0].value") #0 {
@@ -3425,9 +3428,6 @@ entry:
   ret void
 }
 
-; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
-
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
@@ -3526,6 +3526,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.Implicit_arguments_My_struct = type { i32, i32 }
 
 ; Function Attrs: convergent
+declare i32 @Implicit_arguments_get_v0(ptr noundef) #0
+
+; Function Attrs: convergent
 define private void @Implicit_arguments_external_run() #0 {
 entry:
   %instance = alloca %struct.Implicit_arguments_My_struct, align 4
@@ -3544,9 +3547,6 @@ entry:
   store i32 %4, ptr %b, align 4
   ret void
 }
-
-; Function Attrs: convergent
-declare i32 @Implicit_arguments_get_v0(ptr noundef) #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -4635,6 +4635,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_0 = internal constant [24 x i8] c"Value: %d, pointer: %p\0A\00"
 
 ; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
 define void @Use_printf_run() #0 {
 entry:
   %a = alloca i32, align 4
@@ -4643,9 +4646,6 @@ entry:
   %1 = call i32 (ptr, ...) @printf(ptr noundef @global_0, i32 noundef %0, ptr noundef %a)
   ret void
 }
-
-; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -5014,11 +5014,11 @@ float my_global = 0.0f;
     };
 
     char const* const expected_llvm_ir = R"(
+@my_global = global float 0.000000e+00
 @Global_variables_my_global_constant_0 = global float 1.000000e+00
 @Global_variables_my_global_constant_1 = global float 1.000000e+00
 @Global_variables_my_global_variable_0 = global float 1.000000e+00
 @Global_variables_my_global_array = global [3 x i32] [i32 1, i32 2, i32 3]
-@my_global = global float 0.000000e+00
 
 ; Function Attrs: convergent
 define void @Global_variables_use_global_variables(float noundef %"arguments[0].parameter") #0 {
@@ -5048,6 +5048,37 @@ entry:
   store i32 %8, ptr %f, align 4
   ret void
 }
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Using Global Variables 2", "[LLVM_IR]")
+  {
+    char const* const input_file = "using_global_variables_2.hltxt";
+
+    std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "using_global_variables";
+    std::filesystem::create_directories(root_directory_path);
+
+    std::string const header_content = R"(
+void foo();
+)";
+
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+        { "my_module", header_module_file_path }
+    };
+
+    char const* const expected_llvm_ir = R"(
+@Global_variables_2_my_global_array = global [1 x ptr] [ptr @foo]
+@Global_variables_2_my_global_array_2 = global i32 1
+
+; Function Attrs: convergent
+declare void @foo() #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -5434,6 +5465,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_0 = internal constant [3 x i8] c"%d\00"
 
 ; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
 define void @While_loop_expressions_run_while_loops(i32 noundef %"arguments[0].size") #0 {
 entry:
   %size = alloca i32, align 4
@@ -5519,9 +5553,6 @@ entry:
   %1 = call i32 (ptr, ...) @printf(ptr noundef @global_0, i32 noundef %0)
   ret void
 }
-
-; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -5755,6 +5786,9 @@ void foo(My_struct argument);
 %struct.My_struct = type { i32, i32, i32, i32 }
 
 ; Function Attrs: convergent
+declare void @foo(i64, i64) #0
+
+; Function Attrs: convergent
 define private void @c_interoperability_run() #0 {
 entry:
   %instance = alloca %struct.My_struct, align 4
@@ -5774,9 +5808,6 @@ entry:
   ret void
 }
 
-; Function Attrs: convergent
-declare void @foo(i64, i64) #0
-
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
@@ -5787,6 +5818,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
   {
     char const* const expected_llvm_ir = R"(
 %struct.My_struct = type { i32, i32, i32, i32 }
+
+; Function Attrs: convergent
+declare void @foo(ptr noundef) #0
 
 ; Function Attrs: convergent
 define private void @c_interoperability_run() #0 {
@@ -5805,9 +5839,6 @@ entry:
   call void @foo(ptr noundef %0)
   ret void
 }
-
-; Function Attrs: convergent
-declare void @foo(ptr noundef) #0
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
 declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
