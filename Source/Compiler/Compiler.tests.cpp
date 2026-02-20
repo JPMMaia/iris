@@ -4990,6 +4990,7 @@ float my_global = 0.0f;
 @Global_variables_my_global_constant_0 = global float 1.000000e+00
 @Global_variables_my_global_constant_1 = global float 1.000000e+00
 @Global_variables_my_global_variable_0 = global float 1.000000e+00
+@Global_variables_my_global_array = global [3 x i32] [i32 1, i32 2, i32 3]
 @my_global = global float 0.000000e+00
 
 ; Function Attrs: convergent
@@ -5001,6 +5002,7 @@ entry:
   %c = alloca float, align 4
   %d = alloca float, align 4
   %e = alloca float, align 4
+  %f = alloca i32, align 4
   store float %"arguments[0].parameter", ptr %parameter, align 4
   %0 = load float, ptr @Global_variables_my_global_constant_0, align 4
   %1 = load float, ptr @Global_variables_my_global_constant_1, align 4
@@ -5015,6 +5017,8 @@ entry:
   %7 = load float, ptr @my_global, align 4
   store float %7, ptr %d, align 4
   store float 1.000000e+00, ptr %e, align 4
+  %8 = load i32, ptr getelementptr inbounds ([3 x i32], ptr @Global_variables_my_global_array, i32 0, i32 1), align 4
+  store i32 %8, ptr %f, align 4
   ret void
 }
 

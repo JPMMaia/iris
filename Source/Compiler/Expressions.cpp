@@ -25,6 +25,7 @@ import h.core;
 import h.core.declarations;
 import h.core.execution_engine;
 import h.core.types;
+import h.compiler.analysis;
 import h.compiler.clang_data;
 import h.compiler.clang_code_generation;
 import h.compiler.common;
@@ -122,7 +123,15 @@ namespace h::compiler
                 return std::nullopt;
             }
 
-            std::optional<Type_reference> type = global_variable_declaration.type.has_value() ? global_variable_declaration.type : create_statement_value(global_variable_declaration.initial_value, parameters).type;
+            h::compiler::Scope scope{};
+            std::optional<h::Type_reference> type = get_expression_type(
+                global_variable_module,
+                parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
+                scope,
+                global_variable_declaration.initial_value,
+                global_variable_declaration.type,
+                parameters.declaration_database
+            );
 
             return Value_and_type
             {
@@ -2174,6 +2183,32 @@ namespace h::compiler
         throw std::runtime_error{ "Constant expression not handled!" };
     }
 
+    static std::optional<Value_and_type> create_constant_array_with_constant_elements(
+        std::span<Value_and_type const> const array_data_values,
+        Type_reference const& element_type,
+        llvm::ArrayType* const array_type,
+        std::uint64_t const array_length
+    )
+    {
+        for (std::size_t index = 0; index < array_data_values.size(); ++index)
+        {
+            if (!llvm::Constant::classof(array_data_values[index].value))
+                return std::nullopt;
+        }
+
+        std::pmr::vector<llvm::Constant*> constant_values;
+        constant_values.resize(array_data_values.size());
+        for (std::size_t index = 0; index < array_data_values.size(); ++index)
+            constant_values[index] = static_cast<llvm::Constant*>(array_data_values[index].value);
+
+        return Value_and_type
+        {
+            .name = "",
+            .value = llvm::ConstantArray::get(array_type, constant_values),
+            .type = create_constant_array_type_reference({element_type}, array_length),
+        };
+    }
+
     Value_and_type create_constant_array_expression_value(
         Constant_array_expression const& expression,
         Statement const& statement,
@@ -2263,8 +2298,15 @@ namespace h::compiler
         std::uint64_t const array_length = expression.array_data.size();
 
         llvm::ArrayType* const array_type = llvm::ArrayType::get(llvm_element_type, array_length);
+        
+        if (parameters.llvm_parent_function == nullptr)
+        {
+            std::optional<Value_and_type> const constant_array = create_constant_array_with_constant_elements(array_data_values, element_type, array_type, array_length);
+            if (constant_array.has_value())
+                return constant_array.value();
+        }
+    
         llvm::ConstantInt* const array_length_constant = llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_context), array_length);
-
         llvm::AllocaInst* const array_alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, array_type, "array", array_length_constant);
 
         for (std::uint64_t index = 0; index < array_length; ++index)
