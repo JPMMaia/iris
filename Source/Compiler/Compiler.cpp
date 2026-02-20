@@ -271,7 +271,7 @@ namespace h::compiler
         {
             std::optional<std::size_t> const index = find_enum_value_index_with_statement(declaration, enum_value_index);
             if (!index.has_value())
-                return llvm_builder.getInt32(0);
+                return llvm_builder.getInt32(enum_value_index);
 
             Enum_value const& enum_value_with_statement = declaration.values[index.value()];
 
