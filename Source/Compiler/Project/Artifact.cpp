@@ -180,11 +180,15 @@ namespace h::compiler
 
     Executable_info parse_executable_info(nlohmann::json const& json)
     {
-        return Executable_info
-        {
-            .source = json.at("source").get<std::pmr::string>(),
-            .entry_point = json.at("entry_point").get<std::pmr::string>(),
-        };
+        Executable_info info{};
+
+        if (json.contains("source"))
+            info.source = json.at("source").get<std::pmr::string>();
+        
+        if (json.contains("entry_point"))
+            info.source = json.at("entry_point").get<std::pmr::string>();
+        
+        return info;
     }
 
     std::pmr::vector<C_header> parse_c_headers(nlohmann::json const& json)

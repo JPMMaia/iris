@@ -37,13 +37,15 @@ namespace h::compiler
 
         if (options.link_type == Link_type::Executable)
         {
-            arguments_storage.push_back(std::format("/entry:{}", options.entry_point.value_or(std::string_view{"main"})));
             arguments_storage.push_back(std::format("/out:{}.exe", output.generic_string()));
             arguments_storage.push_back("/subsystem:console");
         }
 
         if (options.debug)
             arguments_storage.push_back("/debug:full");
+
+        // Provides mainCRTStartup
+        arguments_storage.push_back(options.debug ? "/defaultlib:msvcrtd.lib" : "/defaultlib:msvcrt.lib");
 
         for (std::string_view const library : libraries)
         {

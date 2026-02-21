@@ -16,7 +16,6 @@
         }
     ],
     "executable": {
-        "source": "my_app.hltxt",
-        "entry_point": "my_app_main"
+        "source": "my_app.hltxt"
     }
 }
