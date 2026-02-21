@@ -459,6 +459,20 @@ namespace h::compiler
         return clang_function_declaration;
     }
 
+    void add_clang_function_declaration(
+        Clang_declaration_database& clang_declaration_database,
+        clang::ASTContext& clang_ast_context,
+        std::string_view const module_name,
+        h::Function_declaration const& function_declaration,
+        Declaration_database const& declaration_database
+    )
+    {
+        auto iterator = clang_declaration_database.map.emplace(module_name.data(), Clang_module_declarations{}).first;
+
+        clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
+        iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
+    }
+
     void add_clang_declarations(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,

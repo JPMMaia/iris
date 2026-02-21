@@ -9,4 +9,5 @@ function add(a: Int32, b: Int32) -> (result: Int32)
 function test_addition() -> ()
 {
     check(add(1, 2) == 3);
+    check(add(2, 3) == 5);
 }

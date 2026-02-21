@@ -493,6 +493,7 @@ namespace h::language_server
             std::pmr::vector<h::compiler::Artifact> artifacts = h::compiler::get_sorted_artifacts(
                 artifact_file_paths,
                 builder.repositories,
+                false,
                 output_allocator,
                 temporaries_allocator
             );

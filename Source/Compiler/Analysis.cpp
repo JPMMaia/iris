@@ -1367,7 +1367,11 @@ namespace h::compiler
             {
                 h::Builtin_type_reference const& builtin_type_reference = std::get<h::Builtin_type_reference>(type_reference.value().data);
                 
-                if (builtin_type_reference.value == "create_array_slice_from_pointer")
+                if (builtin_type_reference.value == "check")
+                {
+                    return std::nullopt;
+                }
+                else if (builtin_type_reference.value == "create_array_slice_from_pointer")
                 {
                     std::pmr::vector<h::Type_reference> element_type;
                     bool is_mutable = false;

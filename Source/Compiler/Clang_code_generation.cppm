@@ -40,6 +40,14 @@ import h.compiler.types;
 
 namespace h::compiler
 {
+    export void add_clang_function_declaration(
+        Clang_declaration_database& clang_declaration_database,
+        clang::ASTContext& clang_ast_context,
+        std::string_view const module_name,
+        h::Function_declaration const& function_declaration,
+        Declaration_database const& declaration_database
+    );
+
     export llvm::FunctionType* create_llvm_function_type(
         Clang_module_data& clang_module_data,
         std::string_view const module_name,

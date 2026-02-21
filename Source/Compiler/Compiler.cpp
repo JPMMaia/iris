@@ -57,6 +57,7 @@ import h.compiler.debug_info;
 import h.compiler.diagnostic;
 import h.compiler.expressions;
 import h.compiler.instructions;
+import h.compiler.test_framework;
 import h.compiler.types;
 import h.parser.convertor;
 import h.parser.parse_tree;
@@ -64,10 +65,14 @@ import h.parser.parser;
 
 namespace h::compiler
 {
-    llvm::GlobalValue::LinkageTypes to_linkage(
-        Linkage const linkage
+    static llvm::GlobalValue::LinkageTypes to_linkage(
+        Linkage const linkage,
+        bool const is_test
     )
     {
+        if (is_test)
+            return llvm::GlobalValue::LinkageTypes::ExternalLinkage;
+
         switch (linkage)
         {
         case Linkage::External:
@@ -167,7 +172,7 @@ namespace h::compiler
         Declaration_database const& declaration_database
     )
     {
-        llvm::GlobalValue::LinkageTypes const linkage = to_linkage(function_declaration.linkage);
+        llvm::GlobalValue::LinkageTypes const linkage = to_linkage(function_declaration.linkage, function_declaration.is_test);
 
         std::string const mangled_name = mangle_name(module_name, function_declaration.name, function_declaration.unique_name);
 
@@ -606,22 +611,32 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        auto const should_compile = [functions_to_compile](Function_definition const& definition) -> bool
+        auto const should_compile = [&](Function_declaration const& declaration) -> bool
         {
+            if (compilation_options.is_test_mode)
+            {
+                if (declaration.unique_name.has_value() && declaration.unique_name.value() == "main")
+                    return false;
+            }
+            else if (declaration.is_test)
+            {
+                return false;
+            }
+
             if (!functions_to_compile.has_value())
                 return true;
 
-            auto const predicate = [&](std::string_view const function_name) { return function_name == definition.name; };
+            auto const predicate = [&](std::string_view const function_name) { return function_name == declaration.name; };
             auto const location = std::find_if(functions_to_compile->begin(), functions_to_compile->end(), predicate);
             return location != functions_to_compile->end();
         };
 
         for (Function_definition const& definition : core_module.definitions.function_definitions)
         {
-            if (!should_compile(definition))
-                continue;
-
             Function_declaration const& declaration = *find_function_declaration(core_module, definition.name).value();
+            
+            if (!should_compile(declaration))
+                continue;
 
             llvm::Function* const llvm_function = get_llvm_function(core_module, llvm_module, definition.name);
             if (!llvm_function)
@@ -841,7 +856,7 @@ namespace h::compiler
         return core_module_dependencies;
     }
 
-    void add_module_declarations(
+    static void add_module_declarations(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
@@ -854,6 +869,7 @@ namespace h::compiler
         Enum_value_constants const& enum_value_constants,
         Type_database& type_database,
         Declaration_database& declaration_database,
+        bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -863,6 +879,16 @@ namespace h::compiler
 
             for (Function_declaration const& function_declaration : function_declarations)
             {
+                if (is_test_mode)
+                {
+                    if (function_declaration.unique_name.has_value() && function_declaration.unique_name.value() == "main")
+                        continue;
+                }
+                else if (function_declaration.is_test)
+                {
+                    continue;
+                }
+
                 if (functions_to_add.has_value())
                 {
                     auto const location = std::find_if(
@@ -1016,6 +1042,7 @@ namespace h::compiler
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
         Enum_value_constants const& enum_value_constants,
+        bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -1044,8 +1071,29 @@ namespace h::compiler
                     enum_value_constants,
                     type_database,
                     declaration_database,
+                    is_test_mode,
                     temporaries_allocator
                 );
+
+                if (is_test_mode)
+                {
+                    add_module_declarations(
+                        llvm_context,
+                        llvm_data_layout,
+                        llvm_module,
+                        clang_module_data,
+                        core_module_dependency,
+                        core_module_dependencies,
+                        core_module_dependency.internal_declarations.function_declarations,
+                        alias_import_location->usages,
+                        core_module_dependency.internal_declarations.global_variable_declarations,
+                        enum_value_constants,
+                        type_database,
+                        declaration_database,
+                        is_test_mode,
+                        temporaries_allocator
+                    );
+                }
             }
         }
     }
@@ -1151,7 +1199,59 @@ namespace h::compiler
         );
     }
 
-    std::unique_ptr<llvm::Module> create_module(
+    static void add_additional_test_declarations(
+        llvm::LLVMContext& llvm_context,
+        llvm::DataLayout const& llvm_data_layout,
+        llvm::Module& llvm_module,
+        Clang_module_data& clang_module_data,
+        Module const& core_module,
+        Type_database& type_database,
+        Declaration_database& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        std::pmr::vector<Function_declaration> function_declarations{temporaries_allocator};
+        function_declarations.reserve(1);
+
+        function_declarations.push_back(create_test_check_function_declaration());
+
+        for (Function_declaration const& declaration : function_declarations)
+        {
+            add_clang_function_declaration(
+                clang_module_data.declaration_database,
+                clang_module_data.ast_context,
+                "Hlang.Test_main",
+                declaration,
+                declaration_database
+            );
+        }
+
+        auto& llvm_function_list = llvm_module.getFunctionList();
+
+        for (Function_declaration const& declaration : function_declarations)
+        {
+             llvm::FunctionType* const llvm_function_type = create_llvm_function_type(
+                clang_module_data,
+                "Hlang.Test_main",
+                declaration.name
+            );
+
+            llvm::Function& llvm_function = to_function(
+                llvm_context,
+                llvm_data_layout,
+                clang_module_data,
+                core_module.name,
+                *llvm_function_type,
+                declaration,
+                type_database,
+                declaration_database
+            );
+
+            llvm_function_list.push_back(&llvm_function);
+        }
+    }
+
+    static std::unique_ptr<llvm::Module> create_module(
         llvm::LLVMContext& llvm_context,
         std::string_view const target_triple,
         llvm::DataLayout const& llvm_data_layout,
@@ -1180,11 +1280,14 @@ namespace h::compiler
             {}
         );
 
-        add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, core_module, core_module_dependencies, enum_value_constants, {});
+        add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, core_module, core_module_dependencies, enum_value_constants, compilation_options.is_test_mode, {});
         
-        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.export_declarations.function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, {});
-        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.internal_declarations.function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, {});
+        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.export_declarations.function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, compilation_options.is_test_mode, {});
+        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.internal_declarations.function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, compilation_options.is_test_mode, {});
         add_instance_call_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, {});
+
+        if (compilation_options.is_test_mode)
+            add_additional_test_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, type_database, declaration_database, {});
 
         std::unique_ptr<Debug_info> debug_info = create_debug_info(
             llvm_data_layout,
@@ -1668,6 +1771,7 @@ namespace h::compiler
 
                 ::fprintf(stderr, "%s\n", diagnostic_string.c_str());
             }
+            ::fflush(stderr);
 
             auto const is_error_diagnostic = [](Diagnostic const& diagnostic) -> bool
             {

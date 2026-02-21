@@ -22,6 +22,7 @@ namespace h::compiler
     export struct Builder_options
     {
         bool output_llvm_ir = false;
+        bool is_test_mode = false;
     };
 
     export struct Builder
@@ -35,6 +36,7 @@ namespace h::compiler
         bool use_profiler = true;
         bool output_module_json = false;
         bool output_llvm_ir = false;
+        bool is_test_mode = false;
     };
 
     export Builder create_builder(
@@ -52,9 +54,15 @@ namespace h::compiler
         std::filesystem::path const& artifact_file_path
     );
 
+    export void build_artifacts(
+        Builder& builder,
+        std::span<std::filesystem::path const> const artifact_file_paths
+    );
+
     export std::pmr::vector<Artifact> get_sorted_artifacts(
         std::span<std::filesystem::path const> const artifact_file_paths,
         std::span<Repository const> repositories,
+        bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
@@ -116,13 +124,25 @@ namespace h::compiler
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         LLVM_data& llvm_data,
         Compilation_database& compilation_database,
-        Compilation_options const& compilation_options
+        Compilation_options const& compilation_options,
+        bool const is_test_mode
+    );
+
+    std::pmr::vector<h::Module> create_test_artifact_modules(
+        Builder& builder,
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        std::span<Artifact const> const artifacts,
+        std::span<h::Module const> const core_modules,
+        Compilation_options const& compilation_options,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     void link_artifacts(
         Builder& builder,
         std::span<Artifact const> const artifacts,
-        h::compiler::Compilation_options const& compilation_options,
+        std::span<Artifact const* const> const artifacts_to_link,
+        bool const debug,
+        bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
@@ -148,5 +168,17 @@ namespace h::compiler
         std::filesystem::path const& artifact_file_path,
         h::compiler::Compilation_options const& compilation_options,
         std::filesystem::path const output_file_path
+    );
+
+    std::pmr::vector<h::compiler::Artifact const*> get_artifact_pointers(
+        std::span<h::compiler::Artifact const> const artifacts,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    );
+
+    std::pmr::vector<h::compiler::Artifact const*> filter_test_artifacts(
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        std::span<h::compiler::Artifact const> const artifacts,
+        std::span<h::Module const> const core_modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator
     );
 }

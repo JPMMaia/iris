@@ -2157,7 +2157,23 @@ namespace h::compiler
         if (is_builtin_type_reference(callable_type.value()))
         {
             h::Builtin_type_reference const& builtin_type_reference = std::get<h::Builtin_type_reference>(callable_type->data);
-            if (builtin_type_reference.value == "create_array_slice_from_pointer")
+            if (builtin_type_reference.value == "check")
+            {
+                h::Function_type function_type
+                {
+                    .input_parameter_types = { h::create_bool_type_reference() },
+                    .output_parameter_types = {},
+                    .is_variadic = false,
+                };
+
+                return h::Function_pointer_type
+                {
+                    .type = std::move(function_type),
+                    .input_parameter_names = { "condition" },
+                    .output_parameter_names = {}
+                };
+            }
+            else if (builtin_type_reference.value == "create_array_slice_from_pointer")
             {
                 std::pmr::vector<h::Type_reference> element_type;
 

@@ -1,0 +1,20 @@
+module my_app;
+
+import my_library as my_library;
+
+function add(a: Int32, b: Int32) -> (result: Int32)
+{
+    return my_library.add(a, b);
+}
+
+@test
+function test_add() -> ()
+{
+    check(add(2, 3) == 5);
+}
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return add(3, 4);
+}

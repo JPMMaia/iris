@@ -22,4 +22,10 @@ namespace h::common
         std::pmr::polymorphic_allocator<> const& temporaries_allocator,
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
+
+    export std::filesystem::path get_builtin_include_directory();
+
+    export std::filesystem::path get_tests_main_file_path();
+
+    export std::filesystem::path get_standard_repository_file_path();
 }

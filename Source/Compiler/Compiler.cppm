@@ -60,6 +60,7 @@ namespace h::compiler
         bool debug = true;
         bool output_debug_code_view = false;
         Contract_options contract_options = Contract_options::Log_error_and_abort;
+        bool is_test_mode = false;
     };
 
     export std::optional<h::Module> read_core_module(

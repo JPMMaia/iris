@@ -136,6 +136,7 @@ namespace h
     bool debug = false;
     std::string_view target_triple = "x86_64-pc-linux-gnu";
     h::compiler::Contract_options contract_options = h::compiler::Contract_options::Log_error_and_abort;
+    bool is_test_mode = false;
   };
 
   void test_create_llvm_module(
@@ -170,6 +171,7 @@ namespace h
       .is_optimized = false,
       .debug = test_options.debug,
       .contract_options = test_options.contract_options,
+      .is_test_mode = test_options.is_test_mode,
     };
 
     h::compiler::LLVM_data llvm_data = h::compiler::initialize_llvm(compilation_options);
@@ -4554,6 +4556,79 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Test Framework Non Test Mode", "[LLVM_IR]")
+  {
+    char const* const input_file = "test_framework.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private i32 @Test_framework_add(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = add i32 %0, %1
+  ret i32 %2
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Test Framework Test Mode", "[LLVM_IR]")
+  {
+    char const* const input_file = "test_framework.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+@hlang_test_source_file_path = internal constant [66 x i8] c"{}\00"
+
+; Function Attrs: convergent
+define private i32 @Test_framework_add(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b") #0 {{
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = add i32 %0, %1
+  ret i32 %2
+}}
+
+; Function Attrs: convergent
+define void @Test_framework_test_addition() #0 {{
+entry:
+  %0 = call i32 @Test_framework_add(i32 noundef 1, i32 noundef 2)
+  %1 = icmp eq i32 %0, 3
+  call void @hlang_test_check(i1 noundef zeroext %1, ptr noundef @hlang_test_source_file_path, i64 noundef 11)
+  %2 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
+  %3 = icmp eq i32 %2, 5
+  call void @hlang_test_check(i1 noundef zeroext %3, ptr noundef @hlang_test_source_file_path, i64 noundef 12)
+  ret void
+}}
+
+; Function Attrs: convergent
+declare void @hlang_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+)", (g_test_source_files_path / input_file).generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.is_test_mode = true});
   }
 
   TEST_CASE("Compile Unary Expressions", "[LLVM_IR]")

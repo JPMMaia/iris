@@ -1,0 +1,13 @@
+{
+    "name": "my_library",
+    "version": "0.1.0",
+    "type": "library",
+    "sources": [
+        {
+            "type": "hlang",
+            "include": [
+                "./**/*.hltxt"
+            ]
+        }
+    ]
+}

@@ -31,6 +31,7 @@ import h.compiler.clang_code_generation;
 import h.compiler.common;
 import h.compiler.debug_info;
 import h.compiler.instructions;
+import h.compiler.test_framework;
 import h.compiler.types;
 
 namespace h::compiler
@@ -332,6 +333,60 @@ namespace h::compiler
             throw std::runtime_error{ "Could not fold constant!" };
 
         return fold_constant(statement_value.value, parameters.llvm_data_layout);
+    }
+
+    static std::pmr::string replace_string_literal_special_values(std::string_view const value)
+    {
+        std::pmr::string output = std::pmr::string{value};
+
+        size_t index = 0;
+        while (true)
+        {
+            index = output.find("\\n", index);
+            if (index == std::pmr::string::npos)
+                break;
+
+            output.replace(index, 2, "\n");
+
+            index += 2;
+        }
+
+        return output;
+    }
+
+    static llvm::Value* create_c_string_constant(
+        llvm::LLVMContext& llvm_context,
+        llvm::Module& llvm_module,
+        std::string_view const string_data,
+        std::optional<std::string_view> const global_name = std::nullopt
+    )
+    {
+        if (global_name.has_value())
+        {
+            llvm::GlobalValue* const llvm_global_value = llvm_module.getNamedValue(global_name->data());
+            if (llvm_global_value != nullptr)
+                return llvm_global_value;
+        }
+
+        std::pmr::string const final_string = replace_string_literal_special_values(string_data);
+
+        std::uint64_t const null_terminator_size = 1;
+        std::uint64_t const array_size = final_string.size() + null_terminator_size;
+        llvm::ArrayType* const array_type = llvm::ArrayType::get(llvm::IntegerType::get(llvm_context, 8), array_size);
+
+        bool const is_constant = true;
+        std::string const global_variable_name = global_name.has_value() ? std::string{global_name.value()} : std::format("global_{}", llvm_module.global_size());
+        llvm::GlobalVariable* const global_variable = new llvm::GlobalVariable(
+            llvm_module,
+            array_type,
+            is_constant,
+            llvm::GlobalValue::InternalLinkage,
+            llvm::ConstantDataArray::getString(llvm_context, final_string.c_str()),
+            global_variable_name
+        );
+
+        llvm::Value* const instruction = global_variable;
+        return instruction;
     }
 
     Value_and_type access_enum_value(
@@ -1694,7 +1749,54 @@ namespace h::compiler
         {
             h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_hand_side.data);
             
-            if (variable_expression.name == "create_array_slice_from_pointer")
+            if (variable_expression.name == "check")
+            {
+                if (expression.arguments.size() != 1)
+                    throw std::runtime_error{"check() expects one argument!"};
+
+                std::pmr::string const source_file_path =
+                    parameters.core_module.source_file_path.has_value() ? 
+                    std::pmr::string{parameters.core_module.source_file_path->generic_string()} :
+                    std::pmr::string{};
+
+                std::uint64_t const line = parameters.source_position.has_value() ? parameters.source_position->line : 0;
+                
+                h::Function_pointer_type const function_pointer_type = create_test_check_function_pointer_type();
+                
+                llvm::FunctionType* const llvm_function_type = convert_to_llvm_function_type(
+                    parameters.clang_module_data,
+                    parameters.declaration_database,
+                    function_pointer_type.type
+                );
+
+                std::pmr::vector<bool> const is_expression_address_of{false, false, false};
+                llvm::Function* const llvm_function_callee = parameters.llvm_module.getFunction("hlang_test_check");
+
+                std::pmr::vector<llvm::Value*> llvm_arguments{parameters.temporaries_allocator};
+                llvm_arguments.resize(3);
+
+                {
+                    Expression_parameters new_parameters = parameters;
+                    new_parameters.expression_type = h::create_bool_type_reference();
+                    Value_and_type const condition_value = create_expression_value(expression.arguments[0].expression_index, statement, new_parameters);
+                    llvm_arguments[0] = condition_value.value;
+                }
+                                
+                llvm_arguments[1] = create_c_string_constant(parameters.llvm_context, parameters.llvm_module, source_file_path, "hlang_test_source_file_path");
+                llvm_arguments[2] = llvm::ConstantInt::get(llvm::Type::getIntNTy(parameters.llvm_context, 64), line);
+
+                Value_and_type result = create_call_expression_value_common(
+                    is_expression_address_of,
+                    llvm_function_callee,
+                    llvm_function_type,
+                    llvm_arguments,
+                    function_pointer_type,
+                    parameters
+                );
+
+                return result;
+            }
+            else if (variable_expression.name == "create_array_slice_from_pointer")
             {
                 if (expression.arguments.size() != 2)
                     throw std::runtime_error{"create_array_slice_from_pointer() expects two arguments!"};
@@ -1996,25 +2098,6 @@ namespace h::compiler
         }
     }
 
-    static std::pmr::string replace_string_literal_special_values(std::string_view const value)
-    {
-        std::pmr::string output = std::pmr::string{value};
-
-        size_t index = 0;
-        while (true)
-        {
-            index = output.find("\\n", index);
-            if (index == std::pmr::string::npos)
-                break;
-
-            output.replace(index, 2, "\n");
-
-            index += 2;
-        }
-
-        return output;
-    }
-
     Value_and_type create_constant_expression_value(
         Constant_expression const& expression,
         llvm::LLVMContext& llvm_context,
@@ -2152,25 +2235,7 @@ namespace h::compiler
         }
         else if (is_c_string(type))
         {
-            std::pmr::string const& string_data = expression.data;
-            std::pmr::string const final_string = replace_string_literal_special_values(string_data);
-
-            std::uint64_t const null_terminator_size = 1;
-            std::uint64_t const array_size = final_string.size() + null_terminator_size;
-            llvm::ArrayType* const array_type = llvm::ArrayType::get(llvm::IntegerType::get(llvm_context, 8), array_size);
-
-            bool const is_constant = true;
-            std::string const global_variable_name = std::format("global_{}", llvm_module.global_size());
-            llvm::GlobalVariable* const global_variable = new llvm::GlobalVariable(
-                llvm_module,
-                array_type,
-                is_constant,
-                llvm::GlobalValue::InternalLinkage,
-                llvm::ConstantDataArray::getString(llvm_context, final_string.c_str()),
-                global_variable_name
-            );
-
-            llvm::Value* const instruction = global_variable;
+            llvm::Value* const instruction = create_c_string_constant(llvm_context, llvm_module, expression.data);
 
             return
             {
@@ -4119,7 +4184,7 @@ namespace h::compiler
     {
         Expression_parameters new_parameters = parameters;
 
-        if (parameters.debug_info != nullptr && expression.source_range.has_value())
+        if (expression.source_range.has_value())
         {
             Source_position const source_position = expression.source_range->start;
             new_parameters.source_position = source_position;
