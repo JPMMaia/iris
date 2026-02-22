@@ -1126,7 +1126,7 @@ Sint32 my_global_2 = 0;
         }
     }
 
-    TEST_CASE("Macros constants are imported as global variable constants")
+    TEST_CASE("Macros constants are imported as global variable macros")
     {
         std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "macro_constants";
         std::filesystem::create_directories(root_directory_path);
@@ -1215,6 +1215,52 @@ Sint32 my_global_2 = 0;
             CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "20") }));
 
             CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 9, 9, 9, 10));
+        }
+    }
+
+    TEST_CASE("Static global constants are imported as global variable macros")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "static_constants";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+static const int MY_VAR = 1;
+const int my_global = 2;
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
+        h::common::write_to_file(header_file_path, header_content);
+
+        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        h::Module const& header_module = header_module_optional.value();
+
+        CHECK(header_module.source_file_path == header_file_path);
+
+        {
+            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[0];
+            CHECK(declaration.name == "MY_VAR");
+            CHECK(declaration.name == declaration.unique_name.value());
+            CHECK(declaration.global_type == h::Global_variable_type::Macro);
+            
+            REQUIRE(declaration.type.has_value());
+            CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "1") }));
+
+            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 2, 18, 2, 19));
+        }
+
+        {
+            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[1];
+            CHECK(declaration.name == "my_global");
+            CHECK(declaration.name == declaration.unique_name.value());
+            CHECK(declaration.global_type == h::Global_variable_type::Constant);
+            
+            REQUIRE(declaration.type.has_value());
+            CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "2") }));
+
+            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 3, 11, 3, 12));
         }
     }
 

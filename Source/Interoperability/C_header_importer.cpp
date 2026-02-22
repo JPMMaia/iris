@@ -1173,9 +1173,21 @@ namespace h::c
 
         std::optional<h::Statement> initial_value = get_global_variable_initial_value(cursor, type_reference.value());
 
-        h::Global_variable_type const global_type =
-            is_macro ? h::Global_variable_type::Macro :
-            (is_const ? h::Global_variable_type::Constant : h::Global_variable_type::Mutable);
+        auto const calculate_global_type = [&]() -> h::Global_variable_type 
+        {
+            if (is_macro)
+                return h::Global_variable_type::Macro;
+
+            CX_StorageClass const storage_class = clang_Cursor_getStorageClass(cursor);
+            if (storage_class == CX_SC_Static)
+                return h::Global_variable_type::Macro;
+            else if (is_const)
+                return h::Global_variable_type::Constant;
+            else
+                return h::Global_variable_type::Mutable;
+        };
+
+        h::Global_variable_type const global_type = calculate_global_type();
 
         return h::Global_variable_declaration
         {
