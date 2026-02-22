@@ -3031,10 +3031,11 @@ namespace h::compiler
         if (expression.expression.has_value())
         {
             std::optional<h::Type_reference> const& provided_type = get_expression_type_from_type_info(parameters.expression_types, expression.expression.value());
+            std::optional<h::Type_reference> const underlying_provided_type = provided_type.has_value() ? get_underlying_type(parameters.declaration_database, provided_type.value()) : std::optional<h::Type_reference>{};
 
-            if (!are_compatible_types(parameters.declaration_database, provided_type, expected_type))
+            if (!are_compatible_types(parameters.declaration_database, underlying_provided_type, expected_type))
             {
-                std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, provided_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, underlying_provided_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
                 std::pmr::string const expected_type_name = h::format_type_reference(parameters.core_module, expected_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 return

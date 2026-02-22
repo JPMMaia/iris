@@ -794,6 +794,27 @@ function add(first: Int32, second: Int32) -> (result: Int32)
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+
+    TEST_CASE("Validates that alias type can be return from function", "[Validation][Function_contracts]")
+    {
+        std::string_view const input = R"(module Test;
+
+using My_alias = *mutable Int32;
+
+function foo() -> (result: My_alias)
+{
+    var value: My_alias = null;
+    return value;
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     
     TEST_CASE("Validates that left hand side is either a module alias, a variable of type struct/union or an enum type", "[Validation][Access_expression]")
     {
