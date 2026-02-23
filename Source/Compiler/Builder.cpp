@@ -1198,10 +1198,9 @@ namespace h::compiler
                 artifact_core_modules,
                 temporaries_allocator
             );
-            if (!test_module.has_value())
-                h::common::print_message_and_exit(std::format("Failed to create test module for artifact '{}'.", artifact.name));
 
-            test_modules.push_back(std::move(test_module.value()));
+            if (test_module.has_value())
+                test_modules.push_back(std::move(test_module.value()));
         }
 
         end_timer(get_profiler(builder), "create_test_artifact_modules");
@@ -1267,7 +1266,7 @@ namespace h::compiler
             }
         }
 
-        ::printf("Compiling '%s'\n", core_module.name.c_str());
+        ::printf("Compiling '%s'%s\n", core_module.name.c_str(), is_test_mode ? " tests" : "");
         if (core_module.source_file_path.has_value())
             ::printf("    input is \"%s\"\n", core_module.source_file_path->generic_string().c_str());
         if (builder.output_llvm_ir)
