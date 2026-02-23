@@ -181,4 +181,10 @@ namespace h::compiler
         std::span<h::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
+
+    export std::pmr::vector<std::filesystem::path> find_artifact_file_paths(
+        std::filesystem::path const& path,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
 }

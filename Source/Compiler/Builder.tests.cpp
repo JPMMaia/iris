@@ -6,6 +6,7 @@ import h.compiler.compile_commands_generator;
 import h.compiler.target;
 
 #include <filesystem>
+#include <fstream>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -386,5 +387,24 @@ namespace h::compiler
         };
 
         test_builder("Test_framework", {"empty_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_3", {.is_test_mode = true});
+    }
+
+    TEST_CASE("Locate artifacts in a directory", "[Builder]")
+    {
+        std::filesystem::path const root = std::filesystem::temp_directory_path() / "builder_artifact_search";
+        std::filesystem::remove_all(root);
+        std::filesystem::create_directories(root / "subdir");
+        {
+            std::ofstream{ root / "hlang_artifact.json" };
+            std::ofstream{ root / "subdir" / "hlang_artifact.json" };
+        }
+
+        std::pmr::vector<std::filesystem::path> const found = h::compiler::find_artifact_file_paths(root, {}, {});
+
+        CHECK(found.size() == 2);
+        for (std::filesystem::path const& artifact_file_path : found)
+        {
+            CHECK(artifact_file_path.filename() == "hlang_artifact.json");
+        }
     }
 }

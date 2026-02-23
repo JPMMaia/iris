@@ -1794,4 +1794,18 @@ namespace h::compiler
 
         write_compile_commands_to_file(commands, output_file_path);
     }
+
+    std::pmr::vector<std::filesystem::path> find_artifact_file_paths(
+        std::filesystem::path const& path,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        return h::common::search_files(
+            path,
+            "hlang_artifact.json",
+            temporaries_allocator,
+            output_allocator
+        );
+    }
 }
