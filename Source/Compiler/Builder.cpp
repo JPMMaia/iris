@@ -1259,7 +1259,7 @@ namespace h::compiler
             {
                 auto const input_module_file_iterator = module_name_to_file_path_map.find(core_module.name);
 
-                if (input_module_file_iterator != module_name_to_file_path_map.end() && is_file_newer_than(output_assembly_file, input_module_file_iterator->second))
+                if (input_module_file_iterator != module_name_to_file_path_map.end() && std::filesystem::exists(input_module_file_iterator->second) && is_file_newer_than(output_assembly_file, input_module_file_iterator->second))
                 {
                     return;
                 }
