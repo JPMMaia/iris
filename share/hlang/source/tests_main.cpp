@@ -1,7 +1,9 @@
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <numeric>
 #include <regex>
+#include <optional>
 #include <span>
 #include <sstream>
 #include <string_view>
@@ -39,12 +41,41 @@ static std::span<char const* const> get_all_test_names()
     return {tests, count};
 }
 
-static bool should_list_tests(std::string_view const argument)
+static std::optional<std::string_view> search_argument(int const argc, char const* const argv[], std::string_view const name)
 {
-    if (argument == "--gtest_list_tests")
-        return true;
+    for (int index = 0; index < argc; ++index)
+    {
+        std::string_view const current = argv[index];
+        if (current.starts_with(name))
+            return current;
+    }
+
+    return std::nullopt;
+}
+
+static bool should_list_tests(int const argc, char const* const argv[])
+{
+    std::optional<std::string_view> const argument = search_argument(argc, argv, "--gtest_list_tests");
+    return argument.has_value();
+}
+
+static bool should_output_xml(int const argc, char const* const argv[])
+{
+    std::optional<std::string_view> const argument = search_argument(argc, argv, "--gtest_output");
+    if (argument.has_value())
+        return argument->starts_with("--gtest_output=xml");
 
     return false;
+}
+
+static std::filesystem::path get_output_xml_file_path(int const argc, char const* const argv[])
+{
+    std::string_view const argument_start = "--gtest_output=xml:";
+    std::optional<std::string_view> const argument = search_argument(argc, argv, argument_start);
+    if (argument.has_value())
+        return argument->substr(argument_start.size());
+
+    return "test_detail.xml";
 }
 
 static std::pmr::vector<std::uint64_t> filter_tests(int const argc, char const* const argv[], std::span<char const* const> const all_test_names)
@@ -118,6 +149,65 @@ static void print_test_names(std::span<char const* const> const test_names)
     std::puts(output.c_str());
 }
 
+// GoogleTest-compatible XML listing. When the executable is invoked with
+// "--gtest_list_tests" we now print the full test hierarchy in XML
+// instead of the human-readable format above. The structure mirrors the
+// output produced by gtest when running with --gtest_list_tests and
+// --gtest_output=xml.
+static void print_test_names_xml(std::span<char const* const> const test_names, std::filesystem::path const& output_file_path)
+{
+    using namespace std::literals;
+
+    // attempt to open the target file with C API
+    std::string const path_string = output_file_path.generic_string();
+    FILE* output = nullptr;
+    fopen_s(&output, path_string.c_str(), "w");
+    if (output == nullptr)
+    {
+        std::fprintf(stderr, "Failed to open xml output file '%s' for writing\n", path_string.c_str());
+        return;
+    }
+
+    // count total number of tests
+    std::uint64_t const total_tests = test_names.size();
+
+    // group tests by module in order encountered
+    std::pmr::vector<std::pair<std::string_view, std::pmr::vector<std::string_view>>> modules;
+    modules.reserve(total_tests);
+
+    for (std::string_view const test : test_names)
+    {
+        std::uint64_t const position = test.find("."sv);
+        std::string_view module = position == std::string_view::npos ? test : test.substr(0, position);
+        std::string_view name = position == std::string_view::npos ? test : test.substr(position + 1);
+
+        if (modules.empty() || modules.back().first != module)
+            modules.emplace_back(module, std::pmr::vector<std::string_view>());
+        modules.back().second.push_back(name);
+    }
+
+    // header
+    std::fprintf(output, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    std::fprintf(output, "<testsuites tests=\"%llu\" name=\"AllTests\">\n", (unsigned long long)total_tests);
+
+    for (auto const& [module, names] : modules)
+    {
+        std::fprintf(output, "  <testsuite name=\"%.*s\" tests=\"%llu\">\n",
+                     (int)module.size(), module.data(), (unsigned long long)names.size());
+        for (auto const& name : names)
+        {
+            std::filesystem::path const file_name = "C:/Users/JPMMa/Desktop/source/rts-game/source/game/main.hltxt";
+            std::string const file_name_string = file_name.generic_string();
+            std::uint64_t const line = 551;
+            std::fprintf(output, "    <testcase name=\"%.*s\" file=\"%s\" line=\"%llu\"/>\n", (int)name.size(), name.data(), file_name_string.data(), line);
+        }
+        std::fprintf(output, "  </testsuite>\n");
+    }
+
+    std::fprintf(output, "</testsuites>\n");
+    std::fclose(output);
+}
+
 struct Test_results
 {
     std::uint64_t failed_count = 0;
@@ -154,12 +244,18 @@ int main(int const argc, char const* const argv[])
 {
     if (argc >= 2)
     {
-        std::string_view const argument = argv[1];
-
-        if (should_list_tests(argument))
+        if (should_list_tests(argc, argv))
         {
             std::span<char const* const> const all_test_names = get_all_test_names();
-            print_test_names(all_test_names);
+            if (should_output_xml(argc, argv))
+            {
+                std::filesystem::path const output_file_path = get_output_xml_file_path(argc, argv);
+                print_test_names_xml(all_test_names, output_file_path);
+            }
+            else
+            {
+                print_test_names(all_test_names);
+            }
             return 0;
         }
     }

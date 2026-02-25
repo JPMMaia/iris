@@ -134,9 +134,37 @@
 					"--artifact-file=${workspaceFolder}/../rts-game/source/game/hlang_artifact.json",
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/Libraries/hlang_repository.json",
+					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
 					"--repository=${workspaceFolder}/../HLang_Local_Repository/hlang_repository.json",
 					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
+				],
+				"cwd": "${workspaceFolder}/build",
+			},
+			{
+				"name": "hlang build-tests rts-game",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/Source/Builder/Debug/hlang.exe",
+				"args": [
+					"build-tests",
+					"--output-llvm-ir",
+					"--artifact-file=${workspaceFolder}/../rts-game/source/game/hlang_artifact.json",
+					"--build-directory=${workspaceFolder}/../rts-game/build",
+					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
+					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
+					"--repository=${workspaceFolder}/../HLang_Local_Repository/hlang_repository.json",
+					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
+				],
+				"cwd": "${workspaceFolder}/build",
+			},
+			{
+				"name": "Debug rts-game tests",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/../rts-game/build/bin/game.test.exe",
+				"args": [
+					"--gtest_list_tests",
+					"--gtest_output=xml:${workspaceFolder}/test.xml"
 				],
 				"cwd": "${workspaceFolder}/build",
 			},
