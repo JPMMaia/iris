@@ -2795,6 +2795,108 @@ namespace h::compiler
         };
     }
 
+    static llvm::Value* convert_constant(
+        llvm::LLVMContext& llvm_context,
+        llvm::IRBuilder<>& llvm_builder,
+        llvm::Type* const storage_type,
+        unsigned const storage_size_bits,
+        llvm::Value* const source_value,
+        llvm::Type* const source_type,
+        unsigned const source_size_bits
+    )
+    {
+        if (source_size_bits == storage_size_bits)
+            return llvm_builder.CreateBitCast(source_value, storage_type);
+
+        if (source_type->isIntegerTy())
+        {
+            llvm::Type* const destination_type = llvm::Type::getIntNTy(llvm_context, storage_size_bits < 64 ? storage_size_bits : 64);
+            if (source_size_bits < storage_size_bits)
+            {
+                return llvm_builder.CreateZExt(source_value, destination_type);
+            }
+            else
+            {
+                return llvm_builder.CreateTrunc(source_value, destination_type);
+            }
+        }
+
+        if (llvm::StructType* struct_type = llvm::dyn_cast<llvm::StructType>(source_type))
+        {
+            if (struct_type->getNumElements() == 1)
+            {
+                llvm::Value* const inner = llvm_builder.CreateExtractValue(source_value, {0});
+                llvm::Type* const inner_type = inner->getType();
+                return convert_constant(llvm_context, llvm_builder, storage_type, storage_size_bits, inner, inner_type, source_size_bits);
+            }
+        }
+
+        return llvm_builder.CreateBitCast(source_value, storage_type);
+    }
+
+    static llvm::Value* create_struct_instance_constant_value(
+        llvm::LLVMContext& llvm_context,
+        llvm::IRBuilder<>& llvm_builder,
+        Statement const& statement,
+        Instantiate_expression const& expression,
+        Expression_parameters const& parameters,
+        Struct_declaration const& struct_declaration,
+        llvm::Type* const llvm_struct_type
+    )
+    {
+        // If there are no explicit member values we can return a
+        // zero‑initialized aggregate immediately.  This covers both the
+        // "default" and "zero_initialized"/"uninitialized" cases at
+        // compile time because globals are guaranteed to be zeroed by
+        // the loader.
+        if (expression.members.empty())
+        {
+            return llvm::Constant::getNullValue(llvm_struct_type);
+        }
+
+        // Build up the structure value by inserting one element at a time.
+        llvm::Value* struct_value = llvm::UndefValue::get(llvm_struct_type);
+
+        for (std::size_t member_index = 0; member_index < struct_declaration.member_names.size(); ++member_index)
+        {
+            std::string_view const member_name = struct_declaration.member_names[member_index];
+            Type_reference const& member_type = struct_declaration.member_types[member_index];
+            llvm::Type* const storage_type = llvm_struct_type->getStructElementType(member_index);
+
+            // Try to find an explicit initializer for this member.
+            llvm::Value* element_value = nullptr;
+            auto const it = std::find_if(
+                expression.members.begin(),
+                expression.members.end(),
+                [&](Instantiate_member_value_pair const& pair) { return pair.member_name == member_name; }
+            );
+
+            if (it != expression.members.end())
+            {
+                Expression_parameters new_parameters = parameters;
+                new_parameters.expression_type = member_type;
+                Value_and_type const member_value = create_expression_value(it->value.expression_index, statement, new_parameters);
+
+                llvm::Value* const source_value = member_value.value;
+                llvm::Type* const source_type = source_value->getType();
+
+                unsigned const storage_size_bits = parameters.llvm_data_layout.getTypeSizeInBits(storage_type);
+                unsigned const source_size_bits = parameters.llvm_data_layout.getTypeSizeInBits(source_type);
+
+                element_value = convert_constant(llvm_context, llvm_builder, storage_type, storage_size_bits, source_value, source_type, source_size_bits);
+            }
+            else
+            {
+                // No initializer for this member -> zero initialize.
+                element_value = llvm::Constant::getNullValue(storage_type);
+            }
+
+            struct_value = llvm_builder.CreateInsertValue(struct_value, element_value, member_index);
+        }
+
+        return struct_value;
+    }
+
     Value_and_type create_instantiate_struct_expression_value(
         Statement const& statement,
         Instantiate_expression const& expression,
@@ -2812,6 +2914,26 @@ namespace h::compiler
         std::optional<Type_instance> const type_instance = std::holds_alternative<Type_instance>(struct_type_reference.data) ? std::get<Type_instance>(struct_type_reference.data) : std::optional<Type_instance>{};
 
         llvm::Type* const llvm_struct_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, struct_type_reference, type_database);
+
+        if (parameters.llvm_parent_function == nullptr)
+        {
+            llvm::Value* const struct_instance = create_struct_instance_constant_value(
+                llvm_context,
+                llvm_builder,
+                statement,
+                expression,
+                parameters,
+                struct_declaration,
+                llvm_struct_type
+            );
+
+            return Value_and_type
+            {
+                .name = "",
+                .value = struct_instance,
+                .type = struct_type_reference
+            };
+        }
 
         llvm::AllocaInst* const struct_alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, llvm_struct_type);
 
@@ -2948,6 +3070,56 @@ namespace h::compiler
         }
     }
 
+    static llvm::Value* create_union_instance_constant_value(
+        llvm::LLVMContext& llvm_context,
+        llvm::IRBuilder<>& llvm_builder,
+        Statement const& statement,
+        Instantiate_expression const& expression,
+        Expression_parameters const& parameters,
+        Union_declaration const& union_declaration,
+        llvm::Type* const llvm_union_type
+    )
+    {
+        if (expression.members.empty())
+        {
+            llvm::Value* const union_value = llvm::Constant::getNullValue(llvm_union_type);
+            return union_value;
+        }
+
+        Instantiate_member_value_pair const& member_value_pair = expression.members[0];
+
+        auto const member_name_location = std::find_if(
+            union_declaration.member_names.begin(),
+            union_declaration.member_names.end(),
+            [&member_value_pair](std::pmr::string const& member_name) { return member_name == member_value_pair.member_name; }
+        );
+        if (member_name_location == union_declaration.member_names.end())
+            throw std::runtime_error{ std::format("Could not find member '{}' while instantiating union ''!", member_value_pair.member_name, union_declaration.name) };
+
+        auto const member_index = std::distance(union_declaration.member_names.begin(), member_name_location);
+        Type_reference const& member_type = union_declaration.member_types[member_index];
+
+        Expression_parameters new_parameters = parameters;
+        new_parameters.expression_type = member_type;
+        Value_and_type const member_value = create_expression_value(member_value_pair.value.expression_index, statement, new_parameters);
+
+        llvm::Type* const storage_type = llvm_union_type->getStructElementType(0);
+        llvm::Type* const source_type = member_value.value->getType();
+
+        unsigned const storage_size_bits = parameters.llvm_data_layout.getTypeSizeInBits(storage_type);
+        unsigned const source_size_bits = parameters.llvm_data_layout.getTypeSizeInBits(member_value.value->getType());
+
+        llvm::Value* const converted_value = convert_constant(llvm_context, llvm_builder, storage_type, storage_size_bits, member_value.value, source_type, source_size_bits);
+        
+        // If we fail to convert to the correct type, then just return null
+        llvm::Type* const element_type = llvm_union_type->getStructElementType(0);
+        if (converted_value->getType() != element_type)
+            return llvm::Constant::getNullValue(llvm_union_type);
+        
+        llvm::Constant* const union_value = llvm::UndefValue::get(llvm_union_type);
+        return llvm_builder.CreateInsertValue(union_value, converted_value, 0);
+    }
+
     Value_and_type create_instantiate_union_expression_value(
         Statement const& statement,
         Instantiate_expression const& expression,
@@ -2956,10 +3128,7 @@ namespace h::compiler
         Union_declaration const& union_declaration,
         Type_reference const& union_type_reference
     )
-    {
-        if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{"Can only create union instances inside functions!"};
-
+    {                
         llvm::LLVMContext& llvm_context = parameters.llvm_context;
         llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
         llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
@@ -2968,6 +3137,26 @@ namespace h::compiler
         llvm::Type* const llvm_union_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, union_type_reference, type_database);
         if (!llvm::StructType::classof(llvm_union_type))
             throw std::runtime_error{ "llvm_union_type must be a StructType!" };
+
+        if (parameters.llvm_parent_function == nullptr)
+        {
+            llvm::Value* const union_instance = create_union_instance_constant_value(
+                llvm_context,
+                llvm_builder,
+                statement,
+                expression,
+                parameters,
+                union_declaration,
+                llvm_union_type
+            );
+            
+            return Value_and_type
+            {
+                .name = "",
+                .value = union_instance,
+                .type = union_type_reference
+            };
+        }
 
         if (expression.type != Instantiate_expression_type::Default)
             throw std::runtime_error{ "Unions only support default Instantiate_expression_type!" };

@@ -1619,14 +1619,11 @@ static const My_flags g_global = 0x800000000ULL;
     };
 
     char const* const expected_llvm_ir = R"(
-@g_global = global i64 34359738368
-
 ; Function Attrs: convergent
 define void @Constant_expressions_run() #0 {
 entry:
   %v0 = alloca i64, align 8
-  %0 = load i64, ptr @g_global, align 8
-  store i64 %0, ptr %v0, align 8
+  store i64 34359738368, ptr %v0, align 8
   ret void
 }
 
@@ -5175,6 +5172,8 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.Structs_My_struct_3 = type { i32, %union.Structs_My_Union }
 %union.Structs_My_Union = type { %struct.Structs_My_struct_2 }
 
+@Structs_g_v0 = global %struct.Structs_My_struct { i32 0, i32 1 }
+
 ; Function Attrs: convergent
 define void @Structs_use_structs(i64 noundef %"arguments[0].my_struct") #0 {
 entry:
@@ -5384,11 +5383,22 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     {
     };
 
+    // TODO currently Unions_g_v5 is zero initialized (which it shouldn't)
     char const* const expected_llvm_ir = R"(
 %union.Unions_My_union = type { i32 }
 %union.Unions_My_union_2 = type { i64 }
 %union.Unions_My_union_3 = type { i64 }
+%union.Unions_My_union_4 = type { %struct.Unions_Big_struct }
+%struct.Unions_Big_struct = type { i64, i64, i64, i64 }
 %struct.Unions_My_struct = type { i32 }
+
+@Unions_g_v0 = global %union.Unions_My_union zeroinitializer
+@Unions_g_v1 = global %union.Unions_My_union_2 { i64 1 }
+@Unions_g_v2 = global %union.Unions_My_union_2 { i64 2 }
+@Unions_g_v3 = global %union.Unions_My_union_3 { i64 3 }
+@Unions_g_v4 = global %union.Unions_My_union_3 { i64 4 }
+@Unions_g_v5 = global %union.Unions_My_union_4 zeroinitializer
+@Unions_g_v6 = global %union.Unions_My_union_4 { %struct.Unions_Big_struct { i64 6, i64 7, i64 8, i64 9 } }
 
 ; Function Attrs: convergent
 define void @Unions_use_unions(i32 noundef %"arguments[0].my_union", i32 noundef %"arguments[1].my_union_tag") #0 {

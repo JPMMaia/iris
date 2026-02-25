@@ -949,7 +949,7 @@ namespace h::compiler
                     .function_declaration = {},
                     .function_arguments = {},
                     .local_variables = {},
-                    .expression_type = std::nullopt,
+                    .expression_type = global_variable_declaration.type,
                     .debug_info = nullptr,
                     .contract_options = Contract_options::Disabled,
                     .source_position = {},
