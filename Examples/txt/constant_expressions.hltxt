@@ -2,7 +2,12 @@ module Constant_expressions;
 
 import my_module as my_module;
 
+var g_global_0 = 0;
+mutable g_global_1 = 0;
+
 export function run() -> ()
 {
-    var v0 = my_module.g_global;
+    var v0 = my_module.g_global_0;
+    var v1 = my_module.g_global_1;
+    var v2 = my_module.g_global_2;
 }

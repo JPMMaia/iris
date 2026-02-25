@@ -869,6 +869,7 @@ namespace h::compiler
         Enum_value_constants const& enum_value_constants,
         Type_database& type_database,
         Declaration_database& declaration_database,
+        bool const is_dependency_module,
         bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -961,7 +962,7 @@ namespace h::compiler
                     expression_parameters
                 );
 
-                llvm::Constant* const initial_value = fold_constant(statement_value.value, llvm_data_layout);
+                llvm::Constant* const initial_value = !is_dependency_module ? fold_constant(statement_value.value, llvm_data_layout) : nullptr;
                 
                 std::optional<Type_reference> const type = global_variable_declaration.type.has_value() ? global_variable_declaration.type : statement_value.type;
                 if (!type.has_value())
@@ -977,7 +978,7 @@ namespace h::compiler
                 new llvm::GlobalVariable(
                     llvm_module,
                     llvm_type,
-                    false,
+                    global_variable_declaration.global_type == h::Global_variable_type::Constant,
                     llvm::GlobalValue::ExternalLinkage, // TODO
                     initial_value,
                     mangled_name
@@ -1071,6 +1072,7 @@ namespace h::compiler
                     enum_value_constants,
                     type_database,
                     declaration_database,
+                    true,
                     is_test_mode,
                     temporaries_allocator
                 );
@@ -1090,6 +1092,7 @@ namespace h::compiler
                         enum_value_constants,
                         type_database,
                         declaration_database,
+                        true,
                         is_test_mode,
                         temporaries_allocator
                     );
@@ -1282,8 +1285,8 @@ namespace h::compiler
 
         add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, core_module, core_module_dependencies, enum_value_constants, compilation_options.is_test_mode, {});
         
-        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.export_declarations.function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, compilation_options.is_test_mode, {});
-        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.internal_declarations.function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, compilation_options.is_test_mode, {});
+        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.export_declarations.function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
+        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.internal_declarations.function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
         add_instance_call_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, {});
 
         if (compilation_options.is_test_mode)

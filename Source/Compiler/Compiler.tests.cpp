@@ -1608,7 +1608,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     std::string const header_content = R"(
 
 typedef unsigned long long My_flags;
-static const My_flags g_global = 0x800000000ULL;
+static const My_flags g_global_0 = 0x800000000ULL;
+const My_flags g_global_1 = 0x000000001ULL;
+My_flags g_global_2 = 0x000000002ULL;
 )";
 
     std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
@@ -1619,11 +1621,22 @@ static const My_flags g_global = 0x800000000ULL;
     };
 
     char const* const expected_llvm_ir = R"(
+@g_global_1 = external constant i64
+@g_global_2 = external global i64
+@Constant_expressions_g_global_0 = constant i32 0
+@Constant_expressions_g_global_1 = global i32 0
+
 ; Function Attrs: convergent
 define void @Constant_expressions_run() #0 {
 entry:
   %v0 = alloca i64, align 8
+  %v1 = alloca i64, align 8
+  %v2 = alloca i64, align 8
   store i64 34359738368, ptr %v0, align 8
+  %0 = load i64, ptr @g_global_1, align 8
+  store i64 %0, ptr %v1, align 8
+  %1 = load i64, ptr @g_global_2, align 8
+  store i64 %1, ptr %v2, align 8
   ret void
 }
 
@@ -5086,11 +5099,11 @@ float my_global = 0.0f;
     };
 
     char const* const expected_llvm_ir = R"(
-@my_global = global float 0.000000e+00
-@Global_variables_my_global_constant_0 = global float 1.000000e+00
-@Global_variables_my_global_constant_1 = global float 1.000000e+00
+@my_global = external global float
+@Global_variables_my_global_constant_0 = constant float 1.000000e+00
+@Global_variables_my_global_constant_1 = constant float 1.000000e+00
 @Global_variables_my_global_variable_0 = global float 1.000000e+00
-@Global_variables_my_global_array = global [3 x i32] [i32 1, i32 2, i32 3]
+@Global_variables_my_global_array = constant [3 x i32] [i32 1, i32 2, i32 3]
 
 ; Function Attrs: convergent
 define void @Global_variables_use_global_variables(float noundef %"arguments[0].parameter") #0 {
@@ -5146,8 +5159,8 @@ void foo();
     };
 
     char const* const expected_llvm_ir = R"(
-@Global_variables_2_my_global_array = global [1 x ptr] [ptr @foo]
-@Global_variables_2_my_global_array_2 = global i32 1
+@Global_variables_2_my_global_array = constant [1 x ptr] [ptr @foo]
+@Global_variables_2_my_global_array_2 = constant i32 1
 
 ; Function Attrs: convergent
 declare void @foo() #0
@@ -5172,7 +5185,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.Structs_My_struct_3 = type { i32, %union.Structs_My_Union }
 %union.Structs_My_Union = type { %struct.Structs_My_struct_2 }
 
-@Structs_g_v0 = global %struct.Structs_My_struct { i32 0, i32 1 }
+@Structs_g_v0 = constant %struct.Structs_My_struct { i32 0, i32 1 }
 
 ; Function Attrs: convergent
 define void @Structs_use_structs(i64 noundef %"arguments[0].my_struct") #0 {
@@ -5392,13 +5405,13 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.Unions_Big_struct = type { i64, i64, i64, i64 }
 %struct.Unions_My_struct = type { i32 }
 
-@Unions_g_v0 = global %union.Unions_My_union zeroinitializer
-@Unions_g_v1 = global %union.Unions_My_union_2 { i64 1 }
-@Unions_g_v2 = global %union.Unions_My_union_2 { i64 2 }
-@Unions_g_v3 = global %union.Unions_My_union_3 { i64 3 }
-@Unions_g_v4 = global %union.Unions_My_union_3 { i64 4 }
-@Unions_g_v5 = global %union.Unions_My_union_4 zeroinitializer
-@Unions_g_v6 = global %union.Unions_My_union_4 { %struct.Unions_Big_struct { i64 6, i64 7, i64 8, i64 9 } }
+@Unions_g_v0 = constant %union.Unions_My_union zeroinitializer
+@Unions_g_v1 = constant %union.Unions_My_union_2 { i64 1 }
+@Unions_g_v2 = constant %union.Unions_My_union_2 { i64 2 }
+@Unions_g_v3 = constant %union.Unions_My_union_3 { i64 3 }
+@Unions_g_v4 = constant %union.Unions_My_union_3 { i64 4 }
+@Unions_g_v5 = constant %union.Unions_My_union_4 zeroinitializer
+@Unions_g_v6 = constant %union.Unions_My_union_4 { %struct.Unions_Big_struct { i64 6, i64 7, i64 8, i64 9 } }
 
 ; Function Attrs: convergent
 define void @Unions_use_unions(i32 noundef %"arguments[0].my_union", i32 noundef %"arguments[1].my_union_tag") #0 {
