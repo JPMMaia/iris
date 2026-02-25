@@ -1611,6 +1611,7 @@ typedef unsigned long long My_flags;
 static const My_flags g_global_0 = 0x800000000ULL;
 const My_flags g_global_1 = 0x000000001ULL;
 My_flags g_global_2 = 0x000000002ULL;
+My_flags g_global_unused = 0x000000003ULL;
 )";
 
     std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);

@@ -866,6 +866,7 @@ namespace h::compiler
         std::span<Function_declaration const> const function_declarations,
         std::optional<std::span<std::pmr::string const> const> const functions_to_add,
         std::span<Global_variable_declaration const> const global_variable_declarations,
+        std::optional<std::span<std::pmr::string const> const> const globals_to_add,
         Enum_value_constants const& enum_value_constants,
         Type_database& type_database,
         Declaration_database& declaration_database,
@@ -926,11 +927,19 @@ namespace h::compiler
                 if (global_variable_declaration.global_type == Global_variable_type::Macro)
                     continue;
 
-                std::string const mangled_name = mangle_name(core_module, global_variable_declaration.name, global_variable_declaration.unique_name);
+                if (globals_to_add.has_value())
+                {
+                    auto const location = std::find_if(
+                        globals_to_add->begin(),
+                        globals_to_add->end(),
+                        [&](std::pmr::string const& name) -> bool { return global_variable_declaration.name == name; }
+                    );
 
-                // TODO initial value might not have been specified
-                // If it is not specified, then use create_struct_member_default_value() ?
-                // Or perhaps make the initial value required, and use create_struct_member_default_value in c header importer to force it
+                    if (location == globals_to_add->end())
+                        continue;
+                }
+
+                std::string const mangled_name = mangle_name(core_module, global_variable_declaration.name, global_variable_declaration.unique_name);
         
                 Expression_parameters const expression_parameters
                 {
@@ -1069,6 +1078,7 @@ namespace h::compiler
                     core_module_dependency.export_declarations.function_declarations,
                     alias_import_location->usages,
                     core_module_dependency.export_declarations.global_variable_declarations,
+                    alias_import_location->usages,
                     enum_value_constants,
                     type_database,
                     declaration_database,
@@ -1089,6 +1099,7 @@ namespace h::compiler
                         core_module_dependency.internal_declarations.function_declarations,
                         alias_import_location->usages,
                         core_module_dependency.internal_declarations.global_variable_declarations,
+                        alias_import_location->usages,
                         enum_value_constants,
                         type_database,
                         declaration_database,
@@ -1285,8 +1296,8 @@ namespace h::compiler
 
         add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, core_module, core_module_dependencies, enum_value_constants, compilation_options.is_test_mode, {});
         
-        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.export_declarations.function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
-        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.internal_declarations.function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
+        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.export_declarations.function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
+        add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, core_module.internal_declarations.function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
         add_instance_call_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, {});
 
         if (compilation_options.is_test_mode)
