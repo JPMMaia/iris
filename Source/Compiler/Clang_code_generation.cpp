@@ -35,6 +35,7 @@ module;
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <span>
 #include <variant>
 
 module h.compiler.clang_code_generation;

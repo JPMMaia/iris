@@ -1,5 +1,6 @@
 module;
 
+#include <functional>
 #include <optional>
 #include <string_view>
 #include <variant>

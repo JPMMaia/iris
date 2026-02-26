@@ -23,6 +23,7 @@ module;
 
 #include <memory>
 #include <memory_resource>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>

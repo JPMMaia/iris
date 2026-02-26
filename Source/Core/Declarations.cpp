@@ -1,6 +1,7 @@
 module;
 
 #include <format>
+#include <functional>
 #include <memory_resource>
 #include <optional>
 #include <string>

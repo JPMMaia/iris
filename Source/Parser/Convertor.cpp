@@ -4,6 +4,7 @@ module;
 #include <filesystem>
 #include <memory_resource>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <variant>

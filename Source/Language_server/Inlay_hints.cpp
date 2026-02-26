@@ -2,6 +2,7 @@ module;
 
 #include <format>
 #include <memory_resource>
+#include <span>
 #include <vector>
 
 #include <lsp/types.h>

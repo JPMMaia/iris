@@ -4,6 +4,7 @@ module;
 #include <format>
 #include <optional>
 #include <regex>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
