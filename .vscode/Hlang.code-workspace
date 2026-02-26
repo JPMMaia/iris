@@ -597,6 +597,21 @@
 				"cwd": "${workspaceFolder}/build",
 			}
 		],
-		"editor.formatOnSave": false
+		"editor.formatOnSave": false,
+		"terminal.integrated.profiles.windows": {
+			"x64 Native Tools": {
+				"path": "C:/Windows/System32/cmd.exe",
+				"args": [
+					"/k",
+					"C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/VsDevCmd.bat",
+					"-arch=x64"
+				]
+			}
+		},
+		"C_Cpp.default.cppStandard": "c++23",
+		"C_Cpp.default.cStandard": "c23",
+		"C_Cpp.default.compileCommands": [
+			"${workspaceFolder}/build/compile_commands.json"
+		]
 	}
 }

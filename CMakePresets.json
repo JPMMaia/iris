@@ -1,20 +1,25 @@
 {
   "version": 2,
   "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 23,
+    "major": 4,
+    "minor": 3,
     "patch": 0
   },
   "configurePresets": [
     {
-      "name": "debug",
-      "generator": "Visual Studio 17 2022",
+      "name": "windows-debug",
+      "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_OVERLAY_PORTS": "${sourceDir}/External/vcpkg-overlays",
         "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
         "BUILD_SHARED_LIBS": "OFF"
+      },
+      "environment": {
+        "CC": "cl",
+        "CXX": "cl"
       }
     },
     {
