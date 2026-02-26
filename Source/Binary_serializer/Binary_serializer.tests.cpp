@@ -227,7 +227,7 @@ namespace h::binary_serializer
         {
             .language_version = language_version,
             .name = "module_name",
-            .content_hash = 12089789297091071925,
+            .content_hash = 12089789297091071925ull,
             .dependencies = std::move(dependencies),
             .export_declarations = std::move(export_declarations),
             .internal_declarations = Module_declarations{},

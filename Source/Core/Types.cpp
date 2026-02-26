@@ -587,7 +587,7 @@ namespace h
                         h::Expression{
                             .data = h::Constant_expression {
                                 .type = uint64_type,
-                                .data = 0
+                                .data = "0"
                             }
                         }
                     }
