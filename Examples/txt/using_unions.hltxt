@@ -44,11 +44,17 @@ export union My_union_4
 }
 
 var g_v0: My_union = {};
+
 var g_v1: My_union_2 = { a: 1 };
+
 var g_v2: My_union_2 = { b: 2i64 };
+
 var g_v3: My_union_3 = { a: 3i64 };
+
 var g_v4: My_union_3 = { b: { a: 4 } };
+
 var g_v5: My_union_4 = { a: 5i64 };
+
 var g_v6: My_union_4 = { b: { a: 6i64, b: 7i64, c: 8i64, d: 9i64 } };
 
 export function use_unions(my_union: My_union, my_union_tag: My_union_tag) -> ()
