@@ -742,6 +742,8 @@ namespace h::compiler
     {
         start_timer(get_profiler(builder), "import_and_export_c_headers");
 
+        create_directory_if_it_does_not_exist(builder.build_directory_path / "artifacts");
+
         Declaration_database declaration_database = create_declaration_database();
 
         C_header_groups const c_header_groups = get_c_headers(artifacts, builder.header_search_paths, temporaries_allocator, temporaries_allocator);
