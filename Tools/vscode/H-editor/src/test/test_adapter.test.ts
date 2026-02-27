@@ -1,3 +1,4 @@
+import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -34,36 +35,30 @@ suite('test_adapter', () => {
 		// restore
 		(child_process as any).execFileSync = original;
 
-		if (suites.length !== 1) {
-			throw new Error('expected one suite');
+		assert.equal(suites.length, 1);
+		if (suites.length < 1) {
+			return;
 		}
+		
 		const suite = suites[0];
-		if (suite.suite_name !== 'game') {
-			throw new Error('suite name mismatch');
-		}
-		if (suite.test_cases.length !== 1) {
-			throw new Error('expected one test case');
-		}
-		const tc = suite.test_cases[0];
-		if (tc.module_name !== 'entry' || tc.test_name !== 'do_something') {
-			throw new Error('test case name split wrong');
-		}
-		if (tc.file_path !== 'C:/path/to/file.hltxt' || tc.line !== 551) {
-			throw new Error('file or line incorrect');
-		}
+		assert.equal(suite.suite_name, "game");
+		
+		const test_case = suite.test_cases[0];
+		assert.equal(test_case.module_name, "entry");
+		assert.equal(test_case.test_name, "do_something");
+		assert.equal(test_case.file_path, "C:/path/to/file.hltxt");
+		assert.equal(test_case.line, 551);
 	});
 
 	test('sanitizes and splits ids correctly', () => {
 		const { sanitize_id, extract_test_identifier } = require('../test_adapter');
 		// sanitize
-		if (sanitize_id('foo/bar baz') !== 'foo_bar_baz') {
-			throw new Error('sanitize_id failed');
-		}
+		assert.equal(sanitize_id('foo/bar baz'), 'foo_bar_baz');
 		// extract
 		const info = extract_test_identifier('root::suite::test');
-		if (!info || info.root_id !== 'root' || info.test_identifier !== 'suite::test') {
-			throw new Error('extract_test_identifier failed');
-		}
+		assert.ok(info);
+		assert.equal(info.root_id, 'root');
+		assert.equal(info.test_identifier, 'suite::test');
 	});
 
 	test('parse_test_results can extract data from mixed output', () => {
@@ -72,29 +67,23 @@ suite('test_adapter', () => {
 		const output = "log line\n{" +
 			"\"tests\":[{\"name\":\"suite::case\",\"status\":\"failed\",\"message\":\"oops\"}]}";
 		let results = parse_test_results(output as string);
-		if (!results.has('suite::case')) {
-			throw new Error('missing entry');
-		}
+		assert.ok(results.has('suite::case'));
 		let r = results.get('suite::case');
-		if (r?.status !== 'failed' || r?.message !== 'oops') {
-			throw new Error('incorrect parse result');
-		}
+		assert.equal(r?.status, 'failed');
+		assert.equal(r?.message, 'oops');
 
 		// now test array format
 		const arrOutput = "prefix\n" + JSON.stringify([{name:'foo',status:'passed'}]);
 		results = parse_test_results(arrOutput as string);
-		if (!results.has('foo') || results.get('foo')?.status !== 'passed') {
-			throw new Error('array format parse failed');
-		}
+		assert.ok(results.has('foo'));
+		assert.equal(results.get('foo')?.status, 'passed');
 	});
 
 	test('make_root_id generates distinct ids for paths that sanitize the same', () => {
 		const { make_root_id } = require('../test_adapter');
 		const a = make_root_id(path.normalize('C:/foo?bar'));
 		const b = make_root_id(path.normalize('C:/foo/bar'));
-		if (a === b) {
-			throw new Error('make_root_id should differentiate paths even when sanitization collides');
-		}
+		assert.notEqual(a, b);
 	});
 
 	test('find_tests removes temporary file even if execution fails', () => {
@@ -119,9 +108,7 @@ suite('test_adapter', () => {
 		// restore
 		(child_process as any).execFileSync = original;
 
-		if (fs.existsSync(outFileName)) {
-			throw new Error('temporary file was not removed on error');
-		}
+		assert.strictEqual(fs.existsSync(outFileName), false);
 	});
 
 	test('parse_test_results ignores stray braces before JSON', () => {
@@ -129,9 +116,8 @@ suite('test_adapter', () => {
 		const output = "info {not json}\n{" +
 			"\"tests\":[{\"name\":\"a\",\"status\":\"passed\"}]}";
 		const results = parse_test_results(output as string);
-		if (!results.has('a') || results.get('a')?.status !== 'passed') {
-			throw new Error('failed to extract balanced JSON');
-		}
+		assert.ok(results.has('a'));
+		assert.equal(results.get('a')?.status, 'passed');
 	});
 
 	test('parse_test_results keys are original names, not sanitized', () => {
@@ -140,27 +126,17 @@ suite('test_adapter', () => {
 		const sanitized = sanitize_id(originalName);
 		const json = JSON.stringify({tests:[{name: originalName, status:'passed'}]});
 		const results = parse_test_results(json as string);
-		if (!results.has(originalName)) {
-			throw new Error('expected original name key');
-		}
-		if (results.has(sanitized)) {
-			throw new Error('sanitized name should not be used as key');
-		}
+		assert.ok(results.has(originalName));
+		assert.strictEqual(results.has(sanitized), false);
 	});
 
 	test('executable_map helpers behave correctly', () => {
 		const { make_root_id, _test_add_executable, _test_remove_executable, get_executable_path } = require('../test_adapter');
 		const root = make_root_id(path.normalize('C:/foo/bar'));
-		if (get_executable_path(root) !== undefined) {
-			throw new Error('map should start empty');
-		}
+		assert.strictEqual(get_executable_path(root), undefined);
 		_test_add_executable(root, 'C:/foo/bar');
-		if (get_executable_path(root) !== 'C:/foo/bar') {
-			throw new Error('map add failed');
-		}
+		assert.equal(get_executable_path(root), 'C:/foo/bar');
 		_test_remove_executable(root);
-		if (get_executable_path(root) !== undefined) {
-			throw new Error('map remove failed');
-		}
+		assert.strictEqual(get_executable_path(root), undefined);
 	});
 });

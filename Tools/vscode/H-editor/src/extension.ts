@@ -13,6 +13,8 @@ import {
 	TransportKind
 } from 'vscode-languageclient/node.js';
 
+import { setup_test_executables_watcher } from './test_adapter';
+
 let client: LanguageClient | undefined = undefined;
 let server_process: child_process.ChildProcess | undefined = undefined;
 
@@ -131,6 +133,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 	await client.start();
 
 	await workspace_initialized_promise;
+
+	// Set up test executable watcher (discover and show tests in the Test Explorer)
+	try {
+		const tests_configuration = vscode.workspace.getConfiguration('hlang_language_server');
+		const glob = tests_configuration.get<string>('test_executable_glob', '**/*.hlang.tests.*');
+		const watcher_disposable = setup_test_executables_watcher(glob);
+		context.subscriptions.push(watcher_disposable);
+	} catch (error) {
+		console.error('Failed to set up test executables watcher:', error);
+	}
 
 	return client;
 }

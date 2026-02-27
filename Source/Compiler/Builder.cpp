@@ -1578,7 +1578,7 @@ namespace h::compiler
                     .link_type = h::compiler::Link_type::Executable
                 };
 
-                std::filesystem::path const output = builder.build_directory_path / "bin" / (artifact.name + ".test");
+                std::filesystem::path const output = builder.build_directory_path / "bin" / (artifact.name + ".hlang.test");
                 create_directory_if_it_does_not_exist(output.parent_path());
 
                 bool const result = h::compiler::link(

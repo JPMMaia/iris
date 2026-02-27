@@ -399,7 +399,7 @@ export function show_tests_in_the_ui(test_executable_file_path: string, test_sui
                         // Run the test executable with specific test filter and capture output
                         // pass the test name as a separate argument to avoid shell quoting issues
                         const stdout = execFileSync(executable_path, 
-                            ['--test-name', test_identifier], 
+                            [`--test-name=${test_identifier}`], 
                             {
                                 timeout: 30000,
                                 stdio: 'pipe',
@@ -554,7 +554,7 @@ export function show_tests_in_the_ui(test_executable_file_path: string, test_sui
                 request: 'launch',
                 name: `Debug ${test_identifier}`,
                 program: executable_path,
-                args: ['--test-name', test_identifier],
+                args: [`--test-name=${test_identifier}`],
                 cwd: '${workspaceFolder}'
             };
 
