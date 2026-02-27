@@ -287,7 +287,7 @@ namespace h::language_server
         if (!configuration.isObject())
             return {};
 
-        lsp::json::Any const& extension_settings = configuration.object().get("hlang_language_server");
+        lsp::json::Any const& extension_settings = configuration.object().get("hlang");
         if (!extension_settings.isObject())
             return {};
 

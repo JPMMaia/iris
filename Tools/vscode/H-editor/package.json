@@ -25,25 +25,25 @@
       "type": "object",
       "title": "Configuration",
       "properties": {
-        "hlang_language_server.hlang_executable": {
+        "hlang.hlang_executable": {
           "scope": "resource",
           "type": "string",
           "default": "hlang",
           "description": "Specify the file path to the hlang executable."
         },
-        "hlang_language_server.hlang_language_server_executable": {
+        "hlang.hlang_language_server_executable": {
           "scope": "resource",
           "type": "string",
           "default": "hlang_language_server",
           "description": "Specify the file path to the hlang language server executable."
         },
-        "hlang_language_server.repositories": {
+        "hlang.repositories": {
           "scope": "resource",
           "type": "array",
           "default": [],
           "description": "Specify repositories that specify additional projects that can be added as dependencies to your project."
         },
-        "hlang_language_server.trace.server": {
+        "hlang.trace.server": {
           "scope": "window",
           "type": "string",
           "enum": [

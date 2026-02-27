@@ -22,7 +22,8 @@ async function create_server_options_to_create(
 	configuration: vscode.WorkspaceConfiguration
 ): Promise<ServerOptions> {
 
-	const server_path = configuration.get<string>("hlang_language_server_executable", "hlang_language_server");
+	const server_env_path = process.env.hlang_language_server;
+	const server_path = server_env_path !== undefined ? server_env_path : configuration.get<string>("hlang_language_server_executable", "hlang_language_server") ;
 
 	const options: child_process.ExecSyncOptions = {};
 
@@ -95,7 +96,7 @@ async function create_server_options_to_attach(
 
 export async function activate(context: vscode.ExtensionContext): Promise<LanguageClient> {
 
-	const configuration = vscode.workspace.getConfiguration("hlang_language_server");
+	const configuration = vscode.workspace.getConfiguration("hlang");
 
 	const mode: string | undefined = process.env.mode;
 	const attach_to_server = mode !== undefined && mode === "debug";
@@ -136,8 +137,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 
 	// Set up test executable watcher (discover and show tests in the Test Explorer)
 	try {
-		const tests_configuration = vscode.workspace.getConfiguration('hlang_language_server');
-		const glob = tests_configuration.get<string>('test_executable_glob', '**/*.hlang.tests.*');
+		const tests_configuration = vscode.workspace.getConfiguration('hlang');
+		const glob = tests_configuration.get<string>('test_executable_glob', 'build/bin/*.hlang.test*');
 		const watcher_disposable = setup_test_executables_watcher(glob);
 		context.subscriptions.push(watcher_disposable);
 	} catch (error) {
