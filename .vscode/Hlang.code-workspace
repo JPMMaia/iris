@@ -358,6 +358,19 @@
 	},
 	"tasks": {
 		"version": "2.0.0",
+		"windows": {
+			"options": {
+				"shell": {
+					"executable": "cmd.exe",
+					"args": [
+						"/k",
+						"\"C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/VsDevCmd.bat\"",
+						"-arch=x64",
+						"&"
+					]
+				}
+			}
+		},
 		"tasks": [
 			{
 				"label": "Package VSCode Extension",
@@ -379,6 +392,7 @@
 			{
 				"label": "Build Language Server",
 				"command": "cmake",
+				"type": "shell",
 				"args": [
 					"--build",
 					"${workspaceFolder}/build",
@@ -416,6 +430,7 @@
 			{
 				"label": "Build Debug",
 				"command": "cmake",
+				"type": "shell",
 				"args": [
 					"--build",
 					"${workspaceFolder}/build"
@@ -427,6 +442,7 @@
 			{
 				"label": "Build Release",
 				"command": "cmake",
+				"type": "shell",
 				"args": [
 					"--build",
 					"${workspaceFolder}/build",
