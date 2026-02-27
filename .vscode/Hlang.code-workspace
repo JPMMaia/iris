@@ -363,7 +363,7 @@
 				"shell": {
 					"executable": "cmd.exe",
 					"args": [
-						"/k",
+						"/c",
 						"\"C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/VsDevCmd.bat\"",
 						"-arch=x64",
 						"&"
@@ -440,17 +440,30 @@
 				]
 			},
 			{
+				"label": "CMake Configure Release",
+				"command": "cmake",
+				"type": "shell",
+				"args": [
+					"-S",
+					"${workspaceFolder}",
+					"-B",
+					"build",
+					"-DCMAKE_BUILD_TYPE=Release"
+				]
+			},
+			{
 				"label": "Build Release",
 				"command": "cmake",
 				"type": "shell",
 				"args": [
 					"--build",
-					"${workspaceFolder}/build",
-					"--config",
-					"release"
+					"${workspaceFolder}/build"
 				],
 				"problemMatcher": [
 					"$msCompile"
+				],
+				"dependsOn": [
+					"CMake Configure Release"
 				]
 			},
 			{
@@ -479,9 +492,7 @@
 				"args": [
 					"${workspaceFolder}/Scripts/build_utilities.py",
 					"install_hlang",
-					"${workspaceFolder}/../Hlang_install",
-					"--configuration",
-					"release"
+					"${workspaceFolder}/../Hlang_install"
 				],
 				"presentation": {
 					"reveal": "always"
