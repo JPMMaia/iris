@@ -294,7 +294,10 @@ namespace h::compiler
 
             std::optional<std::filesystem::path> const dependency_location = h::compiler::get_artifact_location(repositories, dependency.artifact_name);
             if (!dependency_location.has_value())
-                h::common::print_message_and_exit(std::format("Could not find dependency {}.", dependency.artifact_name));
+            {
+                std::fprintf(stderr, "Could not find dependency '%s'.", dependency.artifact_name.c_str());
+                continue;
+            }
 
             std::filesystem::path const dependency_configuration_file_path = dependency_location.value();
 
