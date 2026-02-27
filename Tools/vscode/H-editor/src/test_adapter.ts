@@ -637,6 +637,8 @@ export function setup_test_executables_watcher(glob_pattern: string): vscode.Dis
     // Find all matching executables initially (and await)
     const initial_find = Promise.resolve(vscode.workspace.findFiles(glob_pattern)).then(uris => {
         for (const uri of uris) {
+            if (uri.fsPath.endsWith(".pdb"))
+                continue;
             process_executable(uri.fsPath);
         }
     }).catch(err => {
