@@ -85,8 +85,8 @@ def generate_examples() -> None:
         destination_file = examples_directory.joinpath("hl").joinpath(source_file.stem + ".hl")
         parse_file(examples_directory, source_file, destination_file)
 
-def install_hlang(configuration: str, destination_directory: Path) -> None:
-    run_command(root_directory.as_posix(), "cmake --install build --config " + configuration + " --prefix " + destination_directory.as_posix())
+def install_hlang(destination_directory: Path) -> None:
+    run_command(root_directory.as_posix(), "cmake --install build --prefix " + destination_directory.as_posix())
         
 # Execute commands
 def main() -> None:
@@ -104,7 +104,6 @@ def main() -> None:
 
     install_hlang_command = subparsers.add_parser("install_hlang", help="Install Hlang")
     install_hlang_command.add_argument("destination_directory")
-    install_hlang_command.add_argument("--configuration", default="release")
 
     test_language_server_command = subparsers.add_parser("test_language_server", help="Tests the language server")
 
@@ -117,7 +116,7 @@ def main() -> None:
     elif args.command == "generate_examples":
         generate_examples()
     elif args.command == "install_hlang":
-        install_hlang(args.configuration, Path(args.destination_directory))
+        install_hlang(Path(args.destination_directory))
     elif args.command == "test_language_server":
         if not test_language_server():
             exit(-1)
