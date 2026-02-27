@@ -13,6 +13,8 @@ using Test_function_pointer = void(*)();
 
 extern "C" uint64_t hlang_get_test_count();
 extern "C" char const* const* hlang_get_test_names();
+extern "C" char const* get_test_source_file(uint64_t test_index);
+extern "C" uint64_t const* get_test_source_file_lines();
 extern "C" Test_function_pointer* hlang_get_tests();
 
 extern "C" struct hlang_test_context
@@ -39,6 +41,13 @@ static std::span<char const* const> get_all_test_names()
     std::uint64_t const count = hlang_get_test_count();
     char const* const* const tests = hlang_get_test_names();
     return { tests, count };
+}
+
+static std::span<std::uint64_t const> get_all_source_file_lines()
+{
+    std::uint64_t const count = hlang_get_test_count();
+    std::uint64_t const* const lines = get_test_source_file_lines();
+    return { lines, count };
 }
 
 static std::optional<std::string_view> search_argument(int const argc, char const* const argv[], std::string_view const name)
@@ -149,7 +158,7 @@ static void print_test_names(std::span<char const* const> const test_names)
     std::puts(output.c_str());
 }
 
-static void print_test_names_json(std::span<char const* const> const test_names, std::filesystem::path const& output_file_path)
+static void print_test_names_json(std::filesystem::path const& output_file_path)
 {
     using namespace std::literals;
 
@@ -166,19 +175,29 @@ static void print_test_names_json(std::span<char const* const> const test_names,
         return;
     }
 
+    struct Test_case_info
+    {
+        std::string_view name;
+        std::uint64_t index;
+    };
+    
+    std::span<char const* const> const test_names = get_all_test_names();
+    std::span<std::uint64_t const> const source_file_lines = get_all_source_file_lines();
+
     // group tests by module in order encountered
-    std::pmr::vector<std::pair<std::string_view, std::pmr::vector<std::string_view>>> modules;
+    std::pmr::vector<std::pair<std::string_view, std::pmr::vector<Test_case_info>>> modules;
     modules.reserve(test_names.size());
 
-    for (std::string_view const test : test_names)
+    for (std::uint64_t index = 0; index < test_names.size(); ++index)
     {
+        std::string_view const test = test_names[index];
         std::uint64_t const position = test.find("."sv);
         std::string_view module = position == std::string_view::npos ? test : test.substr(0, position);
         std::string_view name = position == std::string_view::npos ? test : test.substr(position + 1);
 
         if (modules.empty() || modules.back().first != module)
-            modules.emplace_back(module, std::pmr::vector<std::string_view>());
-        modules.back().second.push_back(name);
+            modules.emplace_back(module, std::pmr::vector<Test_case_info>());
+        modules.back().second.push_back({name, index});
     }
 
     auto json_escape = [](std::string_view s) -> std::string
@@ -208,9 +227,10 @@ static void print_test_names_json(std::span<char const* const> const test_names,
         return out;
     };
 
+
     bool first_suite = true;
     std::fprintf(output, "{\"suites\": [");
-    for (auto const& [module, names] : modules)
+    for (auto const& [module, test_case_infos] : modules)
     {
         if (!first_suite)
             std::fprintf(output, ",");
@@ -220,21 +240,19 @@ static void print_test_names_json(std::span<char const* const> const test_names,
         std::fprintf(output, "{\"name\":\"%s\",\"tests\": [", esc_module.c_str());
 
         bool first_test = true;
-        for (auto const& name : names)
+        for (Test_case_info const& test_case_info : test_case_infos)
         {
             if (!first_test) std::fprintf(output, ",");
             first_test = false;
 
-            // TODO
-            std::filesystem::path const file_name = "C:/Users/JPMMa/Desktop/source/rts-game/source/game/main.hltxt";
-            std::string const file_name_string = file_name.generic_string();
-            std::uint64_t const line = 551;
+            std::string_view const source_file = get_test_source_file(test_case_info.index);
+            std::uint64_t const line = source_file_lines[test_case_info.index];
 
-            std::string const full = std::string(module) + "." + std::string(name);
-            const std::string esc_full = json_escape(full);
-            const std::string esc_file = json_escape(file_name_string);
+            std::string const full = std::string(module) + "." + std::string(test_case_info.name);
+            const std::string full_escaped = json_escape(full);
+            const std::string file_escaped = json_escape(source_file);
 
-            std::fprintf(output, "{\"name\":\"%s\",\"file\":\"%s\",\"line\":%llu}", esc_full.c_str(), esc_file.c_str(), (unsigned long long)line);
+            std::fprintf(output, "{\"name\":\"%s\",\"file\":\"%s\",\"line\":%llu}", full_escaped.c_str(), file_escaped.c_str(), line);
         }
 
         std::fprintf(output, "]}");
@@ -281,14 +299,14 @@ int main(int const argc, char const* const argv[])
     {
         if (should_list_tests(argc, argv))
         {
-            std::span<char const* const> const all_test_names = get_all_test_names();
             if (should_output_json(argc, argv))
             {
                 std::filesystem::path const output_file_path = get_output_json_file_path(argc, argv);
-                print_test_names_json(all_test_names, output_file_path);
+                print_test_names_json(output_file_path);
             }
             else
             {
+                std::span<char const* const> const all_test_names = get_all_test_names();
                 print_test_names(all_test_names);
             }
             return 0;

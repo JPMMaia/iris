@@ -163,8 +163,8 @@
 				"request": "launch",
 				"program": "${workspaceFolder}/../rts-game/build/bin/game.test.exe",
 				"args": [
-					"--gtest_list_tests",
-					"--gtest_output=xml:${workspaceFolder}/test.xml"
+					"--list-tests",
+					"--output-format=json:${workspaceFolder}/test.json"
 				],
 				"cwd": "${workspaceFolder}/build",
 			},

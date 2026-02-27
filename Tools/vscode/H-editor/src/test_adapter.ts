@@ -233,7 +233,7 @@ export function show_tests_in_the_ui(test_executable_file_path: string, test_sui
     // Normalize path for consistent comparison
     const normalized_path = path.normalize(test_executable_file_path);
 
-    // Create test controller if not exists
+    // Create test controller if it doesn't exist
     if (!test_controller) {
         test_controller = vscode.tests.createTestController(
             'hlang-test-controller',
