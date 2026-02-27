@@ -41,13 +41,12 @@ root_directory = Path(__file__).resolve().parent.parent
 examples_directory = root_directory.joinpath("Examples")
 extension_directory = root_directory.joinpath("Tools/vscode/H-editor")
 parser_directory = root_directory.joinpath("Source/Parser/tree-sitter-hlang")
-core_package_directory = extension_directory.joinpath("packages/core")
 
 def build_and_test() -> bool:
     if not run_command(parser_directory.as_posix(), "npm run test_tree_sitter"):
         return False
     
-    if not run_command(extension_directory.as_posix(), "npm run test:scripts"):
+    if not run_command(extension_directory.as_posix(), "npm run test"):
         return False
     
     build_compiler("debug")
@@ -64,13 +63,7 @@ def build_and_test() -> bool:
 
 
 def test_language_server() -> bool:
-    arguments = [
-        extension_directory.as_posix(),
-        extension_directory.joinpath("out/packages/client/src/test").as_posix(),
-        extension_directory.joinpath("packages/client/test_fixture").as_posix()
-    ];
-    arguments_string = " ".join(arguments)
-    run_command(extension_directory.as_posix(), "node ./out/packages/client/src/test/runTest.js " + arguments_string)
+    run_command(extension_directory.as_posix(), "rpm run test")
 
 def build_compiler(configuration: str) -> None:
     run_command(root_directory.as_posix(), "cmake -S . -B build")
