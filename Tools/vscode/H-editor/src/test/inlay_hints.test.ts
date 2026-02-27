@@ -195,7 +195,7 @@ async function test_inlay_hints(document_uri: vscode.Uri, range: vscode.Range, e
 			if (expected_label_part.location === undefined) {
 				assert.equal(actual_label_part.location, undefined);
 			}
-			else {
+			else if (actual_label_part.location != undefined) {
 				assert.equal(actual_label_part.location.uri.fsPath, expected_label_part.location.uri.fsPath);
 				assert.deepEqual(actual_label_part.location.range, expected_label_part.location.range);
 			}

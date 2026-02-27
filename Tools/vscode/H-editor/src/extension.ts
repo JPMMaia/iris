@@ -13,7 +13,7 @@ import {
 	TransportKind
 } from 'vscode-languageclient/node.js';
 
-let client: LanguageClient = undefined;
+let client: LanguageClient | undefined = undefined;
 let server_process: child_process.ChildProcess | undefined = undefined;
 
 async function create_server_options_to_create(
@@ -28,19 +28,21 @@ async function create_server_options_to_create(
 
 	let server_is_ready = false;
 
-	language_server_process.stdout.on("data", (data) => {
-
-		const message = data.toString();
-		if (message.startsWith("Listening...")) {
-			server_is_ready = true;
-		}
-
-        console.log("Server:", data.toString());
-    });
+	if (language_server_process.stdout != null) {
+		language_server_process.stdout.on("data", (data) => {
+			const message = data.toString();
+			if (message.startsWith("Listening...")) {
+				server_is_ready = true;
+			}
+			console.log("Server:", data.toString());
+		});
+	}
     
-	language_server_process.stderr.on("data", (data) => {
-        console.error("Server error:", data.toString());
-    });
+	if (language_server_process.stderr != null) {
+		language_server_process.stderr.on("data", (data) => {
+			console.error("Server error:", data.toString());
+		});
+	}
 
 	language_server_process.on("exit", () => {
 		if (!language_server_process.killed) {
@@ -159,7 +161,7 @@ export async function deactivate(): Promise<void> {
 	return undefined;
 }
 
-interface Document_state {
+/*interface Document_state {
 	text: string;
 	pending_change_events: vscode.TextDocumentContentChangeEvent[];
 }
@@ -265,4 +267,4 @@ function provide_inlay_hints(
 		return next(document, view_port, token);
 	});
 	return Promise.resolve(result);
-}
+}*/

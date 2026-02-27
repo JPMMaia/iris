@@ -47,7 +47,7 @@ function find_document_diagnostics(
 	);
 	assert.notEqual(found_item, undefined);
 
-	if (found_item.kind === language_client.DocumentDiagnosticReportKind.Full)
+	if (found_item != undefined && found_item.kind === language_client.DocumentDiagnosticReportKind.Full)
 	{
 		const full_report_item = found_item as language_client.FullDocumentDiagnosticReport;
 		return full_report_item.items;
@@ -67,7 +67,10 @@ function to_vscode_range(input: language_client.Range): vscode.Range {
 	);
 }
 
-function to_vscode_diagnostic_severity(input: language_client.DiagnosticSeverity): vscode.DiagnosticSeverity {
+function to_vscode_diagnostic_severity(input: language_client.DiagnosticSeverity | undefined): vscode.DiagnosticSeverity | undefined {
+	if (input == undefined)
+		return undefined;
+
 	switch (input)
 	{
 	case language_client.DiagnosticSeverity.Error:

@@ -4,8 +4,8 @@ import * as path from 'path';
 import * as child_process from 'child_process';
 import { find_tests, Test_suite } from '../test_adapter';
 
-describe('test_adapter', () => {
-	it('can run executable stub and parse json tests', () => {
+suite('test_adapter', () => {
+	test('can run executable stub and parse json tests', () => {
 		// sample json content matching expected format
 		const json = JSON.stringify({
 			suites: [
@@ -53,7 +53,7 @@ describe('test_adapter', () => {
 		}
 	});
 
-	it('sanitizes and splits ids correctly', () => {
+	test('sanitizes and splits ids correctly', () => {
 		const { sanitize_id, extract_test_identifier } = require('../test_adapter');
 		// sanitize
 		if (sanitize_id('foo/bar baz') !== 'foo_bar_baz') {
@@ -66,7 +66,7 @@ describe('test_adapter', () => {
 		}
 	});
 
-	it('parse_test_results can extract data from mixed output', () => {
+	test('parse_test_results can extract data from mixed output', () => {
 		// import function locally to avoid circular dependencies
 		const { parse_test_results } = require('../test_adapter');
 		const output = "log line\n{" +
@@ -88,7 +88,7 @@ describe('test_adapter', () => {
 		}
 	});
 
-	it('make_root_id generates distinct ids for paths that sanitize the same', () => {
+	test('make_root_id generates distinct ids for paths that sanitize the same', () => {
 		const { make_root_id } = require('../test_adapter');
 		const a = make_root_id(path.normalize('C:/foo?bar'));
 		const b = make_root_id(path.normalize('C:/foo/bar'));
@@ -97,7 +97,7 @@ describe('test_adapter', () => {
 		}
 	});
 
-	it('find_tests removes temporary file even if execution fails', () => {
+	test('find_tests removes temporary file even if execution fails', () => {
 		const { find_tests } = require('../test_adapter');
 		const tmp = os.tmpdir();
 		const randomSuffix = Math.random().toString(36).substring(2);
@@ -124,7 +124,7 @@ describe('test_adapter', () => {
 		}
 	});
 
-	it('parse_test_results ignores stray braces before JSON', () => {
+	test('parse_test_results ignores stray braces before JSON', () => {
 		const { parse_test_results } = require('../test_adapter');
 		const output = "info {not json}\n{" +
 			"\"tests\":[{\"name\":\"a\",\"status\":\"passed\"}]}";
@@ -134,7 +134,7 @@ describe('test_adapter', () => {
 		}
 	});
 
-	it('parse_test_results keys are original names, not sanitized', () => {
+	test('parse_test_results keys are original names, not sanitized', () => {
 		const { parse_test_results, sanitize_id } = require('../test_adapter');
 		const originalName = 'suite name::mod.name::test-name';
 		const sanitized = sanitize_id(originalName);
@@ -148,7 +148,7 @@ describe('test_adapter', () => {
 		}
 	});
 
-	it('executable_map helpers behave correctly', () => {
+	test('executable_map helpers behave correctly', () => {
 		const { make_root_id, _test_add_executable, _test_remove_executable, get_executable_path } = require('../test_adapter');
 		const root = make_root_id(path.normalize('C:/foo/bar'));
 		if (get_executable_path(root) !== undefined) {

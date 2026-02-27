@@ -140,6 +140,9 @@ async function get_semantic_tokens(
 	range?: vscode.Range
 ): Promise<Decoded_semantic_token[]> {
 
+	if (client.initializeResult == undefined || client.initializeResult.capabilities.semanticTokensProvider == undefined)
+		return [];
+
 	const legend = client.initializeResult.capabilities.semanticTokensProvider.legend;
 
 	if (range !== undefined) {

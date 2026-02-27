@@ -9,10 +9,10 @@
 
 # Ignore build artifacts
 node_modules
-out
 
-# Ignore source code
-packages/**
+# Ignore source code and test files
+src/**
+test_fixture/**
 
 # Ignore Misc
 example_files

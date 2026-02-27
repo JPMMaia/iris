@@ -9,7 +9,7 @@ export let platformEol: string;
 
 export async function activate(docUri: vscode.Uri): Promise<LanguageClient> {
 	// The extensionId is `publisher.name` from package.json
-	const ext = vscode.extensions.getExtension('JPMMaia.hlang-language-server')!;
+	const ext = vscode.extensions.getExtension('JPMMaia.hlang')!;
 	const client: LanguageClient = await ext.activate();
 	try {
 		doc = await vscode.workspace.openTextDocument(docUri);
@@ -25,7 +25,7 @@ async function sleep(ms: number) {
 }
 
 export const get_document_path = (p: string) => {
-	return path.resolve(__dirname, '../../../../../packages/client/test_fixture', p);
+	return path.resolve(__dirname, '../../test_fixture', p);
 };
 export const get_document_uri = (p: string) => {
 	return vscode.Uri.file(get_document_path(p));
