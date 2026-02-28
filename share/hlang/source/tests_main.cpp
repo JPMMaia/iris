@@ -13,8 +13,8 @@ using Test_function_pointer = void(*)();
 
 extern "C" uint64_t hlang_get_test_count();
 extern "C" char const* const* hlang_get_test_names();
-extern "C" char const* get_test_source_file(uint64_t test_index);
-extern "C" uint64_t const* get_test_source_file_lines();
+extern "C" char const* hlang_get_test_source_file(uint64_t test_index);
+extern "C" uint64_t const* hlang_get_test_source_file_lines();
 extern "C" Test_function_pointer* hlang_get_tests();
 
 extern "C" struct hlang_test_context
@@ -46,7 +46,7 @@ static std::span<char const* const> get_all_test_names()
 static std::span<std::uint64_t const> get_all_source_file_lines()
 {
     std::uint64_t const count = hlang_get_test_count();
-    std::uint64_t const* const lines = get_test_source_file_lines();
+    std::uint64_t const* const lines = hlang_get_test_source_file_lines();
     return { lines, count };
 }
 
@@ -245,7 +245,7 @@ static void print_test_names_json(std::filesystem::path const& output_file_path)
             if (!first_test) std::fprintf(output, ",");
             first_test = false;
 
-            std::string_view const source_file = get_test_source_file(test_case_info.index);
+            std::string_view const source_file = hlang_get_test_source_file(test_case_info.index);
             std::uint64_t const line = source_file_lines[test_case_info.index];
 
             std::string const full = std::string(module) + "." + std::string(test_case_info.name);

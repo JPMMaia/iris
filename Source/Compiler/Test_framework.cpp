@@ -148,7 +148,7 @@ namespace h::compiler
         for (std::size_t index = 0; index < test_infos.size(); ++index)
         {
             Test_info const test_info = test_infos[index];
-            stream  << test_info.module_index;
+            stream  << test_info.module_index << "u64";
             if (index + 1 < test_infos.size())
                 stream << ',';
             stream << '\n';
@@ -167,7 +167,7 @@ namespace h::compiler
         for (std::size_t index = 0; index < test_infos.size(); ++index)
         {
             Test_info const test_info = test_infos[index];
-            stream  << test_info.source_file_line;
+            stream  << test_info.source_file_line << "u64";
             if (index + 1 < test_infos.size())
                 stream << ',';
             stream << '\n';
