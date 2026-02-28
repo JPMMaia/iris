@@ -13,7 +13,7 @@ import {
 	TransportKind
 } from 'vscode-languageclient/node.js';
 
-import { setup_test_executables_watcher } from './test_adapter';
+import { create_test_controller, setup_test_executables_watcher } from './test_adapter';
 
 let client: LanguageClient | undefined = undefined;
 let server_process: child_process.ChildProcess | undefined = undefined;
@@ -137,12 +137,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 
 	// Set up test executable watcher (discover and show tests in the Test Explorer)
 	try {
-		const tests_configuration = vscode.workspace.getConfiguration('hlang');
-		const glob = tests_configuration.get<string>('test_executable_glob', 'build/bin/*.hlang.test*');
-		const watcher_disposable = setup_test_executables_watcher(glob);
+		const tests_configuration = vscode.workspace.getConfiguration("hlang");
+		const test_controller = create_test_controller("hlang-test-controller");
+		const glob = tests_configuration.get<string>("test_executable_glob", "build/bin/*.hlang.test*");
+		const watcher_disposable = await setup_test_executables_watcher(test_controller, glob);
 		context.subscriptions.push(watcher_disposable);
 	} catch (error) {
-		console.error('Failed to set up test executables watcher:', error);
+		console.error("Failed to set up test executables watcher:", error);
 	}
 
 	return client;

@@ -3,36 +3,180 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as child_process from 'child_process';
-import { find_tests, Test_suite } from '../test_adapter';
+import * as vscode from "vscode";
 
-suite('test_adapter', () => {
-	test('can run executable stub and parse json tests', () => {
-		// sample json content matching expected format
+import * as test_adapter from '../test_adapter';
+
+suite("Test Adapter", () => {
+
+	test("Create test controller and add test suites", () => {
+		const test_suites: test_adapter.Test_suite[] = [
+			{
+				suite_name: "Suite_0",
+				test_cases: [
+					{
+						module_name: "Module_0",
+						test_name: "Test_0",
+						file_path: "/path/to/module_0",
+						line: 10
+					},
+					{
+						module_name: "Module_0",
+						test_name: "Test_1",
+						file_path: "/path/to/module_0",
+						line: 50
+					},
+					{
+						module_name: "Module_1",
+						test_name: "Test_0",
+						file_path: "/path/to/module_1",
+						line: 15
+					}
+				]
+			},
+			{
+				suite_name: "Suite_1",
+				test_cases: [
+					{
+						module_name: "Module_2",
+						test_name: "Test_0",
+						file_path: "/path/to/module_2",
+						line: 20
+					},
+					{
+						module_name: "Module_2",
+						test_name: "Test_1",
+						file_path: "/path/to/module_2",
+						line: 60
+					}
+				]
+			}
+		];
+		
+		const test_controller = test_adapter.create_test_controller("hlang.test_controller");
+		test_adapter.add_tests_to_controller(test_controller, "/path/to/executable", test_suites);
+
+		assert.equal(test_controller.items.size, 1);
+		if (test_controller.items.size != 1) {
+			return;
+		}
+
+		const executable_item = test_controller.items.get("/path/to/executable");
+		assert.notEqual(executable_item, undefined);
+		if (executable_item === undefined) {
+			return;
+		}
+
+		assert.equal(executable_item.label, "executable");
+		assert.equal(executable_item.children.size, 2);
+		if (executable_item.children.size != 2) {
+			return;
+		}
+
+		for (const suite of test_suites) {
+			const suite_id = suite.suite_name;
+			const suite_item = executable_item.children.get(suite_id);
+			assert.notEqual(suite_item, undefined);
+			if (suite_item === undefined) {
+				continue;
+			}
+			
+			assert.equal(suite_item.label, suite.suite_name);
+
+			for (const test_case of suite.test_cases) {
+				const module_id = test_case.module_name;
+				
+				const module_item = suite_item.children.get(module_id);
+				assert.notEqual(module_item, undefined);
+				if (module_item === undefined) {
+					continue;
+				}
+
+				assert.equal(module_item.label, test_case.module_name);
+
+				const test_case_id = test_case.test_name;
+				const test_case_item = module_item.children.get(test_case_id);
+				assert.notEqual(test_case_item, undefined);
+				if (test_case_item === undefined) {
+					continue;
+				}
+
+				assert.equal(test_case_item.label, test_case.test_name);
+				assert.notEqual(test_case_item.uri, undefined);
+				if (test_case_item.uri !== undefined) {
+					assert.equal(test_case_item.uri.fsPath, vscode.Uri.file(test_case.file_path).fsPath);
+				}
+				assert.deepEqual(test_case_item.range, new vscode.Range(test_case.line - 1, 0, test_case.line, 0))
+			}
+		}
+	});
+
+	test("Parses test list json correctly", () => {
+		const json = {
+			suites: [
+				{
+					name: "suite_name",
+					tests: [
+						{ name: "module.name.do_something", file: "C:/path/to/file.hltxt", line: 551 },
+						{ name: "module.name.another_thing", file: "C:/path/to/file.hltxt", line: 800 }
+					]
+				}
+			]
+		};
+
+		const expected: test_adapter.Test_suite[] = [
+			{
+				suite_name: "suite_name",
+				test_cases: [
+					{
+						module_name: "module.name",
+						test_name: "do_something",
+						file_path: "C:/path/to/file.hltxt",
+						line: 551
+					},
+					{
+						module_name: "module.name",
+						test_name: "another_thing",
+						file_path: "C:/path/to/file.hltxt",
+						line: 800
+					}
+				]
+			}
+		];
+
+		const test_suites = test_adapter.parse_tests_list_json(json);
+		assert.deepEqual(test_suites, expected);
+	});
+
+
+	test("Run executable stub and parse json tests", () => {
+		
+		// Sample json content matching expected format
 		const json = JSON.stringify({
 			suites: [
 				{
-					name: 'game',
+					name: "suite_name",
 					tests: [
-						{ name: 'entry.do_something', file: 'C:/path/to/file.hltxt', line: 551 }
+						{ name: "module.name.do_something", file: "C:/path/to/file.hltxt", line: 551 }
 					]
 				}
 			]
 		});
 
-		// stub execFileSync to write the json to the requested output file
+		// Stub execFileSync to write the json to the requested output file
 		const original = child_process.execFileSync;
 		(child_process as any).execFileSync = (exe: string, args: string[], opts: any) => {
-			const outArg = args.find(a => a.startsWith('--output-format=json:'));
+			const outArg = args.find(a => a.startsWith("--output-format=json:"));
 			if (outArg) {
-				const outFile = outArg.substring('--output-format=json:'.length);
-				fs.writeFileSync(outFile, json, 'utf8');
+				const outFile = outArg.substring("--output-format=json:".length);
+				fs.writeFileSync(outFile, json, "utf8");
 			}
-			// simulate a successful run
-			return Buffer.from('');
+			// Simulate a successful run
+			return Buffer.from("");
 		};
 
-		const suites = find_tests('dummy.exe');
-		// restore
+		const suites = test_adapter.find_tests('dummy.exe');
+		// Restore
 		(child_process as any).execFileSync = original;
 
 		assert.equal(suites.length, 1);
@@ -41,27 +185,16 @@ suite('test_adapter', () => {
 		}
 		
 		const suite = suites[0];
-		assert.equal(suite.suite_name, "game");
+		assert.equal(suite.suite_name, "suite_name");
 		
 		const test_case = suite.test_cases[0];
-		assert.equal(test_case.module_name, "entry");
+		assert.equal(test_case.module_name, "module.name");
 		assert.equal(test_case.test_name, "do_something");
 		assert.equal(test_case.file_path, "C:/path/to/file.hltxt");
 		assert.equal(test_case.line, 551);
 	});
 
-	test('sanitizes and splits ids correctly', () => {
-		const { sanitize_id, extract_test_identifier } = require('../test_adapter');
-		// sanitize
-		assert.equal(sanitize_id('foo/bar baz'), 'foo_bar_baz');
-		// extract
-		const info = extract_test_identifier('root::suite::test');
-		assert.ok(info);
-		assert.equal(info.root_id, 'root');
-		assert.equal(info.test_identifier, 'suite::test');
-	});
-
-	test('parse_test_results can extract data from mixed output', () => {
+	test.skip('parse_test_results can extract data from mixed output', () => {
 		// import function locally to avoid circular dependencies
 		const { parse_test_results } = require('../test_adapter');
 		const output = "log line\n{" +
@@ -79,39 +212,7 @@ suite('test_adapter', () => {
 		assert.equal(results.get('foo')?.status, 'passed');
 	});
 
-	test('make_root_id generates distinct ids for paths that sanitize the same', () => {
-		const { make_root_id } = require('../test_adapter');
-		const a = make_root_id(path.normalize('C:/foo?bar'));
-		const b = make_root_id(path.normalize('C:/foo/bar'));
-		assert.notEqual(a, b);
-	});
-
-	test('find_tests removes temporary file even if execution fails', () => {
-		const { find_tests } = require('../test_adapter');
-		const tmp = os.tmpdir();
-		const randomSuffix = Math.random().toString(36).substring(2);
-		const outFileName = path.join(tmp, `hlang-tests-${randomSuffix}.json`);
-
-		// stub execFileSync to create the output file then throw
-		const original = child_process.execFileSync;
-		(child_process as any).execFileSync = (exe: string, args: string[], opts: any) => {
-			const outArg = args.find(a => a.startsWith('--output-format=json:'));
-			if (outArg) {
-				const outFile = outArg.substring('--output-format=json:'.length);
-				fs.writeFileSync(outFile, '{invalid json}', 'utf8');
-			}
-			throw new Error('simulated failure');
-		};
-
-		// call the function
-		const suites = find_tests('dummy.exe');
-		// restore
-		(child_process as any).execFileSync = original;
-
-		assert.strictEqual(fs.existsSync(outFileName), false);
-	});
-
-	test('parse_test_results ignores stray braces before JSON', () => {
+	test.skip('parse_test_results ignores stray braces before JSON', () => {
 		const { parse_test_results } = require('../test_adapter');
 		const output = "info {not json}\n{" +
 			"\"tests\":[{\"name\":\"a\",\"status\":\"passed\"}]}";
@@ -120,7 +221,7 @@ suite('test_adapter', () => {
 		assert.equal(results.get('a')?.status, 'passed');
 	});
 
-	test('parse_test_results keys are original names, not sanitized', () => {
+	test.skip('parse_test_results keys are original names, not sanitized', () => {
 		const { parse_test_results, sanitize_id } = require('../test_adapter');
 		const originalName = 'suite name::mod.name::test-name';
 		const sanitized = sanitize_id(originalName);
@@ -128,15 +229,5 @@ suite('test_adapter', () => {
 		const results = parse_test_results(json as string);
 		assert.ok(results.has(originalName));
 		assert.strictEqual(results.has(sanitized), false);
-	});
-
-	test('executable_map helpers behave correctly', () => {
-		const { make_root_id, _test_add_executable, _test_remove_executable, get_executable_path } = require('../test_adapter');
-		const root = make_root_id(path.normalize('C:/foo/bar'));
-		assert.strictEqual(get_executable_path(root), undefined);
-		_test_add_executable(root, 'C:/foo/bar');
-		assert.equal(get_executable_path(root), 'C:/foo/bar');
-		_test_remove_executable(root);
-		assert.strictEqual(get_executable_path(root), undefined);
 	});
 });

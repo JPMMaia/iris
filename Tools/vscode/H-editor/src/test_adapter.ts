@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process';
+import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -28,29 +28,67 @@ interface Test_result
     stack_trace?: string;
 }
 
+export function parse_tests_list_json(json: any): Test_suite[] {
+
+    // expected JSON format:
+    // {
+    //   "suites": [
+    //       {
+    //          "name": "suite_name",
+    //          "tests": [
+    //              { "name": "module.name.do_something", "file": "path", "line": 551 }
+    //          ]
+    //       }
+    //   ]
+    // }
+
+    const results: Test_suite[] = [];
+
+    const suites: any[] = json.suites || [];
+    for (const s of suites) {
+        const suiteName = s.name || '';
+        const suite: Test_suite = { suite_name: suiteName, test_cases: [] };
+        const tests: any[] = s.tests || [];
+        for (const t of tests) {
+            const fullName = t.name || '';
+            const filePath = t.file || '';
+            const lineNum = parseInt(t.line, 10) || 0;
+
+            let moduleName = '';
+            let testName = fullName;
+            const lastDot = fullName.lastIndexOf('.');
+            if (lastDot !== -1) {
+                moduleName = fullName.substring(0, lastDot);
+                testName = fullName.substring(lastDot + 1);
+            }
+
+            suite.test_cases.push({
+                module_name: moduleName,
+                test_name: testName,
+                file_path: filePath,
+                line: lineNum
+            });
+        }
+        results.push(suite);
+    }
+
+    return results;
+}
 
 export function find_tests(test_executable_file_path: string): Test_suite[]
 {
-    const results: Test_suite[] = [];
-
-    if (!test_executable_file_path) {
-        return results;
-    }
-
     // create temporary json output file
     const tmpDir = os.tmpdir();
     const randomSuffix = crypto.randomBytes(8).toString('hex');
     const outFile = path.join(tmpDir, `hlang-tests-${randomSuffix}.json`);
 
     try {
-        execFileSync(test_executable_file_path,
-            ['--list-tests', `--output-format=json:${outFile}`],
-            { timeout: 30000, stdio: 'pipe' });
+        child_process.execFileSync(test_executable_file_path, ['--list-tests', `--output-format=json:${outFile}`], { timeout: 30000, stdio: 'pipe' });
     } catch (err) {
         const error_msg = err instanceof Error ? err.message : String(err);
         console.error(`error listing tests from ${test_executable_file_path}: ${error_msg}`);
         try { fs.unlinkSync(outFile); } catch {}
-        return results;
+        return [];
     }
 
     let json: string;
@@ -59,50 +97,13 @@ export function find_tests(test_executable_file_path: string): Test_suite[]
     } catch (err) {
         console.error(`could not read test output file at ${outFile}:`, err);
         try { fs.unlinkSync(outFile); } catch {}
-        return results;
+        return [];
     }
 
-    // expected JSON format:
-    // {
-    //   "suites": [
-    //       {
-    //          "name": "game",
-    //          "tests": [
-    //              { "name": "entry.do_something", "file": "path", "line": 551 }
-    //          ]
-    //       }
-    //   ]
-    // }
-
+    let results: Test_suite[] = [];
     try {
         const parsed = JSON.parse(json);
-        const suites: any[] = parsed.suites || [];
-        for (const s of suites) {
-            const suiteName = s.name || '';
-            const suite: Test_suite = { suite_name: suiteName, test_cases: [] };
-            const tests: any[] = s.tests || [];
-            for (const t of tests) {
-                const fullName = t.name || '';
-                const filePath = t.file || '';
-                const lineNum = parseInt(t.line, 10) || 0;
-
-                let moduleName = '';
-                let testName = fullName;
-                const lastDot = fullName.lastIndexOf('.');
-                if (lastDot !== -1) {
-                    moduleName = fullName.substring(0, lastDot);
-                    testName = fullName.substring(lastDot + 1);
-                }
-
-                suite.test_cases.push({
-                    module_name: moduleName,
-                    test_name: testName,
-                    file_path: filePath,
-                    line: lineNum
-                });
-            }
-            results.push(suite);
-        }
+        results = parse_tests_list_json(parsed);
     } catch (err) {
         console.error(`failed to parse test list JSON: ${err}`);
     }
@@ -113,52 +114,15 @@ export function find_tests(test_executable_file_path: string): Test_suite[]
     return results;
 }
 
-let test_controller: vscode.TestController | undefined;
-let run_profile_created = false;
-const executable_map = new Map<string, string>(); // Maps root_id to executable path
-// keep track of original test identifiers so we don't rely on sanitized IDs
-const original_test_identifier = new WeakMap<vscode.TestItem, string>();
-
 // Utility function to sanitize IDs for use in VS Code test items
 export function sanitize_id(input: string): string {
-    return input.replace(/[^a-zA-Z0-9._\-]/g, '_');
+    return input.replace(/[^a-zA-Z0-9._\-/]/g, '_');
 }
 
-// Combines sanitized path with a short hash so that two different executables
-// whose normalized paths only differ by characters replaced during sanitization
-// still produce distinct IDs.
-export function make_root_id(normalized_path: string): string {
+export function make_root_id(path: string): string {
+    const normalized_path = path.normalize().replace("\\", "/");
     const sanitized = sanitize_id(normalized_path);
-    const hash = crypto.createHash('sha1').update(normalized_path).digest('hex').substr(0, 8);
-    return `${sanitized}_${hash}`;
-}
-
-// exported for testing purposes
-export function get_executable_path(root_id: string): string | undefined {
-    return executable_map.get(root_id);
-}
-
-// helpers for unit tests to manipulate internal map without invoking vscode
-export function _test_add_executable(root_id: string, exePath: string): void {
-    executable_map.set(root_id, exePath);
-}
-export function _test_remove_executable(root_id: string): void {
-    executable_map.delete(root_id);
-}
-
-// Extract test identifier (suite::module::test) from test item ID
-// Test IDs have format: root_id::suite_name::module_name::test_name
-export function extract_test_identifier(test_id: string): { root_id: string; test_identifier: string } | null {
-    const parts = test_id.split('::');
-    if (parts.length < 2) {
-        return null;
-    }
-    
-    const root_id = parts[0];
-    // Test identifier is everything after root_id with :: separator
-    const test_identifier = parts.slice(1).join('::');
-    
-    return { root_id, test_identifier };
+    return sanitized;
 }
 
 // Parse test results from JSON output
@@ -228,387 +192,287 @@ export function parse_test_results(output: string): Map<string, Test_result> {
     return results;
 }
 
-export function show_tests_in_the_ui(test_executable_file_path: string, test_suites: Test_suite[]): void
-{
-    // Normalize path for consistent comparison
-    const normalized_path = path.normalize(test_executable_file_path);
-
-    // Create test controller if it doesn't exist
-    if (!test_controller) {
-        test_controller = vscode.tests.createTestController(
-            'hlang-test-controller',
-            'Hlang Tests'
-        );
-    }
-
-    // Remove old tests for this executable if already displayed (to prevent duplicates)
-    const root_id = make_root_id(normalized_path);
-    {
-        // Collect items to delete and delete them
-        const items_to_delete: string[] = [];
-        const items_iter = test_controller.items;
-        (items_iter as any).forEach((item: vscode.TestItem, id: string) => {
-            if (id === root_id) {
-                items_to_delete.push(id);
-            }
-        });
-        for (const id of items_to_delete) {
-            test_controller.items.delete(id);
+async function find_test_executables(glob_pattern: string): Promise<vscode.Uri[]> {
+    const uris = await vscode.workspace.findFiles(glob_pattern);
+    
+    return uris.filter((uri: vscode.Uri): boolean => {
+        if (uri.fsPath.endsWith(".pdb")) {
+            return false;
         }
-    }
-    // also clean up any stale executable mapping
-    executable_map.delete(root_id);
-
-    // Create a root test item for this executable
-    const exec_name = path.basename(test_executable_file_path);
-    const root_item = test_controller.createTestItem(root_id, exec_name);
-    root_item.canResolveChildren = false;
-
-    // Populate suites and test cases
-    for (const suite of test_suites) {
-        const suite_id = `${root_id}::${sanitize_id(suite.suite_name)}`;
-        const suite_item = test_controller.createTestItem(
-            suite_id,
-            suite.suite_name
-        );
-
-        for (const test_case of suite.test_cases) {
-            const sanitized_module = sanitize_id(test_case.module_name);
-            const sanitized_test = sanitize_id(test_case.test_name);
-            const test_id = `${suite_id}::${sanitized_module}::${sanitized_test}`;
-            const test_item = test_controller.createTestItem(
-                test_id,
-                test_case.test_name
-            );
-            // store original identifier for execution/results lookup
-            const original_id = `${suite.suite_name}::${test_case.module_name}::${test_case.test_name}`;
-            original_test_identifier.set(test_item, original_id);
-
-            try {
-                // Set location info
-                test_item.range = new vscode.Range(
-                    new vscode.Position(Math.max(0, test_case.line - 1), 0),
-                    new vscode.Position(test_case.line, 0)
-                );
-                // Uri cannot be set directly, it's read-only
-                // The test location is determined by context and suite
-            } catch (err) {
-                // If range setup fails, just continue without location
-                console.warn(`Failed to set range for test ${test_id}: ${err}`);
-            }
-            test_item.canResolveChildren = false;
-
-            suite_item.children.add(test_item);
-        }
-
-        root_item.children.add(suite_item);
-    }
-
-    test_controller.items.add(root_item);
-
-    // Store the mapping from root_id to executable path for later test execution
-    executable_map.set(root_id, normalized_path);
-
-    // Set up run handler (defined once globally, not per executable)
-    if (!run_profile_created) {
-        const run_handler = async (
-            request: vscode.TestRunRequest,
-            token: vscode.CancellationToken
-        ) => {
-            const run = test_controller!.createTestRun(request);
-
-            try {
-                // Collect all test items to run (leaf nodes only - actual tests, not suites)
-                const items_to_run: vscode.TestItem[] = [];
-
-                if (request.include && request.include.length > 0) {
-                    // Run specific selected tests - collect leaf nodes
-                    const queue = [...request.include];
-                    while (queue.length > 0) {
-                        const item = queue.shift()!;
-                        // If item has children, add them to queue; otherwise it's a test
-                        const has_children = (item.children as any).size > 0;
-                        if (!has_children) {
-                            items_to_run.push(item);
-                        } else {
-                            // It's a suite or root, add its children to queue
-                            (item.children as any).forEach((child: vscode.TestItem) => {
-                                queue.push(child);
-                            });
-                        }
-                    }
-                } else {
-                    // Run all tests - traverse tree to find all leaf test items
-                    const queue = Array.from(test_controller!.items).map(([, item]) => item);
-                    while (queue.length > 0) {
-                        const item = queue.shift()!;
-                        const has_children = (item.children as any).size > 0;
-                        if (!has_children) {
-                            items_to_run.push(item);
-                        } else {
-                            (item.children as any).forEach((child: vscode.TestItem) => {
-                                queue.push(child);
-                            });
-                        }
-                    }
-                }
-
-                // Run each test individually
-                for (const item of items_to_run) {
-                    if (token.isCancellationRequested) {
-                        run.skipped(item);
-                        continue;
-                    }
-
-                    run.started(item);
-
-                    // Extract test identifier and executable path
-                    const orig_id = original_test_identifier.get(item);
-                    let root_id: string;
-                    let test_identifier: string;
-
-                    if (orig_id) {
-                        // when we have an original id store, keep sanitized root but original test name
-                        const temp = extract_test_identifier((item as any).id);
-                        if (!temp) {
-                            run.failed(item, new vscode.TestMessage('Invalid test item ID format'));
-                            continue;
-                        }
-                        root_id = temp.root_id;
-                        test_identifier = orig_id;
-                    } else {
-                        const info = extract_test_identifier((item as any).id);
-                        if (!info) {
-                            run.failed(item, new vscode.TestMessage('Invalid test item ID format'));
-                            continue;
-                        }
-                        root_id = info.root_id;
-                        test_identifier = info.test_identifier;
-                    }
-
-                    const executable_path = executable_map.get(root_id);
-
-                    if (!executable_path) {
-                        run.failed(item, new vscode.TestMessage(
-                            `Could not find executable for test (root: ${root_id})`
-                        ));
-                        continue;
-                    }
-
-                    try {
-                        // Run the test executable with specific test filter and capture output
-                        // pass the test name as a separate argument to avoid shell quoting issues
-                        const stdout = execFileSync(executable_path, 
-                            [`--test-name=${test_identifier}`], 
-                            {
-                                timeout: 30000,
-                                stdio: 'pipe',
-                                encoding: 'utf8'
-                            }
-                        );
-
-                        // append raw output to run panel
-                        if (stdout && stdout.length > 0) {
-                            run.appendOutput(stdout);
-                        }
-
-                        // Parse test results from the output
-                        const results = parse_test_results(stdout);
-                        const test_result = results.get(test_identifier);
-
-                        if (test_result) {
-                            // Use parsed result
-                            if (test_result.status === 'passed') {
-                                run.passed(item, test_result.duration_ms);
-                            } else if (test_result.status === 'skipped') {
-                                run.skipped(item);
-                            } else {
-                                // failed - build detailed error message
-                                let full_message = test_result.message || 'Test failed';
-                                if (test_result.stack_trace) {
-                                    full_message += '\n\n' + test_result.stack_trace;
-                                }
-                                run.failed(item, new vscode.TestMessage(full_message), test_result.duration_ms);
-                            }
-                        } else {
-                            // No result found in output - assume passed if no exception
-                            run.passed(item);
-                        }
-                    } catch (err) {
-                        // Execution failed - try to parse results anyway
-                        let error_msg = 'Test execution failed';
-                        let stderrOutput: string | undefined;
-                        if (err instanceof Error) {
-                            error_msg = err.message;
-                            if ('stdout' in err && typeof (err as any).stdout === 'string') {
-                                const outstr = (err as any).stdout as string;
-                                run.appendOutput(outstr);
-                                const results = parse_test_results(outstr);
-                                const test_result = results.get(test_identifier);
-                                if (test_result && test_result.status === 'failed') {
-                                    // Use the parsed failure info
-                                    let message = test_result.message || error_msg;
-                                    if (test_result.stack_trace) {
-                                        message += '\n\n' + test_result.stack_trace;
-                                    }
-                                    run.failed(item, new vscode.TestMessage(message), test_result.duration_ms);
-                                    continue;
-                                }
-                            }
-                            if ('stderr' in err && typeof (err as any).stderr === 'string') {
-                                stderrOutput = (err as any).stderr as string;
-                                run.appendOutput(stderrOutput);
-                            }
-                        }
-                        run.failed(item, new vscode.TestMessage(error_msg));
-                    }
-                }
-            } finally {
-                run.end();
-            }
-        };
-
-        test_controller.createRunProfile(
-            'Run',
-            vscode.TestRunProfileKind.Run,
-            run_handler,
-            true
-        );
-
-        // Add a debug profile alongside the run profile
-        const debug_handler = async (
-            request: vscode.TestRunRequest,
-            token: vscode.CancellationToken
-        ) => {
-            const run = test_controller!.createTestRun(request);
-
-            // pick first leaf test item to debug
-            let targetItem: vscode.TestItem | undefined;
-            if (request.include && request.include.length > 0) {
-                // find first leaf in the include list
-                const queue = [...request.include];
-                while (queue.length > 0 && !targetItem) {
-                    const it = queue.shift()!;
-                    const hasChildren = (it.children as any).size > 0;
-                    if (hasChildren) {
-                        (it.children as any).forEach((c: vscode.TestItem) => queue.push(c));
-                    } else {
-                        targetItem = it;
-                        break;
-                    }
-                }
-            } else {
-                // get first leaf from all items
-                const queue = Array.from(test_controller!.items).map(([, item]) => item);
-                while (queue.length > 0 && !targetItem) {
-                    const it = queue.shift()!;
-                    const hasChildren = (it.children as any).size > 0;
-                    if (hasChildren) {
-                        (it.children as any).forEach((c: vscode.TestItem) => queue.push(c));
-                    } else {
-                        targetItem = it;
-                        break;
-                    }
-                }
-            }
-
-            if (!targetItem) {
-                run.end();
-                return;
-            }
-
-            run.started(targetItem);
-            const orig = original_test_identifier.get(targetItem);
-            const orig_id = original_test_identifier.get(targetItem);
-            let root_id: string;
-            let test_identifier: string;
-            if (orig_id) {
-                const temp = extract_test_identifier((targetItem as any).id);
-                if (!temp) {
-                    run.failed(targetItem, new vscode.TestMessage('Invalid test item ID format'));
-                    run.end();
-                    return;
-                }
-                root_id = temp.root_id;
-                test_identifier = orig_id;
-            } else {
-                const info = extract_test_identifier((targetItem as any).id);
-                if (!info) {
-                    run.failed(targetItem, new vscode.TestMessage('Invalid test item ID format'));
-                    run.end();
-                    return;
-                }
-                root_id = info.root_id;
-                test_identifier = info.test_identifier;
-            }
-
-            const executable_path = executable_map.get(root_id);
-            if (!executable_path) {
-                run.failed(targetItem, new vscode.TestMessage(`Could not find executable for test (root: ${root_id})`));
-                run.end();
-                return;
-            }
-
-            const debug_config: vscode.DebugConfiguration = {
-                type: 'cppvsdbg',
-                request: 'launch',
-                name: `Debug ${test_identifier}`,
-                program: executable_path,
-                args: [`--test-name=${test_identifier}`],
-                cwd: '${workspaceFolder}'
-            };
-
-            try {
-                await vscode.debug.startDebugging(undefined, debug_config);
-                run.passed(targetItem);
-            } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                run.failed(targetItem, new vscode.TestMessage(`Debug session failed: ${msg}`));
-            } finally {
-                run.end();
-            }
-        };
-
-        test_controller.createRunProfile(
-            'Debug',
-            vscode.TestRunProfileKind.Debug,
-            debug_handler,
-            true
-        );
-
-        run_profile_created = true;
-    }
+        return true;
+    });
 }
 
-export function setup_test_executables_watcher(glob_pattern: string): vscode.Disposable
-{
-    // keep track of which executables we've already processed for this watcher
-    const processed_executables = new Set<string>();
+export function create_test_controller(id: string): vscode.TestController {
+    const test_controller = vscode.tests.createTestController(
+        id,
+        "Hlang Tests"
+    );
 
-    // Helper to remove root item for a specific executable
-    const remove_old_root = (exec_path: string) => {
-        if (test_controller) {
-            const normalized_path = path.normalize(exec_path);
-            const root_id = make_root_id(normalized_path);
-            test_controller.items.delete(root_id);
+    const run_handler = async (request: vscode.TestRunRequest, token: vscode.CancellationToken) => {
+        const run = test_controller.createTestRun(request);
+        try {
+            await on_run_tests(test_controller, run, request, token);
+        }
+        finally {
+            run.end();
         }
     };
 
-    // Helper to process an executable file
-    const process_executable = (exec_path: string) => {
-        const normalized_path = path.normalize(exec_path);
-        if (processed_executables.has(normalized_path)) {
-            // Already processed recently, skip to avoid redundant work
+    test_controller.createRunProfile(
+        'Run',
+        vscode.TestRunProfileKind.Run,
+        run_handler,
+        true
+    );
+
+    const debug_handler = async (request: vscode.TestRunRequest, token: vscode.CancellationToken) => {
+        const run = test_controller.createTestRun(request);
+        try {
+            await on_debug_tests(test_controller, run, request, token);
+        }
+        finally {
+            run.end();
+        }
+    };
+
+    test_controller.createRunProfile(
+        'Debug',
+        vscode.TestRunProfileKind.Debug,
+        debug_handler,
+        true
+    );
+
+    test_controller.refreshHandler = async () => {
+        const tests_configuration = vscode.workspace.getConfiguration("hlang");
+        const glob_pattern = tests_configuration.get<string>("test_executable_glob", "build/bin/*.hlang.test*");
+        const uris = await find_test_executables(glob_pattern);
+        for (const uri of uris) {
+            const suites = find_tests(uri.fsPath);
+            add_tests_to_controller(test_controller, uri.fsPath, suites);
+        }        
+    };
+
+    return test_controller;
+}
+
+function get_leaf_test_items(items: readonly vscode.TestItem[]): vscode.TestItem[] {
+    const leaf_items: vscode.TestItem[] = [];
+
+    const queue = [...items];
+     while (queue.length > 0) {
+        const item = queue.shift()!;
+        
+        // If item has children, add them to queue; otherwise it's a test
+        const has_children = (item.children as any).size > 0;
+        if (!has_children) {
+            leaf_items.push(item);
+        } else {
+            item.children.forEach((child: vscode.TestItem) => queue.push(child));
+        }
+    }
+
+    return leaf_items;
+}
+
+function exclude_test_items(items: readonly vscode.TestItem[], exclude: readonly vscode.TestItem[] | undefined): readonly vscode.TestItem[] {
+    if (exclude === undefined) {
+        return items;
+    }
+
+    return items.filter((item: vscode.TestItem) => exclude.find((current: vscode.TestItem) => current.id === item.id) === undefined);
+}
+
+function get_items_to_run(test_controller: vscode.TestController, request: vscode.TestRunRequest): vscode.TestItem[] {
+    if (request.include && request.include.length > 0) {
+        const items = exclude_test_items(request.include, request.exclude);
+        return get_leaf_test_items(items);
+    }
+    else {
+        const items = Array.from(test_controller.items).map(([, item]) => item);
+        const filtered_items = exclude_test_items(items, request.exclude);
+        return get_leaf_test_items(filtered_items);
+    }
+}
+
+interface Process_result {
+    code: number | null;
+    output: string;
+    duration_milliseconds: number;
+    user_data: any;
+}
+
+function run_process(command: string, args: string[], spawn_options: child_process.SpawnOptionsWithoutStdio, user_data: any, spawn_callback: () => void, close_callback: (error: boolean, code: number | null, duration_milliseconds: number) => void, token: vscode.CancellationToken): Promise<Process_result> {
+  return new Promise<Process_result>((resolve, reject) => {
+
+    if (token.isCancellationRequested) {
+        reject(new Error("Canceled"));
+    }
+
+    const start_time = performance.now();
+    const child = child_process.spawn(command, args, spawn_options);
+
+    let output = "";
+
+    child.on("spawn", spawn_callback);
+
+    child.stdout.on("data", (data) => {
+        output += data.toString();
+    });
+
+    child.stderr.on("data", (data) => {
+        output += data.toString();
+    });
+
+    child.on("error", (err) => {
+        const end_time = performance.now();
+        const duration_milliseconds = end_time - start_time;
+        close_callback(true, null, duration_milliseconds);
+        reject(err);
+    });
+
+    child.on("close", (code) => {
+        const end_time = performance.now();
+        const duration_milliseconds = end_time - start_time;
+        close_callback(false, code, duration_milliseconds);
+        resolve({ code, output, duration_milliseconds, user_data });
+    });
+  });
+}
+
+function run_test(run: vscode.TestRun, item: vscode.TestItem, spawn_options: child_process.SpawnOptionsWithoutStdio, token: vscode.CancellationToken): Promise<Process_result> {
+    run.started(item);
+
+    const module_item = item.parent as vscode.TestItem;
+    const executable_item = module_item.parent as vscode.TestItem;
+    const executable_uri = executable_item.uri;
+    if (executable_uri === undefined) {
+        run.failed(item, new vscode.TestMessage("Could not find executable path corresponding to this test."));
+        return Promise.reject(new Error("Could not find executable path"));
+    }
+
+    run.enqueued(item);
+
+    const spawn_callback = (): void => {
+        run.started(item);
+    };
+
+    const close_callback = (error: boolean, code: number | null, duration_milliseconds: number): void => {
+        if (error) {
+            run.errored(item, new vscode.TestMessage("Unexpected error while executing test."), duration_milliseconds);
+        }
+        else if (code === 0) {
+            run.passed(item, duration_milliseconds);
+        }
+        else {
+            run.failed(item, new vscode.TestMessage("Test failed."), duration_milliseconds);
+        }
+    };
+
+    return run_process(executable_uri.fsPath, [`--test-name=${module_item.id}.${item.id}`], spawn_options, item, spawn_callback, close_callback, token);
+}
+
+async function on_run_tests(test_controller: vscode.TestController, run: vscode.TestRun, request: vscode.TestRunRequest, token: vscode.CancellationToken): Promise<void> {
+    
+    const items_to_run: vscode.TestItem[] = get_items_to_run(test_controller, request);
+
+    const spawn_options: child_process.SpawnOptionsWithoutStdio = {
+        timeout: 30000,
+        stdio: 'pipe'
+    };
+
+    const promisses: Promise<Process_result>[] = [];
+
+    for (const item of items_to_run) {
+        if (token.isCancellationRequested) {
+            await Promise.all(promisses);
             return;
         }
 
-        try {
-            processed_executables.add(normalized_path);
-            const suites = find_tests(normalized_path);
-            show_tests_in_the_ui(normalized_path, suites);
-        } catch (err) {
-            console.error(`Error processing test executable ${exec_path}:`, err);
+        const promise = run_test(run, item, spawn_options, token);
+        promisses.push(promise);
+    }
+
+    const results = await Promise.all(promisses);
+
+    for (const result of results) {
+        run.appendOutput(result.output, undefined, result.user_data as vscode.TestItem);
+    }
+
+    for (const item of items_to_run) {
+        run.passed(item);
+    }
+}
+
+async function on_debug_tests(test_controller: vscode.TestController, run: vscode.TestRun, request: vscode.TestRunRequest, token: vscode.CancellationToken): Promise<void> {
+
+    const items_to_run = get_items_to_run(test_controller, request);
+    if (items_to_run.length === 0) {
+        return;
+    }
+
+    const item = items_to_run[0];
+
+    const module_item = item.parent as vscode.TestItem;
+    const executable_item = item.parent as vscode.TestItem;
+    const executable_uri = executable_item.uri;
+    if (executable_uri === undefined) {
+        run.failed(item, new vscode.TestMessage("Could not find executable path corresponding to this test."));
+        return Promise.reject(new Error("Could not find executable path"));
+    }
+
+    run.started(item);
+    
+    const test_name = `${module_item.id}.${item.id}`;
+    const debug_config: vscode.DebugConfiguration = {
+        type: "cppvsdbg",
+        request: "launch",
+        name: `Debug ${test_name}`,
+        program: executable_uri.fsPath,
+        args: [`--test-name=${test_name}`],
+        cwd: "${workspaceFolder}"
+    };
+
+    try {
+        await vscode.debug.startDebugging(undefined, debug_config);
+        run.passed(item);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        run.failed(item, new vscode.TestMessage(`Debug session failed: ${msg}`));
+    }
+}
+
+export function add_tests_to_controller(test_controller: vscode.TestController, test_executable_file_path: string, test_suites: Test_suite[]): void {
+    
+    const executable_id = make_root_id(test_executable_file_path);
+    const executable_name = path.basename(test_executable_file_path);
+    const executable_item = test_controller.createTestItem(executable_id, executable_name, vscode.Uri.file(test_executable_file_path));
+    test_controller.items.add(executable_item);
+
+    for (const suite of test_suites) {
+        for (const test_case of suite.test_cases) {
+            const module_id = sanitize_id(test_case.module_name);
+
+            let module_item = executable_item.children.get(module_id);
+            if (module_item === undefined) {
+                module_item = test_controller.createTestItem(module_id, test_case.module_name, vscode.Uri.file(test_case.file_path));
+                executable_item.children.add(module_item);
+            }
+
+            const test_case_id = sanitize_id(test_case.test_name);
+            const test_case_item = test_controller.createTestItem(test_case_id, test_case.test_name, vscode.Uri.file(test_case.file_path));
+            test_case_item.range = new vscode.Range(test_case.line - 1, 0, test_case.line, 0);
+            module_item.children.add(test_case_item);
         }
+    }
+}
+
+export async function setup_test_executables_watcher(test_controller: vscode.TestController, glob_pattern: string): Promise<vscode.Disposable>
+{
+    // Helper to process an executable file
+    const process_executable = (executable_path: string) => {
+        const suites = find_tests(executable_path);
+        add_tests_to_controller(test_controller, executable_path, suites);
     };
 
     // Create file system watcher for the glob pattern
@@ -621,29 +485,20 @@ export function setup_test_executables_watcher(glob_pattern: string): vscode.Dis
 
     // Handle modified test executables (refresh tests)
     const change_subscription = watcher.onDidChange((uri) => {
-        const normalized_path = path.normalize(uri.fsPath);
-        processed_executables.delete(normalized_path);
-        remove_old_root(normalized_path);
-        process_executable(normalized_path);
+        process_executable(uri.fsPath);
     });
 
     // Handle deleted test executables (remove from UI)
     const delete_subscription = watcher.onDidDelete((uri) => {
-        const normalized_path = path.normalize(uri.fsPath);
-        processed_executables.delete(normalized_path);
-        remove_old_root(normalized_path);
+        const root_id = make_root_id(uri.fsPath);
+        test_controller.items.delete(root_id);
     });
 
-    // Find all matching executables initially (and await)
-    const initial_find = Promise.resolve(vscode.workspace.findFiles(glob_pattern)).then(uris => {
-        for (const uri of uris) {
-            if (uri.fsPath.endsWith(".pdb"))
-                continue;
-            process_executable(uri.fsPath);
-        }
-    }).catch(err => {
-        console.error(`Error during initial test discovery: ${err}`);
-    });
+    // Find all matching executables initially
+    const uris = await find_test_executables(glob_pattern);
+    for (const uri of uris) {
+        process_executable(uri.fsPath);
+    }
 
     // Return a disposable that cleans up all subscriptions and the watcher
     return vscode.Disposable.from(
