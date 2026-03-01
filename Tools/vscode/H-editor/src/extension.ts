@@ -19,7 +19,8 @@ let client: LanguageClient | undefined = undefined;
 let server_process: child_process.ChildProcess | undefined = undefined;
 
 async function create_server_options_to_create(
-	configuration: vscode.WorkspaceConfiguration
+	configuration: vscode.WorkspaceConfiguration,
+	output_channel: vscode.OutputChannel
 ): Promise<ServerOptions> {
 
 	const server_env_path = process.env.hlang_language_server;
@@ -28,6 +29,24 @@ async function create_server_options_to_create(
 	const options: child_process.ExecSyncOptions = {};
 
 	const language_server_process = child_process.spawn(server_path, options);
+
+	language_server_process.on("spawn", () => {
+		output_channel.appendLine("Language Server spawned");
+	});
+
+	language_server_process.on("message", (message: child_process.Serializable) => {
+		output_channel.append("Language server: ");
+		output_channel.append(message.toString());
+	});
+
+	language_server_process.on("error", (error: Error) => {
+		output_channel.append("Language server error: ");
+		output_channel.append(error.toString());
+	});
+
+	language_server_process.on("exit", () => {
+		output_channel.appendLine("Language Server exited");
+	});
 
 	let server_is_ready = false;
 
@@ -68,12 +87,13 @@ async function create_server_options_to_create(
 
 	server_process = language_server_process;
 
-	return create_server_options_to_attach("127.0.0.1", 12345);
+	return create_server_options_to_attach("127.0.0.1", 12345, output_channel);
 }
 
 async function create_server_options_to_attach(
 	server_host: string,
-	server_port: number
+	server_port: number,
+	output_channel: vscode.OutputChannel
 ): Promise<ServerOptions> {
 	 
 	const server_options = () => {
@@ -85,8 +105,17 @@ async function create_server_options_to_attach(
                 });
             });
 
-            socket.on('error', (err) => {
-                reject(err);
+			socket.on("end", () => {
+				output_channel.appendLine("Language server socket connection end");
+			});
+			
+			socket.on("close", (hadError: boolean) => {
+				output_channel.appendLine("Language server socket connection closed");
+			});
+
+            socket.on('error', (error: Error) => {
+				output_channel.appendLine("Language server socket error: " + error.message);
+                reject(error);
             });
         });
     };
@@ -101,10 +130,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 	const mode: string | undefined = process.env.mode;
 	const attach_to_server = mode !== undefined && mode === "debug";
 
+	const output_channel = vscode.window.createOutputChannel("hlang", "hlang");
+	
 	const server_options = 
 		attach_to_server ?
-		await create_server_options_to_attach("127.0.0.1", 12345) :
-		await create_server_options_to_create(configuration);
+		await create_server_options_to_attach("127.0.0.1", 12345, output_channel) :
+		await create_server_options_to_create(configuration, output_channel);
+
 
 	// Options to control the language client
 	const client_options: LanguageClientOptions = {
@@ -113,7 +145,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 		synchronize: {
 			// Notify the server about file changes to '.clientrc files contained in the workspace
 			fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
-		}
+		},
+		outputChannel: output_channel
 	};
 
 	// Create the language client and start the client.
@@ -137,6 +170,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 
 	// Set up test executable watcher (discover and show tests in the Test Explorer)
 	try {
+		output_channel.appendLine("Starting test adapter");
 		const tests_configuration = vscode.workspace.getConfiguration("hlang");
 		const test_controller = create_test_controller("hlang-test-controller");
 		const glob = tests_configuration.get<string>("test_executable_glob", "build/bin/*.hlang.test*");
