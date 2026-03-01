@@ -6,13 +6,12 @@
 
 # Ignore test files
 .vscode-test/**
-
-# Ignore build artifacts
-node_modules
+.vscode-test.mjs
 
 # Ignore source code and test files
 src/**
 test_fixture/**
+out/test/**
 
 # Ignore Misc
 example_files
