@@ -527,8 +527,7 @@ namespace h::compiler
                 llvm_debug_builder.getOrCreateArray(elements)
             );
 
-            //llvm_debug_builder.replaceTemporary(llvm::TempDIType(llvm_forward_declaration_debug_type), llvm_struct_debug_type);
-            llvm_forward_declaration_debug_type->replaceAllUsesWith(llvm_struct_debug_type);
+            llvm_debug_builder.replaceTemporary(llvm::TempDIType(llvm_forward_declaration_debug_type), llvm_struct_debug_type);
             llvm_debug_type_map[struct_declaration.name] = llvm_struct_debug_type;
         }
     }
@@ -653,8 +652,7 @@ namespace h::compiler
                 llvm_debug_builder.getOrCreateArray(elements)
             );
 
-            //llvm_debug_builder.replaceTemporary(llvm::TempDIType(llvm_forward_declaration_debug_type), llvm_union_debug_type);
-            llvm_forward_declaration_debug_type->replaceAllUsesWith(llvm_union_debug_type);
+            llvm_debug_builder.replaceTemporary(llvm::TempDIType(llvm_forward_declaration_debug_type), llvm_union_debug_type);
             llvm_debug_type_map[union_declaration.name] = llvm_union_debug_type;
         }
     }
@@ -751,6 +749,14 @@ namespace h::compiler
         set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module, core_module.export_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
         set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module, core_module.internal_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
     }
+
+    llvm::DIType* create_void_type(
+        llvm::DIBuilder& llvm_debug_builder
+    )
+    {
+        return llvm_debug_builder.createBasicType("void", 0, llvm::dwarf::DW_ATE_unsigned);
+    }
+    
 
     llvm::DIType* array_slice_type_to_llvm_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
@@ -1021,7 +1027,7 @@ namespace h::compiler
         Debug_type_database const& debug_type_database
     )
     {
-        llvm::DIType* const pointed_type = !type.element_type.empty() ? type_reference_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, type.element_type[0], debug_type_database) : nullptr;
+        llvm::DIType* const pointed_type = !type.element_type.empty() ? type_reference_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, type.element_type[0], debug_type_database) : create_void_type(llvm_debug_builder);
         return llvm_debug_builder.createPointerType(pointed_type, llvm_data_layout.getPointerSizeInBits());
     }
 
@@ -1075,20 +1081,6 @@ namespace h::compiler
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
             return llvm::PointerType::get(llvm_context, 0);
-            
-            /*Function_pointer_type const& data = std::get<Function_pointer_type>(type_reference.data);
-
-            llvm::FunctionType* const llvm_function_type = create_llvm_function_type(
-                llvm_context,
-                llvm_data_layout,
-                data.type.input_parameter_types,
-                data.type.output_parameter_types,
-                data.type.is_variadic,
-                type_database,
-                {}
-            );
-
-            return llvm_function_type;*/
         }
         else if (std::holds_alternative<Integer_type>(type_reference.data))
         {
@@ -1216,7 +1208,7 @@ namespace h::compiler
     )
     {
         if (type_reference.empty())
-            return nullptr;
+            return create_void_type(llvm_debug_builder);
 
         return type_reference_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, type_reference[0], debug_type_database);
     }

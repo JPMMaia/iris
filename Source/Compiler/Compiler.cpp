@@ -588,6 +588,12 @@ namespace h::compiler
 
         set_function_definition_attributes(llvm_context, clang_module_data, llvm_function);
 
+        if (debug_info != nullptr)
+        {
+            llvm::DISubprogram* const subprogram = llvm_function.getSubprogram();
+            debug_info->llvm_builder->finalizeSubprogram(subprogram);
+        }
+
         if (llvm::verifyFunction(llvm_function, &llvm::errs())) {
             llvm::errs() << "\n Function body:\n";
             llvm_function.print(llvm::errs(), nullptr);
@@ -1206,6 +1212,8 @@ namespace h::compiler
         if (!core_module.source_file_path)
             h::common::print_message_and_exit("Module did not contain source file path!");
 
+        llvm_debug_builder->finalize();
+
         return std::make_unique<Debug_info>(
             std::move(llvm_debug_builder),
             std::move(debug_type_database),
@@ -1334,11 +1342,6 @@ namespace h::compiler
         {
             llvm_module->print(llvm::errs(), nullptr);
             throw std::runtime_error{ std::format("Module '{}' is not valid!", core_module.name) };
-        }
-
-        if (debug_info != nullptr)
-        {
-            debug_info->llvm_builder->finalize();
         }
 
         return llvm_module;
