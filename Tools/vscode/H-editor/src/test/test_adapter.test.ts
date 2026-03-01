@@ -68,25 +68,13 @@ suite("Test Adapter", () => {
 		}
 
 		assert.equal(executable_item.label, "executable");
-		assert.equal(executable_item.children.size, 2);
-		if (executable_item.children.size != 2) {
-			return;
-		}
+		assert.equal(executable_item.children.size, 3);
 
 		for (const suite of test_suites) {
-			const suite_id = suite.suite_name;
-			const suite_item = executable_item.children.get(suite_id);
-			assert.notEqual(suite_item, undefined);
-			if (suite_item === undefined) {
-				continue;
-			}
-			
-			assert.equal(suite_item.label, suite.suite_name);
-
 			for (const test_case of suite.test_cases) {
 				const module_id = test_case.module_name;
 				
-				const module_item = suite_item.children.get(module_id);
+				const module_item = executable_item.children.get(module_id);
 				assert.notEqual(module_item, undefined);
 				if (module_item === undefined) {
 					continue;
