@@ -2322,6 +2322,58 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
   }
 
+  TEST_CASE("Compile Debug Information Temporary Replacement", "[LLVM_IR]")
+  {
+    char const* const input_file = "debug_information_temporary_replacement.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+%struct.Debug_information_temporary_replacement_My_struct = type {{ ptr, ptr }}
+
+; Function Attrs: convergent
+define private void @Debug_information_temporary_replacement_run() #0 !dbg !3 {{
+entry:
+  %instance = alloca %struct.Debug_information_temporary_replacement_My_struct, align 8, !dbg !7
+  %0 = getelementptr inbounds %struct.Debug_information_temporary_replacement_My_struct, ptr %instance, i32 0, i32 0, !dbg !7
+  store ptr null, ptr %0, align 8, !dbg !7
+  %1 = getelementptr inbounds %struct.Debug_information_temporary_replacement_My_struct, ptr %instance, i32 0, i32 1, !dbg !7
+  store ptr null, ptr %1, align 8, !dbg !7
+  call void @llvm.dbg.declare(metadata ptr %instance, metadata !8, metadata !DIExpression()), !dbg !7
+  ret void, !dbg !7
+}}
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
+
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
+
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_temporary_replacement.hltxt", directory: "{}")
+!3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_temporary_replacement_run", scope: null, file: !2, line: 10, type: !4, scopeLine: 11, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
+!4 = !DISubroutineType(types: !5)
+!5 = !{{null}}
+!6 = !{{}}
+!7 = !DILocation(line: 12, column: 5, scope: !3)
+!8 = !DILocalVariable(name: "instance", scope: !3, file: !2, line: 12, type: !9)
+!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "Debug_information_temporary_replacement_My_struct", file: !2, line: 3, size: 128, align: 8, elements: !10)
+!10 = !{{!11, !13}}
+!11 = !DIDerivedType(tag: DW_TAG_member, name: "a", file: !2, line: 4, baseType: !12, size: 64, align: 64)
+!12 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !9, size: 64)
+!13 = !DIDerivedType(tag: DW_TAG_member, name: "b", file: !2, line: 5, baseType: !14, size: 64, align: 64, offset: 64)
+!14 = !DIDerivedType(tag: DW_TAG_typedef, name: "Debug_information_temporary_replacement_My_alias", file: !2, line: 8, baseType: !12)
+)", g_test_source_files_path.generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
+  }
+
   TEST_CASE("Compile Debug Information Union", "[LLVM_IR]")
   {
     char const* const input_file = "debug_information_unions.hltxt";

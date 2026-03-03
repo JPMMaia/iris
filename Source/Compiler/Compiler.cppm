@@ -105,6 +105,7 @@ namespace h::compiler
 
     std::pmr::vector<h::Module const*> sort_core_modules(
         std::pmr::unordered_map<std::pmr::string, h::Module> const& core_module_dependencies,
+        h::Module const* const core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
@@ -145,7 +146,7 @@ namespace h::compiler
         LLVM_data& llvm_data,
         h::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        Compilation_database& compilation_database,
+        Compilation_database const& compilation_database,
         Compilation_options const& compilation_options
     );
 

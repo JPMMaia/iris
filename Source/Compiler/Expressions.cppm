@@ -61,7 +61,7 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder;
         llvm::Function* const llvm_parent_function;
         llvm::Module& llvm_module;
-        Clang_module_data& clang_module_data;
+        Clang_module_data const& clang_module_data;
         Module const& core_module;
         std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies;
         Declaration_database& declaration_database;

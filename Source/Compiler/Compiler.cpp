@@ -164,7 +164,7 @@ namespace h::compiler
     llvm::Function& to_function(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         std::string_view const module_name,
         llvm::FunctionType& llvm_function_type,
         Function_declaration const& function_declaration,
@@ -208,7 +208,7 @@ namespace h::compiler
     llvm::Function& create_function_declaration(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Module const& core_module,
         Function_declaration const& function_declaration,
         Type_database& type_database,
@@ -356,7 +356,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
         Declaration_database& declaration_database,
@@ -410,7 +410,7 @@ namespace h::compiler
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Module const& core_module,
         Function_declaration const& function_declaration,
         Function_definition const& function_definition,
@@ -605,7 +605,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
         std::optional<std::span<std::string_view const>> const functions_to_compile,
@@ -866,7 +866,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
         std::span<Function_declaration const> const function_declarations,
@@ -1006,7 +1006,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Type_database& type_database,
         Declaration_database& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -1052,7 +1052,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Type_database& type_database,
         Declaration_database& declaration_database,
         Module const& core_module,
@@ -1169,7 +1169,7 @@ namespace h::compiler
             llvm_data_layout
         );
 
-        std::pmr::vector<h::Module const*> const sorted_core_module_dependencies = sort_core_modules(core_module_dependencies, {}, {});
+        std::pmr::vector<h::Module const*> const sorted_core_module_dependencies = sort_core_modules(core_module_dependencies, nullptr, {}, {});
 
         for (h::Module const* module_dependency : sorted_core_module_dependencies)
         {
@@ -1225,7 +1225,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Module const& core_module,
         Type_database& type_database,
         Declaration_database& declaration_database,
@@ -1234,19 +1234,7 @@ namespace h::compiler
     {
         std::pmr::vector<Function_declaration> function_declarations{temporaries_allocator};
         function_declarations.reserve(1);
-
         function_declarations.push_back(create_test_check_function_declaration());
-
-        for (Function_declaration const& declaration : function_declarations)
-        {
-            add_clang_function_declaration(
-                clang_module_data.declaration_database,
-                clang_module_data.ast_context,
-                "Hlang.Test_main",
-                declaration,
-                declaration_database
-            );
-        }
 
         auto& llvm_function_list = llvm_module.getFunctionList();
 
@@ -1277,12 +1265,12 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         std::string_view const target_triple,
         llvm::DataLayout const& llvm_data_layout,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
         std::optional<std::span<std::string_view const>> const functions_to_compile,
-        Declaration_database& declaration_database,
-        Type_database& type_database,
+        Declaration_database declaration_database, // TODO makes copy
+        Type_database type_database, // TODO makes copy
         Compilation_options const& compilation_options
     )
     {
@@ -1461,6 +1449,7 @@ namespace h::compiler
 
     std::pmr::vector<h::Module const*> sort_core_modules(
         std::pmr::unordered_map<std::pmr::string, h::Module> const& core_module_dependencies,
+        h::Module const* const core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -1474,7 +1463,7 @@ namespace h::compiler
         }
 
         std::pmr::vector<h::Module const*> sorted{ output_allocator };
-        sorted.reserve(core_module_dependencies.size());
+        sorted.reserve(core_module_dependencies.size() + 1);
 
         while (!remaining.empty())
         {
@@ -1501,6 +1490,9 @@ namespace h::compiler
             }
         }
 
+        if (core_module != nullptr)
+            sorted.push_back(core_module);
+
         return sorted;
     }
 
@@ -1512,12 +1504,11 @@ namespace h::compiler
         Compilation_options const& compilation_options
     )
     {
-        std::pmr::vector<h::Module const*> const sorted_core_module_dependencies = sort_core_modules(core_module_dependencies, {}, {});
+        std::pmr::vector<h::Module const*> const sorted_core_modules = sort_core_modules(core_module_dependencies, &core_module, {}, {});
 
         Declaration_database declaration_database = create_declaration_database();
-        for (Module const* module_dependency : sorted_core_module_dependencies)
+        for (Module const* module_dependency : sorted_core_modules)
             add_declarations(declaration_database, *module_dependency);
-        add_declarations(declaration_database, core_module);
 
         // TODO do this a different place so we can modify original
         Module new_core_module = core_module;
@@ -1533,22 +1524,10 @@ namespace h::compiler
             }
         }
 
-        std::pmr::vector<h::Module const*> all_core_modules{
-            sorted_core_module_dependencies.begin(), sorted_core_module_dependencies.end()
-        };
-        all_core_modules.push_back(&new_core_module);
-        Clang_module_data clang_module_data = create_clang_module_data(
-            *llvm_data.context,
-            llvm_data.clang_data,
-            "Hl_clang_module",
-            all_core_modules,
-            declaration_database
-        );
+        Compilation_database compilation_database = process_modules_and_create_compilation_database(llvm_data, sorted_core_modules, declaration_database, {}, {});
 
-        Type_database type_database = create_type_database(*llvm_data.context);
-        for (Module const* module_dependency : sorted_core_module_dependencies)
-            add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, clang_module_data, *module_dependency);
-        add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, clang_module_data, new_core_module);
+        Clang_module_data const& clang_module_data = compilation_database.clang_module_data;
+        Type_database& type_database = compilation_database.type_database;
 
         std::unique_ptr<llvm::Module> llvm_module = create_module(*llvm_data.context, llvm_data.target_triple, llvm_data.data_layout, clang_module_data, new_core_module, core_module_dependencies, functions_to_compile, declaration_database, type_database, compilation_options);
         
@@ -1806,6 +1785,28 @@ namespace h::compiler
         }
     }
 
+    static void add_additional_test_declarations_to_clang_database(
+        Clang_module_data& clang_module_data,
+        Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        std::pmr::vector<h::Function_declaration> function_declarations{temporaries_allocator};
+        function_declarations.reserve(1);
+        function_declarations.push_back(create_test_check_function_declaration());
+
+        for (Function_declaration const& declaration : function_declarations)
+        {
+            add_clang_function_declaration(
+                clang_module_data.declaration_database,
+                clang_module_data.ast_context,
+                "Hlang.Test_main",
+                declaration,
+                declaration_database
+            );
+        }
+    }
+
     Compilation_database process_modules_and_create_compilation_database(
         LLVM_data& llvm_data,
         std::span<h::Module const* const> const sorted_modules,
@@ -1821,6 +1822,8 @@ namespace h::compiler
             sorted_modules,
             declaration_database
         );
+
+        add_additional_test_declarations_to_clang_database(clang_module_data, declaration_database, temporaries_allocator);
 
         Type_database type_database = create_type_database(*llvm_data.context);
         for (Module const* sorted_module : sorted_modules)
@@ -1838,7 +1841,7 @@ namespace h::compiler
         LLVM_data& llvm_data,
         h::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        Compilation_database& compilation_database,
+        Compilation_database const& compilation_database,
         Compilation_options const& compilation_options
     )
     {

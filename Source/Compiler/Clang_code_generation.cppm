@@ -50,13 +50,13 @@ namespace h::compiler
     );
 
     export llvm::FunctionType* create_llvm_function_type(
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         std::string_view const module_name,
         std::string_view const function_name
     );
 
     export llvm::FunctionType* convert_to_llvm_function_type(
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Declaration_database const& declaration_database,
         h::Function_type const& function_type
     );
@@ -64,7 +64,7 @@ namespace h::compiler
     export void set_llvm_function_argument_names(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         h::Function_declaration const& function_declaration,
         llvm::Function& llvm_function,
         Declaration_database const& declaration_database,
@@ -83,7 +83,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         h::Module const& core_module,
@@ -112,7 +112,7 @@ namespace h::compiler
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
         llvm::Function& llvm_parent_function,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         h::Module const& core_module,
         h::Function_type const& function_type,
         llvm::FunctionType& llvm_function_type,
@@ -126,7 +126,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         h::Module const& core_module,
         h::Function_declaration const& function_declaration,
         llvm::Function& llvm_function,
@@ -141,7 +141,7 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         h::Module const& core_module,
         h::Function_type const& function_type,
         llvm::Function& llvm_function,
@@ -153,7 +153,7 @@ namespace h::compiler
 
     export void set_function_definition_attributes(
         llvm::LLVMContext& llvm_context,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         llvm::Function& llvm_function
     );
 
