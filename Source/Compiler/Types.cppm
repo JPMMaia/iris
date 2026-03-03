@@ -38,7 +38,7 @@ namespace h::compiler
     };
 
     using LLVM_type_map = std::pmr::unordered_map<std::pmr::string, llvm::Type*>;
-    using LLVM_debug_type_map = std::pmr::unordered_map<std::pmr::string, llvm::DIType*>;
+    using LLVM_debug_type_map = std::pmr::unordered_map<std::pmr::string, llvm::TypedTrackingMDRef<llvm::DIType>>;
     using Module_name = std::pmr::string;
 
     export struct Type_database

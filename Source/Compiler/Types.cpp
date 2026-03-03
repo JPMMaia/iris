@@ -528,7 +528,7 @@ namespace h::compiler
             );
 
             llvm_debug_builder.replaceTemporary(llvm::TempDIType(llvm_forward_declaration_debug_type), llvm_struct_debug_type);
-            llvm_debug_type_map[struct_declaration.name] = llvm_struct_debug_type;
+            llvm_debug_type_map[struct_declaration.name] = llvm::TypedTrackingMDRef<llvm::DIType>{llvm_struct_debug_type};
         }
     }
 
@@ -653,7 +653,7 @@ namespace h::compiler
             );
 
             llvm_debug_builder.replaceTemporary(llvm::TempDIType(llvm_forward_declaration_debug_type), llvm_union_debug_type);
-            llvm_debug_type_map[union_declaration.name] = llvm_union_debug_type;
+            llvm_debug_type_map[union_declaration.name] = llvm::TypedTrackingMDRef<llvm::DIType>{llvm_union_debug_type};
         }
     }
 
