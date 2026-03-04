@@ -414,7 +414,7 @@ async function on_debug_tests(test_controller: vscode.TestController, run: vscod
     const item = items_to_run[0];
 
     const module_item = item.parent as vscode.TestItem;
-    const executable_item = item.parent as vscode.TestItem;
+    const executable_item = module_item.parent as vscode.TestItem;
     const executable_uri = executable_item.uri;
     if (executable_uri === undefined) {
         run.failed(item, new vscode.TestMessage("Could not find executable path corresponding to this test."));
