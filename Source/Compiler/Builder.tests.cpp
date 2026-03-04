@@ -323,7 +323,7 @@ namespace h::compiler
         {
             std::filesystem::path{"artifacts"} / "my_library.test.bc",
             std::filesystem::path{"artifacts"} / "my_library.generated_tests_information.test.bc",
-            std::filesystem::path{"bin"} / get_binary_name("my_library.test", target)
+            std::filesystem::path{"bin"} / get_binary_name("my_library.hlang.test", target)
         };
 
         test_builder("Test_framework", {"my_library/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_0", {.is_test_mode = true});
@@ -343,7 +343,7 @@ namespace h::compiler
             std::filesystem::path{"artifacts"} / "my_library.bc",
             std::filesystem::path{"artifacts"} / "my_app.test.bc",
             std::filesystem::path{"artifacts"} / "my_app.generated_tests_information.test.bc",
-            std::filesystem::path{"bin"} / get_binary_name("my_app.test", target)
+            std::filesystem::path{"bin"} / get_binary_name("my_app.hlang.test", target)
         };
 
         test_builder("Test_framework", {"my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_1", {.is_test_mode = true});
@@ -365,8 +365,8 @@ namespace h::compiler
             std::filesystem::path{"artifacts"} / "my_library.generated_tests_information.test.bc",
             std::filesystem::path{"artifacts"} / "my_app.test.bc",
             std::filesystem::path{"artifacts"} / "my_app.generated_tests_information.test.bc",
-            std::filesystem::path{"bin"} / get_binary_name("my_library.test", target),
-            std::filesystem::path{"bin"} / get_binary_name("my_app.test", target)
+            std::filesystem::path{"bin"} / get_binary_name("my_library.hlang.test", target),
+            std::filesystem::path{"bin"} / get_binary_name("my_app.hlang.test", target)
         };
 
         test_builder("Test_framework", {"my_library/hlang_artifact.json", "my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_2", {.is_test_mode = true});
