@@ -290,6 +290,7 @@ enum My_enum
     b = 1 + 2,
     c = a + b,
     d = get_value(),
+    e = -1,
 }
 )";
 

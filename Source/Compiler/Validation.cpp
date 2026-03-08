@@ -4057,6 +4057,33 @@ namespace h::compiler
 
             return true;
         }
+        else if (std::holds_alternative<h::Unary_expression>(expression.data))
+        {
+            h::Unary_expression const& unary_expression = std::get<h::Unary_expression>(expression.data);
+
+            switch (unary_expression.operation)
+            {
+                case h::Unary_operation::Pre_increment:
+                case h::Unary_operation::Post_increment:
+                case h::Unary_operation::Pre_decrement:
+                case h::Unary_operation::Post_decrement:
+                case h::Unary_operation::Indirection:
+                case h::Unary_operation::Address_of:
+                    return false;
+                default:
+                    break;
+            }
+
+            return is_computable_at_compile_time(
+                core_module,
+                scope,
+                statement,
+                statement.expressions[unary_expression.expression.expression_index],
+                expression_type,
+                expression_types,
+                declaration_database
+            );
+        }
         else if (std::holds_alternative<h::Variable_expression>(expression.data))
         {
             h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
