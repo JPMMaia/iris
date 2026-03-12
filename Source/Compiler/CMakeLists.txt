@@ -157,6 +157,7 @@ target_sources(H_compiler
          "JIT/JIT_compiler.cppm"
          "JIT/JIT_runner.cppm"
          "JIT/Recompile_module_layer.cppm"
+         "Passes/Compile_time_pass.cppm"
          "Project/Artifact.cppm"
          "Project/Repository.cppm"
          "Project/Target.cppm"
@@ -180,6 +181,7 @@ target_sources(H_compiler
       "JIT/JIT_compiler.cpp"
       "JIT/JIT_runner.cpp"
       "JIT/Recompile_module_layer.cpp"
+      "Passes/Compile_time_pass.cpp"
       "Project/Artifact.cpp"
       "Project/Repository.cpp"
 )

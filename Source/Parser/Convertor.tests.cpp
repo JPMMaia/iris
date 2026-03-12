@@ -250,6 +250,18 @@ namespace h::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts compile_time_for.hltxt", "[Convertor]")
+    {
+        std::string_view const input_file = "compile_time_for.hltxt";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts compile_time_if.hltxt", "[Convertor]")
+    {
+        std::string_view const input_file = "compile_time_if.hltxt";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts constant_array_expressions.hltxt", "[Convertor]")
     {
         std::string_view const input_file = "constant_array_expressions.hltxt";

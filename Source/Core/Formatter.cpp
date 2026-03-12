@@ -293,6 +293,7 @@ namespace h
         bool const does_not_end_with_semicolon =
             std::holds_alternative<h::Block_expression>(expression.data) ||
             std::holds_alternative<h::Comment_expression>(expression.data) ||
+            std::holds_alternative<h::Compile_time_expression>(expression.data) ||
             std::holds_alternative<h::For_loop_expression>(expression.data) ||
             std::holds_alternative<h::If_expression>(expression.data) ||
             std::holds_alternative<h::Switch_expression>(expression.data) ||
@@ -408,7 +409,7 @@ namespace h
         else if (std::holds_alternative<Compile_time_expression>(expression.data))
         {
             Compile_time_expression const& value = std::get<Compile_time_expression>(expression.data);
-            add_format_expression_compile_time(buffer, statement, value, options);
+            add_format_expression_compile_time(buffer, statement, value, indentation, options);
         }
         else if (std::holds_alternative<Continue_expression>(expression.data))
         {
@@ -840,11 +841,12 @@ namespace h
         String_buffer& buffer,
         Statement const& statement,
         Compile_time_expression const& expression,
+        std::uint32_t const indentation,
         Format_options const& options
     )
     {
-        add_text(buffer, "comptime ");
-        add_format_expression(buffer, statement, get_expression(statement, expression.expression), 0, options);
+        add_text(buffer, "compile_time ");
+        add_format_expression(buffer, statement, get_expression(statement, expression.expression), indentation, options);
     }
 
     void add_format_expression_constant(

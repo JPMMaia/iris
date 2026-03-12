@@ -1,0 +1,13 @@
+module compile_time_for;
+
+function foo(index: Uint64) -> ()
+{
+}
+
+function run() -> ()
+{
+    compile_time for index in 0u64 to 3u64
+    {
+        foo(index);
+    }
+}

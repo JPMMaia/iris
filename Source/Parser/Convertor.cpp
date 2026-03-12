@@ -1786,6 +1786,10 @@ namespace h::parser
         {
             expression.data = node_to_expression_comment(tree, expression_node, output_allocator, temporaries_allocator);
         }
+        else if (expression_type == "Expression_compile_time")
+        {
+            expression.data = node_to_expression_compile_time(statement, module_info, tree, expression_node, output_allocator, temporaries_allocator);
+        }
         else if (expression_type == "Expression_constant")
         {
             expression.data = node_to_expression_constant(tree, expression_node, output_allocator);
@@ -2267,6 +2271,36 @@ namespace h::parser
             }
         }
         
+        return output;
+    }
+
+    h::Compile_time_expression node_to_expression_compile_time(
+        h::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {        
+        std::optional<Parse_node> choice_node = get_child_node(tree, node, 1);
+        if (!choice_node.has_value())
+            return {};
+
+        std::optional<Parse_node> expression_node = get_child_node(tree, choice_node.value(), 0);
+        if (!expression_node.has_value())
+            return {};
+
+        h::Compile_time_expression output = {};
+        output.expression = node_to_expression(
+            statement,
+            module_info,
+            tree,
+            expression_node.value(),
+            output_allocator,
+            temporaries_allocator
+        );
+
         return output;
     }
 

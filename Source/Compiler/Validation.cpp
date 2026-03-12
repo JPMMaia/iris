@@ -1051,16 +1051,16 @@ namespace h::compiler
         std::string_view const function_name,
         std::span<h::Statement const> const statements,
         std::optional<Source_range> const source_range
+    );
+
+    static std::pmr::vector<h::compiler::Diagnostic> validate_function_return_expressions_with_statement_expression(
+        h::Module const& core_module,
+        std::string_view const function_name,
+        h::Statement const& last_statement,
+        h::Expression const& last_statement_expression,
+        std::optional<Source_range> const source_range
     )
     {
-        if (statements.empty())
-            return create_function_missing_return_diagnostic(core_module, function_name, source_range);
-
-        h::Statement const& last_statement = statements[statements.size() - 1];
-        if (last_statement.expressions.empty())
-            return create_function_missing_return_diagnostic(core_module, function_name, source_range);
-
-        h::Expression const& last_statement_expression = last_statement.expressions[0];
         if (std::holds_alternative<h::Return_expression>(last_statement_expression.data))
         {
             return {};
@@ -1069,6 +1069,12 @@ namespace h::compiler
         {
             h::Block_expression const& block_expression = std::get<h::Block_expression>(last_statement_expression.data);
             return validate_function_return_expressions_with_statements(core_module, function_name, block_expression.statements, source_range);
+        }
+        else if (std::holds_alternative<h::Compile_time_expression>(last_statement_expression.data))
+        {
+            h::Compile_time_expression const& compile_time_expression = std::get<h::Compile_time_expression>(last_statement_expression.data);
+            h::Expression const& right_side_expression = last_statement.expressions[compile_time_expression.expression.expression_index];
+            return validate_function_return_expressions_with_statement_expression(core_module, function_name, last_statement, right_side_expression, source_range);
         }
         else if (std::holds_alternative<h::If_expression>(last_statement_expression.data))
         {
@@ -1104,6 +1110,24 @@ namespace h::compiler
         {
             return create_function_missing_return_diagnostic(core_module, function_name, source_range);
         }
+    }
+
+    static std::pmr::vector<h::compiler::Diagnostic> validate_function_return_expressions_with_statements(
+        h::Module const& core_module,
+        std::string_view const function_name,
+        std::span<h::Statement const> const statements,
+        std::optional<Source_range> const source_range
+    )
+    {
+        if (statements.empty())
+            return create_function_missing_return_diagnostic(core_module, function_name, source_range);
+
+        h::Statement const& last_statement = statements[statements.size() - 1];
+        if (last_statement.expressions.empty())
+            return create_function_missing_return_diagnostic(core_module, function_name, source_range);
+
+        h::Expression const& last_statement_expression = last_statement.expressions[0];
+        return validate_function_return_expressions_with_statement_expression(core_module, function_name, last_statement, last_statement_expression, source_range);
     }
 
     static std::pmr::vector<h::compiler::Diagnostic> validate_function_return_expressions(

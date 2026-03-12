@@ -278,6 +278,15 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
+    h::Compile_time_expression node_to_expression_compile_time(
+        h::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     h::Constant_expression node_to_expression_constant(
         Parse_tree const& tree,
         Parse_node const& node,

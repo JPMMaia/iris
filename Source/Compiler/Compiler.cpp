@@ -53,6 +53,7 @@ import h.compiler.analysis;
 import h.compiler.clang_code_generation;
 import h.compiler.clang_data;
 import h.compiler.common;
+import h.compiler.compile_time_pass;
 import h.compiler.debug_info;
 import h.compiler.diagnostic;
 import h.compiler.expressions;
@@ -413,7 +414,7 @@ namespace h::compiler
         Clang_module_data const& clang_module_data,
         Module const& core_module,
         Function_declaration const& function_declaration,
-        Function_definition const& function_definition,
+        Function_definition function_definition,
         std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
         Declaration_database& declaration_database,
         Type_database& type_database,
@@ -423,6 +424,8 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
+        run_compile_time_pass_on_function(core_module, function_declaration, function_definition, temporaries_allocator);
+
         llvm::BasicBlock* const block = llvm::BasicBlock::Create(llvm_context, "entry", &llvm_function);
 
         llvm::IRBuilder<> llvm_builder{ block };

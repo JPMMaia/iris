@@ -110,6 +110,7 @@ module.exports = grammar({
       seq($.Expression_break, ";"),
       seq($.Expression_call, ";"),
       $.Expression_comment,
+      $.Expression_compile_time,
       seq($.Expression_continue, ";"),
       seq($.Expression_defer, ";"),
       $.Expression_for_loop,
@@ -178,6 +179,11 @@ module.exports = grammar({
     Expression_call_arguments: $ => seq("(", optional(seq($.Generic_expression_or_instantiate, repeat(seq(",", $.Generic_expression_or_instantiate)))), ")"),
     Expression_cast: $ => prec(11, seq($.Generic_expression, "as", $.Expression_type)),
     Expression_comment: $ => $.Comment,
+    Expression_compile_time: $ => seq("compile_time", $.Expression_compile_time_statements),
+    Expression_compile_time_statements: $ => choice(
+      $.Expression_for_loop,
+      $.Expression_if
+    ),
     Expression_constant: $ => choice($.Boolean, $.Number, $.String),
     Expression_continue: $ => "continue",
     Expression_create_array: $ => seq("[", optional(seq($.Generic_expression_or_instantiate, repeat(seq(",", $.Generic_expression_or_instantiate)))), "]"),

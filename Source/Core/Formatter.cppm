@@ -216,6 +216,7 @@ namespace h
         String_buffer& buffer,
         Statement const& statement,
         Compile_time_expression const& expression,
+        std::uint32_t const indentation,
         Format_options const& options
     );
 

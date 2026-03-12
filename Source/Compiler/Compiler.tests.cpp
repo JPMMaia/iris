@@ -1594,6 +1594,63 @@ while_loop_after:                                 ; preds = %while_loop_conditio
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
+  TEST_CASE("Compile Compile Time For", "[LLVM_IR]")
+  {
+    char const* const input_file = "compile_time_for.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private void @compile_time_for_foo(i64 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i64, align 8
+  store i64 %"arguments[0].index", ptr %index, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private void @compile_time_for_run() #0 {
+entry:
+  call void @compile_time_for_foo(i64 noundef 0)
+  call void @compile_time_for_foo(i64 noundef 1)
+  call void @compile_time_for_foo(i64 noundef 2)
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Compile Time If", "[LLVM_IR]")
+  {
+    char const* const input_file = "compile_time_if.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+@compile_time_if_g_debug = constant i8 1
+
+; Function Attrs: convergent
+define i32 @compile_time_if_run_0() #0 {
+entry:
+  ret i32 0
+}
+
+; Function Attrs: convergent
+define i32 @compile_time_if_run_1() #0 {
+entry:
+  ret i32 3
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }

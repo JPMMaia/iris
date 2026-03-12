@@ -1457,6 +1457,10 @@
           "name": "Expression_comment"
         },
         {
+          "type": "SYMBOL",
+          "name": "Expression_compile_time"
+        },
+        {
           "type": "SEQ",
           "members": [
             {
@@ -2314,6 +2318,32 @@
     "Expression_comment": {
       "type": "SYMBOL",
       "name": "Comment"
+    },
+    "Expression_compile_time": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "compile_time"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_compile_time_statements"
+        }
+      ]
+    },
+    "Expression_compile_time_statements": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "Expression_for_loop"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_if"
+        }
+      ]
     },
     "Expression_constant": {
       "type": "CHOICE",

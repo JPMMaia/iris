@@ -504,6 +504,40 @@
     }
   },
   {
+    "type": "Expression_compile_time",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_compile_time_statements",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_compile_time_statements",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_for_loop",
+          "named": true
+        },
+        {
+          "type": "Expression_if",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "Expression_constant",
     "named": true,
     "fields": {},
@@ -1984,6 +2018,10 @@
           "named": true
         },
         {
+          "type": "Expression_compile_time",
+          "named": true
+        },
+        {
           "type": "Expression_continue",
           "named": true
         },
@@ -2604,6 +2642,10 @@
   },
   {
     "type": "case",
+    "named": false
+  },
+  {
+    "type": "compile_time",
     "named": false
   },
   {
