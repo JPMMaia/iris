@@ -24,3 +24,7 @@ else()
       "Filesystem_linux.cpp"
    )
 endif()
+
+if (MSVC)
+   target_link_libraries(H_common PUBLIC std_module)
+endif ()

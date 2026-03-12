@@ -10,6 +10,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(CTest)
 
 if (MSVC)
+    include("Scripts/compile_cpp_std_module.cmake")
+endif ()
+
+if (MSVC)
     add_compile_options("/EHsc")
 else ()
     if (CMAKE_DEBUG_TYPE STREQUAL "Debug")
