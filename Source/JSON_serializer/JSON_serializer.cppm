@@ -209,7 +209,9 @@ namespace h::json
         )
     {
         std::string const file_path_string = file_path.generic_string();
-        std::FILE* file = std::fopen(file_path_string.c_str(), "w");
+        
+        std::FILE* file = nullptr;
+        fopen_s(&file, file_path_string.c_str(), "w");
 
         char write_buffer[65536];
         rapidjson::FileWriteStream output_stream{ file, write_buffer, sizeof(write_buffer) };
