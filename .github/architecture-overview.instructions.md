@@ -1,5 +1,6 @@
 ---
-applyTo: "*"
+name: 'Architecture Overview'
+description: 'Overview of the H language repository structure and components'
 ---
 
 # H Language Repository - GitHub Copilot Instructions
