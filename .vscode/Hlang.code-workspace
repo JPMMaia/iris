@@ -443,6 +443,18 @@
 				]
 			},
 			{
+				"label": "CMake Configure Debug",
+				"command": "cmake",
+				"type": "shell",
+				"args": [
+					"-S",
+					"${workspaceFolder}",
+					"-B",
+					"build",
+					"-DCMAKE_BUILD_TYPE=Debug"
+				]
+			},
+			{
 				"label": "CMake Configure Release",
 				"command": "cmake",
 				"type": "shell",
