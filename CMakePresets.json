@@ -19,7 +19,25 @@
       },
       "environment": {
         "CC": "cl",
-        "CXX": "cl"
+        "CXX": "cl",
+        "VCPKG_BINARY_SOURCES": "clear;files,${sourceDir}/../vcpkg_binary_cache,readwrite"
+      }
+    },
+    {
+      "name": "windows-clang-debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build_clang",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_OVERLAY_PORTS": "${sourceDir}/External/vcpkg-overlays",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "BUILD_SHARED_LIBS": "OFF"
+      },
+      "environment": {
+        "CC": "C:/Program Files/LLVM/bin/clang-cl.exe",
+        "CXX": "C:/Program Files/LLVM/bin/clang-cl.exe",
+        "VCPKG_BINARY_SOURCES": "clear;files,${sourceDir}/../vcpkg_binary_cache,readwrite"
       }
     },
     {
