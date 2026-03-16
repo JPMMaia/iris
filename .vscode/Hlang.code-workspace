@@ -648,7 +648,10 @@
 			"/^powershell -Command \"\\. \\$PROFILE ; Enter-VsDevEnv ; cd 'C:\\\\Users\\\\JPMMa\\\\Desktop\\\\source\\\\H' ; cmake --build build --target H_compiler\"$/": {
 				"approve": true,
 				"matchCommandLine": true
-			}
+			},
+			"Enter-VsDevEnv": true,
+			".\\build\\Source\\Compiler\\H_compiler_tests.exe": true,
+			"cmake": true
 		}
 	}
 }
