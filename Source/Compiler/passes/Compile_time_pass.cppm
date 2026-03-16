@@ -1,7 +1,13 @@
+module;
+
+#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/LLVMContext.h>
+
 export module h.compiler.compile_time_pass;
 
 import std;
 
+import h.compiler.types;
 import h.core;
 
 namespace h::compiler
@@ -16,6 +22,10 @@ namespace h::compiler
     {
         h::Module const& core_module;
         std::pmr::polymorphic_allocator<> const& output_allocator;
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator;
+        llvm::LLVMContext& llvm_context;
+        llvm::DataLayout const& llvm_data_layout;
+        h::compiler::Type_database const& type_database;
     };
 
     std::optional<Compile_time_value_and_type> evaluate_compile_time_expression(
@@ -30,9 +40,8 @@ namespace h::compiler
     );
 
     export void run_compile_time_pass_on_function(
-        h::Module const& core_module,
         h::Function_declaration const& function_declaration,
         h::Function_definition& function_definition,
-        std::pmr::polymorphic_allocator<> const& output_allocator
+        Compile_time_parameters const& parameters
     );
 }

@@ -1,12 +1,15 @@
 module;
 
+#include <cassert>
 #include <compare>
 
 module h.compiler.compile_time_pass;
 
+import llvm;
 import std;
 import std.compat;
 
+import h.compiler.types;
 import h.core;
 import h.core.types;
 
@@ -16,7 +19,6 @@ namespace h::compiler
         h::Statement& statement,
         std::size_t const expression_index,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
-        
     )
     {
         std::pmr::vector<std::size_t> indices_to_invalidate{temporaries_allocator};
@@ -56,6 +58,36 @@ namespace h::compiler
 
         statement.expressions.push_back(h::Expression{.data = h::Invalid_expression{}});
         return statement.expressions.size() - 1;
+    }
+
+    static std::size_t find_expression_index(
+        h::Statement const& statement,
+        h::Expression const& expression
+    )
+    {
+        for (std::size_t index = 0; index < statement.expressions.size(); ++index)
+        {
+            if (&statement.expressions[index] == &expression)
+                return index;
+        }
+
+        return -1;
+    }
+
+    static void replace_expression(
+        h::Statement& statement,
+        h::Expression const& expression,
+        h::Statement const& new_statement,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        assert(new_statement.expressions.size() == 1);
+
+        std::size_t const expression_index = find_expression_index(statement, expression);
+
+        invalidate_expression_and_descendants(statement, expression_index, temporaries_allocator);
+        std::size_t const new_expression_index = get_or_create_expression_slot(statement);
+        statement.expressions[new_expression_index] = new_statement.expressions[0];
     }
     
     static h::Statement create_block_statement(
@@ -139,7 +171,7 @@ namespace h::compiler
         h::Expression const& expression = statement.expressions[0];
         if (std::holds_alternative<h::Constant_expression>(expression.data))
         {
-            h::Constant_expression const constant_expression = std::get<h::Constant_expression>(expression.data);
+            h::Constant_expression const& constant_expression = std::get<h::Constant_expression>(expression.data);
             if (h::is_bool(constant_expression.type) || h::is_c_bool(constant_expression.type))
                 return constant_expression.data == "true" || constant_expression.data == "1";
         }
@@ -425,6 +457,49 @@ namespace h::compiler
         return create_value_and_type(create_block_statement(std::move(iteration_blocks), parameters.output_allocator));
     }
 
+    static std::optional<Compile_time_value_and_type> evaluate_compile_time_reflection_expression(
+        h::Statement const& statement,
+        h::Reflection_expression const& expression,
+        Compile_time_parameters const& parameters
+    )
+    {
+        if (expression.name == "alignment_of")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "alignment_of() requires exactly one type argument!" };
+
+            Type_reference const& type_reference = expression.type_arguments[0];
+            llvm::Type* const llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, type_reference, parameters.type_database);
+            llvm::Align const alignment = parameters.llvm_data_layout.getABITypeAlign(llvm_type);
+            std::uint64_t const alignment_in_bytes = alignment.value();
+
+            std::pmr::string data = std::pmr::string{std::to_string(alignment_in_bytes)};
+            return create_value_and_type(create_constant_expression_statement(
+                create_integer_type_type_reference(64, false),
+                std::move(data)
+            ));
+        }
+        else if (expression.name == "size_of")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "size_of() requires exactly one type argument!" };
+
+            Type_reference const& type_reference = expression.type_arguments[0];
+            llvm::Type* const llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, type_reference, parameters.type_database);
+            std::uint64_t const size_in_bytes = parameters.llvm_data_layout.getTypeAllocSize(llvm_type);
+
+            std::pmr::string data = std::pmr::string{std::to_string(size_in_bytes)};
+            return create_value_and_type(create_constant_expression_statement(
+                create_integer_type_type_reference(64, false),
+                std::move(data)
+            ));
+        }
+        else
+        {
+            throw std::runtime_error{ std::format("Reflection expression '{}' not implemented!", expression.name) };
+        }
+    }
+
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_unary_expression(
         h::Statement const& statement,
         h::Unary_expression const& expression,
@@ -538,6 +613,11 @@ namespace h::compiler
             h::For_loop_expression const& for_loop_expression = std::get<h::For_loop_expression>(expression.data);
             return evaluate_compile_time_for_loop_expression(statement, for_loop_expression, parameters);
         }
+        else if (std::holds_alternative<h::Reflection_expression>(expression.data))
+        {
+            h::Reflection_expression const& reflection_expression = std::get<h::Reflection_expression>(expression.data);
+            return evaluate_compile_time_reflection_expression(statement, reflection_expression, parameters);
+        }
         else if (std::holds_alternative<h::Unary_expression>(expression.data))
         {
             h::Unary_expression const& unary_expression = std::get<h::Unary_expression>(expression.data);
@@ -568,37 +648,59 @@ namespace h::compiler
         );
     }
 
-    void run_compile_time_pass_on_function(
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_definition& function_definition,
-        std::pmr::polymorphic_allocator<> const& output_allocator
+    static void visit_and_replace_compile_time_expressions(
+        h::Statement& statement,
+        h::Expression const& expression,
+        Compile_time_parameters const& parameters
     )
     {
-        Compile_time_parameters const parameters
+        if (std::holds_alternative<h::Compile_time_expression>(expression.data))
         {
-            .core_module = core_module,
-            .output_allocator = output_allocator,
-        };
-
-        for (std::size_t index = 0; index < function_definition.statements.size(); ++index)
-        {
-            h::Statement& statement = function_definition.statements[index];
-            if (statement.expressions.empty())
+            h::Compile_time_expression const& compile_time_expression = std::get<h::Compile_time_expression>(expression.data);
+            if (compile_time_expression.expression.expression_index >= statement.expressions.size())
                 return;
-
-            h::Expression const& expression = statement.expressions[0];
-
-            if (std::holds_alternative<h::Compile_time_expression>(expression.data))
+                
+            h::Expression const& right_side_expression = statement.expressions[compile_time_expression.expression.expression_index];
+            
+            std::optional<Compile_time_value_and_type> new_value = evaluate_compile_time_expression(
+                statement,
+                right_side_expression,
+                parameters
+            );
+            if (new_value.has_value())
             {
-                std::optional<Compile_time_value_and_type> new_value = evaluate_compile_time_expression(
-                    statement,
-                    expression,
-                    parameters
-                );
-                if (new_value.has_value())
-                    statement = std::move(new_value->statement);
+                replace_expression(statement, expression, new_value->statement, parameters.temporaries_allocator);
             }
         }
+        else if (std::holds_alternative<h::Reflection_expression>(expression.data))
+        {
+            h::Reflection_expression const& reflection_expression = std::get<h::Reflection_expression>(expression.data);
+            
+            std::optional<Compile_time_value_and_type> new_value = evaluate_compile_time_reflection_expression(
+                statement,
+                reflection_expression,
+                parameters
+            );
+            if (new_value.has_value())
+            {
+                replace_expression(statement, expression, new_value->statement, parameters.temporaries_allocator);
+            }
+        }
+    }
+
+    void run_compile_time_pass_on_function(
+        h::Function_declaration const& function_declaration,
+        h::Function_definition& function_definition,
+        Compile_time_parameters const& parameters
+    )
+    {
+        auto const visit_and_replace = [&](h::Expression const& expression, h::Statement const& statement) -> bool
+        {
+            h::Statement& mutable_statement = const_cast<h::Statement&>(statement);
+            visit_and_replace_compile_time_expressions(mutable_statement, expression, parameters);
+            return false;
+        };
+
+        visit_expressions(function_definition.statements, visit_and_replace);
     }
 }

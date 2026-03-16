@@ -424,7 +424,16 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        run_compile_time_pass_on_function(core_module, function_declaration, function_definition, temporaries_allocator);
+        Compile_time_parameters const parameters
+        {
+            .core_module = core_module,
+            .output_allocator = temporaries_allocator,
+            .temporaries_allocator = temporaries_allocator,
+            .llvm_context = llvm_context,
+            .llvm_data_layout = llvm_data_layout,
+            .type_database = type_database,
+        };
+        run_compile_time_pass_on_function(function_declaration, function_definition, parameters);
 
         llvm::BasicBlock* const block = llvm::BasicBlock::Create(llvm_context, "entry", &llvm_function);
 

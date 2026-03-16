@@ -1594,6 +1594,10 @@ while_loop_after:                                 ; preds = %while_loop_conditio
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Compile Time For", "[LLVM_IR]")
   {
     char const* const input_file = "compile_time_for.hltxt";

@@ -3375,51 +3375,6 @@ namespace h::compiler
         return create_expression_value(expression.expression.expression_index, statement, parameters);
     }
 
-    Value_and_type create_reflection_expression_value(
-        Reflection_expression const& expression,
-        Statement const& statement,
-        Expression_parameters const& parameters
-    )
-    {
-        if (expression.name == "alignment_of")
-        {
-            if (expression.type_arguments.size() != 1)
-                throw std::runtime_error{ "alignment_of() requires exactly one type argument!" };
-
-            Type_reference const& type_reference = expression.type_arguments[0];
-            llvm::Type* const llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, type_reference, parameters.type_database);
-            llvm::Align const alignment = parameters.llvm_data_layout.getABITypeAlign(llvm_type);
-            std::uint64_t const alignment_in_bytes = alignment.value();
-
-            return Value_and_type
-            {
-                .name = "",
-                .value = llvm::ConstantInt::get(llvm::Type::getInt64Ty(parameters.llvm_context), alignment_in_bytes),
-                .type = create_integer_type_type_reference(64, false)
-            };
-        }
-        else if (expression.name == "size_of")
-        {
-            if (expression.type_arguments.size() != 1)
-                throw std::runtime_error{ "size_of() requires exactly one type argument!" };
-
-            Type_reference const& type_reference = expression.type_arguments[0];
-            llvm::Type* const llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, type_reference, parameters.type_database);
-            std::uint64_t const size_in_bytes = parameters.llvm_data_layout.getTypeAllocSize(llvm_type);
-
-            return Value_and_type
-            {
-                .name = "",
-                .value = llvm::ConstantInt::get(llvm::Type::getInt64Ty(parameters.llvm_context), size_in_bytes),
-                .type = create_integer_type_type_reference(64, false)
-            };
-        }
-        else
-        {
-            throw std::runtime_error{ std::format("Reflection expression '{}' not implemented!", expression.name) };
-        }
-    }
-
     Value_and_type create_return_expression_value(
         Return_expression const& expression,
         Statement const& statement,
@@ -4484,8 +4439,7 @@ namespace h::compiler
         }
         else if (std::holds_alternative<Reflection_expression>(expression.data))
         {
-            Reflection_expression const& data = std::get<Reflection_expression>(expression.data);
-            return create_reflection_expression_value(data, statement, new_parameters);
+            throw std::runtime_error{"Reflection_expression should have been handled in the Compile_time_pass!"};
         }
         else if (std::holds_alternative<Return_expression>(expression.data))
         {
