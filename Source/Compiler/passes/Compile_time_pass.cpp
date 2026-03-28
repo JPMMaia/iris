@@ -11,85 +11,11 @@ import std.compat;
 
 import h.compiler.types;
 import h.core;
+import h.core.expressions;
 import h.core.types;
 
 namespace h::compiler
-{
-    static void invalidate_expression_and_descendants(
-        h::Statement& statement,
-        std::size_t const expression_index,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
-    )
-    {
-        std::pmr::vector<std::size_t> indices_to_invalidate{temporaries_allocator};
-        indices_to_invalidate.reserve(statement.expressions.size());
-        
-        auto const invalidate_descendants = [&](h::Expression const& expression, h::Statement const& statement) -> bool
-        {
-            for (std::size_t index = 0; index < statement.expressions.size(); ++index)
-            {
-                if (&statement.expressions[index] == &expression)
-                {
-                    indices_to_invalidate.push_back(index);
-                    return false;
-                }
-            }
-
-            return false;
-        };
-
-        h::Expression const& expression_to_invalidate = statement.expressions[expression_index];
-        visit_expressions(expression_to_invalidate, statement, invalidate_descendants);
-
-        for (std::size_t index : indices_to_invalidate)
-            statement.expressions[index] = h::Expression{.data = h::Invalid_expression{}};
-    }
-
-    static std::size_t get_or_create_expression_slot(
-        h::Statement& statement
-    )
-    {
-        for (std::size_t index = 0; index < statement.expressions.size(); ++index)
-        {
-            h::Expression const& expression = statement.expressions[index];
-            if (std::holds_alternative<h::Invalid_expression>(expression.data))
-                return index;
-        }
-
-        statement.expressions.push_back(h::Expression{.data = h::Invalid_expression{}});
-        return statement.expressions.size() - 1;
-    }
-
-    static std::size_t find_expression_index(
-        h::Statement const& statement,
-        h::Expression const& expression
-    )
-    {
-        for (std::size_t index = 0; index < statement.expressions.size(); ++index)
-        {
-            if (&statement.expressions[index] == &expression)
-                return index;
-        }
-
-        return -1;
-    }
-
-    static void replace_expression(
-        h::Statement& statement,
-        h::Expression const& expression,
-        h::Statement const& new_statement,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
-    )
-    {
-        assert(new_statement.expressions.size() == 1);
-
-        std::size_t const expression_index = find_expression_index(statement, expression);
-
-        invalidate_expression_and_descendants(statement, expression_index, temporaries_allocator);
-        std::size_t const new_expression_index = get_or_create_expression_slot(statement);
-        statement.expressions[new_expression_index] = new_statement.expressions[0];
-    }
-    
+{    
     static h::Statement create_block_statement(
         std::pmr::vector<h::Statement> statements,
         std::pmr::polymorphic_allocator<> const& output_allocator

@@ -1,10 +1,6 @@
-module;
-
-#include <memory_resource>
-#include <string_view>
-#include <vector>
-
 export module h.core.expressions;
+
+import std;
 
 import h.core;
 
@@ -36,4 +32,27 @@ namespace h
     export h::Expression create_null_pointer_expression();
 
     export h::Expression create_variable_expression(std::pmr::string name);
+
+
+    export void invalidate_expression_and_descendants(
+        h::Statement& statement,
+        std::size_t const expression_index,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    export std::size_t get_or_create_expression_slot(
+        h::Statement& statement
+    );
+
+    export std::size_t find_expression_index(
+        h::Statement const& statement,
+        h::Expression const& expression
+    );
+
+    export void replace_expression(
+        h::Statement& statement,
+        h::Expression const& expression,
+        h::Statement const& new_statement,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
 }
