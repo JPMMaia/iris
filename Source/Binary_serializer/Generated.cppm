@@ -1236,6 +1236,22 @@ namespace h::binary_serializer
     }
 
     export template <>
+    void serialize(Serializer& serializer, Module_instanced_declarations const& value)
+    {
+        serialize(serializer, value.struct_declarations);
+        serialize(serializer, value.union_declarations);
+        serialize(serializer, value.function_declarations);
+    }
+
+    export template <>
+    void deserialize(Deserializer& deserializer, Module_instanced_declarations& value)
+    {
+        deserialize(deserializer, value.struct_declarations);
+        deserialize(deserializer, value.union_declarations);
+        deserialize(deserializer, value.function_declarations);
+    }
+
+    export template <>
     void serialize(Serializer& serializer, Module_definitions const& value)
     {
         serialize(serializer, value.function_definitions);
@@ -1256,6 +1272,7 @@ namespace h::binary_serializer
         serialize(serializer, value.dependencies);
         serialize(serializer, value.export_declarations);
         serialize(serializer, value.internal_declarations);
+        serialize(serializer, value.instanced_declarations);
         serialize(serializer, value.definitions);
         serialize(serializer, value.comment);
         serialize(serializer, value.source_file_path);
@@ -1270,6 +1287,7 @@ namespace h::binary_serializer
         deserialize(deserializer, value.dependencies);
         deserialize(deserializer, value.export_declarations);
         deserialize(deserializer, value.internal_declarations);
+        deserialize(deserializer, value.instanced_declarations);
         deserialize(deserializer, value.definitions);
         deserialize(deserializer, value.comment);
         deserialize(deserializer, value.source_file_path);

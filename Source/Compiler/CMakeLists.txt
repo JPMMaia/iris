@@ -50,7 +50,10 @@ target_sources(H_compiler
          "JIT/JIT_compiler.cppm"
          "JIT/JIT_runner.cppm"
          "JIT/Recompile_module_layer.cppm"
+         "Passes/All_passes.cppm"
          "Passes/Compile_time_pass.cppm"
+         "Passes/Implicit_function_pass.cppm"
+         "Passes/Instantiate_pass.cppm"
          "Project/Artifact.cppm"
          "Project/Repository.cppm"
          "Project/Target.cppm"
@@ -74,7 +77,10 @@ target_sources(H_compiler
       "JIT/JIT_compiler.cpp"
       "JIT/JIT_runner.cpp"
       "JIT/Recompile_module_layer.cpp"
+      "Passes/All_passes.cpp"
       "Passes/Compile_time_pass.cpp"
+      "Passes/Implicit_function_pass.cpp"
+      "Passes/Instantiate_pass.cpp"
       "Project/Artifact.cpp"
       "Project/Repository.cpp"
 )
@@ -95,6 +101,12 @@ if(BUILD_TESTING)
    add_executable(H_compiler_tests)
    target_link_libraries(H_compiler_tests PRIVATE H::C_header_importer H::Compiler H::JSON_serializer H::Parser)
 
+   target_sources(H_compiler_tests
+      PUBLIC FILE_SET modules TYPE CXX_MODULES
+         FILES
+            "passes/Pass_test_helpers.cppm"
+   )
+
    find_package(Catch2 CONFIG REQUIRED)
    target_link_libraries(H_compiler_tests PRIVATE Catch2::Catch2 Catch2::Catch2WithMain)
 
@@ -111,6 +123,10 @@ if(BUILD_TESTING)
    target_sources(H_compiler_tests PRIVATE
       "Builder.tests.cpp"
       "Compiler.tests.cpp"
+      "passes/All_passes.tests.cpp"
+      "passes/Compile_time_pass.tests.cpp"
+      "passes/Instantiate_pass.tests.cpp"
+      "passes/Implicit_function_pass.tests.cpp"
       "Recompilation.tests.cpp"
       "Validation.tests.cpp"
       "JIT/JIT_runner.tests.cpp"

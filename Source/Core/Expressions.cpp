@@ -7,6 +7,7 @@ module h.core.expressions;
 import std;
 
 import h.core;
+import h.core.expressions_visitor;
 import h.core.types;
 
 namespace h
@@ -124,22 +125,15 @@ namespace h
         std::pmr::vector<std::size_t> indices_to_invalidate{temporaries_allocator};
         indices_to_invalidate.reserve(statement.expressions.size());
         
-        auto const invalidate_descendants = [&](h::Expression const& expression, h::Statement const& statement) -> bool
+        auto const invalidate_descendants = [&](h::Statement const& statement, h::Expression const& expression) -> bool
         {
-            for (std::size_t index = 0; index < statement.expressions.size(); ++index)
-            {
-                if (&statement.expressions[index] == &expression)
-                {
-                    indices_to_invalidate.push_back(index);
-                    return false;
-                }
-            }
-
+            std::size_t const index = find_expression_index(statement, expression);
+            indices_to_invalidate.push_back(index);
             return false;
         };
 
         h::Expression const& expression_to_invalidate = statement.expressions[expression_index];
-        visit_expressions(expression_to_invalidate, statement, invalidate_descendants);
+        visit_expressions_recursively(statement, expression_to_invalidate, invalidate_descendants);
 
         for (std::size_t index : indices_to_invalidate)
             statement.expressions[index] = h::Expression{.data = h::Invalid_expression{}};
@@ -188,5 +182,145 @@ namespace h
         invalidate_expression_and_descendants(statement, expression_index, temporaries_allocator);
         std::size_t const new_expression_index = get_or_create_expression_slot(statement);
         statement.expressions[new_expression_index] = new_statement.expressions[0];
+    }
+
+    void offset_expression_indices(
+        h::Expression& expression,
+        std::uint64_t const offset
+    )
+    {
+        auto const offset_index = [&](Expression_index& idx)
+        {
+            if (idx.expression_index != static_cast<std::uint64_t>(-1))
+                idx.expression_index += offset;
+        };
+
+        std::visit([&](auto& data)
+        {
+            using T = std::decay_t<decltype(data)>;
+            if constexpr (std::is_same_v<T, Access_expression>)
+            {
+                offset_index(data.expression);
+            }
+            else if constexpr (std::is_same_v<T, Access_array_expression>)
+            {
+                offset_index(data.expression);
+                offset_index(data.index);
+            }
+            else if constexpr (std::is_same_v<T, Assignment_expression>)
+            {
+                offset_index(data.left_hand_side);
+                offset_index(data.right_hand_side);
+            }
+            else if constexpr (std::is_same_v<T, Binary_expression>)
+            {
+                offset_index(data.left_hand_side);
+                offset_index(data.right_hand_side);
+            }
+            else if constexpr (std::is_same_v<T, Call_expression>)
+            {
+                offset_index(data.expression);
+                for (Expression_index& arg : data.arguments)
+                    offset_index(arg);
+            }
+            else if constexpr (std::is_same_v<T, Cast_expression>)
+            {
+                offset_index(data.source);
+            }
+            else if constexpr (std::is_same_v<T, Compile_time_expression>)
+            {
+                offset_index(data.expression);
+            }
+            else if constexpr (std::is_same_v<T, Defer_expression>)
+            {
+                offset_index(data.expression_to_defer);
+            }
+            else if constexpr (std::is_same_v<T, Dereference_and_access_expression>)
+            {
+                offset_index(data.expression);
+            }
+            else if constexpr (std::is_same_v<T, For_loop_expression>)
+            {
+                offset_index(data.range_begin);
+                if (data.step_by)
+                    offset_index(*data.step_by);
+            }
+            else if constexpr (std::is_same_v<T, Instantiate_expression>)
+            {
+                for (Instantiate_member_value_pair& member : data.members)
+                    offset_index(member.value);
+            }
+            else if constexpr (std::is_same_v<T, Instance_call_expression>)
+            {
+                offset_index(data.left_hand_side);
+            }
+            else if constexpr (std::is_same_v<T, Parenthesis_expression>)
+            {
+                offset_index(data.expression);
+            }
+            else if constexpr (std::is_same_v<T, Reflection_expression>)
+            {
+                for (Expression_index& arg : data.arguments)
+                    offset_index(arg);
+            }
+            else if constexpr (std::is_same_v<T, Return_expression>)
+            {
+                if (data.expression)
+                    offset_index(*data.expression);
+            }
+            else if constexpr (std::is_same_v<T, Switch_expression>)
+            {
+                offset_index(data.value);
+                for (Switch_case_expression_pair& case_pair : data.cases)
+                {
+                    if (case_pair.case_value)
+                        offset_index(*case_pair.case_value);
+                }
+            }
+            else if constexpr (std::is_same_v<T, Ternary_condition_expression>)
+            {
+                offset_index(data.condition);
+            }
+            else if constexpr (std::is_same_v<T, Unary_expression>)
+            {
+                offset_index(data.expression);
+            }
+            else if constexpr (std::is_same_v<T, Variable_declaration_expression>)
+            {
+                offset_index(data.right_hand_side);
+            }
+            else if constexpr (std::is_same_v<T, Variable_declaration_with_type_expression>)
+            {
+                offset_index(data.right_hand_side);
+            }
+            // All other types have no parent-level Expression_index fields.
+        }, expression.data);
+    }
+
+    std::pmr::vector<Expression_index> add_statements_as_expressions(
+        std::pmr::vector<h::Expression>& output,
+        std::span<h::Statement const> const statements
+    )
+    {
+        std::pmr::vector<Expression_index> statement_indices{output.get_allocator().resource()};
+        statement_indices.reserve(statements.size());
+
+        for (h::Statement const& statement : statements)
+        {
+            std::size_t const offset = output.size();
+            if (statement.expressions.empty())
+            {
+                statement_indices.push_back(h::Expression_index{});
+                continue;
+            }
+
+            statement_indices.push_back(h::Expression_index{.expression_index = static_cast<std::uint64_t>(offset)});
+            output.insert(output.end(), statement.expressions.begin(), statement.expressions.end());
+
+            for (std::size_t i = offset; i < output.size(); ++i)
+                offset_expression_indices(output[i], static_cast<std::uint64_t>(offset));
+        }
+
+        return statement_indices;
     }
 }

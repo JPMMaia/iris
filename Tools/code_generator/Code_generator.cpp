@@ -110,6 +110,13 @@ namespace h::tools::code_generator
             return enum_types.contains(type.name);
         }
 
+        bool is_deque_type(
+            Type const& type
+        )
+        {
+            return type.name.starts_with("std::deque") || type.name.starts_with("std::pmr::deque");
+        }
+
         bool is_vector_type(
             Type const& type
         )
@@ -2718,7 +2725,7 @@ namespace h::json
             for (std::size_t member_index = 0; member_index < struct_info.members.size(); ++member_index)
             {
                 Member const& member = struct_info.members[member_index];
-                if (is_optional_type(member.type) || is_vector_type(member.type))
+                if (is_optional_type(member.type) || is_vector_type(member.type) || is_deque_type(member.type))
                     from_json_body += std::format("        if (data.contains(\"{}\")) from_json(data.at(\"{}\"), value.{});", member.name, member.name, member.name);
                 else
                     from_json_body += std::format("        from_json(data.at(\"{}\"), value.{});", member.name, member.name);
@@ -2820,6 +2827,96 @@ namespace h::json::operators
             std::string const output = std::vformat(struct_template, std::make_format_args(struct_type.name, struct_type.name));
             output_stream << output;
         }
+
+        output_stream << "}\n";
+    }
+
+    void generate_expressions_visitor(
+        std::istream& input_stream,
+        std::ostream& output_stream
+    )
+    {
+        File_types const file_types = identify_file_types(
+            input_stream
+        );
+
+        std::string_view const initial_code = R"(export module h.core.expressions_visitor;
+
+import std;
+import h.core;
+
+namespace h
+{
+)";
+
+    std::string_view const function_template = R"(
+    export void visit_expressions_recursively(h::Statement const& statement, h::Expression const& expression, std::function<void(h::Statement const& statement, h::Expression const& expression)> const& predicate)
+    {{
+        predicate(statement, expression);
+{}
+    }}
+)";
+
+        std::string_view const if_expression_type_template = R"(
+        if (std::holds_alternative<{}>(expression.data))
+        {{
+            {} const& data = std::get<{}>(expression.data);
+{}
+        }}
+        )";
+
+        std::string_view const visit_expression_index_template = R"(
+            visit_expressions_recursively(statement, statement.expressions[data.{}.expression_index], predicate);)";
+
+        std::string_view const visit_optional_expression_index_template = R"(
+            if (data.{}.has_value())
+                visit_expressions_recursively(statement, statement.expressions[data.{}->expression_index], predicate);)";
+
+        std::string_view const visit_vector_expression_index_template = R"(
+            for (std::size_t index = 0; index < data.{}.size(); ++index)
+                visit_expressions_recursively(statement, statement.expressions[data.{}[index].expression_index], predicate);)";
+
+        output_stream << initial_code;
+
+        std::stringstream if_stream;
+
+        for (Struct const& struct_type : file_types.structs)
+        {
+            if (struct_type.name.ends_with("_expression"))
+            {
+                std::stringstream visit_expression_stream;
+
+                bool at_least_one = false;
+                
+                for (Member const& member : struct_type.members)
+                {
+                    if (member.type.name == "Expression_index")
+                    {
+                        visit_expression_stream << std::vformat(visit_expression_index_template, std::make_format_args(member.name));
+                        at_least_one = true;
+                    }
+                    else if (member.type.name == "std::optional<Expression_index>")
+                    {
+                        visit_expression_stream << std::vformat(visit_optional_expression_index_template, std::make_format_args(member.name, member.name));
+                        at_least_one = true;
+                    }
+                    else if (member.type.name == "std::pmr::vector<Expression_index>")
+                    {
+                        visit_expression_stream << std::vformat(visit_vector_expression_index_template, std::make_format_args(member.name, member.name));
+                        at_least_one = true;
+                    }
+                }
+                
+                if (at_least_one)
+                {
+                    std::string const visit_stream_expression_string = visit_expression_stream.str();
+                    if_stream << std::vformat(if_expression_type_template, std::make_format_args(struct_type.name, struct_type.name, struct_type.name, visit_stream_expression_string));
+                }
+            }
+        }
+
+        std::string const if_stream_string = if_stream.str();
+        output_stream << std::vformat(function_template, std::make_format_args(if_stream_string));
 
         output_stream << "}\n";
     }

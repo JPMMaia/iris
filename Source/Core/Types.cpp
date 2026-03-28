@@ -597,4 +597,179 @@ namespace h
             .is_literal = false,
         };
     }
+
+    namespace
+    {
+        template<typename Constructor_parameter_type>
+        std::optional<Type_reference> get_instance_argument_type(
+            std::span<Constructor_parameter_type const> const constructor_parameters,
+            std::span<Statement const> const instance_arguments,
+            std::string_view const parameter_name
+        )
+        {
+            auto const location = std::find_if(
+                constructor_parameters.begin(),
+                constructor_parameters.end(),
+                [&](Constructor_parameter_type const& parameter) -> bool {
+                    return parameter.name == parameter_name;
+                }
+            );
+            if (location == constructor_parameters.end())
+                return std::nullopt;
+
+            std::size_t const parameter_index = std::distance(constructor_parameters.begin(), location);
+            if (parameter_index >= instance_arguments.size())
+                return std::nullopt;
+
+            Statement const& argument_statement = instance_arguments[parameter_index];
+            if (argument_statement.expressions.size() != 1)
+                return std::nullopt;
+
+            Expression const& argument_expression = argument_statement.expressions[0];
+            if (!std::holds_alternative<Type_expression>(argument_expression.data))
+                return std::nullopt;
+
+            Type_expression const& type_expression = std::get<Type_expression>(argument_expression.data);
+            return type_expression.type;
+        }
+
+        
+        template<typename Constructor_parameter_type>
+        bool replace_parameter_types_by_instance_arguments_impl(
+            Function_type& function_type,
+            std::span<Constructor_parameter_type const> const constructor_parameters,
+            std::span<Statement const> const instance_arguments
+        );
+
+        template<typename Constructor_parameter_type>
+        bool replace_parameter_types_by_instance_arguments_impl(
+            Type_reference& type_reference,
+            std::span<Constructor_parameter_type const> const constructor_parameters,
+            std::span<Statement const> const instance_arguments
+        )
+        {
+            if (std::holds_alternative<Parameter_type>(type_reference.data))
+            {
+                Parameter_type const& parameter_type = std::get<Parameter_type>(type_reference.data);
+                std::optional<Type_reference> const replacement_type = get_instance_argument_type(
+                    constructor_parameters,
+                    instance_arguments,
+                    parameter_type.name
+                );
+                if (!replacement_type.has_value())
+                    return false;
+
+                type_reference = replacement_type.value();
+            }
+            else if (std::holds_alternative<Array_slice_type>(type_reference.data))
+            {
+                Array_slice_type& array_slice_type = std::get<Array_slice_type>(type_reference.data);
+                for (Type_reference& element_type : array_slice_type.element_type)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(element_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+            }
+            else if (std::holds_alternative<Constant_array_type>(type_reference.data))
+            {
+                Constant_array_type& constant_array_type = std::get<Constant_array_type>(type_reference.data);
+                for (Type_reference& value_type : constant_array_type.value_type)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(value_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+            }
+            else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
+            {
+                Function_pointer_type& function_pointer_type = std::get<Function_pointer_type>(type_reference.data);
+                if (!replace_parameter_types_by_instance_arguments_impl(function_pointer_type.type, constructor_parameters, instance_arguments))
+                    return false;
+            }
+            else if (std::holds_alternative<Pointer_type>(type_reference.data))
+            {
+                Pointer_type& pointer_type = std::get<Pointer_type>(type_reference.data);
+                for (Type_reference& element_type : pointer_type.element_type)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(element_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+            }
+            else if (std::holds_alternative<Type_instance>(type_reference.data))
+            {
+                Type_instance& type_instance = std::get<Type_instance>(type_reference.data);
+                for (Statement& argument_statement : type_instance.arguments)
+                {
+                    for (Expression& argument_expression : argument_statement.expressions)
+                    {
+                        if (!std::holds_alternative<Type_expression>(argument_expression.data))
+                            continue;
+
+                        Type_expression& argument_type_expression = std::get<Type_expression>(argument_expression.data);
+                        if (!replace_parameter_types_by_instance_arguments_impl(argument_type_expression.type, constructor_parameters, instance_arguments))
+                            return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        template<typename Constructor_parameter_type>
+        bool replace_parameter_types_by_instance_arguments_impl(
+            Function_type& function_type,
+            std::span<Constructor_parameter_type const> const constructor_parameters,
+            std::span<Statement const> const instance_arguments
+        )
+        {
+            for (Type_reference& input_type : function_type.input_parameter_types)
+            {
+                if (!replace_parameter_types_by_instance_arguments_impl(input_type, constructor_parameters, instance_arguments))
+                    return false;
+            }
+
+            for (Type_reference& output_type : function_type.output_parameter_types)
+            {
+                if (!replace_parameter_types_by_instance_arguments_impl(output_type, constructor_parameters, instance_arguments))
+                    return false;
+            }
+
+            return true;
+        }
+    }
+
+    bool replace_parameter_types_by_instance_arguments(
+        Type_reference& type_reference,
+        std::span<Function_constructor_parameter const> const function_constructor_parameters,
+        std::span<Statement const> const instance_arguments
+    )
+    {
+        return replace_parameter_types_by_instance_arguments_impl(type_reference, function_constructor_parameters, instance_arguments);
+    }
+
+    bool replace_parameter_types_by_instance_arguments(
+        Type_reference& type_reference,
+        std::span<Type_constructor_parameter const> const type_constructor_parameters,
+        std::span<Statement const> const instance_arguments
+    )
+    {
+        return replace_parameter_types_by_instance_arguments_impl(type_reference, type_constructor_parameters, instance_arguments);
+    }
+
+    bool replace_parameter_types_by_instance_arguments(
+        Function_type& function_type,
+        std::span<Function_constructor_parameter const> const function_constructor_parameters,
+        std::span<Statement const> const instance_arguments
+    )
+    {
+        return replace_parameter_types_by_instance_arguments_impl(function_type, function_constructor_parameters, instance_arguments);
+    }
+
+    bool replace_parameter_types_by_instance_arguments(
+        Function_type& function_type,
+        std::span<Type_constructor_parameter const> const type_constructor_parameters,
+        std::span<Statement const> const instance_arguments
+    )
+    {
+        return replace_parameter_types_by_instance_arguments_impl(function_type, type_constructor_parameters, instance_arguments);
+    }
 }

@@ -395,7 +395,14 @@ namespace h::compiler
                 throw std::runtime_error{ "alignment_of() requires exactly one type argument!" };
 
             Type_reference const& type_reference = expression.type_arguments[0];
-            llvm::Type* const llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, type_reference, parameters.type_database);
+            llvm::Type* const llvm_type = type_reference_to_llvm_type_on_demand(
+                parameters.llvm_context,
+                parameters.llvm_data_layout,
+                parameters.core_module,
+                type_reference,
+                parameters.declaration_database,
+                parameters.clang_context
+            );
             llvm::Align const alignment = parameters.llvm_data_layout.getABITypeAlign(llvm_type);
             std::uint64_t const alignment_in_bytes = alignment.value();
 
@@ -411,7 +418,14 @@ namespace h::compiler
                 throw std::runtime_error{ "size_of() requires exactly one type argument!" };
 
             Type_reference const& type_reference = expression.type_arguments[0];
-            llvm::Type* const llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, type_reference, parameters.type_database);
+            llvm::Type* const llvm_type = type_reference_to_llvm_type_on_demand(
+                parameters.llvm_context,
+                parameters.llvm_data_layout,
+                parameters.core_module,
+                type_reference,
+                parameters.declaration_database,
+                parameters.clang_context
+            );
             std::uint64_t const size_in_bytes = parameters.llvm_data_layout.getTypeAllocSize(llvm_type);
 
             std::pmr::string data = std::pmr::string{std::to_string(size_in_bytes)};
@@ -463,6 +477,73 @@ namespace h::compiler
         }
 
         return std::nullopt;
+    }
+
+    static std::optional<Compile_time_value_and_type> evaluate_compile_time_binary_expression(
+        h::Statement const& statement,
+        h::Binary_expression const& expression,
+        Compile_time_parameters const& parameters
+    )
+    {
+        if (!is_comparison_binary_operation(expression.operation) && !is_equality_binary_operation(expression.operation))
+            throw std::runtime_error{ std::format("Unsupported compile_time binary operation '{}'", static_cast<int>(expression.operation)) };
+
+        if (expression.left_hand_side.expression_index >= statement.expressions.size())
+            throw std::runtime_error{ "Invalid left operand index in compile_time binary expression" };
+
+        if (expression.right_hand_side.expression_index >= statement.expressions.size())
+            throw std::runtime_error{ "Invalid right operand index in compile_time binary expression" };
+
+        h::Expression const& left_expression = statement.expressions[expression.left_hand_side.expression_index];
+        h::Expression const& right_expression = statement.expressions[expression.right_hand_side.expression_index];
+
+        std::optional<Compile_time_value_and_type> const left_value = evaluate_compile_time_expression(statement, left_expression, parameters);
+        if (!left_value.has_value())
+            throw std::runtime_error{ "Could not evaluate left operand in compile_time binary expression" };
+
+        std::optional<Compile_time_value_and_type> const right_value = evaluate_compile_time_expression(statement, right_expression, parameters);
+        if (!right_value.has_value())
+            throw std::runtime_error{ "Could not evaluate right operand in compile_time binary expression" };
+
+        std::optional<Compile_time_integer_value> const left_integer = get_integer_from_value(left_value.value());
+        if (!left_integer.has_value())
+            throw std::runtime_error{ "Left operand of compile_time binary expression is not an integer constant" };
+
+        std::optional<Compile_time_integer_value> const right_integer = get_integer_from_value(right_value.value());
+        if (!right_integer.has_value())
+            throw std::runtime_error{ "Right operand of compile_time binary expression is not an integer constant" };
+
+        if (left_integer->is_signed != right_integer->is_signed)
+            throw std::runtime_error{ "Signed/unsigned comparison is not supported in compile_time binary expression" };
+
+        auto const compare = [&](auto const left_side, auto const right_side) -> bool
+        {
+            switch (expression.operation)
+            {
+                case h::Binary_operation::Equal:
+                    return left_side == right_side;
+                case h::Binary_operation::Not_equal:
+                    return left_side != right_side;
+                case h::Binary_operation::Less_than:
+                    return left_side < right_side;
+                case h::Binary_operation::Less_than_or_equal_to:
+                    return left_side <= right_side;
+                case h::Binary_operation::Greater_than:
+                    return left_side > right_side;
+                case h::Binary_operation::Greater_than_or_equal_to:
+                    return left_side >= right_side;
+                default:
+                    throw std::runtime_error{ "Unsupported compile_time comparison operation" };
+            }
+
+            return false;
+        };
+
+        bool const result = left_integer->is_signed
+            ? compare(left_integer->signed_value, right_integer->signed_value)
+            : compare(left_integer->unsigned_value, right_integer->unsigned_value);
+
+        return create_value_and_type(create_constant_bool_expression_statement(result));
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_variable_expression(
@@ -549,6 +630,11 @@ namespace h::compiler
             h::Unary_expression const& unary_expression = std::get<h::Unary_expression>(expression.data);
             return evaluate_compile_time_unary_expression(statement, unary_expression, parameters);
         }
+        else if (std::holds_alternative<h::Binary_expression>(expression.data))
+        {
+            h::Binary_expression const& binary_expression = std::get<h::Binary_expression>(expression.data);
+            return evaluate_compile_time_binary_expression(statement, binary_expression, parameters);
+        }
         else if (std::holds_alternative<h::Variable_expression>(expression.data))
         {
             h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
@@ -611,6 +697,25 @@ namespace h::compiler
             {
                 replace_expression(statement, expression, new_value->statement, parameters.temporaries_allocator);
             }
+        }
+    }
+
+    void run_compile_time_pass_on_module(
+        h::Module& core_module,
+        Compile_time_parameters const& parameters
+    )
+    {
+        for (h::Function_definition& function_definition : core_module.definitions.function_definitions)
+        {
+            std::optional<Function_declaration const*> const function_declaration = find_function_declaration(core_module, function_definition.name);
+            if (!function_declaration.has_value())
+                continue;
+
+            run_compile_time_pass_on_function(
+                *function_declaration.value(),
+                function_definition,
+                parameters
+            );
         }
     }
 

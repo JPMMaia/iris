@@ -119,6 +119,29 @@ namespace h
 
     void add_declarations(
         Declaration_database& database,
+        std::string_view const module_name,
+        bool const are_export,
+        Module_declarations const& declarations
+    )
+    {
+        add_declarations(
+            database,
+            module_name,
+            are_export,
+            declarations.alias_type_declarations,
+            declarations.enum_declarations,
+            declarations.forward_declarations,
+            declarations.global_variable_declarations,
+            declarations.struct_declarations,
+            declarations.union_declarations,
+            declarations.function_declarations,
+            declarations.function_constructors,
+            declarations.type_constructors
+        );
+    }
+
+    void add_declarations(
+        Declaration_database& database,
         Module const& core_module
     )
     {
@@ -126,43 +149,37 @@ namespace h
             database,
             core_module.name,
             true,
-            core_module.export_declarations.alias_type_declarations,
-            core_module.export_declarations.enum_declarations,
-            core_module.export_declarations.forward_declarations,
-            core_module.export_declarations.global_variable_declarations,
-            core_module.export_declarations.struct_declarations,
-            core_module.export_declarations.union_declarations,
-            core_module.export_declarations.function_declarations,
-            core_module.export_declarations.function_constructors,
-            core_module.export_declarations.type_constructors
+            core_module.export_declarations
         );
 
         add_declarations(
             database,
             core_module.name,
             false,
-            core_module.internal_declarations.alias_type_declarations,
-            core_module.internal_declarations.enum_declarations,
-            core_module.internal_declarations.forward_declarations,
-            core_module.internal_declarations.global_variable_declarations,
-            core_module.internal_declarations.struct_declarations,
-            core_module.internal_declarations.union_declarations,
-            core_module.internal_declarations.function_declarations,
-            core_module.internal_declarations.function_constructors,
-            core_module.internal_declarations.type_constructors
+            core_module.internal_declarations
         );
-
-        add_instantiated_type_instances(database, core_module);
-        add_instance_call_expression_values(database, core_module);
     }
 
-    void add_instance_type_struct_declaration(
+    void add_struct_declaration(
         Declaration_database& database,
-        Type_instance const& type_instance,
-        Struct_declaration const& struct_declaration
+        std::string_view const module_name,
+        bool const is_export,
+        h::Struct_declaration const& declaration
     )
     {
-        database.instances.insert(std::make_pair(type_instance, Declaration_instance_storage{ .data = struct_declaration }));
+        Declaration_map& map = database.map[module_name.data()];
+        map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = is_export}));
+    }
+
+    void add_function_declaration(
+        Declaration_database& database,
+        std::string_view const module_name,
+        bool const is_export,
+        h::Function_declaration const& declaration
+    )
+    {
+        Declaration_map& map = database.map[module_name.data()];
+        map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = is_export}));
     }
 
     std::optional<Declaration> find_declaration(
@@ -198,40 +215,13 @@ namespace h
         else if (std::holds_alternative<Type_instance>(type_reference.data))
         {
             Type_instance const& type_instance = std::get<Type_instance>(type_reference.data);
-
-            auto const declaration_location = database.instances.find(type_instance);
-            if (declaration_location == database.instances.end())
-                return std::nullopt;
-
             std::string_view const declaration_module_name = type_instance.type_constructor.module_reference.name;
-            bool const is_export = true;
-            
-            Declaration_instance_storage const& instance_storage = declaration_location->second;
-            if (std::holds_alternative<Alias_type_declaration>(instance_storage.data))
-            {
-                Alias_type_declaration const& declaration = std::get<Alias_type_declaration>(instance_storage.data);
-                return Declaration{ .data = &declaration, .module_name = std::pmr::string{ declaration_module_name}, .is_export = is_export };
-            }
-            else if (std::holds_alternative<Enum_declaration>(instance_storage.data))
-            {
-                Enum_declaration const& declaration = std::get<Enum_declaration>(instance_storage.data);
-                return Declaration{ .data = &declaration, .module_name = std::pmr::string{ declaration_module_name}, .is_export = is_export };
-            }
-            else if (std::holds_alternative<Function_declaration>(instance_storage.data))
-            {
-                Function_declaration const& declaration = std::get<Function_declaration>(instance_storage.data);
-                return Declaration{ .data = &declaration, .module_name = std::pmr::string{ declaration_module_name}, .is_export = is_export };
-            }
-            else if (std::holds_alternative<Struct_declaration>(instance_storage.data))
-            {
-                Struct_declaration const& declaration = std::get<Struct_declaration>(instance_storage.data);
-                return Declaration{ .data = &declaration, .module_name = std::pmr::string{ declaration_module_name}, .is_export = is_export };
-            }
-            else if (std::holds_alternative<Union_declaration>(instance_storage.data))
-            {
-                Union_declaration const& declaration = std::get<Union_declaration>(instance_storage.data);
-                return Declaration{ .data = &declaration, .module_name = std::pmr::string{ declaration_module_name}, .is_export = is_export };
-            }
+            std::pmr::string const mangled_name = mangle_type_instance_name(type_instance);
+            std::optional<Declaration> const instanced_declaration = find_declaration(database, declaration_module_name, mangled_name);
+            if (instanced_declaration.has_value())
+                return instanced_declaration;
+
+            return find_declaration(database, declaration_module_name, type_instance.type_constructor.name);
         }
 
         return std::nullopt;
@@ -317,6 +307,46 @@ namespace h
             database,
             optional_declaration.value()
         );
+    }
+
+    std::optional<Declaration> find_declaration_in_instanced_module_declarations(
+        h::Module_instanced_declarations const& declarations,
+        std::string_view const module_name,
+        std::string_view const declaration_name
+    )
+    {
+        auto const create_declaration = [module_name](auto const& declaration_pointer) -> Declaration
+        {
+            return Declaration{
+                .data = declaration_pointer,
+                .module_name = std::pmr::string{ module_name },
+                .is_export = false
+            };
+        };
+
+        auto const find_declaration_in_list = [declaration_name, &create_declaration]<typename T>(std::pmr::deque<T> const& declaration_list) -> std::optional<Declaration>
+        {
+            auto const location = std::find_if(
+                declaration_list.begin(),
+                declaration_list.end(),
+                [declaration_name](T const& declaration) -> bool { return declaration.name == declaration_name; }
+            );
+            if (location == declaration_list.end())
+                return std::nullopt;
+
+            return create_declaration(&*location);
+        };
+
+        if (std::optional<Declaration> declaration = find_declaration_in_list(declarations.function_declarations); declaration.has_value())
+            return declaration;
+
+        if (std::optional<Declaration> declaration = find_declaration_in_list(declarations.struct_declarations); declaration.has_value())
+            return declaration;
+
+        if (std::optional<Declaration> declaration = find_declaration_in_list(declarations.union_declarations); declaration.has_value())
+            return declaration;
+
+        return std::nullopt;
     }
 
     std::optional<Type_reference> get_underlying_type(
@@ -441,7 +471,7 @@ namespace h
     }
 
     Declaration_instance_storage instantiate_type_instance(
-        Declaration_database& declaration_database,
+        Declaration_database const& declaration_database,
         Type_instance const& type_instance
     )
     {
@@ -471,6 +501,7 @@ namespace h
         {
             Struct_declaration struct_declaration = std::get<Struct_declaration>(created_declaration.data);
             struct_declaration.name = mangle_type_instance_name(type_instance);
+            struct_declaration.unique_name = struct_declaration.name;
 
             return Declaration_instance_storage{.data = struct_declaration};
         }
@@ -483,84 +514,51 @@ namespace h
     )
     {
         std::size_t const type_instance_hash = Type_instance_hash{}(type_instance);
-        return std::pmr::string{std::format("{}@{}", type_instance.type_constructor.name, type_instance_hash)};
+        return std::pmr::string{std::format("{}@{}@{}", type_instance.type_constructor.module_reference.name, type_instance.type_constructor.name, type_instance_hash)};
     }
 
-    void add_instantiated_type_instances(
-        Declaration_database& declaration_database,
-        h::Module const& core_module
+    std::optional<h::Custom_type_reference> unmangle_type_instance_name(
+        std::string_view const name
     )
     {
-        auto const instantiate_all = [&](std::string_view const declaration_name, h::Type_reference const& type_reference) -> bool {
+        auto const first_location = std::find(name.begin(), name.end(), '@');
+        if (first_location == name.end())
+            return std::nullopt;
 
-            if (std::holds_alternative<Type_instance>(type_reference.data))
-            {
-                Type_instance const& type_instance = std::get<Type_instance>(type_reference.data);
-                if (!declaration_database.instances.contains(type_instance))
-                {
-                    Declaration_instance_storage storage = instantiate_type_instance(declaration_database, type_instance);
-                    declaration_database.instances.emplace(type_instance, std::move(storage));   
-                }
-            }
+        auto const second_location = std::find(first_location + 1, name.end(), '@');
+        if (second_location == name.end())
+            return std::nullopt;
 
-            return false;
+        std::size_t const module_name_length = std::distance(name.begin(), first_location);
+        std::string_view const module_name = name.substr(0, module_name_length);
+
+        std::size_t const type_constructor_name_length = std::distance(first_location + 1, second_location);
+        std::string_view const type_constructor_name = name.substr(module_name_length + 1, type_constructor_name_length);
+
+        return h::Custom_type_reference{
+            .module_reference { .name = std::pmr::string{module_name} },
+            .name = std::pmr::string{type_constructor_name}
         };
-
-        h::visit_type_references_recursively_with_declaration_name(
-            core_module,
-            instantiate_all
-        );
-    }
-
-    void add_instantiated_type_instances(
-        Declaration_database& declaration_database,
-        h::Function_expression const& function_expression
-    )
-    {
-        auto const instantiate_all = [&](h::Type_reference const& type_reference) -> bool {
-
-            if (std::holds_alternative<Type_instance>(type_reference.data))
-            {
-                Type_instance const& type_instance = std::get<Type_instance>(type_reference.data);
-                if (!declaration_database.instances.contains(type_instance))
-                {
-                    Declaration_instance_storage storage = instantiate_type_instance(declaration_database, type_instance);
-                    declaration_database.instances.emplace(type_instance, std::move(storage));
-                }
-            }
-
-            return false;
-        };
-
-        h::visit_type_references_recursively(
-            function_expression.declaration,
-            instantiate_all
-        );
-
-        h::visit_type_references_recursively(
-            function_expression.definition,
-            instantiate_all
-        );
     }
 
     std::optional<Custom_type_reference> get_function_constructor_type_reference(
         Declaration_database const& declaration_database,
+        h::Module const& core_module,
         Expression const& expression,
-        Statement const& statement,
-        std::string_view const current_module_name
+        Statement const& statement
     )
     {
         if (std::holds_alternative<Variable_expression>(expression.data))
         {
             Variable_expression const& variable_expression = std::get<Variable_expression>(expression.data);
-            std::optional<Declaration> const declaration = find_declaration(declaration_database, current_module_name, variable_expression.name);
+            std::optional<Declaration> const declaration = find_declaration(declaration_database, core_module.name, variable_expression.name);
             if (!declaration.has_value() || !std::holds_alternative<Function_constructor const*>(declaration.value().data))
                 return std::nullopt;
 
             return Custom_type_reference
             {
                 .module_reference = {
-                    .name = std::pmr::string{current_module_name}
+                    .name = core_module.name
                 },
                 .name = variable_expression.name
             };
@@ -573,10 +571,14 @@ namespace h
                 return std::nullopt;
 
             Variable_expression const& variable_expression = std::get<Variable_expression>(left_hand_side_expression.data);
+            Import_module_with_alias const* const import_module = find_import_module_with_alias(core_module, variable_expression.name);
+            if (import_module == nullptr)
+                return std::nullopt;
+
             return Custom_type_reference
             {
                 .module_reference = {
-                    .name = variable_expression.name
+                    .name = import_module->module_name
                 },
                 .name = access_expression.member_name
             };
@@ -587,9 +589,9 @@ namespace h
 
             return get_function_constructor_type_reference(
                 declaration_database,
+                core_module,
                 statement.expressions[data.left_hand_side.expression_index],
-                statement,
-                current_module_name
+                statement
             );
         }
 
@@ -598,16 +600,16 @@ namespace h
 
     Instance_call_key create_instance_call_key(
         Declaration_database const& declaration_database,
+        h::Module const& core_module,
         Instance_call_expression const& expression,
-        Statement const& statement,
-        std::string_view const current_module_name
+        Statement const& statement
     )
     {
         std::optional<Custom_type_reference> const custom_type_reference = get_function_constructor_type_reference(
             declaration_database,
+            core_module,
             statement.expressions[expression.left_hand_side.expression_index],
-            statement,
-            current_module_name
+            statement
         );
         if (!custom_type_reference.has_value())
             throw std::runtime_error("Could not find function constructor for instance call");
@@ -622,10 +624,11 @@ namespace h
 
     Function_constructor const* get_function_constructor(
         Declaration_database const& declaration_database,
-        Custom_type_reference const& custom_type_reference
+        std::string_view const module_name,
+        std::string_view const declaration_name
     )
     {
-        std::optional<Declaration> const declaration = find_declaration(declaration_database, custom_type_reference.module_reference.name, custom_type_reference.name);
+        std::optional<Declaration> const declaration = find_declaration(declaration_database, module_name, declaration_name);
         if (!declaration.has_value() || !std::holds_alternative<Function_constructor const*>(declaration.value().data))
             return nullptr;
 
@@ -634,16 +637,24 @@ namespace h
 
     Function_constructor const* get_function_constructor(
         Declaration_database const& declaration_database,
+        Custom_type_reference const& custom_type_reference
+    )
+    {
+        return get_function_constructor(declaration_database, custom_type_reference.module_reference.name, custom_type_reference.name);
+    }
+
+    Function_constructor const* get_function_constructor(
+        Declaration_database const& declaration_database,
+        h::Module const& core_module,
         Expression const& expression,
-        Statement const& statement,
-        std::string_view const current_module_name
+        Statement const& statement
     )
     {
         std::optional<Custom_type_reference> const custom_type_reference = get_function_constructor_type_reference(
             declaration_database,
+            core_module,
             expression,
-            statement,
-            current_module_name
+            statement
         );
         if (!custom_type_reference.has_value())
             return nullptr;
@@ -651,17 +662,28 @@ namespace h
         return get_function_constructor(declaration_database, *custom_type_reference);
     }
 
-    Function_expression const* get_instance_call_function_expression(
+    std::optional<Function_expression> get_instance_call_function_expression(
         Declaration_database const& declaration_database,
+        Module const& core_module,
         Instance_call_key const& key
     )
     {
-        auto const location = declaration_database.call_instances.find(key);
-        if (location == declaration_database.call_instances.end())
-            return nullptr;
+        std::string const mangled_name = mangle_instance_call_name(key);
+        std::optional<Declaration> const declaration = find_declaration(declaration_database, key.module_name, mangled_name);
+        if (!declaration.has_value() || !std::holds_alternative<Function_declaration const*>(declaration->data))
+            return std::nullopt;
 
-        Function_expression const& function_expression = location->second;
-        return &function_expression;
+        Function_declaration const& function_declaration = *std::get<Function_declaration const*>(declaration->data);
+
+        for (Function_definition const& definition : core_module.definitions.function_definitions)
+        {
+            if (definition.name == function_declaration.name)
+            {
+                return Function_expression{ .declaration = function_declaration, .definition = definition };
+            }
+        }
+
+        return std::nullopt;
     }
 
     std::string mangle_instance_call_name(
@@ -669,7 +691,31 @@ namespace h
     )
     {
         std::size_t const instance_call_hash = Instance_call_key_hash{}(key);
-        return std::format("{}@{}", key.function_constructor_name, instance_call_hash);
+        return std::format("{}@{}@{}", key.module_name, key.function_constructor_name, instance_call_hash);
+    }
+
+    std::optional<h::Custom_type_reference> unmangle_instance_call_name(
+        std::string_view const name
+    )
+    {
+        auto const first_location = std::find(name.begin(), name.end(), '@');
+        if (first_location == name.end())
+            return std::nullopt;
+
+        auto const second_location = std::find(first_location + 1, name.end(), '@');
+        if (second_location == name.end())
+            return std::nullopt;
+
+        std::size_t const module_name_length = std::distance(name.begin(), first_location);
+        std::string_view const module_name = name.substr(0, module_name_length);
+
+        std::size_t const function_constructor_name_length = std::distance(first_location + 1, second_location);
+        std::string_view const function_constructor_name = name.substr(module_name_length + 1, function_constructor_name_length);
+
+        return h::Custom_type_reference{
+            .module_reference { .name = std::pmr::string{module_name} },
+            .name = std::pmr::string{function_constructor_name}
+        };
     }
 
     Function_expression create_instance_call_expression_value(
@@ -694,31 +740,33 @@ namespace h
 
         std::string const mangled_name = mangle_instance_call_name(key);
         function_declaration.name = std::pmr::string{mangled_name};
+        function_declaration.unique_name = function_declaration.name;
+        function_expression.definition.name = function_declaration.name;
 
         return function_expression;
     }
 
     std::pair<Instance_call_key, Function_expression> create_instance_call_expression_value(
-        Declaration_database& declaration_database,
+        Declaration_database const& declaration_database,
+        h::Module const& core_module,
         Instance_call_expression const& expression,
-        Statement const& statement,
-        std::string_view const current_module_name
+        Statement const& statement
     )
     {
         Function_constructor const* function_constructor = get_function_constructor(
             declaration_database,
+            core_module,
             statement.expressions[expression.left_hand_side.expression_index],
-            statement,
-            current_module_name
+            statement
         );
         if (function_constructor == nullptr)
             throw std::runtime_error{ "Could not find function constructor!" };
 
         Instance_call_key const key = create_instance_call_key(
             declaration_database,
+            core_module,
             expression,
-            statement,
-            current_module_name
+            statement
         );
 
         Function_expression const function_expression = create_instance_call_expression_value(
@@ -727,59 +775,6 @@ namespace h
             key
         );
         return std::make_pair(key, function_expression);
-    }
-
-    static bool is_builtin_instance_call(
-        h::Statement const& statement,
-        Instance_call_expression const& expression
-    )
-    {
-        h::Expression const& left_hand_side = statement.expressions[expression.left_hand_side.expression_index];
-        if (std::holds_alternative<h::Variable_expression>(left_hand_side.data))
-        {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_hand_side.data);
-            return is_builtin_function_name(variable_expression.name);
-        }
-
-        return false;
-    }
-
-    void add_instance_call_expression_values(
-        Declaration_database& declaration_database,
-        h::Module const& core_module
-    )
-    {
-        auto const instantiate_all = [&](h::Expression const& expression, h::Statement const& statement) -> bool {
-
-            if (std::holds_alternative<Instance_call_expression>(expression.data))
-            {
-                Instance_call_expression const& instance_call_expression = std::get<Instance_call_expression>(expression.data);
-
-                if (is_builtin_instance_call(statement, instance_call_expression))
-                    return false;
-
-                // TODO can optimize by checking for the existence of the key first
-                std::pair<Instance_call_key, Function_expression> const pair = create_instance_call_expression_value(
-                    declaration_database,
-                    instance_call_expression,
-                    statement,
-                    core_module.name
-                );
-
-                if (!declaration_database.call_instances.contains(pair.first))
-                {
-                    add_instantiated_type_instances(declaration_database, pair.second);
-                    declaration_database.call_instances.emplace(std::move(pair));
-                }
-            }
-
-            return false;
-        };
-
-        h::visit_expressions(
-            core_module,
-            instantiate_all
-        );
     }
 
     std::optional<std::string_view> get_declaration_unique_name(

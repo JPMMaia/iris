@@ -154,39 +154,19 @@ namespace h::execution_engine
         auto const process_type = [&](Type_reference const& type_reference) -> bool
         {
             Type_reference& mutable_type_reference = const_cast<Type_reference&>(type_reference);
-            if (std::holds_alternative<Parameter_type>(mutable_type_reference.data))
-            {
-                Parameter_type const& parameter_type = std::get<Parameter_type>(mutable_type_reference.data);
+            auto const location = std::find_if(
+                type_constructor_parameters.begin(),
+                type_constructor_parameters.end(),
+                [&](Type_constructor_parameter const& parameter) -> bool {
+                    return std::holds_alternative<Parameter_type>(mutable_type_reference.data)
+                        && std::get<Parameter_type>(mutable_type_reference.data).name == parameter.name;
+                }
+            );
+            if (location != type_constructor_parameters.end() && !is_compile_time_builtin_type(location->type))
+                throw std::runtime_error{ "Type constructor parameter type is not the compile time builtin type!"};
 
-                auto const location = std::find_if(
-                    type_constructor_parameters.begin(),
-                    type_constructor_parameters.end(), 
-                    [&](Type_constructor_parameter const& parameter) -> bool { return parameter.name == parameter_type.name; }
-                );
-                if (location == type_constructor_parameters.end())
-                    throw std::runtime_error{ "Could not find parameter type in type constructor!"};
-
-                Type_constructor_parameter const& parameter = *location;
-                if (!is_compile_time_builtin_type(parameter.type))
-                    throw std::runtime_error{ "Type constructor parameter type is not the compile time builtin type!"};
-
-                std::size_t const parameter_index = std::distance(type_constructor_parameters.begin(), location);
-                if (parameter_index >= type_instance_arguments.size())
-                    throw std::runtime_error{ "Type instance does not provide all arguments!"};
-
-                Statement const& argument_statement = type_instance_arguments[parameter_index];
-                if (argument_statement.expressions.size() != 1)
-                    throw std::runtime_error{ "argument_statement.expressions.size() != 1!"};
-
-                Expression const& expression = argument_statement.expressions[0];
-                if (!std::holds_alternative<Type_expression>(expression.data))
-                    throw std::runtime_error{ "Expected type instance argument to by a type expression!"};
-
-                Type_expression const& type_expression = std::get<Type_expression>(expression.data);
-
-                // TODO use allocator to copy
-                mutable_type_reference.data = type_expression.type.data;                
-            }
+            if (!h::replace_parameter_types_by_instance_arguments(mutable_type_reference, type_constructor_parameters, type_instance_arguments))
+                throw std::runtime_error{ "Could not replace parameter type by instance argument!" };
 
             return false;
         };
@@ -260,21 +240,8 @@ namespace h::execution_engine
         auto const process_type = [&](Type_reference const& type_reference) -> bool
         {
             Type_reference& mutable_type_reference = const_cast<Type_reference&>(type_reference);
-            if (std::holds_alternative<Parameter_type>(mutable_type_reference.data))
-            {
-                Parameter_type const& parameter_type = std::get<Parameter_type>(mutable_type_reference.data);
-
-                std::optional<Type_expression> const new_parameter_type = find_type_expression_from_function_constructor_arguments(
-                    function_constructor_parameters,
-                    type_instance_arguments,
-                    parameter_type.name
-                );
-                if (!new_parameter_type.has_value())
-                    throw std::runtime_error{ "Could not find parameter type in type constructor!"};
-
-                // TODO use allocator to copy
-                mutable_type_reference.data = new_parameter_type.value().type.data;
-            }
+            if (!h::replace_parameter_types_by_instance_arguments(mutable_type_reference, function_constructor_parameters, type_instance_arguments))
+                throw std::runtime_error{ "Could not find parameter type in type constructor!"};
 
             return false;
         };

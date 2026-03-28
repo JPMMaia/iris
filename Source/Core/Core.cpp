@@ -317,7 +317,8 @@ namespace h
     std::optional<Type const*> get_value(
         std::string_view const name,
         std::pmr::vector<Type> const& span_0,
-        std::pmr::vector<Type> const& span_1
+        std::pmr::vector<Type> const& span_1,
+        std::pmr::deque<Type> const& span_2
     )
     {
         auto const find_declaration = [name](Type const& declaration) -> bool { return declaration.name == name; };
@@ -334,47 +335,53 @@ namespace h
                 return &(*location);
         }
 
+        {
+            auto const location = std::find_if(span_2.begin(), span_2.end(), find_declaration);
+            if (location != span_2.end())
+                return &(*location);
+        }
+
         return std::nullopt;
     }
 
     std::optional<Alias_type_declaration const*> find_alias_type_declaration(h::Module const& module, std::string_view const name)
     {
-        return get_value(name, module.export_declarations.alias_type_declarations, module.internal_declarations.alias_type_declarations);
+        return get_value(name, module.export_declarations.alias_type_declarations, module.internal_declarations.alias_type_declarations, {});
     }
 
     std::optional<Enum_declaration const*> find_enum_declaration(h::Module const& module, std::string_view const name)
     {
-        return get_value(name, module.export_declarations.enum_declarations, module.internal_declarations.enum_declarations);
+        return get_value(name, module.export_declarations.enum_declarations, module.internal_declarations.enum_declarations, {});
     }
 
     std::optional<Forward_declaration const*> find_forward_declaration(h::Module const& module, std::string_view const name)
     {
-        return get_value(name, module.export_declarations.forward_declarations, module.internal_declarations.forward_declarations);
+        return get_value(name, module.export_declarations.forward_declarations, module.internal_declarations.forward_declarations, {});
     }
 
     std::optional<Global_variable_declaration const*> find_global_variable_declaration(h::Module const& module, std::string_view name)
     {
-        return get_value(name, module.export_declarations.global_variable_declarations, module.internal_declarations.global_variable_declarations);
+        return get_value(name, module.export_declarations.global_variable_declarations, module.internal_declarations.global_variable_declarations, {});
     }
 
     std::optional<Function_declaration const*> find_function_declaration(h::Module const& module, std::string_view const name)
     {
-        return get_value(name, module.export_declarations.function_declarations, module.internal_declarations.function_declarations);
+        return get_value(name, module.export_declarations.function_declarations, module.internal_declarations.function_declarations, module.instanced_declarations.function_declarations);
     }
 
     std::optional<Function_definition const*> find_function_definition(Module const& module, std::string_view name)
     {
-        return get_value(name, module.definitions.function_definitions, {});
+        return get_value(name, {}, {}, module.definitions.function_definitions);
     }
 
     std::optional<Struct_declaration const*> find_struct_declaration(h::Module const& module, std::string_view const name)
     {
-        return get_value(name, module.export_declarations.struct_declarations, module.internal_declarations.struct_declarations);
+        return get_value(name, module.export_declarations.struct_declarations, module.internal_declarations.struct_declarations, module.instanced_declarations.struct_declarations);
     }
 
     std::optional<Union_declaration const*> find_union_declaration(h::Module const& module, std::string_view const name)
     {
-        return get_value(name, module.export_declarations.union_declarations, module.internal_declarations.union_declarations);
+        return get_value(name, module.export_declarations.union_declarations, module.internal_declarations.union_declarations, module.instanced_declarations.union_declarations);
     }
 
     Import_module_with_alias const* find_import_module_with_alias(

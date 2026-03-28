@@ -1650,6 +1650,25 @@ namespace h::json::operators
             return output_stream;
         }
 
+        export std::istream& operator>>(std::istream& input_stream, Module_instanced_declarations& value)
+        {
+            JSON data{};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }
+
+        export std::ostream& operator<<(std::ostream& output_stream, Module_instanced_declarations const& value)
+        {
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }
+
         export std::istream& operator>>(std::istream& input_stream, Module_definitions& value)
         {
             JSON data{};

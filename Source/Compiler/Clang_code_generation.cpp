@@ -460,6 +460,35 @@ namespace h::compiler
         return clang_function_declaration;
     }
 
+    void add_clang_struct_declaration(
+        Clang_declaration_database& clang_declaration_database,
+        clang::ASTContext& clang_ast_context,
+        h::Module const& core_module,
+        h::Struct_declaration const& struct_declaration,
+        Declaration_database const& declaration_database
+    )
+    {
+        auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
+
+        clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
+        iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
+        set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
+    }
+
+    void add_clang_union_declaration(
+        Clang_declaration_database& clang_declaration_database,
+        clang::ASTContext& clang_ast_context,
+        h::Module const& core_module,
+        h::Union_declaration const& union_declaration,
+        Declaration_database const& declaration_database
+    )
+    {
+        auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
+
+        add_clang_union_declaration(iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
+        add_clang_union_definition(iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
+    }
+
     void add_clang_function_declaration(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
@@ -474,7 +503,7 @@ namespace h::compiler
         iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
     }
 
-    void add_clang_declarations(
+    void add_clang_function_declarations(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
         h::Module const& core_module,
@@ -482,70 +511,6 @@ namespace h::compiler
     )
     {
         auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
-
-        for (h::Enum_declaration const& enum_declaration : core_module.export_declarations.enum_declarations)
-        {
-            add_clang_enum_declaration(iterator->second.enum_declarations, clang_ast_context, enum_declaration);
-        }
-
-        for (h::Enum_declaration const& enum_declaration : core_module.internal_declarations.enum_declarations)
-        {
-            add_clang_enum_declaration(iterator->second.enum_declarations, clang_ast_context, enum_declaration);
-        }
-
-        for (h::Struct_declaration const& struct_declaration : core_module.export_declarations.struct_declarations)
-        {
-            clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
-            iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
-        }
-
-        for (h::Struct_declaration const& struct_declaration : core_module.internal_declarations.struct_declarations)
-        {
-            clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
-            iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
-        }
-
-        for (h::Union_declaration const& union_declaration : core_module.export_declarations.union_declarations)
-        {
-            add_clang_union_declaration(iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
-        }
-
-        for (h::Union_declaration const& union_declaration : core_module.internal_declarations.union_declarations)
-        {
-            add_clang_union_declaration(iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
-        }
-
-        for (h::Alias_type_declaration const& alias_type_declaration : core_module.export_declarations.alias_type_declarations)
-        {
-            add_clang_alias_type_declaration(iterator->second.alias_type_declarations, clang_ast_context, alias_type_declaration, declaration_database, clang_declaration_database);
-        }
-
-        for (h::Alias_type_declaration const& alias_type_declaration : core_module.internal_declarations.alias_type_declarations)
-        {
-            add_clang_alias_type_declaration(iterator->second.alias_type_declarations, clang_ast_context, alias_type_declaration, declaration_database, clang_declaration_database);
-        }
-
-        for (h::Struct_declaration const& struct_declaration : core_module.export_declarations.struct_declarations)
-        {
-            clang::RecordDecl* const record_declaration = iterator->second.struct_declarations.at(struct_declaration.name);
-            set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
-        }
-
-        for (h::Struct_declaration const& struct_declaration : core_module.internal_declarations.struct_declarations)
-        {
-            clang::RecordDecl* const record_declaration = iterator->second.struct_declarations.at(struct_declaration.name);
-            set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
-        }
-
-        for (h::Union_declaration const& union_declaration : core_module.export_declarations.union_declarations)
-        {
-            add_clang_union_definition(iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
-        }
-
-        for (h::Union_declaration const& union_declaration : core_module.internal_declarations.union_declarations)
-        {
-            add_clang_union_definition(iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
-        }
 
         for (h::Function_declaration const& function_declaration : core_module.export_declarations.function_declarations)
         {
@@ -560,12 +525,130 @@ namespace h::compiler
         }
     }
 
-    Clang_module_data create_clang_module_data(
+    void add_clang_declarations(
+        Clang_declaration_database& clang_declaration_database,
+        clang::ASTContext& clang_ast_context,
+        h::Module const& core_module,
+        Declaration_database const& declaration_database
+    )
+    {
+        auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
+
+        for (h::Enum_declaration const& enum_declaration : core_module.export_declarations.enum_declarations)
+            add_clang_enum_declaration(iterator->second.enum_declarations, clang_ast_context, enum_declaration);
+
+        for (h::Enum_declaration const& enum_declaration : core_module.internal_declarations.enum_declarations)
+            add_clang_enum_declaration(iterator->second.enum_declarations, clang_ast_context, enum_declaration);
+
+        for (h::Struct_declaration const& struct_declaration : core_module.export_declarations.struct_declarations)
+        {
+            clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
+            iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
+        }
+
+        for (h::Struct_declaration const& struct_declaration : core_module.internal_declarations.struct_declarations)
+        {
+            clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
+            iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
+        }
+
+        for (h::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
+        {
+            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
+            assert(instance_custom_type_reference.has_value());
+            
+            clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, instance_custom_type_reference->module_reference.name, struct_declaration);
+
+            auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
+            instance_iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
+        }
+
+        for (h::Union_declaration const& union_declaration : core_module.export_declarations.union_declarations)
+            add_clang_union_declaration(iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
+
+        for (h::Union_declaration const& union_declaration : core_module.internal_declarations.union_declarations)
+            add_clang_union_declaration(iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
+
+        for (h::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
+        {
+            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
+            assert(instance_custom_type_reference.has_value());
+            
+            auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
+            add_clang_union_declaration(instance_iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
+        }
+
+        for (h::Alias_type_declaration const& alias_type_declaration : core_module.export_declarations.alias_type_declarations)
+            add_clang_alias_type_declaration(iterator->second.alias_type_declarations, clang_ast_context, alias_type_declaration, declaration_database, clang_declaration_database);
+
+        for (h::Alias_type_declaration const& alias_type_declaration : core_module.internal_declarations.alias_type_declarations)
+            add_clang_alias_type_declaration(iterator->second.alias_type_declarations, clang_ast_context, alias_type_declaration, declaration_database, clang_declaration_database);
+
+        for (h::Struct_declaration const& struct_declaration : core_module.export_declarations.struct_declarations)
+        {
+            clang::RecordDecl* const record_declaration = iterator->second.struct_declarations.at(struct_declaration.name);
+            set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
+        }
+
+        for (h::Struct_declaration const& struct_declaration : core_module.internal_declarations.struct_declarations)
+        {
+            clang::RecordDecl* const record_declaration = iterator->second.struct_declarations.at(struct_declaration.name);
+            set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
+        }
+
+        for (h::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
+        {
+            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
+            assert(instance_custom_type_reference.has_value());
+
+            auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
+            clang::RecordDecl* const record_declaration = instance_iterator->second.struct_declarations.at(struct_declaration.name);
+            set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
+        }
+
+        for (h::Union_declaration const& union_declaration : core_module.export_declarations.union_declarations)
+            add_clang_union_definition(iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
+
+        for (h::Union_declaration const& union_declaration : core_module.internal_declarations.union_declarations)
+            add_clang_union_definition(iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
+
+        for (h::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
+        {
+            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
+            assert(instance_custom_type_reference.has_value());
+
+            auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
+            add_clang_union_definition(instance_iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
+        }
+
+        for (h::Function_declaration const& function_declaration : core_module.export_declarations.function_declarations)
+        {
+            clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
+            iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
+        }
+
+        for (h::Function_declaration const& function_declaration : core_module.internal_declarations.function_declarations)
+        {
+            clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
+            iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
+        }
+
+        for (h::Function_declaration const& function_declaration : core_module.instanced_declarations.function_declarations)
+        {
+            clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
+
+            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(function_declaration.name);
+            assert(instance_custom_type_reference.has_value());
+            
+            auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
+            instance_iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
+        }
+    }
+
+    Clang_context create_clang_context(
         llvm::LLVMContext& llvm_context,
         Clang_data const& clang_data,
-        std::string_view const module_name,
-        std::span<h::Module const* const> const sorted_modules,
-        Declaration_database const& declaration_database
+        std::string_view const module_name
     )
     {
         clang::ASTContext& clang_ast_context = clang_data.compiler_instance->getASTContext();
@@ -585,61 +668,44 @@ namespace h::compiler
         };
         code_generator->Initialize(clang_ast_context);
 
-        Clang_declaration_database clang_declaration_database;
-
-        for (std::pair<Type_instance const, Declaration_instance_storage> const& pair : declaration_database.instances)
+        return Clang_context
         {
-            Type_instance const& type_instance = pair.first;
-            Declaration_instance_storage const& storage = pair.second;
+            .ast_context = clang_ast_context,
+            .code_generator = std::move(code_generator),
+        };
+    }
 
-            if (std::holds_alternative<Struct_declaration>(storage.data))
-            {
-                Struct_declaration const& struct_declaration = std::get<Struct_declaration>(storage.data);
+    Clang_module_data create_clang_module_data(
+        Clang_context&& clang_context,
+        std::span<h::Module const* const> const sorted_modules,
+        Declaration_database const& declaration_database
+    )
+    {
+        clang::ASTContext& clang_ast_context = clang_context.ast_context;
 
-                clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, type_instance.type_constructor.module_reference.name, struct_declaration);
-                clang_declaration_database.instances.emplace(type_instance, record_declaration);
-            }
-            else
-            {
-                throw std::runtime_error{"Could not create clang type instance declaration!"};
-            }
-        }
+        Clang_declaration_database clang_declaration_database;
 
         for (Module const* sorted_module : sorted_modules)
             add_clang_declarations(clang_declaration_database, clang_ast_context, *sorted_module, declaration_database);
 
-        for (std::pair<Type_instance const, Declaration_instance_storage> const& pair : declaration_database.instances)
-        {
-            Type_instance const& type_instance = pair.first;
-            Declaration_instance_storage const& storage = pair.second;
-
-            if (std::holds_alternative<Struct_declaration>(storage.data))
-            {
-                Struct_declaration const& struct_declaration = std::get<Struct_declaration>(storage.data);
-                clang::RecordDecl* const record_declaration = clang_declaration_database.instances.at(type_instance);
-                set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
-            }
-            else
-            {
-                throw std::runtime_error{"Could not create clang type instance declaration!"};
-            }
-        }
-
-        for (std::pair<Instance_call_key const, Function_expression> const& pair : declaration_database.call_instances)
-        {
-            Instance_call_key const& key = pair.first;
-            Function_expression const& function_expression = pair.second;
-
-            clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_expression.declaration, declaration_database, clang_declaration_database);
-            clang_declaration_database.call_instances.emplace(key, clang_declaration);
-        }
-
         return Clang_module_data
         {
             .ast_context = clang_ast_context,
-            .code_generator = std::move(code_generator),
+            .code_generator = std::move(clang_context.code_generator),
             .declaration_database = std::move(clang_declaration_database),
         };
+    }
+
+    Clang_module_data create_clang_module_data(
+        llvm::LLVMContext& llvm_context,
+        Clang_data const& clang_data,
+        std::string_view const module_name,
+        std::span<h::Module const* const> const sorted_modules,
+        Declaration_database const& declaration_database
+    )
+    {
+        Clang_context clang_context = create_clang_context(llvm_context, clang_data, module_name);
+        return create_clang_module_data(std::move(clang_context), sorted_modules, declaration_database);
     }
 
     clang::CodeGen::CGFunctionInfo const& create_clang_function_info(
@@ -661,15 +727,27 @@ namespace h::compiler
         return clang::CodeGen::arrangeFreeFunctionType(clang_module_data.code_generator->CGM(), clang_function_proto_type);
     }
 
+    static llvm::FunctionType* create_llvm_function_type_auxiliary(
+        Clang_module_data const& clang_module_data,
+        std::string_view const module_name,
+        std::string_view const function_name
+    )
+    {
+
+    }
+
     llvm::FunctionType* create_llvm_function_type(
         Clang_module_data const& clang_module_data,
         std::string_view const module_name,
         std::string_view const function_name
     )
     {
-        auto const module_declarations_location = clang_module_data.declaration_database.map.find(module_name);
+        std::optional<h::Custom_type_reference> const instance_type_reference = unmangle_instance_call_name(function_name);
+        std::string_view const actual_module_name = instance_type_reference.has_value() ? std::string_view{instance_type_reference->module_reference.name} : module_name;
+
+        auto const module_declarations_location = clang_module_data.declaration_database.map.find(actual_module_name);
         if (module_declarations_location == clang_module_data.declaration_database.map.end())
-            throw std::runtime_error{std::format("Module '{}' not found in Clang module data!", module_name)};
+            throw std::runtime_error{std::format("Module '{}' not found in Clang module data!", actual_module_name)};
         Clang_module_declarations const& module_declarations = module_declarations_location->second;
 
         clang::FunctionDecl* const clang_function_declaration = module_declarations.function_declarations.at(function_name.data());
@@ -1743,7 +1821,10 @@ namespace h::compiler
         std::string_view const declaration_name
     )
     {
-        Clang_module_declarations const& clang_declarations = clang_module_data.declaration_database.map.find(module_name)->second;
+        std::optional<h::Custom_type_reference> const instance_type_reference = unmangle_type_instance_name(declaration_name);
+        std::string_view const actual_module_name = instance_type_reference.has_value() ? std::string_view{instance_type_reference->module_reference.name} : module_name;
+
+        Clang_module_declarations const& clang_declarations = clang_module_data.declaration_database.map.find(actual_module_name)->second;
 
         {
             auto const location = clang_declarations.alias_type_declarations.find(declaration_name);
@@ -1788,6 +1869,179 @@ namespace h::compiler
         throw std::runtime_error{ std::format("Could not find type '{}.{}'", module_name, declaration_name) };
     }
 
+    static clang::RecordDecl* create_on_demand_clang_union_declaration(
+        clang::ASTContext& clang_ast_context,
+        std::string_view const module_name,
+        h::Union_declaration const& union_declaration
+    )
+    {
+        std::string const mangled_name = mangle_name(module_name, union_declaration.name, union_declaration.unique_name);
+        clang::IdentifierInfo* const union_name = &clang_ast_context.Idents.get(mangled_name);
+
+        clang::RecordDecl* const record_declaration = clang::RecordDecl::Create(
+            clang_ast_context,
+            clang::TagTypeKind::Union,
+            clang_ast_context.getTranslationUnitDecl(),
+            clang::SourceLocation(),
+            clang::SourceLocation(),
+            union_name
+        );
+
+        return record_declaration;
+    }
+
+    static void ensure_clang_custom_type_declaration(
+        clang::ASTContext& clang_ast_context,
+        Declaration_database const& declaration_database,
+        Clang_declaration_database& clang_declaration_database,
+        std::string_view const module_name,
+        std::string_view const declaration_name
+    )
+    {
+        auto module_location = clang_declaration_database.map.find(module_name);
+        if (module_location != clang_declaration_database.map.end())
+        {
+            Clang_module_declarations const& clang_declarations = module_location->second;
+
+            if (clang_declarations.alias_type_declarations.contains(declaration_name))
+                return;
+
+            if (clang_declarations.enum_declarations.contains(declaration_name))
+                return;
+
+            if (clang_declarations.struct_declarations.contains(declaration_name))
+                return;
+
+            if (clang_declarations.union_declarations.contains(declaration_name))
+                return;
+        }
+
+        std::optional<Declaration> const declaration = find_declaration(declaration_database, module_name, declaration_name);
+        if (!declaration.has_value())
+            throw std::runtime_error{ std::format("Could not find declaration '{}.{}'", module_name, declaration_name) };
+
+        auto const ensure_nested_custom_type_declarations = [&](Type_reference const& type_reference) -> bool
+        {
+            if (!std::holds_alternative<Custom_type_reference>(type_reference.data))
+                return false;
+
+            Custom_type_reference const& custom_type_reference = std::get<Custom_type_reference>(type_reference.data);
+            ensure_clang_custom_type_declaration(
+                clang_ast_context,
+                declaration_database,
+                clang_declaration_database,
+                custom_type_reference.module_reference.name,
+                custom_type_reference.name
+            );
+
+            return false;
+        };
+
+        Clang_module_declarations& clang_declarations = clang_declaration_database.map.emplace(module_name, Clang_module_declarations{}).first->second;
+
+        if (std::holds_alternative<h::Alias_type_declaration const*>(declaration->data))
+        {
+            Alias_type_declaration const* const alias_declaration = std::get<h::Alias_type_declaration const*>(declaration->data);
+
+            if (!alias_declaration->type.empty())
+                visit_type_references_recursively(alias_declaration->type[0], ensure_nested_custom_type_declarations);
+
+            add_clang_alias_type_declaration(clang_declarations.alias_type_declarations, clang_ast_context, *alias_declaration, declaration_database, clang_declaration_database);
+            return;
+        }
+
+        if (std::holds_alternative<h::Enum_declaration const*>(declaration->data))
+        {
+            Enum_declaration const* const enum_declaration = std::get<h::Enum_declaration const*>(declaration->data);
+            add_clang_enum_declaration(clang_declarations.enum_declarations, clang_ast_context, *enum_declaration);
+            return;
+        }
+
+        if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+        {
+            Struct_declaration const* const struct_declaration = std::get<h::Struct_declaration const*>(declaration->data);
+
+            for (Type_reference const& member_type : struct_declaration->member_types)
+                visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
+
+            clang::RecordDecl* record_declaration = nullptr;
+            auto const struct_location = clang_declarations.struct_declarations.find(declaration_name);
+            if (struct_location == clang_declarations.struct_declarations.end())
+            {
+                record_declaration = create_clang_struct_declaration(clang_ast_context, module_name, *struct_declaration);
+                clang_declarations.struct_declarations.emplace(declaration_name, record_declaration);
+            }
+            else
+            {
+                record_declaration = struct_location->second;
+            }
+
+            if (!record_declaration->isCompleteDefinition())
+                set_clang_struct_definition(clang_ast_context, *record_declaration, *struct_declaration, declaration_database, clang_declaration_database);
+
+            return;
+        }
+
+        if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+        {
+            Union_declaration const* const union_declaration = std::get<h::Union_declaration const*>(declaration->data);
+
+            for (Type_reference const& member_type : union_declaration->member_types)
+                visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
+
+            clang::RecordDecl* record_declaration = nullptr;
+            auto const union_location = clang_declarations.union_declarations.find(declaration_name);
+            if (union_location == clang_declarations.union_declarations.end())
+            {
+                record_declaration = create_on_demand_clang_union_declaration(clang_ast_context, module_name, *union_declaration);
+                clang_declarations.union_declarations.emplace(declaration_name, record_declaration);
+            }
+            else
+            {
+                record_declaration = union_location->second;
+            }
+
+            if (!record_declaration->isCompleteDefinition())
+                add_clang_union_definition(clang_declarations.union_declarations, clang_ast_context, *union_declaration, declaration_database, clang_declaration_database);
+
+            return;
+        }
+
+        throw std::runtime_error{ std::format("'{}.{}' is not a type declaration", module_name, declaration_name) };
+    }
+
+    llvm::Type* convert_type_on_demand(
+        Clang_context const& clang_context,
+        Declaration_database const& declaration_database,
+        std::string_view const module_name,
+        std::string_view const declaration_name
+    )
+    {
+        Clang_declaration_database transient_clang_declaration_database;
+
+        ensure_clang_custom_type_declaration(
+            clang_context.ast_context,
+            declaration_database,
+            transient_clang_declaration_database,
+            module_name,
+            declaration_name
+        );
+
+        Type_reference const type_reference = create_custom_type_reference(module_name, declaration_name);
+        std::optional<clang::QualType> const clang_type = create_type(
+            clang_context.ast_context,
+            type_reference,
+            true,
+            declaration_database,
+            transient_clang_declaration_database
+        );
+
+        if (!clang_type.has_value())
+            throw std::runtime_error{ std::format("Could not create clang type '{}.{}'", module_name, declaration_name) };
+
+        return clang::CodeGen::convertTypeForMemory(clang_context.code_generator->CGM(), *clang_type);
+    }
+
     llvm::Type* convert_type(
         Clang_module_data const& clang_module_data,
         clang::RecordDecl* const record_declaration
@@ -1806,46 +2060,12 @@ namespace h::compiler
         return clang::CodeGen::convertFreeFunctionType(clang_module_data.code_generator->CGM(), function_declaration);
     }
 
-    llvm::FunctionType* get_instance_call_llvm_function_type(
-        Clang_module_data const& clang_module_data,
-        Instance_call_key const& key
-    )
-    {
-        Clang_declaration_database const& clang_declaration_database = clang_module_data.declaration_database;
-
-        auto const location = clang_declaration_database.call_instances.find(key);
-        if (location == clang_declaration_database.call_instances.end())
-            return nullptr;
-
-        clang::FunctionDecl* const clang_function_declaration = location->second;
-
-        return convert_function_type(
-            clang_module_data,
-            clang_function_declaration
-        );
-    }
-
     clang::RecordDecl* get_record_declaration(
         std::string_view const module_name,
         std::string_view const declaration_name,
-        std::optional<h::Type_instance> const& type_instance,
         Clang_declaration_database const& clang_declaration_database
     )
     {
-        if (type_instance.has_value())
-        {
-            auto const location = clang_declaration_database.instances.find(type_instance.value());
-            if (location != clang_declaration_database.instances.end())
-            {
-                clang::RecordDecl* const record_declaration = location->second;
-                return record_declaration;
-            }
-            else
-            {
-                return nullptr;
-            }
-        }
-
         {
             auto const clang_declarations_location = clang_declaration_database.map.find(module_name);
             if (clang_declarations_location != clang_declaration_database.map.end())
@@ -1864,39 +2084,10 @@ namespace h::compiler
         return nullptr;
     }
 
-    static h::Type_reference create_type_reference(
-        std::string_view const module_name,
-        std::string_view const declaration_name,
-        std::optional<h::Type_instance> const& type_instance
-    )
-    {
-        if (type_instance.has_value())
-        {
-            return h::Type_reference
-            {
-                .data = type_instance.value()
-            };
-        }
-        else
-        {
-            return h::Type_reference
-            {
-                .data = h::Custom_type_reference
-                {
-                    .module_reference = {
-                        .name = std::pmr::string{module_name}
-                    },
-                    .name = std::pmr::string{declaration_name}
-                }
-            };
-        }
-    }
-
     std::pmr::vector<Clang_struct_member_info> get_clang_struct_member_infos(
         Clang_module_data const& clang_module_data,
         std::string_view const module_name,
         Struct_declaration const& struct_declaration,
-        std::optional<h::Type_instance> const& type_instance,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
@@ -1909,7 +2100,6 @@ namespace h::compiler
         clang::RecordDecl* const record_declaration = get_record_declaration(
             module_name,
             struct_declaration.name,
-            type_instance,
             clang_module_data.declaration_database
         );
         if (record_declaration == nullptr)
@@ -1970,7 +2160,6 @@ namespace h::compiler
         std::string_view const access_member_name,
         std::string_view const module_name,
         Struct_declaration const& struct_declaration,
-        std::optional<h::Type_instance> const& type_instance,
         Type_database const& type_database
     )
     {
@@ -1989,7 +2178,6 @@ namespace h::compiler
         clang::RecordDecl* const record_declaration = get_record_declaration(
             module_name,
             struct_declaration.name,
-            type_instance,
             clang_module_data.declaration_database
         );
         if (record_declaration == nullptr)
@@ -2003,7 +2191,7 @@ namespace h::compiler
         llvm::Type* const struct_llvm_type = type_reference_to_llvm_type(
             llvm_context,
             llvm_data_layout,
-            create_type_reference(module_name, struct_declaration.name, type_instance),
+            create_custom_type_reference(module_name, struct_declaration.name),
             type_database
         );
         if (struct_llvm_type == nullptr)
@@ -2095,7 +2283,6 @@ namespace h::compiler
         std::string_view const access_member_name,
         std::string_view const module_name,
         Struct_declaration const& struct_declaration,
-        std::optional<h::Type_instance> const& type_instance,
         Value_and_type const& value_to_store,
         Type_database const& type_database
     )
@@ -2115,7 +2302,6 @@ namespace h::compiler
         clang::RecordDecl* const record_declaration = get_record_declaration(
             module_name,
             struct_declaration.name,
-            type_instance,
             clang_module_data.declaration_database
         );
         if (record_declaration == nullptr)
@@ -2129,7 +2315,7 @@ namespace h::compiler
         llvm::Type* const struct_llvm_type = type_reference_to_llvm_type(
             llvm_context,
             llvm_data_layout,
-            create_type_reference(module_name, struct_declaration.name, type_instance),
+            create_custom_type_reference(module_name, struct_declaration.name),
             type_database
         );
         if (struct_llvm_type == nullptr)
@@ -2410,21 +2596,6 @@ namespace h::compiler
                 return clang_ast_context.getPointerType(*element_type);
             else
                 return clang_ast_context.getPointerType(clang_ast_context.VoidTy);
-        }
-        else if (std::holds_alternative<h::Type_instance>(type_reference.data))
-        {
-            h::Type_instance const& type_instance = std::get<h::Type_instance>(type_reference.data);
-
-            {
-                auto const location = clang_declaration_database.instances.find(type_instance);
-                if (location != clang_declaration_database.instances.end())
-                {
-                    clang::RecordDecl* const record_declaration = location->second;
-                    return clang_ast_context.getRecordType(record_declaration);
-                }
-            }
-            
-            return std::nullopt;
         }
 
         return std::nullopt;

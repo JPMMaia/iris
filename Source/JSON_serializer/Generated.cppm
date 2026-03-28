@@ -1625,6 +1625,24 @@ namespace h::json
     }
 
     export template <>
+    JSON to_json(Module_instanced_declarations const& value)
+    {
+        JSON data;
+        data["struct_declarations"] = to_json(value.struct_declarations);
+        data["union_declarations"] = to_json(value.union_declarations);
+        data["function_declarations"] = to_json(value.function_declarations);
+        return data;
+    }
+
+    export template <>
+    void from_json(JSON const& data, Module_instanced_declarations& value)
+    {
+        if (data.contains("struct_declarations")) from_json(data.at("struct_declarations"), value.struct_declarations);
+        if (data.contains("union_declarations")) from_json(data.at("union_declarations"), value.union_declarations);
+        if (data.contains("function_declarations")) from_json(data.at("function_declarations"), value.function_declarations);
+    }
+
+    export template <>
     JSON to_json(Module_definitions const& value)
     {
         JSON data;

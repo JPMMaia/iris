@@ -65,4 +65,34 @@ namespace h
         std::pmr::vector<h::Expression>& output,
         std::span<h::Statement const> const statements
     );
+
+    export template<typename Expression_type>
+    struct Expression_reference
+    {
+        Expression_type* value;
+        std::size_t index;
+    };
+
+    export template<typename Expression_type>
+    Expression_reference<Expression_type> create_expression_reference(
+        std::pmr::vector<h::Expression>& expressions,
+        std::size_t index
+    )
+    {
+        h::Expression& expression = expressions[index];
+        return {
+            .value = &std::get<Expression_type>(expression.data),
+            .index = index
+        };
+    }
+
+    export template<typename Expression_type>
+    Expression_reference<Expression_type> create_expression_inside_statement(
+        std::pmr::vector<h::Expression>& expressions
+    )
+    {
+        std::size_t const index = expressions.size();
+        expressions.push_back(h::Expression{ .data = Expression_type{} });
+        return create_expression_reference<Expression_type>(expressions, index);
+    }
 }

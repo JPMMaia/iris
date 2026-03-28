@@ -45,7 +45,6 @@ namespace h::compiler
     {
         Builtin_types builtin;
         std::pmr::unordered_map<Module_name, LLVM_type_map> name_to_llvm_type;
-        std::pmr::unordered_map<Type_instance, llvm::Type*, Type_instance_hash> type_instance_to_llvm_type;
     };
 
     export struct Debug_type_database
@@ -70,6 +69,20 @@ namespace h::compiler
         llvm::DataLayout const& llvm_data_layout,
         Clang_module_data const& clang_module_data,
         Module const& core_module
+    );
+
+    export void add_struct_declaration_to_type_database(
+        Type_database& type_database,
+        Clang_module_data const& clang_module_data,
+        Module const& core_module,
+        Struct_declaration const& struct_declaration
+    );
+
+    export void add_union_declaration_to_type_database(
+        Type_database& type_database,
+        Clang_module_data const& clang_module_data,
+        Module const& core_module,
+        Union_declaration const& union_declaration
     );
 
     export void add_module_debug_types(
@@ -97,6 +110,24 @@ namespace h::compiler
         llvm::DataLayout const& llvm_data_layout,
         std::span<Type_reference const> type_reference,
         Type_database const& type_database
+    );
+
+    export llvm::Type* type_reference_to_llvm_type_on_demand(
+        llvm::LLVMContext& llvm_context,
+        llvm::DataLayout const& llvm_data_layout,
+        Module const& core_module,
+        Type_reference const& type_reference,
+        Declaration_database const& declaration_database,
+        Clang_context const& clang_context
+    );
+
+    export llvm::Type* type_reference_to_llvm_type_on_demand(
+        llvm::LLVMContext& llvm_context,
+        llvm::DataLayout const& llvm_data_layout,
+        Module const& core_module,
+        std::span<Type_reference const> type_reference,
+        Declaration_database const& declaration_database,
+        Clang_context const& clang_context
     );
 
     export std::pmr::vector<llvm::Type*> type_references_to_llvm_types(

@@ -1,3 +1,4 @@
+#include <deque>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -20,6 +21,17 @@ namespace h::json
     void from_json(
         JSON const& data,
         T& output
+    );
+
+    template <typename T>
+    JSON to_json(
+        std::pmr::deque<T> const& value
+    );
+
+    template <typename T>
+    void from_json(
+        JSON const& data,
+        std::pmr::deque<T>& output
     );
 
     template <typename T>
@@ -154,6 +166,39 @@ namespace h::json
         T value{};
         h::json::from_json(data, value);
         output = value;
+    }
+
+    template <typename T>
+    JSON to_json(
+        std::pmr::deque<T> const& value
+    )
+    {
+        JSON json;
+
+        json["size"] = value.size();
+
+        JSON array_json = JSON::array();
+        for (std::size_t index = 0; index < value.size(); ++index)
+            array_json.push_back(to_json(value[index]));
+        json["elements"] = std::move(array_json);
+
+        return json;
+    }
+
+    template <typename T>
+    void from_json(
+        JSON const& data,
+        std::pmr::deque<T>& output
+    )
+    {
+        JSON const& array_json = data.at("elements");
+
+        for (JSON const& element_data : array_json)
+        {
+            T element{};
+            h::json::from_json(element_data, element);
+            output.push_back(std::move(element));
+        }
     }
 
     template <typename T>

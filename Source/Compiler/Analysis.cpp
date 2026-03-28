@@ -307,235 +307,6 @@ namespace h::compiler
         }
     }
 
-    template<typename Expression_type>
-    struct Expression_reference
-    {
-        Expression_type* value;
-        std::size_t index;
-    };
-
-    template<typename Expression_type>
-    Expression_reference<Expression_type> create_expression_reference(
-        std::pmr::vector<h::Expression>& expressions,
-        std::size_t index
-    )
-    {
-        h::Expression& expression = expressions[index];
-        return {
-            .value = &std::get<Expression_type>(expression.data),
-            .index = index
-        };
-    }
-
-    template<typename Expression_type>
-    Expression_reference<Expression_type> create_expression_inside_statement(
-        std::pmr::vector<h::Expression>& expressions
-    )
-    {
-        std::size_t const index = expressions.size();
-        expressions.push_back(h::Expression{ .data = Expression_type{} });
-        return create_expression_reference<Expression_type>(expressions, index);
-    }
-
-    struct Implicit_function_data
-    {
-        std::optional<std::string_view> const import_alias;
-        std::string_view const function_name;
-        std::size_t const call_expression_index;
-        std::size_t const left_access_expression_index;
-        bool dereference;
-    };
-
-    static std::optional<Implicit_function_data> find_implicit_function_auxiliary(
-        h::Statement const& statement,
-        std::size_t const call_expression_index,
-        std::size_t const left_access_expression_index,
-        std::string_view const access_expression_member_name,
-        bool const dereference,
-        h::Module const& core_module,
-        Scope const& scope,
-        h::Declaration_database const& declaration_database
-    )
-    {
-        h::Expression const& left_access_expression = statement.expressions[left_access_expression_index];
-
-        if (std::holds_alternative<h::Variable_expression>(left_access_expression.data))
-        {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_access_expression.data);
-            Variable const* variable = find_variable_from_scope(scope, variable_expression.name);
-            if (variable == nullptr)
-                return std::nullopt;
-
-            std::optional<h::Type_reference> const declaration_type =
-                dereference ?
-                std::optional<h::Type_reference>{remove_pointer(variable->type)} :
-                std::optional<h::Type_reference>{variable->type};
-            if (!declaration_type.has_value())
-                return std::nullopt;
-
-            std::optional<Declaration> const declaration = find_underlying_declaration(declaration_database, declaration_type.value());
-            if (declaration.has_value())
-            {
-                if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
-                {
-                    h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration->data);
-
-                    auto const member_location = std::find(
-                        struct_declaration.member_names.begin(),
-                        struct_declaration.member_names.end(),
-                        access_expression_member_name
-                    );
-
-                    if (member_location != struct_declaration.member_names.end())
-                        return std::nullopt;
-
-                    h::Import_module_with_alias const* const import_module_with_alias = h::find_import_module_with_module_name(
-                        core_module,
-                        declaration->module_name
-                    );
-                    std::optional<std::string_view> const import_alias = 
-                        import_module_with_alias != nullptr ?
-                        std::optional<std::string_view>{import_module_with_alias->alias} :
-                        std::optional<std::string_view>{};
-
-                    return Implicit_function_data
-                    {
-                        .import_alias = import_alias,
-                        .function_name = access_expression_member_name,
-                        .call_expression_index = call_expression_index,
-                        .left_access_expression_index = left_access_expression_index,
-                        .dereference = dereference,
-                    };
-                }
-            }
-        }
-
-        return std::nullopt;
-    }
-
-    static std::optional<Implicit_function_data> find_implicit_function(
-        h::Statement const& statement,
-        h::Expression const& expression,
-        std::size_t const expression_index,
-        h::Module const& core_module,
-        Scope const& scope,
-        h::Declaration_database const& declaration_database
-    )
-    {
-        if (std::holds_alternative<h::Call_expression>(expression.data))
-        {
-            h::Call_expression const& data = std::get<h::Call_expression>(expression.data);
-            h::Expression const& left_call_expression = statement.expressions[data.expression.expression_index];
-
-            if (std::holds_alternative<h::Access_expression>(left_call_expression.data))
-            {
-                h::Access_expression const& access_expression = std::get<h::Access_expression>(left_call_expression.data);
-
-                return find_implicit_function_auxiliary(
-                    statement,
-                    expression_index,
-                    access_expression.expression.expression_index,
-                    access_expression.member_name,
-                    false,
-                    core_module,
-                    scope,
-                    declaration_database
-                );
-            }
-            else if (std::holds_alternative<h::Dereference_and_access_expression>(left_call_expression.data))
-            {
-                h::Dereference_and_access_expression const& access_expression = std::get<h::Dereference_and_access_expression>(left_call_expression.data);
-                
-                return find_implicit_function_auxiliary(
-                    statement,
-                    expression_index,
-                    access_expression.expression.expression_index,
-                    access_expression.member_name,
-                    true,
-                    core_module,
-                    scope,
-                    declaration_database
-                );
-            }
-        }
-
-        return std::nullopt;
-    }
-
-    static h::Statement transform_statement_with_implicit_function(
-        h::Statement const& statement,
-        std::optional<std::string_view> const import_alias,
-        std::string_view const function_name,
-        std::size_t const call_expression_index,
-        std::size_t const left_access_expression_index,
-        bool const dereference
-    )
-    {
-        // import external_module as em;
-        // var instance: em.My_struct = ...;
-        // instance.get_v0() -> em.get_v0(&instance)
-        // var pointer = &instance;
-        // pointer->get_v0() -> em.get_v0(pointer);
-
-        h::Call_expression const& call_expression = std::get<h::Call_expression>(statement.expressions[call_expression_index].data);
-
-        std::pmr::vector<h::Expression> new_expressions = statement.expressions;
-        new_expressions.reserve(statement.expressions.size() + 3);
-
-        std::size_t new_left_access_expression_index = 0;
-
-        if (import_alias.has_value())
-        {
-            Expression_reference<h::Access_expression> access_alias_expression = create_expression_inside_statement<h::Access_expression>(new_expressions);
-            access_alias_expression.value->member_name = std::pmr::string{function_name};
-            
-            Expression_reference<h::Variable_expression> alias_name_expression = create_expression_inside_statement<h::Variable_expression>(new_expressions);
-            alias_name_expression.value->name = std::pmr::string{import_alias.value()};
-            access_alias_expression.value->expression = {.expression_index = alias_name_expression.index};
-
-            new_left_access_expression_index = access_alias_expression.index;
-        }
-        else
-        {
-            Expression_reference<h::Variable_expression> function_name_expression = create_expression_inside_statement<h::Variable_expression>(new_expressions);
-            function_name_expression.value->name = std::pmr::string{function_name};
-
-            new_left_access_expression_index = function_name_expression.index;
-        }
-
-        Expression_reference<h::Call_expression> new_call_expression = create_expression_reference<h::Call_expression>(new_expressions, call_expression_index);
-        
-        std::size_t new_call_left_side_index = left_access_expression_index;
-        if (!dereference)
-        {
-            Expression_reference<h::Unary_expression> new_take_address_expression = create_expression_inside_statement<h::Unary_expression>(new_expressions);
-            *new_take_address_expression.value = {
-                .expression = {.expression_index = left_access_expression_index },
-                .operation = h::Unary_operation::Address_of
-            };
-            new_call_left_side_index = new_take_address_expression.index;
-        }
-
-        *new_call_expression.value = {
-            .expression = { .expression_index = new_left_access_expression_index },
-            .arguments = {}
-        };
-        new_call_expression.value->arguments.reserve(1 + call_expression.arguments.size());
-        new_call_expression.value->arguments.push_back(
-            h::Expression_index{.expression_index = new_call_left_side_index }
-        );
-        new_call_expression.value->arguments.insert(
-            new_call_expression.value->arguments.end(),
-            call_expression.arguments.begin(),
-            call_expression.arguments.end()
-        );
-
-        return h::Statement
-        {
-            .expressions = std::move(new_expressions)
-        };
-    }
-
     std::optional<h::Statement> process_expression(
         Analysis_result& result,
         h::Module& core_module,
@@ -562,81 +333,6 @@ namespace h::compiler
                 options,
                 temporaries_allocator
             );
-        }
-        else if (std::holds_alternative<h::Call_expression>(expression.data))
-        {
-            h::Call_expression& data = std::get<h::Call_expression>(expression.data);
-
-            {
-                std::optional<Implicit_function_data> const implicit_function = find_implicit_function(
-                    statement,
-                    expression,
-                    expression_index,
-                    core_module,
-                    scope,
-                    declaration_database
-                );
-                if (implicit_function.has_value())
-                {
-                    if (implicit_function->import_alias.has_value())
-                        add_import_usage(core_module, implicit_function->import_alias.value(), implicit_function->function_name);
-
-                    return transform_statement_with_implicit_function(
-                        statement,
-                        implicit_function->import_alias,
-                        implicit_function->function_name,
-                        implicit_function->call_expression_index,
-                        implicit_function->left_access_expression_index,
-                        implicit_function->dereference
-                    );
-                }
-            }
-
-            std::optional<Deduced_instance_call> const deduced_instance_call = deduce_instance_call_arguments(
-                declaration_database,
-                core_module,
-                scope,
-                statement,
-                data,
-                temporaries_allocator
-            );
-
-            if (deduced_instance_call.has_value())
-            {
-                Instance_call_key key = {
-                    .module_name = deduced_instance_call->custom_type_reference.module_reference.name,
-                    .function_constructor_name = deduced_instance_call->custom_type_reference.name,
-                    .arguments = deduced_instance_call->arguments
-                };
-
-                Function_expression call_instance = create_instance_call_expression_value(
-                    deduced_instance_call->function_constructor,
-                    deduced_instance_call->arguments,
-                    key
-                );
-
-                add_instantiated_type_instances(declaration_database, call_instance);
-                declaration_database.call_instances.emplace(std::move(key), std::move(call_instance));
-
-                h::Expression& left_side_expression = statement.expressions[data.expression.expression_index];
-
-                if (std::holds_alternative<h::Instance_call_expression>(left_side_expression.data))
-                {
-                    h::Instance_call_expression& original_expression = std::get<h::Instance_call_expression>(left_side_expression.data);
-                    original_expression.arguments = deduced_instance_call->arguments;
-                }
-                else
-                {
-                    h::Instance_call_expression instance_call_expression =
-                    {
-                        .left_hand_side = { data.expression.expression_index },
-                        .arguments = deduced_instance_call->arguments
-                    };
-
-                    data.expression.expression_index = statement.expressions.size();
-                    statement.expressions.push_back(h::Expression{.data = instance_call_expression, .source_range = expression.source_range});
-                }
-            }
         }
         else if (std::holds_alternative<h::Constant_array_expression>(expression.data))
         {
@@ -1053,6 +749,47 @@ namespace h::compiler
         return std::nullopt;
     }
 
+     std::optional<Type_info> get_instanced_function_type(
+        h::Declaration_database const& declaration_database,
+        Instance_call_key const& key
+    )
+    {
+        Function_constructor const* const function_constructor = get_function_constructor(declaration_database, key.module_name, key.function_constructor_name);
+        if (function_constructor == nullptr)
+            return std::nullopt;
+
+        Function_expression const* function_expression = nullptr;
+        std::size_t function_expression_count = 0;
+
+        auto const process_expression = [&](Expression const& expression, [[maybe_unused]] Statement const& statement) -> bool {
+            if (std::holds_alternative<Function_expression>(expression.data))
+            {
+                ++function_expression_count;
+                function_expression = &std::get<Function_expression>(expression.data);
+            }
+
+            return false;
+        };
+        visit_expressions(function_constructor->statements, process_expression);
+
+        if (function_expression_count != 1 || function_expression == nullptr)
+            return std::nullopt;
+
+        Function_type function_type = function_expression->declaration.type;
+        if (!replace_parameter_types_by_instance_arguments(function_type, function_constructor->parameters, key.arguments))
+            return std::nullopt;
+
+        return Type_info
+        {
+            .type = create_function_type_type_reference(
+                std::move(function_type),
+                function_expression->declaration.input_parameter_names,
+                function_expression->declaration.output_parameter_names
+            ),
+            .is_mutable = false,
+        };
+    }
+
     std::optional<Type_info> get_expression_type_info(
         h::Module const& core_module,
         h::Function_declaration const* const function_declaration,
@@ -1191,6 +928,8 @@ namespace h::compiler
             }
             else if (std::holds_alternative<h::Custom_type_reference>(type_reference.value().data))
             {
+                h::Custom_type_reference const custom_type_reference = std::get<h::Custom_type_reference>(type_reference.value().data);
+                
                 std::optional<Declaration> const declaration = find_underlying_declaration(
                     declaration_database,
                     type_reference.value()
@@ -1219,12 +958,31 @@ namespace h::compiler
                 if (implicit_function_type.has_value())
                     return implicit_function_type;
 
+                std::optional<h::Custom_type_reference> const type_instance_name = unmangle_type_instance_name(custom_type_reference.name);
+                if (type_instance_name.has_value())
+                {
+                    h::Type_reference const& implicit_custom_type_reference = create_custom_type_reference(type_instance_name->module_reference.name, data.member_name);
+                    std::optional<Declaration> const implicit_declaration = find_declaration(
+                        declaration_database,
+                        type_instance_name->module_reference.name,
+                        data.member_name
+                    );
+                    if (implicit_declaration.has_value())
+                    {
+                        return Type_info
+                        {
+                            .type = implicit_custom_type_reference,
+                            .is_mutable = false,
+                        };
+                    }
+                }
+
                 return std::nullopt;
             }
             else if (std::holds_alternative<h::Type_instance>(type_reference.value().data))
             {
                 Type_instance const& type_instance = std::get<h::Type_instance>(type_reference.value().data);
-                Declaration_instance_storage const& storage = declaration_database.instances.at(type_instance);
+                Declaration_instance_storage const storage = instantiate_type_instance(declaration_database, type_instance);
                 if (std::holds_alternative<h::Struct_declaration>(storage.data))
                 {
                     Struct_declaration const& struct_declaration = std::get<h::Struct_declaration>(storage.data);
@@ -1263,7 +1021,7 @@ namespace h::compiler
                 }
             }
 
-            return std::nullopt; // TODO
+            return std::nullopt; // TODO@instances
         }
         else if (std::holds_alternative<h::Access_array_expression>(expression.data))
         {
@@ -1640,9 +1398,9 @@ namespace h::compiler
 
             std::optional<Custom_type_reference> custom_type_reference = get_function_constructor_type_reference(
                 declaration_database,
+                core_module,
                 statement.expressions[data.left_hand_side.expression_index],
-                statement,
-                core_module.name
+                statement
             );
             if (!custom_type_reference.has_value())
                 return std::nullopt;
@@ -1653,18 +1411,7 @@ namespace h::compiler
                 .arguments = data.arguments
             };
 
-            Function_expression const* const function_expression = get_instance_call_function_expression(
-                declaration_database,
-                key
-            );
-            if (function_expression == nullptr)
-                return std::nullopt;
-
-            return Type_info
-            {
-                .type = create_function_type_type_reference(function_expression->declaration.type, function_expression->declaration.input_parameter_names, function_expression->declaration.output_parameter_names),
-                .is_mutable = false,
-            };
+            return get_instanced_function_type(declaration_database, key);
         }
         else if (std::holds_alternative<h::Instantiate_expression>(expression.data))
         {
@@ -1702,7 +1449,7 @@ namespace h::compiler
             if (!declaration.has_value())
                 return std::nullopt;
 
-            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data) || std::holds_alternative<h::Union_declaration const*>(declaration->data))
+            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data) || std::holds_alternative<h::Union_declaration const*>(declaration->data) || std::holds_alternative<h::Type_constructor const*>(declaration->data))
             {
                 return Type_info
                 {
@@ -1978,9 +1725,9 @@ namespace h::compiler
 
         return get_function_constructor_type_reference(
             declaration_database,
+            core_module,
             expression,
-            statement,
-            core_module.name
+            statement
         );
     }
 

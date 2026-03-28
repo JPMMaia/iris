@@ -136,6 +136,7 @@ namespace h::compiler
 
     export Compilation_database process_modules_and_create_compilation_database(
         LLVM_data& llvm_data,
+        Clang_context&& clang_context,
         std::span<h::Module const* const> const sorted_modules,
         Declaration_database declaration_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,

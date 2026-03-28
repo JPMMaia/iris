@@ -218,7 +218,7 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 
-    void add_import_usage(
+    export void add_import_usage(
         h::Module& core_module,
         std::string_view const alias,
         std::string_view const usage

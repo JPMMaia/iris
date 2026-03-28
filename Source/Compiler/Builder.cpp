@@ -193,10 +193,17 @@ namespace h::compiler
         if (!compile_cpp_and_write_to_bitcode_files(builder, artifacts, llvm_data, compilation_options, temporaries_allocator))
             h::common::print_message_and_exit(std::format("Failed to compile c++."));
 
+        h::compiler::Clang_context clang_context = h::compiler::create_clang_context(
+            *llvm_data.context,
+            llvm_data.clang_data,
+            "Hl_clang_module"
+        );
+
         start_timer(get_profiler(builder), "process_modules_and_create_compilation_database");
         // TODO make const
         Compilation_database compilation_database = process_modules_and_create_compilation_database(
             llvm_data,
+            std::move(clang_context),
             sorted_modules,
             modules_and_declaration_database.declaration_database, // TODO this does a copy
             output_allocator,

@@ -4,6 +4,7 @@ module;
 #include <compare>
 #include <cstddef>
 #include <cstring>
+#include <deque>
 #include <filesystem>
 #include <optional>
 #include <span>
@@ -207,6 +208,30 @@ namespace h::binary_serializer
         };
         
         value = funcs[index](deserializer);
+    }
+
+    export template <typename T>
+    void serialize(Serializer& serializer, std::pmr::deque<T> const& value)
+    {
+        write_uint64(serializer, value.size());
+
+        for (std::size_t index = 0; index < value.size(); ++index)
+            serialize(serializer, value[index]);
+    }
+
+    export template <typename T>
+    void deserialize(Deserializer& deserializer, std::pmr::deque<T>& value)
+    {
+        std::uint64_t const size_in_bytes = read_uint64(deserializer);
+
+        value.resize(size_in_bytes);
+
+        for (std::size_t index = 0; index < value.size(); ++index)
+        {
+            T element;
+            deserialize(deserializer, element);
+            value[index] = std::move(element);
+        }
     }
 
     export template <typename T>

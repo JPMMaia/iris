@@ -90,7 +90,7 @@ namespace h::compiler
             );
 
             {
-                std::pmr::vector<h::Function_definition>& function_definitions = m_core_module_compilation_data.core_module.definitions.function_definitions;
+                std::pmr::deque<h::Function_definition>& function_definitions = m_core_module_compilation_data.core_module.definitions.function_definitions;
                 function_definitions.erase(
                     std::remove_if(function_definitions.begin(), function_definitions.end(), is_requested_symbol),
                     function_definitions.end()

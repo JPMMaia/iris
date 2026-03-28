@@ -3591,7 +3591,7 @@ namespace h::compiler
         if (std::holds_alternative<h::Instantiate_expression>(right_hand_side.data) && !std::holds_alternative<h::Array_slice_type>(type.data))
         {
             std::optional<Declaration> const declaration_optional = find_underlying_declaration(parameters.declaration_database, type);
-            if (!declaration_optional.has_value() || (!std::holds_alternative<h::Struct_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Union_declaration const*>(declaration_optional->data)))
+            if (!declaration_optional.has_value() || (!std::holds_alternative<h::Struct_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Union_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Type_constructor const*>(declaration_optional->data)))
             {
                 return
                 {

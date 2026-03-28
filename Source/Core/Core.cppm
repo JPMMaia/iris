@@ -1,6 +1,7 @@
 module;
 
 #include <compare>
+#include <deque>
 #include <filesystem>
 #include <memory_resource>
 #include <optional>
@@ -1252,9 +1253,22 @@ namespace h
 #endif
     };
 
+    export struct Module_instanced_declarations
+    {
+        std::pmr::deque<Struct_declaration> struct_declarations;
+        std::pmr::deque<Union_declaration> union_declarations;
+        std::pmr::deque<Function_declaration> function_declarations;
+
+#if HACK_SPACESHIP_OPERATOR
+        friend std::strong_ordering operator<=>(Module_instanced_declarations const&, Module_instanced_declarations const&) = default;
+#else
+        friend auto operator<=>(Module_instanced_declarations const&, Module_instanced_declarations const&) = default;
+#endif
+    };
+
     export struct Module_definitions
     {
-        std::pmr::vector<Function_definition> function_definitions;
+        std::pmr::deque<Function_definition> function_definitions;
 
 #if HACK_SPACESHIP_OPERATOR
         friend std::strong_ordering operator<=>(Module_definitions const&, Module_definitions const&) = default;
@@ -1271,6 +1285,7 @@ namespace h
         Module_dependencies dependencies;
         Module_declarations export_declarations;
         Module_declarations internal_declarations;
+        Module_instanced_declarations instanced_declarations;
         Module_definitions definitions;
         std::optional<std::pmr::string> comment;
         std::optional<std::filesystem::path> source_file_path;

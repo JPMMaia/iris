@@ -1125,7 +1125,8 @@ namespace h
                     "elements": []
                 }}
             }},
-            "instanced_declarations": {{}},
+            "instanced_declarations": {{
+            }},
             "definitions": {{
                 "function_definitions": {{
                     "size": 1,
@@ -1437,6 +1438,300 @@ namespace h
             index_of_v<Type_reference::Data_type, Integer_type>,
             index_of_v<Type_reference::Data_type, Integer_type>
         )};
+
+        std::pmr::string const actual = h::json::write(input);
+
+        CHECK(actual == expected);
+    }
+
+    std::pmr::string create_module_instanced_declarations_json()
+    {
+        std::string const json_data = std::format(R"JSON(
+            {{
+                "struct_declarations": {{
+                    "size": 1,
+                    "elements": [
+                        {{
+                            "name": "My_struct",
+                            "member_names": {{
+                                "size": 3,
+                                "elements": [
+                                    "first",
+                                    "second",
+                                    "third"
+                                ]
+                            }},
+                            "member_types": {{
+                                "size": 3,
+                                "elements": [
+                                    {{
+                                        "data": {{
+                                            "index": {},
+                                            "value": {{
+                                                "number_of_bits": 32,
+                                                "is_signed": false
+                                            }}
+                                        }}
+                                    }},
+                                    {{
+                                        "data": {{
+                                            "index": {},
+                                            "value": {{
+                                                "number_of_bits": 32,
+                                                "is_signed": false
+                                            }}
+                                        }}
+                                    }},
+                                    {{
+                                        "data": {{
+                                            "index": {},
+                                            "value": {{
+                                                "number_of_bits": 32,
+                                                "is_signed": false
+                                            }}
+                                        }}
+                                    }}
+                                ]
+                            }},
+                            "member_bit_fields": {{
+                                "size": 3,
+                                "elements": [
+                                    24,
+                                    8,
+                                    null
+                                ]
+                            }},
+                            "member_comments": {{
+                                "elements": [],
+                                "size":0
+                            }},
+                            "member_default_values": {{
+                                "size": 3,
+                                "elements": [
+                                    {{
+                                        "expressions": {{
+                                            "size": 1,
+                                            "elements": [
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
+                                                            "type": {{
+                                                                "data": {{
+                                                                    "index": {},
+                                                                    "value": {{
+                                                                        "number_of_bits": 32,
+                                                                        "is_signed": false
+                                                                    }}
+                                                                }}
+                                                            }},
+                                                            "data": "0"
+                                                        }}
+                                                    }}
+                                                }}
+                                            ]
+                                        }}
+                                    }},
+                                    {{
+                                        "expressions": {{
+                                            "size": 1,
+                                            "elements": [
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
+                                                            "type": {{
+                                                                "data": {{
+                                                                    "index": {},
+                                                                    "value": {{
+                                                                        "number_of_bits": 32,
+                                                                        "is_signed": false
+                                                                    }}
+                                                                }}
+                                                            }},
+                                                            "data": "0"
+                                                        }}
+                                                    }}
+                                                }}
+                                            ]
+                                        }}
+                                    }},
+                                    {{
+                                        "expressions": {{
+                                            "size": 1,
+                                            "elements": [
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
+                                                            "type": {{
+                                                                "data": {{
+                                                                    "index": {},
+                                                                    "value": {{
+                                                                        "number_of_bits": 32,
+                                                                        "is_signed": false
+                                                                    }}
+                                                                }}
+                                                            }},
+                                                            "data": "0"
+                                                        }}
+                                                    }}
+                                                }}
+                                            ]
+                                        }}
+                                    }}
+                                ]
+                            }},
+                            "is_packed": false,
+                            "is_literal": false
+                        }}
+                    ]
+                }},
+                "union_declarations": {{
+                    "size": 0,
+                    "elements": []
+                }},
+                "function_declarations": {{
+                    "size": 1,
+                    "elements": [
+                        {{
+                            "name": "Add",
+                            "type": {{
+                                "input_parameter_types": {{
+                                    "size": 2,
+                                    "elements": [
+                                        {{
+                                            "data": {{
+                                                "index": {},
+                                                "value": "Byte"
+                                            }}
+                                        }},
+                                        {{
+                                            "data": {{
+                                                "index": {},
+                                                "value": "Byte"
+                                            }}
+                                        }}
+                                    ]
+                                }},
+                                "output_parameter_types": {{
+                                    "size": 1,
+                                    "elements": [
+                                        {{
+                                            "data": {{
+                                                "index": {},
+                                                "value": "Byte"
+                                            }}
+                                        }}
+                                    ]
+                                }},
+                                "is_variadic": false
+                            }},
+                            "input_parameter_names": {{
+                                "size": 2,
+                                "elements": [
+                                    "lhs", "rhs"
+                                ]
+                            }},
+                            "output_parameter_names": {{
+                                "size": 1,
+                                "elements": [
+                                    "sum"
+                                ]
+                            }},
+                            "linkage": "External",
+                            "source_location": {{
+                                "range": {{
+                                    "start": {{
+                                        "line": 2,
+                                        "column": 6
+                                    }},
+                                    "end": {{
+                                        "line": 4,
+                                        "column": 2
+                                    }}
+                                }}
+                            }},
+                            "input_parameter_source_positions": {{
+                                "size": 1,
+                                "elements": [
+                                    {{
+                                        "line": 3,
+                                        "column": 22
+                                    }}
+                                ]
+                            }},
+                            "output_parameter_source_positions": {{
+                                "size": 1,
+                                "elements": [
+                                    {{
+                                        "line": 3,
+                                        "column": 38
+                                    }}
+                                ]
+                            }},
+                            "is_test": false,
+                            "preconditions": {{"size": 0, "elements": []}},
+                            "postconditions": {{"size": 0, "elements": []}}
+                        }}
+                    ]
+                }}
+            }}
+)JSON",
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Expression::Data_type, Constant_expression>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Expression::Data_type, Constant_expression>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Expression::Data_type, Constant_expression>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Type_reference::Data_type, Fundamental_type>,
+            index_of_v<Type_reference::Data_type, Fundamental_type>,
+            index_of_v<Type_reference::Data_type, Fundamental_type>
+        );
+
+        return std::pmr::string{nlohmann::json::parse(json_data).dump()};
+    }
+
+    TEST_CASE("Read Module_instanced_declarations")
+    {
+        std::pmr::string const json_data = create_module_instanced_declarations_json();
+
+        h::Module_instanced_declarations const expected
+        {
+            .struct_declarations = {
+                create_expected_struct_declaration()
+            },
+            .union_declarations = {},
+            .function_declarations = {
+                create_expected_function_declaration()
+            }
+        };
+
+        std::optional<h::Module_instanced_declarations> const output = h::json::read<h::Module_instanced_declarations>(json_data);
+
+        REQUIRE(output.has_value());
+
+        h::Module_instanced_declarations const& actual = output.value();
+        CHECK(actual == expected);
+    }
+
+    TEST_CASE("Write Module_instanced_declarations")
+    {
+        h::Module_instanced_declarations const input
+        {
+            .struct_declarations = {
+                create_expected_struct_declaration()
+            },
+            .union_declarations = {},
+            .function_declarations = {
+                create_expected_function_declaration()
+            }
+        };
+
+        std::pmr::string const expected = create_module_instanced_declarations_json();
 
         std::pmr::string const actual = h::json::write(input);
 

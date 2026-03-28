@@ -1003,4 +1003,28 @@ namespace h
 
         return false;
     }
+
+    export bool replace_parameter_types_by_instance_arguments(
+        Type_reference& type_reference,
+        std::span<Function_constructor_parameter const> function_constructor_parameters,
+        std::span<Statement const> instance_arguments
+    );
+
+    export bool replace_parameter_types_by_instance_arguments(
+        Type_reference& type_reference,
+        std::span<Type_constructor_parameter const> type_constructor_parameters,
+        std::span<Statement const> instance_arguments
+    );
+
+    export bool replace_parameter_types_by_instance_arguments(
+        Function_type& function_type,
+        std::span<Function_constructor_parameter const> function_constructor_parameters,
+        std::span<Statement const> instance_arguments
+    );
+
+    export bool replace_parameter_types_by_instance_arguments(
+        Function_type& function_type,
+        std::span<Type_constructor_parameter const> type_constructor_parameters,
+        std::span<Statement const> instance_arguments
+    );
 }

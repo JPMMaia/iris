@@ -493,7 +493,6 @@ namespace h::compiler
         std::string_view const access_member_name,
         std::string_view const module_name,
         Struct_declaration const& struct_declaration,
-        std::optional<h::Type_instance> const& type_instance,
         Expression_parameters const& parameters
     )
     {
@@ -509,7 +508,6 @@ namespace h::compiler
             access_member_name,
             module_name,
             struct_declaration,
-            type_instance,
             parameters.type_database
         );
 
@@ -678,7 +676,6 @@ namespace h::compiler
                 expression.member_name,
                 "H.Builtin",
                 struct_declaration,
-                std::nullopt,
                 parameters
             );
         }
@@ -736,7 +733,6 @@ namespace h::compiler
                                 expression.member_name,
                                 module_name,
                                 struct_declaration,
-                                std::nullopt,
                                 parameters
                             );
                         }
@@ -772,23 +768,6 @@ namespace h::compiler
                 if (declaration.has_value() && (std::holds_alternative<Function_constructor const*>(declaration.value().data) || std::holds_alternative<Function_declaration const*>(declaration.value().data)))
                 {
                     Type_reference const access_type = create_custom_type_reference(module_name, expression.member_name);
-
-                    return Value_and_type
-                    {
-                        .name = expression.member_name,
-                        .value = nullptr,
-                        .type = access_type
-                    };
-                }
-            }
-            else if (std::holds_alternative<Type_instance>(left_hand_side_type.data))
-            {
-                Type_instance const& type_instance = std::get<Type_instance>(left_hand_side_type.data);
-                
-                std::optional<Declaration> const declaration = find_declaration(declaration_database, type_instance.type_constructor.module_reference.name, expression.member_name);
-                if (declaration.has_value() && (std::holds_alternative<Function_constructor const*>(declaration.value().data) || std::holds_alternative<Function_declaration const*>(declaration.value().data)))
-                {
-                    Type_reference const access_type = create_custom_type_reference(type_instance.type_constructor.module_reference.name, expression.member_name);
 
                     return Value_and_type
                     {
@@ -1009,7 +988,6 @@ namespace h::compiler
                             access_expression.member_name,
                             module_name,
                             struct_declaration,
-                            std::nullopt,
                             result,
                             parameters.type_database
                         );
@@ -1648,7 +1626,6 @@ namespace h::compiler
             "data",
             "H.Builtin",
             struct_declaration,
-            std::nullopt,
             data_value,
             parameters.type_database
         );
@@ -1662,7 +1639,6 @@ namespace h::compiler
             "length",
             "H.Builtin",
             struct_declaration,
-            std::nullopt,
             length_value,
             parameters.type_database
         );
@@ -2473,7 +2449,6 @@ namespace h::compiler
                                     dereference_and_access_expression.member_name,
                                     module_name,
                                     struct_declaration,
-                                    std::nullopt,
                                     parameters
                                 );
                             }
@@ -2488,35 +2463,6 @@ namespace h::compiler
                                     parameters
                                 );
                             }
-                        }
-                    }
-                    else if (std::holds_alternative<Type_instance>(value_type.value().data))
-                    {
-                        Type_instance const& type_instance = std::get<Type_instance>(value_type.value().data);
-                        Declaration_instance_storage const& storage = parameters.declaration_database.instances.at(type_instance);
-                        
-                        if (std::holds_alternative<Struct_declaration>(storage.data))
-                        {
-                            Struct_declaration const& struct_declaration = std::get<Struct_declaration>(storage.data);
-                            return create_access_struct_member(
-                                loaded_left_hand_side,
-                                dereference_and_access_expression.member_name,
-                                type_instance.type_constructor.module_reference.name,
-                                struct_declaration,
-                                type_instance,
-                                parameters
-                            );
-                        }
-                        else if (std::holds_alternative<Union_declaration>(storage.data))
-                        {
-                            Union_declaration const& union_declaration = std::get<Union_declaration>(storage.data);
-                            return create_access_union_member(
-                                loaded_left_hand_side,
-                                dereference_and_access_expression.member_name,
-                                type_instance.type_constructor.module_reference.name,
-                                union_declaration,
-                                parameters
-                            );
                         }
                     }
                 }
@@ -2911,8 +2857,6 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
         Type_database const& type_database = parameters.type_database;
 
-        std::optional<Type_instance> const type_instance = std::holds_alternative<Type_instance>(struct_type_reference.data) ? std::get<Type_instance>(struct_type_reference.data) : std::optional<Type_instance>{};
-
         llvm::Type* const llvm_struct_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, struct_type_reference, type_database);
 
         if (parameters.llvm_parent_function == nullptr)
@@ -2961,7 +2905,6 @@ namespace h::compiler
                         member_name,
                         module_name,
                         struct_declaration,
-                        type_instance,
                         member_value,
                         parameters.type_database
                     );
@@ -2986,7 +2929,6 @@ namespace h::compiler
                         member_name,
                         module_name,
                         struct_declaration,
-                        type_instance,
                         member_value,
                         parameters.type_database
                     );
@@ -3028,7 +2970,6 @@ namespace h::compiler
                     member_name,
                     module_name,
                     struct_declaration,
-                    type_instance,
                     member_value,
                     parameters.type_database
                 );
@@ -3237,11 +3178,12 @@ namespace h::compiler
         if (llvm_function == nullptr)
             throw std::runtime_error{ std::format("Could not find function '{}'", mangled_name) };
 
-        Function_expression const* function_expression = get_instance_call_function_expression(
+        std::optional<Function_expression> const function_expression = get_instance_call_function_expression(
             parameters.declaration_database,
+            parameters.core_module,
             key
         );
-        if (function_expression == nullptr)
+        if (!function_expression.has_value())
             throw std::runtime_error{ "Could not find function expression!" };
 
         Function_declaration const& function_declaration = function_expression->declaration;

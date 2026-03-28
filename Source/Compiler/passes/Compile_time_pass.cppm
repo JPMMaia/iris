@@ -7,8 +7,10 @@ export module h.compiler.compile_time_pass;
 
 import std;
 
+import h.compiler.clang_data;
 import h.compiler.types;
 import h.core;
+import h.core.declarations;
 
 namespace h::compiler
 {
@@ -25,7 +27,8 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator;
         llvm::LLVMContext& llvm_context;
         llvm::DataLayout const& llvm_data_layout;
-        h::compiler::Type_database const& type_database;
+        h::Declaration_database const& declaration_database;
+        h::compiler::Clang_context const& clang_context;
     };
 
     std::optional<Compile_time_value_and_type> evaluate_compile_time_expression(
@@ -36,6 +39,11 @@ namespace h::compiler
 
     std::optional<Compile_time_value_and_type> evaluate_compile_time_statement(
         h::Statement const& statement,
+        Compile_time_parameters const& parameters
+    );
+
+    export void run_compile_time_pass_on_module(
+        h::Module& core_module,
         Compile_time_parameters const& parameters
     );
 
