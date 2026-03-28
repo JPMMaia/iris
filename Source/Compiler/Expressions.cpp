@@ -4146,22 +4146,6 @@ namespace h::compiler
             }
         }
 
-        // Search for function constructors and instantiate if needed:
-        {
-            std::optional<Declaration> const declaration = find_declaration(parameters.declaration_database, parameters.core_module.name, variable_name);
-            if (declaration.has_value() && std::holds_alternative<Function_constructor const*>(declaration.value().data))
-            {
-                Type_reference custom_type_reference = create_custom_type_reference(parameters.core_module.name, variable_name);
-
-                return Value_and_type
-                {
-                    .name = expression.name,
-                    .value = nullptr,
-                    .type = custom_type_reference
-                };
-            }
-        }
-
         throw std::runtime_error{ std::format("Undefined variable '{}'", variable_name) };
     }
 

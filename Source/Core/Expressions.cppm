@@ -55,4 +55,14 @@ namespace h
         h::Statement const& new_statement,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
+
+    export void offset_expression_indices(
+        h::Expression& expression,
+        std::uint64_t offset
+    );
+
+    export std::pmr::vector<Expression_index> add_statements_as_expressions(
+        std::pmr::vector<h::Expression>& output,
+        std::span<h::Statement const> const statements
+    );
 }
