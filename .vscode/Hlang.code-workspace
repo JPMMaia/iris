@@ -8,45 +8,24 @@
 		"version": "0.2.0",
 		"configurations": [
 			{
-				"name": "Generate read JSON",
-				"type": "node",
+				"name": "Generate JSON serializer",
+				"type": "cppvsdbg",
 				"request": "launch",
 				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
 				"args": [
-					"read",
-					"h.json_serializer.read_json",
-					"h::json",
-					"h.core",
+					"serialize_json_code",
 					"${workspaceFolder}/Source/Core/Core.cppm",
-					"${workspaceFolder}/Source/JSON_serializer/Read_json.cppm"
+					"${workspaceFolder}/Source/JSON_serializer/Generated.cppm"
 				],
 				"cwd": "${fileDirname}",
 			},
 			{
-				"name": "Generate write JSON",
-				"type": "lldb-dap",
-				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
-				"args": [
-					"write",
-					"h.json_serializer.write_json",
-					"h::json",
-					"h.core",
-					"${workspaceFolder}/Source/Core/Core.cppm",
-					"${workspaceFolder}/Source/JSON_serializer/Write_json.cppm"
-				],
-				"cwd": "${fileDirname}"
-			},
-			{
 				"name": "Generate JSON operators",
-				"type": "lldb-dap",
+				"type": "cppvsdbg",
 				"request": "launch",
 				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
 				"args": [
 					"operators",
-					"h.json_serializer.operators",
-					"h::json",
-					"h.core",
 					"${workspaceFolder}/Source/Core/Core.cppm",
 					"${workspaceFolder}/Source/JSON_serializer/Operators.cppm"
 				],
@@ -664,6 +643,12 @@
 		"cmake.automaticReconfigure": false,
 		"cmake.buildBeforeRun": false,
 		"cmake.configureOnEdit": false,
-		"cmake.enableAutomaticKitScan": false
+		"cmake.enableAutomaticKitScan": false,
+		"chat.tools.terminal.autoApprove": {
+			"/^powershell -Command \"\\. \\$PROFILE ; Enter-VsDevEnv ; cd 'C:\\\\Users\\\\JPMMa\\\\Desktop\\\\source\\\\H' ; cmake --build build --target H_compiler\"$/": {
+				"approve": true,
+				"matchCommandLine": true
+			}
+		}
 	}
 }

@@ -1,23 +1,10 @@
 module;
 
-#include <algorithm>
-#include <cctype>
-#include <format>
-#include <istream>
-#include <optional>
-#include <ranges>
-#include <span>
-#include <sstream>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
-
-#include <rapidjson/document.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
+#include <nlohmann/json.hpp>
 
 module h.tools.code_generator;
+
+import std;
 
 namespace h::tools::code_generator
 {
@@ -563,129 +550,207 @@ namespace h::tools::code_generator
     {
         std::stringstream output_stream;
 
-        output_stream << indent(indentation) << "export template<typename Event_data>\n";
-        output_stream << indent(indentation) << "    bool read_object(\n";
-        output_stream << indent(indentation) << "        " << struct_type.name << "& output,\n";
-        output_stream << indent(indentation) << "        Event const event,\n";
-        output_stream << indent(indentation) << "        Event_data const event_data,\n";
-        output_stream << indent(indentation) << "        std::pmr::vector<int>& state_stack,\n";
-        output_stream << indent(indentation) << "        std::size_t const state_stack_position\n";
-        output_stream << indent(indentation) << "    )\n";
-        output_stream << indent(indentation) << "{\n";
-        output_stream << indent(indentation) << "    if (state_stack_position >= state_stack.size())\n";
-        output_stream << indent(indentation) << "    {\n";
-        output_stream << indent(indentation) << "        return false;\n";
-        output_stream << indent(indentation) << "    }\n";
-        output_stream << "\n";
-        output_stream << indent(indentation) << "    int& state = state_stack[state_stack_position];\n";
-        output_stream << "\n";
-        output_stream << indent(indentation) << "    switch (state)\n";
-        output_stream << indent(indentation) << "    {\n";
-        output_stream << indent(indentation) << "    case 0:\n";
-        output_stream << indent(indentation) << "    {\n";
-        output_stream << indent(indentation) << "        if (event == Event::Start_object)\n";
-        output_stream << indent(indentation) << "        {\n";
-        output_stream << indent(indentation) << "            state = 1;\n";
-        output_stream << indent(indentation) << "            return true;\n";
-        output_stream << indent(indentation) << "        }\n";
-        output_stream << indent(indentation) << "        break;\n";
-        output_stream << indent(indentation) << "    }\n";
-        output_stream << indent(indentation) << "    case 1:\n";
-        output_stream << indent(indentation) << "    {\n";
-        output_stream << indent(indentation) << "        switch (event)\n";
-        output_stream << indent(indentation) << "        {\n";
-        output_stream << indent(indentation) << "        case Event::Key:\n";
-        output_stream << indent(indentation) << "        {\n";
-        output_stream << indent(indentation) << "            if constexpr (std::is_same_v<Event_data, std::string_view>)\n";
-        output_stream << indent(indentation) << "            {\n";
+            output_stream << indent(indentation) << "export void from_json(nlohmann::json const& j, " << struct_type.name << "& output)\n";
+            output_stream << indent(indentation) << "{\n";
 
-        constexpr int first_member_parse_state = 3;
-
-        {
-            int current_state = first_member_parse_state;
-
-            if (!struct_type.members.empty())
+            for (Member const& member : struct_type.members)
             {
-                Member const& member = struct_type.members[0];
+                if (is_optional_type(member.type))
+                {
+                    std::pmr::string const value_type_str = get_optional_value_type(member.type);
+                    Type const value_type = Type{ value_type_str };
 
-                int const state_count = generate_read_struct_member_key_code(
-                    output_stream,
-                    struct_type.name,
-                    member,
-                    current_state,
-                    struct_types,
-                    indentation + 16,
-                    true
-                );
+                    output_stream << indent(indentation) << "    {\n";
+                    output_stream << indent(indentation) << "        auto const it = j.find(\"" << member.name << "\");\n";
+                    output_stream << indent(indentation) << "        if (it != j.end() && !it->is_null())\n";
+                    output_stream << indent(indentation) << "        {\n";
 
-                current_state += state_count;
+                    if (is_vector_type(value_type))
+                    {
+                        std::pmr::string const vec_elem_str = get_vector_value_type(value_type);
+                        Type const vec_elem = Type{ vec_elem_str };
+                        output_stream << indent(indentation) << "            output." << member.name << ".emplace();\n";
+                        output_stream << indent(indentation) << "            nlohmann::json const& arr = it->at(\"elements\");\n";
+                        output_stream << indent(indentation) << "            output." << member.name << ".value().resize(arr.size());\n";
+                        if (is_struct_type(vec_elem, struct_types))
+                        {
+                            output_stream << indent(indentation) << "            for (std::size_t i = 0; i < arr.size(); ++i)\n";
+                            output_stream << indent(indentation) << "                from_json(arr[i], output." << member.name << ".value()[i]);\n";
+                        }
+                        else if (is_string_type(vec_elem))
+                        {
+                            output_stream << indent(indentation) << "            for (std::size_t i = 0; i < arr.size(); ++i)\n";
+                            output_stream << indent(indentation) << "                output." << member.name << ".value()[i] = std::pmr::string{arr[i].get<std::string>()};\n";
+                        }
+                        else
+                        {
+                            output_stream << indent(indentation) << "            for (std::size_t i = 0; i < arr.size(); ++i)\n";
+                            output_stream << indent(indentation) << "                output." << member.name << ".value()[i] = arr[i].get<" << vec_elem_str << ">();\n";
+                        }
+                    }
+                    else if (is_struct_type(value_type, struct_types))
+                    {
+                        output_stream << indent(indentation) << "            output." << member.name << ".emplace();\n";
+                        output_stream << indent(indentation) << "            from_json(*it, output." << member.name << ".value());\n";
+                    }
+                    else if (is_string_type(value_type))
+                    {
+                        output_stream << indent(indentation) << "            output." << member.name << " = std::pmr::string{it->get<std::string>()};\n";
+                    }
+                    else if (is_filesystem_path_type(value_type))
+                    {
+                        output_stream << indent(indentation) << "            output." << member.name << " = std::filesystem::path{it->get<std::string>()};\n";
+                    }
+                    else if (is_enum_type(value_type, enum_types))
+                    {
+                        output_stream << indent(indentation) << "            {\n";
+                        output_stream << indent(indentation) << "                std::string const s = it->get<std::string>();\n";
+                        output_stream << indent(indentation) << "                " << value_type_str << " enum_val{};\n";
+                        output_stream << indent(indentation) << "                read_enum(enum_val, std::string_view{s});\n";
+                        output_stream << indent(indentation) << "                output." << member.name << " = std::move(enum_val);\n";
+                        output_stream << indent(indentation) << "            }\n";
+                    }
+                    else
+                    {
+                        output_stream << indent(indentation) << "            output." << member.name << " = it->get<" << value_type_str << ">();\n";
+                    }
+
+                    output_stream << indent(indentation) << "        }\n";
+                    output_stream << indent(indentation) << "    }\n";
+                }
+                else if (is_variant_type(member.type))
+                {
+                    std::pmr::vector<std::pmr::string> const variadic_types = get_variadic_types(member.type.name);
+
+                    output_stream << indent(indentation) << "    {\n";
+                    output_stream << indent(indentation) << "        nlohmann::json const& data = j.at(\"" << member.name << "\");\n";
+                    output_stream << indent(indentation) << "        std::string const type_str = data.at(\"type\").get<std::string>();\n";
+
+                    for (std::size_t i = 0; i < variadic_types.size(); ++i)
+                    {
+                        std::pmr::string const& type_name = variadic_types[i];
+                        Type const elem_type = Type{ type_name };
+
+                        output_stream << indent(indentation) << "        ";
+                        if (i != 0) output_stream << "else ";
+                        output_stream << "if (type_str == \"" << type_name << "\")\n";
+                        output_stream << indent(indentation) << "        {\n";
+
+                        if (is_struct_type(elem_type, struct_types))
+                        {
+                            output_stream << indent(indentation) << "            output." << member.name << " = h::" << type_name << "{};\n";
+                            output_stream << indent(indentation) << "            from_json(data.at(\"value\"), std::get<h::" << type_name << ">(output." << member.name << "));\n";
+                        }
+                        else if (is_enum_type(elem_type, enum_types))
+                        {
+                            output_stream << indent(indentation) << "            {\n";
+                            output_stream << indent(indentation) << "                std::string const val_str = data.at(\"value\").get<std::string>();\n";
+                            output_stream << indent(indentation) << "                h::" << type_name << " enum_val{};\n";
+                            output_stream << indent(indentation) << "                read_enum(enum_val, std::string_view{val_str});\n";
+                            output_stream << indent(indentation) << "                output." << member.name << " = std::move(enum_val);\n";
+                            output_stream << indent(indentation) << "            }\n";
+                        }
+                        else if (is_string_type(elem_type))
+                        {
+                            output_stream << indent(indentation) << "            output." << member.name << " = " << std::string{type_name} << "{data.at(\"value\").get<std::string>()};\n";
+                        }
+                        else
+                        {
+                            output_stream << indent(indentation) << "            output." << member.name << " = data.at(\"value\").get<" << type_name << ">();\n";
+                        }
+
+                        output_stream << indent(indentation) << "        }\n";
+                    }
+
+                    output_stream << indent(indentation) << "    }\n";
+                }
+                else if (is_vector_type(member.type))
+                {
+                    std::pmr::string const elem_type_str = get_vector_value_type(member.type);
+                    Type const elem_type = Type{ elem_type_str };
+
+                    output_stream << indent(indentation) << "    {\n";
+                    output_stream << indent(indentation) << "        nlohmann::json const& arr = j.at(\"" << member.name << "\").at(\"elements\");\n";
+                    output_stream << indent(indentation) << "        output." << member.name << ".resize(arr.size());\n";
+                    output_stream << indent(indentation) << "        for (std::size_t i = 0; i < arr.size(); ++i)\n";
+                    output_stream << indent(indentation) << "        {\n";
+
+                    if (is_struct_type(elem_type, struct_types))
+                    {
+                        output_stream << indent(indentation) << "            from_json(arr[i], output." << member.name << "[i]);\n";
+                    }
+                    else if (is_optional_type(elem_type))
+                    {
+                        std::pmr::string const opt_val_str = get_optional_value_type(elem_type);
+                        Type const opt_val = Type{ opt_val_str };
+                        output_stream << indent(indentation) << "            if (!arr[i].is_null())\n";
+                        output_stream << indent(indentation) << "            {\n";
+                        if (is_struct_type(opt_val, struct_types))
+                        {
+                            output_stream << indent(indentation) << "                output." << member.name << "[i].emplace();\n";
+                            output_stream << indent(indentation) << "                from_json(arr[i], output." << member.name << "[i].value());\n";
+                        }
+                        else if (is_string_type(opt_val))
+                        {
+                            output_stream << indent(indentation) << "                output." << member.name << "[i] = std::pmr::string{arr[i].get<std::string>()};\n";
+                        }
+                        else
+                        {
+                            output_stream << indent(indentation) << "                output." << member.name << "[i] = arr[i].get<" << opt_val_str << ">();\n";
+                        }
+                        output_stream << indent(indentation) << "            }\n";
+                    }
+                    else if (is_enum_type(elem_type, enum_types))
+                    {
+                        output_stream << indent(indentation) << "            { std::string s = arr[i].get<std::string>(); read_enum(output." << member.name << "[i], std::string_view{s}); }\n";
+                    }
+                    else if (is_string_type(elem_type))
+                    {
+                        output_stream << indent(indentation) << "            output." << member.name << "[i] = std::pmr::string{arr[i].get<std::string>()};\n";
+                    }
+                    else if (is_filesystem_path_type(elem_type))
+                    {
+                        output_stream << indent(indentation) << "            output." << member.name << "[i] = std::filesystem::path{arr[i].get<std::string>()};\n";
+                    }
+                    else
+                    {
+                        output_stream << indent(indentation) << "            output." << member.name << "[i] = arr[i].get<" << elem_type_str << ">();\n";
+                    }
+
+                    output_stream << indent(indentation) << "        }\n";
+                    output_stream << indent(indentation) << "    }\n";
+                }
+                else if (is_struct_type(member.type, struct_types))
+                {
+                    output_stream << indent(indentation) << "    from_json(j.at(\"" << member.name << "\"), output." << member.name << ");\n";
+                }
+                else if (is_enum_type(member.type, enum_types))
+                {
+                    output_stream << indent(indentation) << "    {\n";
+                    output_stream << indent(indentation) << "        std::string const s = j.at(\"" << member.name << "\").get<std::string>();\n";
+                    output_stream << indent(indentation) << "        read_enum(output." << member.name << ", std::string_view{s});\n";
+                    output_stream << indent(indentation) << "    }\n";
+                }
+                else if (is_bool_type(member.type))
+                {
+                    output_stream << indent(indentation) << "    output." << member.name << " = j.at(\"" << member.name << "\").get<bool>();\n";
+                }
+                else if (is_string_type(member.type))
+                {
+                    output_stream << indent(indentation) << "    output." << member.name << " = std::pmr::string{j.at(\"" << member.name << "\").get<std::string>()};\n";
+                }
+                else if (is_filesystem_path_type(member.type))
+                {
+                    output_stream << indent(indentation) << "    output." << member.name << " = std::filesystem::path{j.at(\"" << member.name << "\").get<std::string>()};\n";
+                }
+                else
+                {
+                    // int, uint, int64, uint64, double, float, etc.
+                    output_stream << indent(indentation) << "    output." << member.name << " = j.at(\"" << member.name << "\").get<" << member.type.name << ">();\n";
+                }
             }
 
-            for (std::size_t member_index = 1; member_index < struct_type.members.size(); ++member_index)
-            {
-                Member const& member = struct_type.members[member_index];
-
-                output_stream << indent(indentation) << "                else ";
-
-                int const state_count = generate_read_struct_member_key_code(
-                    output_stream,
-                    struct_type.name,
-                    member,
-                    current_state,
-                    struct_types,
-                    indentation + 16,
-                    false
-                );
-
-                current_state += state_count;
-            }
-        }
-
-        output_stream << indent(indentation) << "            }\n";
-        output_stream << indent(indentation) << "            break;\n";
-        output_stream << indent(indentation) << "        }\n";
-        output_stream << indent(indentation) << "        case Event::End_object:\n";
-        output_stream << indent(indentation) << "        {\n";
-        output_stream << indent(indentation) << "            state = 2;\n";
-        output_stream << indent(indentation) << "            return true;\n";
-        output_stream << indent(indentation) << "        }\n";
-        output_stream << indent(indentation) << "        default:\n";
-        output_stream << indent(indentation) << "            break;\n";
-        output_stream << indent(indentation) << "        }\n";
-        output_stream << indent(indentation) << "        break;\n";
-        output_stream << indent(indentation) << "    }\n";
-        output_stream << indent(indentation) << "    case 2:\n";
-        output_stream << indent(indentation) << "    {\n";
-        output_stream << indent(indentation) << "        std::cerr << \"While parsing '" << struct_type.name << "' unexpected '}' found.\\n\";\n";
-        output_stream << indent(indentation) << "        return false;\n";
-        output_stream << indent(indentation) << "    }\n";
-
-        {
-            int current_state = first_member_parse_state;
-
-            for (std::size_t member_index = 0; member_index < struct_type.members.size(); ++member_index)
-            {
-                Member const& member = struct_type.members[member_index];
-
-                int const state_count = generate_read_struct_member_value_code(
-                    output_stream,
-                    struct_type.name,
-                    member,
-                    current_state,
-                    enum_types,
-                    struct_types,
-                    indentation + 4
-                );
-
-                current_state += state_count;
-            }
-        }
-
-        output_stream << indent(indentation) << "    }\n";
-        output_stream << "\n";
-        output_stream << indent(indentation) << "    std::cerr << \"Error while reading '" << struct_type.name << "'.\\n\";\n";
-        output_stream << indent(indentation) << "    return false;\n";
-        output_stream << indent(indentation) << "}\n";
+            output_stream << indent(indentation) << "}\n";
 
         return std::pmr::string{ output_stream.str() };
     }
@@ -698,45 +763,18 @@ namespace h::tools::code_generator
             std::string_view const name
         )
         {
-            if (is_string_type(type))
-            {
-                output_stream << "writer.String(" << name << ".data(), " << name << ".size());";
-            }
-            else
-            {
-                output_stream << "writer.";
-
-                if (is_bool_type(type))
+                if (is_string_type(type))
                 {
-                    output_stream << "Bool";
+                    output_stream << "std::string{" << name << "}";
                 }
-                else if (is_int_type(type))
+                else if (is_filesystem_path_type(type))
                 {
-                    output_stream << "Int";
-                }
-                else if (is_int64_type(type))
-                {
-                    output_stream << "Int64";
-                }
-                else if (is_uint_type(type))
-                {
-                    output_stream << "Uint";
-                }
-                else if (is_uint64_type(type))
-                {
-                    output_stream << "Uint64";
-                }
-                else if (is_double_type(type))
-                {
-                    output_stream << "Double";
+                    output_stream << name << ".generic_string()";
                 }
                 else
                 {
-                    throw std::runtime_error{ std::format("Type '{}' not handled!", type.name) };
+                    output_stream << name;
                 }
-
-                output_stream << "(" << name << ");";
-            }
         }
     }
 
@@ -749,21 +787,16 @@ namespace h::tools::code_generator
     {
         std::stringstream output_stream;
 
-        output_stream << indent(indentation) << "export template<typename Writer_type>\n";
-        output_stream << indent(indentation) << "    void write_object(\n";
-        output_stream << indent(indentation) << "        Writer_type& writer,\n";
-        output_stream << indent(indentation) << "        " << struct_type.name << " const& output\n";
-        output_stream << indent(indentation) << "    )\n";
+            output_stream << indent(indentation) << "export void to_json(nlohmann::json& j, " << struct_type.name << " const& output)\n";
         output_stream << indent(indentation) << "{\n";
-        output_stream << indent(indentation) << "    writer.StartObject();\n";
+            output_stream << indent(indentation) << "    j = nlohmann::json::object();\n";
 
         for (Member const& member : struct_type.members)
         {
             if (is_variant_type(member.type))
             {
-                output_stream << indent(indentation) << "    writer.Key(\"data\");\n";
-                output_stream << "\n";
-                output_stream << indent(indentation) << "    writer.StartObject();\n";
+                    output_stream << indent(indentation) << "    {\n";
+                    output_stream << indent(indentation) << "        nlohmann::json data_obj = nlohmann::json::object();\n";
 
                 std::pmr::vector<std::pmr::string> const type_names = get_variadic_types(
                     member.type.name
@@ -774,42 +807,35 @@ namespace h::tools::code_generator
                     std::pmr::string const& type_name = type_names[index];
                     Type const underlying_type = { .name = type_name };
 
-                    output_stream << indent(indentation + 4);
+                        output_stream << indent(indentation + 8);
                     if (index != 0)
                     {
                         output_stream << "else ";
                     }
                     output_stream << "if (std::holds_alternative<" << type_name << ">(output." << member.name << "))\n";
-                    output_stream << indent(indentation) << "    {\n";
-                    output_stream << indent(indentation) << "        writer.Key(\"type\");\n";
-                    output_stream << indent(indentation) << "        writer.String(\"" << type_name << "\");\n";
-                    output_stream << indent(indentation) << "        writer.Key(\"value\");\n";
+                        output_stream << indent(indentation) << "        {\n";
+                        output_stream << indent(indentation) << "            data_obj[\"type\"] = \"" << type_name << "\";\n";
 
                     if (is_enum_type(underlying_type, enum_types))
                     {
-                        output_stream << indent(indentation) << "        {\n";
-                        output_stream << indent(indentation) << "            " << type_name << " const& value = std::get<" << type_name << ">(output." << member.name << ");\n";
-                        output_stream << indent(indentation) << "            std::string_view const enum_value_string = write_enum(value);\n";
-                        output_stream << indent(indentation) << "            writer.String(enum_value_string.data(), enum_value_string.size());\n";
-                        output_stream << indent(indentation) << "        }\n";
+                            output_stream << indent(indentation) << "            data_obj[\"value\"] = std::string{write_enum(std::get<" << type_name << ">(output." << member.name << "))};\n";
                     }
                     else if (is_struct_type(underlying_type, struct_types))
                     {
-                        output_stream << indent(indentation) << "        " << type_name << " const& value = std::get<" << type_name << ">(output." << member.name << ");\n";
-                        output_stream << indent(indentation) << "        write_object(writer, value);\n";
+                            output_stream << indent(indentation) << "            to_json(data_obj[\"value\"], std::get<" << type_name << ">(output." << member.name << "));\n";
                     }
                     else
                     {
-                        output_stream << indent(indentation) << "        " << type_name << " const& value = std::get<" << type_name << ">(output." << member.name << ");\n";
-                        output_stream << indent(indentation) << "        ";
-                        generate_write_value_json_code(output_stream, underlying_type, "value");
-                        output_stream << '\n';
+                            output_stream << indent(indentation) << "            data_obj[\"value\"] = ";
+                            generate_write_value_json_code(output_stream, underlying_type, "std::get<" + std::string{type_name} + ">(output." + std::string{member.name} + ")");
+                            output_stream << ";\n";
                     }
 
-                    output_stream << indent(indentation) << "    }\n";
+                        output_stream << indent(indentation) << "        }\n";
                 }
 
-                output_stream << indent(indentation) << "    writer.EndObject();\n\n";
+                    output_stream << indent(indentation) << "        j[\"" << member.name << "\"] = std::move(data_obj);\n";
+                    output_stream << indent(indentation) << "    }\n";
             }
             else
             {
@@ -818,40 +844,91 @@ namespace h::tools::code_generator
                     Type const value_type = Type{ get_optional_value_type(member.type) };
                     if (is_struct_type(value_type, struct_types))
                     {
-                        output_stream << indent(indentation) << "    write_optional_object(writer, \"" << member.name << "\", output." << member.name << ");\n";
+                            output_stream << indent(indentation) << "    if (output." << member.name << ".has_value())\n";
+                            output_stream << indent(indentation) << "    {\n";
+                            output_stream << indent(indentation) << "        to_json(j[\"" << member.name << "\"], output." << member.name << ".value());\n";
+                            output_stream << indent(indentation) << "    }\n";
                     }
                     else
                     {
-                        output_stream << indent(indentation) << "    write_optional(writer, \"" << member.name << "\", output." << member.name << ");\n";
+                            output_stream << indent(indentation) << "    if (output." << member.name << ".has_value())\n";
+                            output_stream << indent(indentation) << "    {\n";
+                            if (is_string_type(value_type))
+                            {
+                                output_stream << indent(indentation) << "        j[\"" << member.name << "\"] = std::string{output." << member.name << ".value()};\n";
+                            }
+                            else if (is_filesystem_path_type(value_type))
+                            {
+                                output_stream << indent(indentation) << "        j[\"" << member.name << "\"] = output." << member.name << ".value().generic_string();\n";
+                            }
+                            else if (is_enum_type(value_type, enum_types))
+                            {
+                                output_stream << indent(indentation) << "        j[\"" << member.name << "\"] = std::string{write_enum(output." << member.name << ".value())};\n";
+                            }
+                            else
+                            {
+                                output_stream << indent(indentation) << "        j[\"" << member.name << "\"] = output." << member.name << ".value();\n";
+                            }
+                            output_stream << indent(indentation) << "    }\n";
                     }
                 }
                 else
                 {
-                    output_stream << indent(indentation) << "    writer.Key(\"" << member.name << "\");\n";
-
                     if (is_struct_type(member.type, struct_types) || is_vector_type(member.type))
                     {
-                        output_stream << indent(indentation) << "    write_object(writer, output." << member.name << ");\n";
+                            if (is_vector_type(member.type))
+                            {
+                                std::pmr::string const elem_type = get_vector_value_type(member.type);
+                                Type const elem = Type{ elem_type };
+                                output_stream << indent(indentation) << "    {\n";
+                                output_stream << indent(indentation) << "        nlohmann::json arr = nlohmann::json::array();\n";
+                                output_stream << indent(indentation) << "        for (auto const& elem : output." << member.name << ")\n";
+                                output_stream << indent(indentation) << "        {\n";
+                                if (is_struct_type(elem, struct_types))
+                                {
+                                    output_stream << indent(indentation) << "            nlohmann::json e;\n";
+                                    output_stream << indent(indentation) << "            to_json(e, elem);\n";
+                                    output_stream << indent(indentation) << "            arr.push_back(std::move(e));\n";
+                                }
+                                else if (is_enum_type(elem, enum_types))
+                                {
+                                    output_stream << indent(indentation) << "            arr.push_back(std::string{write_enum(elem)});\n";
+                                }
+                                else if (is_string_type(elem))
+                                {
+                                    output_stream << indent(indentation) << "            arr.push_back(std::string{elem});\n";
+                                }
+                                else if (is_filesystem_path_type(elem))
+                                {
+                                    output_stream << indent(indentation) << "            arr.push_back(elem.generic_string());\n";
+                                }
+                                else
+                                {
+                                    output_stream << indent(indentation) << "            arr.push_back(elem);\n";
+                                }
+                                output_stream << indent(indentation) << "        }\n";
+                                output_stream << indent(indentation) << "        j[\"" << member.name << "\"] = nlohmann::json{{\"size\", output." << member.name << ".size()}, {\"elements\", std::move(arr)}};\n";
+                                output_stream << indent(indentation) << "    }\n";
+                            }
+                            else
+                            {
+                                output_stream << indent(indentation) << "    to_json(j[\"" << member.name << "\"], output." << member.name << ");\n";
+                            }
                     }
                     else if (is_enum_type(member.type, enum_types))
                     {
-                        output_stream << indent(indentation) << "    {\n";
-                        output_stream << indent(indentation) << "        std::string_view const enum_value_string = write_enum(output." << member.name << ");\n";
-                        output_stream << indent(indentation) << "        writer.String(enum_value_string.data(), enum_value_string.size());\n";
-                        output_stream << indent(indentation) << "    }\n";
+                            output_stream << indent(indentation) << "    j[\"" << member.name << "\"] = std::string{write_enum(output." << member.name << ")};\n";
                     }
                     else
                     {
-                        output_stream << indent(indentation) << "    ";
-                        std::pmr::string const name = "output." + member.name;
-                        generate_write_value_json_code(output_stream, member.type, name);
-                        output_stream << '\n';
+                            output_stream << indent(indentation) << "    j[\"" << member.name << "\"] = ";
+                            generate_write_value_json_code(output_stream, member.type, "output." + member.name);
+                            output_stream << ";\n";
                     }
                 }
             }
         }
 
-        output_stream << indent(indentation) << "    writer.EndObject();\n";
         output_stream << indent(indentation) << "}\n";
 
         return std::pmr::string{ output_stream.str() };
@@ -1232,24 +1309,36 @@ namespace h::tools::code_generator
         output_stream << "#include <vector>\n";
         output_stream << '\n';
         output_stream << "export module " << export_module_name << ";\n";
-        output_stream << '\n';
-        output_stream << "import " << module_name_to_import << ";\n";
+            output_stream << "#include <nlohmann/json.hpp>\n";
+            output_stream << '\n';
+            output_stream << "module;\n";
+            output_stream << '\n';
+            output_stream << "#include <filesystem>\n";
+            output_stream << "#include <memory_resource>\n";
+            output_stream << "#include <optional>\n";
+            output_stream << "#include <variant>\n";
+            output_stream << "#include <vector>\n";
+            output_stream << '\n';
+            output_stream << "#include <nlohmann/json.hpp>\n";
+            output_stream << '\n';
+            output_stream << "export module " << export_module_name << ";\n";
+            output_stream << '\n';
+            output_stream << "module;\n";
+            output_stream << '\n';
+            output_stream << "#include <filesystem>\n";
+            output_stream << "#include <memory_resource>\n";
+            output_stream << "#include <optional>\n";
+            output_stream << "#include <variant>\n";
+            output_stream << "#include <vector>\n";
+            output_stream << '\n';
+            output_stream << "#include <nlohmann/json.hpp>\n";
+            output_stream << '\n';
+            output_stream << "export module " << export_module_name << ";\n";
+            output_stream << '\n';
+            output_stream << "import " << module_name_to_import << ";\n";
         output_stream << '\n';
         output_stream << "namespace " << namespace_name << '\n';
         output_stream << "{\n";
-        output_stream << "    export struct Stack_state\n";
-        output_stream << "    {\n";
-        output_stream << "        void* pointer;\n";
-        output_stream << "        std::pmr::string type;\n";
-        output_stream << "        std::optional<Stack_state>(*get_next_state)(Stack_state* state, std::string_view key);\n";
-        output_stream << "\n";
-        output_stream << "        void (*set_vector_size)(Stack_state const* state, std::size_t size);\n";
-        output_stream << "        void* (*get_element)(Stack_state const* state, std::size_t index);\n";
-        output_stream << "        std::optional<Stack_state>(*get_next_state_element)(Stack_state* state, std::string_view key);\n";
-        output_stream << "\n";
-        output_stream << "        void (*set_variant_type)(Stack_state* state, std::string_view type);\n";
-        output_stream << "    };\n";
-        output_stream << "\n";
 
         // Generate read_enum()
         output_stream << "    export template<typename Enum_type, typename Event_value>\n";
@@ -1264,488 +1353,22 @@ namespace h::tools::code_generator
             output_stream << "\n";
         }
 
-        // Generate read_enum_value()
-        output_stream << "    export std::optional<int> get_enum_value(std::string_view const type, std::string_view const value)\n";
-        output_stream << "    {\n";
-        for (Enum const& enum_type : file_types.enums)
-        {
-            output_stream << std::format("        if (type == \"{}\")\n", enum_type.name);
-            output_stream << "        {\n";
-            output_stream << std::format("            {} enum_value;\n", enum_type.name);
-            output_stream << "            read_enum(enum_value, value);\n";
-            output_stream << "            return static_cast<int>(enum_value);\n";
-            output_stream << "        }\n\n";
-        }
-        output_stream << "        return {};\n";
-        output_stream << "    }\n\n";
-
-        // Generate get_next_state_vector
-        output_stream << "    std::optional<Stack_state> get_next_state_vector(Stack_state* state, std::string_view const key)\n";
-        output_stream << "    {\n";
-        output_stream << "        if (key == \"size\")\n";
-        output_stream << "        {\n";
-        output_stream << "            return Stack_state\n";
-        output_stream << "            {\n";
-        output_stream << "                .pointer = state->pointer,\n";
-        output_stream << "                .type = \"vector_size\",\n";
-        output_stream << "                .get_next_state = nullptr,\n";
-        output_stream << "            };\n";
-        output_stream << "        }\n";
-        output_stream << "        else if (key == \"elements\")\n";
-        output_stream << "        {\n";
-        output_stream << "            return Stack_state\n";
-        output_stream << "            {\n";
-        output_stream << "                .pointer = state->pointer,\n";
-        output_stream << "                .type = \"vector_elements\",\n";
-        output_stream << "                .get_next_state = nullptr\n";
-        output_stream << "            };\n";
-        output_stream << "        }\n";
-        output_stream << "        else\n";
-        output_stream << "        {\n";
-        output_stream << "            return {};\n";
-        output_stream << "        }\n";
-        output_stream << "    }\n\n";
-
-        // Forward declare get_next_state
-        for (Struct const& struct_info : file_types.structs)
-        {
-            output_stream << "    export std::optional<Stack_state> get_next_state_" << to_lowercase(struct_info.name) << "(Stack_state* state, std::string_view const key);\n";
-        }
-
-        // Generate get_next_state
-        for (Struct const& struct_info : file_types.structs)
-        {
-            output_stream << "    export std::optional<Stack_state> get_next_state_" << to_lowercase(struct_info.name) << "(Stack_state* state, std::string_view const key)\n";
-            output_stream << "    {\n";
-            output_stream << std::format("        h::{}* parent = static_cast<h::{}*>(state->pointer);\n", struct_info.name, struct_info.name);
-            output_stream << '\n';
-
-            for (Member const& member : struct_info.members)
+            // Forward declare from_json for all structs
+            for (Struct const& struct_info : file_types.structs)
             {
-                output_stream << std::format("        if (key == \"{}\")\n", member.name);
-                output_stream << "        {\n";
-
-                if (is_vector_type(member.type) || (is_optional_type(member.type) && is_vector_type(Type{ get_optional_value_type(member.type) })))
-                {
-                    std::pmr::string const type_name = is_optional_type(member.type) ? get_optional_value_type(member.type) : member.type.name;
-
-                    output_stream << "            auto const set_vector_size = [](Stack_state const* const state, std::size_t const size) -> void\n";
-                    output_stream << "            {\n";
-                    output_stream << std::format("                {}* parent = static_cast<{}*>(state->pointer);\n", type_name, type_name);
-                    output_stream << "                parent->resize(size);\n";
-                    output_stream << "            };\n\n";
-
-                    output_stream << "            auto const get_element = [](Stack_state const* const state, std::size_t const index) -> void*\n";
-                    output_stream << "            {\n";
-                    output_stream << std::format("                {}* parent = static_cast<{}*>(state->pointer);\n", type_name, type_name);
-                    output_stream << "                return &((*parent)[index]);\n";
-                    output_stream << "            };\n";
-                }
-                else if (is_variant_type(member.type))
-                {
-                    std::pmr::vector<std::pmr::string> const variadic_types = get_variadic_types(member.type.name);
-                    std::pmr::string const variant_type = create_formatted_variant_type(variadic_types);
-
-                    output_stream << "            auto const set_variant_type = [](Stack_state* state, std::string_view const type) -> void\n";
-                    output_stream << "            {\n";
-                    output_stream << std::format("                using Variant_type = {};\n", variant_type);
-                    output_stream << "                Variant_type* pointer = static_cast<Variant_type*>(state->pointer);\n";
-                    output_stream << "\n";
-
-                    for (std::pmr::string const& type : variadic_types)
-                    {
-                        output_stream << std::format("                if (type == \"{}\")\n", type);
-                        output_stream << "                {\n";
-                        output_stream << std::format("                    *pointer = {}{};\n", type, "{}");
-                        output_stream << std::format("                    state->type = \"{}\";\n", type);
-                        output_stream << "                    return;\n";
-
-                        output_stream << "                }\n";
-                    }
-
-                    output_stream << "            };\n";
-                    output_stream << "\n";
-
-                    output_stream << "            auto const get_next_state = [](Stack_state* state, std::string_view const key) -> std::optional<Stack_state>\n";
-                    output_stream << "            {\n";
-                    output_stream << "                if (key == \"type\")\n";
-                    output_stream << "                {\n";
-                    output_stream << "                    return Stack_state\n";
-                    output_stream << "                    {\n";
-                    output_stream << "                        .pointer = state->pointer,\n";
-                    output_stream << "                        .type = \"variant_type\",\n";
-                    output_stream << "                        .get_next_state = nullptr\n";
-                    output_stream << "                    };\n";
-                    output_stream << "                }\n";
-                    output_stream << "\n";
-                    output_stream << "                if (key == \"value\")\n";
-                    output_stream << "                {\n";
-
-                    output_stream << "                    auto const get_next_state_function = [&]() -> std::optional<Stack_state>(*)(Stack_state* state, std::string_view key)\n";
-                    output_stream << "                    {\n";
-                    for (std::pmr::string const& type : variadic_types)
-                    {
-                        output_stream << std::format("                        if (state->type == \"{}\")\n", type);
-                        output_stream << "                        {\n";
-                        if (is_struct_type(Type{ type }, struct_map))
-                        {
-                            output_stream << std::format("                            return get_next_state_{};\n", to_lowercase(type));
-                        }
-                        else
-                        {
-                            output_stream << "                            return nullptr;\n";
-                        }
-                        output_stream << "                        }\n";
-                        output_stream << "\n";
-                    }
-                    output_stream << "                        return nullptr;\n";
-                    output_stream << "                    };\n";
-                    output_stream << "\n";
-                    output_stream << "                    return Stack_state\n";
-                    output_stream << "                    {\n";
-                    output_stream << "                        .pointer = state->pointer,\n";
-                    output_stream << "                        .type = \"variant_value\",\n";
-                    output_stream << "                        .get_next_state = get_next_state_function()\n";
-                    output_stream << "                    };\n";
-                    output_stream << "                }\n";
-                    output_stream << "\n";
-                    output_stream << "                return {};\n";
-                    output_stream << "            };\n";
-                    output_stream << "\n";
-                }
-
-                if (is_optional_type(member.type))
-                {
-                    std::pmr::string const value_type = get_optional_value_type(member.type);
-                    output_stream << std::format("            parent->{} = {}{}{};", member.name, is_cpp_type(member.type) ? "" : "h::", value_type, "{}");
-                }
-                output_stream << "\n";
-
-                output_stream << "            return Stack_state\n";
-                output_stream << "            {\n";
-
-                if (is_optional_type(member.type))
-                {
-                    std::pmr::string const value_type = get_optional_value_type(member.type);
-                    output_stream << std::format("                .pointer = &parent->{}.value(),\n", member.name);
-                    output_stream << std::format("                .type = \"{}\",\n", value_type);
-                }
-                else
-                {
-                    output_stream << std::format("                .pointer = &parent->{},\n", member.name);
-                    output_stream << std::format("                .type = \"{}\",\n", member.type.name);
-                }
-
-                if (is_struct_type(member.type, struct_map))
-                {
-                    output_stream << std::format("                .get_next_state = get_next_state_{},\n", to_lowercase(member.type.name));
-                }
-                else if (is_vector_type(member.type) || (is_optional_type(member.type) && is_vector_type(Type{ get_optional_value_type(member.type) })))
-                {
-                    Type const value_type = Type{ is_optional_type(member.type) ? get_vector_value_type(Type{get_optional_value_type(member.type)}) : get_vector_value_type(member.type) };
-                    output_stream << "                .get_next_state = get_next_state_vector,\n";
-                    output_stream << "                .set_vector_size = set_vector_size,\n";
-                    output_stream << "                .get_element = get_element,\n";
-
-                    if (is_struct_type(value_type, struct_map))
-                    {
-                        output_stream << std::format("                .get_next_state_element = get_next_state_{}\n", to_lowercase(value_type.name));
-                    }
-                    else if (is_optional_type(value_type))
-                    {
-                        Type const optional_value_type = Type{ get_optional_value_type(value_type) };
-                        if (is_struct_type(optional_value_type, struct_map))
-                        {
-                            output_stream << std::format("                .get_next_state_element = get_next_state_{}\n", to_lowercase(optional_value_type.name));
-                        }
-                        else
-                        {
-                            output_stream << "                .get_next_state_element = nullptr,\n";
-                        }
-                    }
-                    else
-                    {
-                        output_stream << "                .get_next_state_element = nullptr\n";
-                    }
-                }
-                else if (is_variant_type(member.type))
-                {
-                    output_stream << "                .get_next_state = get_next_state,\n";
-                    output_stream << "                .set_variant_type = set_variant_type,\n";
-                }
-                else if (is_optional_type(member.type))
-                {
-                    Type const value_type = Type{ get_optional_value_type(member.type) };
-                    if (is_struct_type(value_type, struct_map))
-                    {
-                        output_stream << std::format("                .get_next_state = get_next_state_{}\n", to_lowercase(value_type.name));
-                    }
-                    else
-                    {
-                        output_stream << "                .get_next_state = nullptr,\n";
-                    }
-                }
-                else
-                {
-                    output_stream << "                .get_next_state = nullptr,\n";
-                }
-
-                output_stream << "            };\n";
-                output_stream << "        }\n";
-                output_stream << '\n';
+                output_stream << "    export void from_json(nlohmann::json const& j, h::" << struct_info.name << "& output);\n";
             }
-
-            output_stream << "        return {};\n";
-            output_stream << "    }\n";
             output_stream << "\n";
-        }
 
-        // Generate get_first_state()
-        output_stream << "    export template<typename Struct_type>\n";
-        output_stream << "        Stack_state get_first_state(Struct_type* output)\n";
-        output_stream << "    {\n";
-        for (Struct const& struct_info : file_types.structs)
-        {
-            output_stream << std::format("        if constexpr (std::is_same_v<Struct_type, h::{}>)\n", struct_info.name);
-            output_stream << "        {\n";
-            output_stream << "            return Stack_state\n";
-            output_stream << "            {\n";
-            output_stream << "                .pointer = output,\n";
-            output_stream << std::format("                .type = \"{}\",\n", struct_info.name);
-            output_stream << std::format("                .get_next_state = get_next_state_{}\n", to_lowercase(struct_info.name));
-            output_stream << "            };\n";
-            output_stream << "        }\n";
-            output_stream << "\n";
-        }
-        output_stream << "    }\n";
+            // Generate from_json for each struct
+            for (Struct const& struct_type : file_types.structs)
+            {
+                output_stream << generate_read_struct_json_code(struct_type, enum_map, struct_map, 4);
+                output_stream << "\n";
+            }
 
         output_stream << "}\n";
 
-        /*output_stream << "module;\n";
-        output_stream << '\n';
-        output_stream << "#include <format>\n";
-        output_stream << "#include <iostream>\n";
-        output_stream << "#include <memory_resource>\n";
-        output_stream << "#include <variant>\n";
-        output_stream << "#include <vector>\n";
-        output_stream << '\n';
-        output_stream << "export module " << export_module_name << ";\n";
-        output_stream << '\n';
-        output_stream << "import " << module_name_to_import << ";\n";
-        output_stream << '\n';
-        output_stream << "namespace " << namespace_name << '\n';
-        output_stream << "{\n";
-        output_stream << "    export enum class Event\n";
-        output_stream << "    {\n";
-        output_stream << "        Start_object,\n";
-        output_stream << "        End_object,\n";
-        output_stream << "        Start_array,\n";
-        output_stream << "        End_array,\n";
-        output_stream << "        Key,\n";
-        output_stream << "        Value\n";
-        output_stream << "    };\n";
-        output_stream << "\n";
-        output_stream << "    export struct No_event_data\n";
-        output_stream << "    {\n";
-        output_stream << "    };\n";
-        output_stream << "\n";
-        output_stream << "    export template<typename Output_type, typename Value_type>\n";
-        output_stream << "        bool read_value(\n";
-        output_stream << "            Output_type& output,\n";
-        output_stream << "            std::string_view const key,\n";
-        output_stream << "            Value_type const value\n";
-        output_stream << "        )\n";
-        output_stream << "    {\n";
-        output_stream << "        if constexpr (std::is_arithmetic_v<Output_type> && std::is_arithmetic_v<Value_type>)\n";
-        output_stream << "        {\n";
-        output_stream << "            output = static_cast<Output_type>(value);\n";
-        output_stream << "            return true;\n";
-        output_stream << "        }\n";
-        output_stream << "        else if constexpr (std::is_same_v<Output_type, std::pmr::string> && std::is_same_v<Value_type, std::string_view>)\n";
-        output_stream << "        {\n";
-        output_stream << "            output = value;\n";
-        output_stream << "            return true;\n";
-        output_stream << "        }\n";
-        output_stream << "        else\n";
-        output_stream << "        {\n";
-        output_stream << "            std::cerr << std::format(\"Incompatible type found while parsing key '{}'.\\n\", key);\n";
-        output_stream << "            return false;\n";
-        output_stream << "        }\n";
-        output_stream << "    }\n";
-        output_stream << "\n";
-        output_stream << "    template<typename Object_type, typename Event_data>\n";
-        output_stream << "    bool read_object(\n";
-        output_stream << "        Object_type& output,\n";
-        output_stream << "        Event const event,\n";
-        output_stream << "        Event_data const event_data,\n";
-        output_stream << "        std::pmr::vector<int>& state_stack,\n";
-        output_stream << "        std::size_t const state_stack_position\n";
-        output_stream << "    );\n";
-        output_stream << "\n";
-        output_stream << "    export template<typename Output_type, typename Event_data>\n";
-        output_stream << "        bool read_object(\n";
-        output_stream << "            std::pmr::vector<Output_type>& output,\n";
-        output_stream << "            Event const event,\n";
-        output_stream << "            Event_data const event_data,\n";
-        output_stream << "            std::pmr::vector<int>& state_stack,\n";
-        output_stream << "            std::size_t const state_stack_position\n";
-        output_stream << "        )\n";
-        output_stream << "    {\n";
-        output_stream << "        if (state_stack_position >= state_stack.size())\n";
-        output_stream << "        {\n";
-        output_stream << "            return false;\n";
-        output_stream << "        }\n";
-        output_stream << "\n";
-        output_stream << "        int& state = state_stack[state_stack_position];\n";
-        output_stream << "\n";
-        output_stream << "        if (state == 0)\n";
-        output_stream << "        {\n";
-        output_stream << "            if (event == Event::Start_object)\n";
-        output_stream << "            {\n";
-        output_stream << "                state = 1;\n";
-        output_stream << "                return true;\n";
-        output_stream << "            }\n";
-        output_stream << "        }\n";
-        output_stream << "        else if (state == 1)\n";
-        output_stream << "        {\n";
-        output_stream << "            if (event == Event::Key)\n";
-        output_stream << "            {\n";
-        output_stream << "                if constexpr (std::is_same_v<Event_data, std::string_view>)\n";
-        output_stream << "                {\n";
-        output_stream << "                    if (event_data == \"size\")\n";
-        output_stream << "                    {\n";
-        output_stream << "                        state = 2;\n";
-        output_stream << "                        return true;\n";
-        output_stream << "                    }\n";
-        output_stream << "                    else if (event_data == \"elements\")\n";
-        output_stream << "                    {\n";
-        output_stream << "                        state = 3;\n";
-        output_stream << "                        return true;\n";
-        output_stream << "                    }\n";
-        output_stream << "                }\n";
-        output_stream << "            }\n";
-        output_stream << "        }\n";
-        output_stream << "        else if (state == 2)\n";
-        output_stream << "        {\n";
-        output_stream << "            if (event == Event::Value)\n";
-        output_stream << "            {\n";
-        output_stream << "                if constexpr (std::is_unsigned_v<Event_data>)\n";
-        output_stream << "                {\n";
-        output_stream << "                    output.reserve(event_data);\n";
-        output_stream << "                    state = 1;\n";
-        output_stream << "                    return true;\n";
-        output_stream << "                }\n";
-        output_stream << "            }\n";
-        output_stream << "        }\n";
-        output_stream << "        else if (state == 3)\n";
-        output_stream << "        {\n";
-        output_stream << "            if (event == Event::Start_array)\n";
-        output_stream << "            {\n";
-        output_stream << "                state = 4;\n";
-        output_stream << "                return true;\n";
-        output_stream << "            }\n";
-        output_stream << "        }\n";
-        output_stream << "        else if (state == 4)\n";
-        output_stream << "        {\n";
-        output_stream << "            if (event == Event::Value)\n";
-        output_stream << "            {\n";
-        output_stream << "                if constexpr ((std::is_arithmetic_v<Output_type> && std::is_arithmetic_v<Event_data>) || std::is_same_v<Output_type, std::pmr::string>)\n";
-        output_stream << "                {\n";
-        output_stream << "                    Output_type element;\n";
-        output_stream << "                    if (!read_value(element, \"array_element\", event_data))\n";
-        output_stream << "                    {\n";
-        output_stream << "                        return false;\n";
-        output_stream << "                    }\n";
-        output_stream << "                    output.push_back(element);\n";
-        output_stream << "                    return true;\n";
-        output_stream << "                }\n";
-        output_stream << "            }\n";
-        output_stream << "            else if (event == Event::Start_object)\n";
-        output_stream << "            {\n";
-        output_stream << "                if constexpr (std::is_class_v<Output_type> && !std::is_same_v<Output_type, std::pmr::string>)\n";
-        output_stream << "                {\n";
-        output_stream << "                    output.emplace_back();\n";
-        output_stream << "                    state = 5;\n";
-        output_stream << "                    return read_object(output.back(), event, event_data, state_stack, state_stack_position + 1);\n";
-        output_stream << "                }\n";
-        output_stream << "            }\n";
-        output_stream << "            else if (event == Event::End_array)\n";
-        output_stream << "            {\n";
-        output_stream << "                state = 6;\n";
-        output_stream << "                return true;\n";
-        output_stream << "            }\n";
-        output_stream << "        }\n";
-        output_stream << "        else if (state == 5)\n";
-        output_stream << "        {\n";
-        output_stream << "            if constexpr (std::is_class_v<Output_type> && !std::is_same_v<Output_type, std::pmr::string>)\n";
-        output_stream << "            {\n";
-        output_stream << "                if ((event == Event::End_object) && (state_stack_position + 2) == state_stack.size())\n";
-        output_stream << "                {\n";
-        output_stream << "                    if (!read_object(output.back(), event, event_data, state_stack, state_stack_position + 1))\n";
-        output_stream << "                    {\n";
-        output_stream << "                        return false;\n";
-        output_stream << "                    }\n";
-        output_stream << "\n";
-        output_stream << "                    state = 4;\n";
-        output_stream << "                    return true;\n";
-        output_stream << "                }\n";
-        output_stream << "                else\n";
-        output_stream << "                {\n";
-        output_stream << "                    return read_object(output.back(), event, event_data, state_stack, state_stack_position + 1);\n";
-        output_stream << "                }\n";
-        output_stream << "            }\n";
-        output_stream << "        }\n";
-        output_stream << "        else if (state == 6)\n";
-        output_stream << "        {\n";
-        output_stream << "            if (event == Event::End_object)\n";
-        output_stream << "            {\n";
-        output_stream << "                state = 7;\n";
-        output_stream << "                return true;\n";
-        output_stream << "            }\n";
-        output_stream << "        }\n";
-        output_stream << "\n";
-        output_stream << "        return false;\n";
-        output_stream << "    }\n";
-        output_stream << "\n";
-        output_stream << "    export template<typename Enum_type, typename Event_value>\n";
-        output_stream << "        bool read_enum(Enum_type& output, Event_value const value)\n";
-        output_stream << "    {\n";
-        output_stream << "        return false;\n";
-        output_stream << "    };\n";
-        output_stream << "\n";
-
-        for (Enum const& enum_type : file_types.enums)
-        {
-            output_stream << generate_read_enum_json_code(enum_type, 4);
-            output_stream << "\n";
-        }
-
-        output_stream << "\n";
-        output_stream << "    export template<typename Object_type, typename Event_data>\n";
-        output_stream << "        bool read_object(\n";
-        output_stream << "            Object_type& output,\n";
-        output_stream << "            Event const event,\n";
-        output_stream << "            Event_data const event_data,\n";
-        output_stream << "            std::pmr::vector<int>& state_stack,\n";
-        output_stream << "            std::size_t const state_stack_position\n";
-        output_stream << "        );\n";
-        output_stream << "\n";
-
-        std::pmr::unordered_map<std::pmr::string, Enum> const enum_map = create_name_map<Enum>(
-            file_types.enums
-        );
-
-        std::pmr::unordered_map<std::pmr::string, Struct> struct_map = create_name_map<Struct>(
-            file_types.structs
-        );
-
-        for (Struct const& struct_type : file_types.structs)
-        {
-            output_stream << generate_read_struct_json_code(struct_type, enum_map, struct_map, 4);
-            output_stream << "\n";
-        }
-
-        output_stream << "}\n";*/
     }
 
     void generate_write_json_code(
@@ -1756,26 +1379,27 @@ namespace h::tools::code_generator
         std::string_view const namespace_name
     )
     {
-        File_types const file_types = identify_file_types(
+        /*File_types const file_types = identify_file_types(
             input_stream
         );
 
-        output_stream << "module;\n";
-        output_stream << '\n';
-        output_stream << "#include <filesystem>\n";
-        output_stream << "#include <iostream>\n";
-        output_stream << "#include <memory_resource>\n";
-        output_stream << "#include <optional>\n";
-        output_stream << "#include <string_view>\n";
-        output_stream << "#include <variant>\n";
-        output_stream << "#include <vector>\n";
-        output_stream << '\n';
-        output_stream << "export module " << export_module_name << ";\n";
-        output_stream << '\n';
-        output_stream << "import " << module_name_to_import << ";\n";
-        output_stream << '\n';
-        output_stream << "namespace " << namespace_name << '\n';
-        output_stream << "{\n";
+        std::string_view const initial_code = R"(module;
+
+#include <compare>
+
+#include <nlohmann/json.hpp>
+
+export module h.json_serializer.operators;
+
+import std;
+
+import h.binary_serializer.generics;
+import h.core;
+
+namespace h::binary_serializer
+{
+
+)";
 
         for (Enum const& enum_type : file_types.enums)
         {
@@ -1783,126 +1407,11 @@ namespace h::tools::code_generator
             output_stream << "\n";
         }
 
-        generate_write_forward_declarations(output_stream, file_types.structs, 4);
-
-        output_stream << "    template <typename C> struct Is_optional : std::false_type {};\n";
-        output_stream << "    template <typename T> struct Is_optional< std::optional<T> > : std::true_type {};\n";
-        output_stream << "    template <typename C> inline constexpr bool Is_optional_v = Is_optional<C>::value;\n";
-        output_stream << "\n";
-        output_stream << "    export template <typename Writer_type, typename Value_type>\n";
-        output_stream << "        void write_object(\n";
-        output_stream << "            Writer_type& writer,\n";
-        output_stream << "            std::pmr::vector<Value_type> const& values\n";
-        output_stream << "        );\n";
-        output_stream << "\n";
-        output_stream << "    export template <typename Writer_type, typename Value_type>\n";
-        output_stream << "        void write_value(\n";
-        output_stream << "            Writer_type& writer,\n";
-        output_stream << "            Value_type const& value\n";
-        output_stream << "        )\n";
-        output_stream << "    {\n";
-        output_stream << "        if constexpr (std::is_unsigned_v<Value_type> && sizeof(Value_type) <= 4)\n";
-        output_stream << "        {\n";
-        output_stream << "            writer.Uint(value);\n";
-        output_stream << "        }\n";
-        output_stream << "        else if constexpr (std::is_unsigned_v<Value_type>)\n";
-        output_stream << "        {\n";
-        output_stream << "            writer.Uint64(value);\n";
-        output_stream << "        }\n";
-        output_stream << "        else if constexpr (std::is_signed_v<Value_type> && sizeof(Value_type) <= 4)\n";
-        output_stream << "        {\n";
-        output_stream << "            writer.Int(value);\n";
-        output_stream << "        }\n";
-        output_stream << "        else if constexpr (std::is_signed_v<Value_type>)\n";
-        output_stream << "        {\n";
-        output_stream << "            writer.Int64(value);\n";
-        output_stream << "        }\n";
-        output_stream << "        else if constexpr (std::is_floating_point_v<Value_type>)\n";
-        output_stream << "        {\n";
-        output_stream << "            writer.Double(value);\n";
-        output_stream << "        }\n";
-        output_stream << "        else if constexpr (std::is_same_v<Value_type, std::string> || std::is_same_v<Value_type, std::pmr::string> || std::is_same_v<Value_type, std::string_view>)\n";
-        output_stream << "        {\n";
-        output_stream << "            writer.String(value.data(), value.size());\n";
-        output_stream << "        }\n";
-        output_stream << "        else if constexpr (std::is_same_v<Value_type, std::filesystem::path>)\n";
-        output_stream << "        {\n";
-        output_stream << "            std::string const path_string = value.generic_string();\n";
-        output_stream << "            writer.String(path_string.data(), path_string.size());\n";
-        output_stream << "        }\n";
-        output_stream << "        else if constexpr (std::is_enum_v<Value_type>)\n";
-        output_stream << "        {\n";
-        output_stream << "            {\n";
-        output_stream << "                std::string_view const enum_value_string = write_enum(value);\n";
-        output_stream << "                writer.String(enum_value_string.data(), enum_value_string.size());\n";
-        output_stream << "            }\n";
-        output_stream << "        }\n";
-        output_stream << "        else if constexpr (Is_optional_v<Value_type>)\n";
-        output_stream << "        {\n";
-        output_stream << "            if (value.has_value())\n";
-        output_stream << "            {\n";
-        output_stream << "                write_value(writer, value.value());\n";
-        output_stream << "            }\n";
-        output_stream << "            else\n";
-        output_stream << "            {\n";
-        output_stream << "                writer.Null();\n";
-        output_stream << "            }\n";
-        output_stream << "        }\n";
-        output_stream << "        else if constexpr (std::is_class_v<Value_type>)\n";
-        output_stream << "        {\n";
-        output_stream << "            write_object(writer, value);\n";
-        output_stream << "        }\n";
-        output_stream << "    }\n";
-        output_stream << "\n";
-        output_stream << "    export template <typename Writer_type, typename Value_type>\n";
-        output_stream << "        void write_object(\n";
-        output_stream << "            Writer_type& writer,\n";
-        output_stream << "            std::pmr::vector<Value_type> const& values\n";
-        output_stream << "        )\n";
-        output_stream << "    {\n";
-        output_stream << "        writer.StartObject();\n";
-        output_stream << "\n";
-        output_stream << "        writer.Key(\"size\");\n";
-        output_stream << "        writer.Uint64(values.size());\n";
-        output_stream << "\n";
-        output_stream << "        writer.Key(\"elements\");\n";
-        output_stream << "        writer.StartArray();\n";
-        output_stream << "        for (Value_type const& value : values)\n";
-        output_stream << "        {\n";
-        output_stream << "            write_value(writer, value);\n";
-        output_stream << "        }\n";
-        output_stream << "        writer.EndArray(values.size());\n";
-        output_stream << "\n";
-        output_stream << "        writer.EndObject();\n";
-        output_stream << "    }\n";
-        output_stream << "\n";
-        output_stream << "    export template <typename Writer_type, typename Value_type>\n";
-        output_stream << "        void write_optional(\n";
-        output_stream << "            Writer_type& writer,\n";
-        output_stream << "            char const* const key,\n";
-        output_stream << "            std::optional<Value_type> const& value\n";
-        output_stream << "        )\n";
-        output_stream << "    {\n";
-        output_stream << "        if (value.has_value())\n";
-        output_stream << "        {\n";
-        output_stream << "            writer.Key(key);\n";
-        output_stream << "            write_value(writer, value);\n";
-        output_stream << "        }\n";
-        output_stream << "    }\n";
-        output_stream << "\n";
-        output_stream << "    export template <typename Writer_type, typename Value_type>\n";
-        output_stream << "        void write_optional_object(\n";
-        output_stream << "            Writer_type& writer,\n";
-        output_stream << "            char const* const key,\n";
-        output_stream << "            std::optional<Value_type> const& value\n";
-        output_stream << "        )\n";
-        output_stream << "    {\n";
-        output_stream << "        if (value.has_value())\n";
-        output_stream << "        {\n";
-        output_stream << "            writer.Key(key);\n";
-        output_stream << "            write_object(writer, value.value());\n";
-        output_stream << "        }\n";
-        output_stream << "    }\n";
+        // Forward declare to_json for all structs
+        for (Struct const& struct_info : file_types.structs)
+        {
+            output_stream << "    export void to_json(nlohmann::json& j, " << struct_info.name << " const& output);\n";
+        }
         output_stream << "\n";
 
         std::pmr::unordered_map<std::pmr::string, Enum> const enum_map = create_name_map<Enum>(
@@ -1919,89 +1428,7 @@ namespace h::tools::code_generator
             output_stream << "\n";
         }
 
-        output_stream << "}\n";
-    }
-
-    void generate_json_operators_code(
-        std::istream& input_stream,
-        std::ostream& output_stream,
-        std::string_view const export_module_name,
-        std::string_view const namespace_name
-    )
-    {
-        File_types const file_types = identify_file_types(
-            input_stream
-        );
-
-        output_stream << "module;\n";
-        output_stream << '\n';
-        output_stream << "#include <filesystem>\n";
-        output_stream << "#include <istream>\n";
-        output_stream << "#include <optional>\n";
-        output_stream << "#include <ostream>\n";
-        output_stream << "\n";
-        output_stream << "#include <rapidjson/istreamwrapper.h>\n";
-        output_stream << "#include <rapidjson/ostreamwrapper.h>\n";
-        output_stream << "#include <rapidjson/reader.h>\n";
-        output_stream << "#include <rapidjson/writer.h>\n";
-        output_stream << '\n';
-        output_stream << "export module " << export_module_name << ";\n";
-        output_stream << '\n';
-        output_stream << "import h.core;\n";
-        output_stream << "import h.json_serializer;\n";
-        output_stream << '\n';
-        output_stream << "namespace " << namespace_name << '\n';
-        output_stream << "{\n";
-
-        for (Enum const& enum_type : file_types.enums)
-        {
-            output_stream << "    export std::istream& operator>>(std::istream& input_stream, " << enum_type.name << "& value)\n";
-            output_stream << "    {\n";
-            output_stream << "        std::pmr::string string;\n";
-            output_stream << "        input_stream >> string;\n";
-            output_stream << "\n";
-            output_stream << "        value = h::json::read_enum<" << enum_type.name << ">(string);\n";
-            output_stream << "\n";
-            output_stream << "        return input_stream;\n";
-            output_stream << "    }\n";
-            output_stream << "\n";
-            output_stream << "    export std::ostream& operator<<(std::ostream& output_stream, " << enum_type.name << " const value)\n";
-            output_stream << "    {\n";
-            output_stream << "        output_stream << h::json::write_enum(value);\n";
-            output_stream << "\n";
-            output_stream << "        return output_stream;\n";
-            output_stream << "    }\n";
-            output_stream << "\n";
-        }
-
-        for (Struct const& struct_type : file_types.structs)
-        {
-            output_stream << "    export std::istream& operator>>(std::istream& input_stream, " << struct_type.name << "& value)\n";
-            output_stream << "    {\n";
-            output_stream << "        rapidjson::Reader reader;\n";
-            output_stream << "        rapidjson::IStreamWrapper stream_wrapper{ input_stream };\n";
-            output_stream << "        std::optional<" << struct_type.name << "> const output = h::json::read<" << struct_type.name << ">(reader, stream_wrapper);\n";
-            output_stream << "\n";
-            output_stream << "        if (output)\n";
-            output_stream << "        {\n";
-            output_stream << "            value = std::move(*output);\n";
-            output_stream << "        }\n";
-            output_stream << "\n";
-            output_stream << "        return input_stream;\n";
-            output_stream << "    }\n";
-            output_stream << "\n";
-            output_stream << "    export std::ostream& operator<<(std::ostream& output_stream, " << struct_type.name << " const& value)\n";
-            output_stream << "    {\n";
-            output_stream << "        rapidjson::OStreamWrapper stream_wrapper{ output_stream };\n";
-            output_stream << "        rapidjson::Writer<rapidjson::OStreamWrapper> writer{ stream_wrapper };\n";
-            output_stream << "        h::json::write(writer, value);\n";
-            output_stream << "\n";
-            output_stream << "        return output_stream;\n";
-            output_stream << "    }\n";
-            output_stream << "\n";
-        }
-
-        output_stream << "}\n";
+        output_stream << "}\n";*/
     }
 
     void generate_json_data(
@@ -2013,75 +1440,36 @@ namespace h::tools::code_generator
             input_stream
         );
 
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer{ buffer };
+            nlohmann::json j;
 
-        writer.StartObject();
-        {
+            j["enums"] = nlohmann::json::array();
+            for (Enum const& enum_info : file_types.enums)
             {
-                writer.Key("enums");
-
-                writer.StartArray();
-                for (Enum const& enum_info : file_types.enums)
-                {
-                    writer.StartObject();
-                    {
-                        writer.Key("name");
-                        writer.String(enum_info.name.c_str());
-
-                        writer.Key("values");
-                        writer.StartArray();
-                        for (std::pmr::string const& value : enum_info.values)
-                        {
-                            writer.String(value.c_str());
-                        }
-                        writer.EndArray();
-                    }
-                    writer.EndObject();
-                }
-                writer.EndArray();
+                nlohmann::json enum_json;
+                enum_json["name"] = std::string{ enum_info.name };
+                enum_json["values"] = nlohmann::json::array();
+                for (std::pmr::string const& value : enum_info.values)
+                    enum_json["values"].push_back(std::string{ value });
+                j["enums"].push_back(std::move(enum_json));
             }
 
+            j["structs"] = nlohmann::json::array();
+            for (Struct const& struct_info : file_types.structs)
             {
-                writer.Key("structs");
-
-                writer.StartArray();
-                for (Struct const& struct_info : file_types.structs)
+                nlohmann::json struct_json;
+                struct_json["name"] = std::string{ struct_info.name };
+                struct_json["members"] = nlohmann::json::array();
+                for (Member const& member : struct_info.members)
                 {
-                    writer.StartObject();
-                    {
-                        writer.Key("name");
-                        writer.String(struct_info.name.c_str());
-
-                        writer.Key("members");
-                        writer.StartArray();
-                        for (Member const& member : struct_info.members)
-                        {
-                            writer.StartObject();
-                            {
-                                writer.Key("type");
-                                writer.StartObject();
-                                {
-                                    writer.Key("name");
-                                    writer.String(member.type.name.c_str());
-                                }
-                                writer.EndObject();
-
-                                writer.Key("name");
-                                writer.String(member.name.c_str());
-                            }
-                            writer.EndObject();
-                        }
-                        writer.EndArray();
-                    }
-                    writer.EndObject();
+                    nlohmann::json member_json;
+                    member_json["type"] = nlohmann::json{ {"name", std::string{ member.type.name }} };
+                    member_json["name"] = std::string{ member.name };
+                    struct_json["members"].push_back(std::move(member_json));
                 }
-                writer.EndArray();
+                j["structs"].push_back(std::move(struct_json));
             }
-        }
-        writer.EndObject();
 
-        output_stream << buffer.GetString();
+            output_stream << j;
     }
 
     std::pmr::string join(std::span<std::pmr::string const> const strings, std::string_view const delimiter)
@@ -3203,5 +2591,236 @@ namespace h::binary_serializer
         output_stream << "}\n";
 
         output_stream.flush();
+    }
+
+    void generate_serialize_json_code(
+        std::istream& input_stream,
+        std::ostream& output_stream
+    )
+    {
+        File_types const file_types = identify_file_types(
+            input_stream
+        );
+
+        std::string_view const initial_code = R"(module;
+
+#include "Generics.h"
+
+#include <compare>
+
+export module h.json_serializer.generated;
+
+//import h.json_serializer.generics;
+import h.core;
+
+namespace h::json
+{
+    export template <typename T>
+    JSON to_json(
+        T const& value
+    );
+
+    export template <typename T>
+    void from_json(
+        JSON const& data,
+        T& output
+    );
+
+)";
+
+        std::string_view const enum_template = R"(    export template <>
+    JSON to_json({} const& value)
+    {{
+        switch (value)
+        {{
+{}
+        }}
+    }}
+
+    export template <>
+    void from_json(JSON const& data, {}& output)
+    {{
+        std::string const& value = data.get<std::string>();
+{}
+    }}
+
+)";
+
+        std::string_view const function_template = R"(    export template <>
+    JSON to_json({} const& value)
+    {{
+        JSON data;
+{}
+        return data;
+    }}
+
+    export template <>
+    void from_json(JSON const& data, {}& value)
+    {{
+{}
+    }}
+
+)";
+
+        output_stream << initial_code;
+
+        for (Enum const& enum_info : file_types.enums)
+        {
+            std::pmr::string to_json_body;
+
+            for (std::size_t enum_value_index = 0; enum_value_index < enum_info.values.size(); ++enum_value_index)
+            {
+                std::string_view const enum_value = enum_info.values[enum_value_index];
+                to_json_body += std::format("            case {}::{}: return \"{}\";", enum_info.name, enum_value, enum_value);
+
+                if (enum_value_index + 1 < enum_info.values.size())
+                    to_json_body += '\n';
+            }
+            if (!enum_info.values.empty())
+                to_json_body += std::format("\n        default: return \"{}\";", enum_info.values[0]);
+
+            std::pmr::string from_json_body;
+
+            for (std::size_t enum_value_index = 0; enum_value_index < enum_info.values.size(); ++enum_value_index)
+            {
+                std::string_view const enum_value = enum_info.values[enum_value_index];
+                from_json_body += std::format("        if (value == \"{}\") {{ output = {}::{}; return; }}", enum_value, enum_info.name, enum_value);
+
+                if (enum_value_index + 1 < enum_info.values.size())
+                    from_json_body += '\n';
+            }
+            if (!enum_info.values.empty())
+                from_json_body += std::format("\n        output = {}::{};", enum_info.name, enum_info.values[0]);
+
+            std::string const output = std::vformat(enum_template, std::make_format_args(enum_info.name, to_json_body, enum_info.name, from_json_body));
+
+            output_stream << output;
+        }
+
+        for (Struct const& struct_info : file_types.structs)
+        {
+            std::pmr::string to_json_body;
+
+            for (std::size_t member_index = 0; member_index < struct_info.members.size(); ++member_index)
+            {
+                Member const& member = struct_info.members[member_index];
+                if (is_optional_type(member.type))
+                    to_json_body += std::format("        if (value.{}.has_value()) data[\"{}\"] = to_json(value.{});", member.name, member.name, member.name);
+                else
+                    to_json_body += std::format("        data[\"{}\"] = to_json(value.{});", member.name, member.name);
+
+                if (member_index + 1 < struct_info.members.size())
+                    to_json_body += '\n';
+            }
+
+            std::pmr::string from_json_body;
+
+            for (std::size_t member_index = 0; member_index < struct_info.members.size(); ++member_index)
+            {
+                Member const& member = struct_info.members[member_index];
+                if (is_optional_type(member.type) || is_vector_type(member.type))
+                    from_json_body += std::format("        if (data.contains(\"{}\")) from_json(data.at(\"{}\"), value.{});", member.name, member.name, member.name);
+                else
+                    from_json_body += std::format("        from_json(data.at(\"{}\"), value.{});", member.name, member.name);
+
+                if (member_index + 1 < struct_info.members.size())
+                    from_json_body += '\n';
+            }
+
+            std::string const output = std::vformat(function_template, std::make_format_args(struct_info.name, to_json_body, struct_info.name, from_json_body));
+
+            output_stream << output;
+        }
+
+        output_stream << "}\n";
+
+        output_stream.flush();
+    }
+
+    void generate_json_operators_code(
+        std::istream& input_stream,
+        std::ostream& output_stream
+    )
+    {
+        File_types const file_types = identify_file_types(
+            input_stream
+        );
+
+        std::string_view const initial_code = R"(module;
+
+#include "Generics.h"
+
+#include <compare>
+#include <variant>
+
+#include <nlohmann/json.hpp>
+
+export module h.json_serializer.operators;
+
+import h.json_serializer.generated;
+//import h.json_serializer.generics;
+import h.core;
+
+namespace h::json::operators
+{
+)";
+
+    std::string_view const enum_template = R"(
+        export std::istream& operator>>(std::istream& input_stream, {}& value)
+        {{
+            JSON data{{}};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }}
+
+        export std::ostream& operator<<(std::ostream& output_stream, {} const value)
+        {{
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }}
+)";
+
+    std::string_view const struct_template = R"(
+        export std::istream& operator>>(std::istream& input_stream, {}& value)
+        {{
+            JSON data{{}};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }}
+
+        export std::ostream& operator<<(std::ostream& output_stream, {} const& value)
+        {{
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }}
+)";
+
+        output_stream << initial_code;
+
+        for (Enum const& enum_type : file_types.enums)
+        {
+            std::string const output = std::vformat(enum_template, std::make_format_args(enum_type.name, enum_type.name));
+            output_stream << output;
+        }
+
+        for (Struct const& struct_type : file_types.structs)
+        {
+            std::string const output = std::vformat(struct_template, std::make_format_args(struct_type.name, struct_type.name));
+            output_stream << output;
+        }
+
+        output_stream << "}\n";
     }
 }

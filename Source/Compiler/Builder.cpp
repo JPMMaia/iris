@@ -504,7 +504,7 @@ namespace h::compiler
         {
             std::filesystem::path const output_module_json_filename = std::format("{}.hlb.json", header_module_name);
             std::filesystem::path const output_module_json_path = get_hl_build_directory(build_directory_path) / output_module_json_filename;
-            h::json::write<h::Module>(output_module_json_path, *header_module);
+            h::json::write_module_to_file(output_module_json_path, *header_module);
         }
 
         return header_module.value();
@@ -1122,7 +1122,7 @@ namespace h::compiler
             {
                 std::filesystem::path const output_module_json_filename = std::format("{}.hlb.json", module_name.value());
                 std::filesystem::path const output_module_json_path = get_hl_build_directory(builder.build_directory_path) / output_module_json_filename;
-                h::json::write<h::Module>(output_module_json_path, core_module.value());
+                h::json::write_module_to_file(output_module_json_path, core_module.value());
             }
 
             core_modules[index] = std::move(core_module.value());

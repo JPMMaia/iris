@@ -1,12 +1,4 @@
-#include <algorithm>
-#include <compare>
-#include <filesystem>
-#include <span>
-#include <stdexcept>
-#include <string_view>
-#include <system_error>
-#include <variant>
-#include <vector>
+#include <iosfwd>
 
 import h.common;
 import h.common.filesystem;
@@ -18,7 +10,9 @@ import h.json_serializer.operators;
 
 using h::json::operators::operator<<;
 
-#include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
+
+import std;
 
 namespace h::c
 {

@@ -5,23 +5,16 @@ target_compile_features(H_JSON_serializer PUBLIC cxx_std_23)
 
 target_link_libraries(H_JSON_serializer PUBLIC H::Core)
 
-find_package(RapidJSON CONFIG REQUIRED)
-
-if(WIN32)
-    target_link_libraries(H_JSON_serializer PRIVATE rapidjson)
-else()
-    target_link_libraries(H_JSON_serializer PRIVATE RapidJSON)
-endif()
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(H_JSON_serializer PRIVATE nlohmann_json::nlohmann_json)
 
 target_sources(H_JSON_serializer
     PUBLIC FILE_SET modules TYPE CXX_MODULES
         FILES
+            "Generated.cppm"
+            #"Generics.cppm"
             "JSON_serializer.cppm"
-            "Read_handler.cppm"
             "Operators.cppm"
-            "Read_json.cppm"
-            "Read_header_handler.cppm"
-            "Write_json.cppm"
 )
 
 
@@ -42,45 +35,22 @@ endif()
 set(H_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}/../../")
 
 add_custom_command(
-    OUTPUT "${H_ROOT_DIR}/Source/JSON_serializer/Read_json.cppm"
+    OUTPUT "${H_ROOT_DIR}/Source/JSON_serializer/Generated.cppm"
     COMMAND H_Tools_Generate_JSON
                 ARGS
-                "read"
-                "h.json_serializer.read_json"
-                "h::json"
-                "h.core"
+                "serialize_json_code"
                 "${H_ROOT_DIR}/Source/Core/Core.cppm"
-                "${H_ROOT_DIR}/Source/JSON_serializer/Read_json.cppm"
+                "${H_ROOT_DIR}/Source/JSON_serializer/Generated.cppm"
     DEPENDS H_Tools_Generate_JSON "${H_ROOT_DIR}/Source/Core/Core.cppm"
     VERBATIM
 )
-add_custom_target(Generate_json_serializer_read_code DEPENDS "${H_ROOT_DIR}/Source/JSON_serializer/Read_json.cppm")
-
-
-add_custom_command(
-    OUTPUT "${H_ROOT_DIR}/Source/JSON_serializer/Write_json.cppm"
-    COMMAND H_Tools_Generate_JSON
-                ARGS
-                "write"
-                "h.json_serializer.write_json"
-                "h::json"
-                "h.core"
-                "${H_ROOT_DIR}/Source/Core/Core.cppm"
-                "${H_ROOT_DIR}/Source/JSON_serializer/Write_json.cppm"
-    DEPENDS H_Tools_Generate_JSON "${H_ROOT_DIR}/Source/Core/Core.cppm"
-    VERBATIM
-)
-add_custom_target(Generate_json_serializer_write_code DEPENDS "${H_ROOT_DIR}/Source/JSON_serializer/Write_json.cppm")
-
+add_custom_target(Generate_json_serializer_generated DEPENDS "${H_ROOT_DIR}/Source/JSON_serializer/Generated.cppm")
 
 add_custom_command(
     OUTPUT "${H_ROOT_DIR}/Source/JSON_serializer/Operators.cppm"
     COMMAND H_Tools_Generate_JSON
                 ARGS
                 "operators"
-                "h.json_serializer.operators"
-                "h::json::operators"
-                "h.core"
                 "${H_ROOT_DIR}/Source/Core/Core.cppm"
                 "${H_ROOT_DIR}/Source/JSON_serializer/Operators.cppm"
     DEPENDS H_Tools_Generate_JSON "${H_ROOT_DIR}/Source/Core/Core.cppm"
@@ -88,4 +58,4 @@ add_custom_command(
 )
 add_custom_target(Generate_json_serializer_operators_code DEPENDS "${H_ROOT_DIR}/Source/JSON_serializer/Operators.cppm")
 
-add_custom_target(Generate_json_serializer_code DEPENDS Generate_json_serializer_read_code Generate_json_serializer_write_code Generate_json_serializer_operators_code)
+add_custom_target(Generate_json_serializer_code DEPENDS Generate_json_serializer_generated Generate_json_serializer_operators_code)

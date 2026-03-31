@@ -1,10 +1,9 @@
+#include <cstddef>
 #include <memory_resource>
 #include <string>
 #include <variant>
 
-#include <rapidjson/reader.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
+#include <nlohmann/json.hpp>
 
 import h.core;
 import h.core.types;
@@ -17,6 +16,25 @@ using h::json::operators::operator<<;
 
 namespace h
 {
+    template <typename Variant, typename T>
+    struct index_of;
+
+    template <typename T, typename ...Ts>
+    struct index_of<std::variant<Ts...>, T> {
+        static constexpr std::size_t value = [] {
+            std::size_t i = 0;
+            for (bool match : {std::is_same_v<T, Ts>...})
+            {
+                if (match) return i;
+                ++i;
+            }
+            return std::size_t(-1);
+        }();
+    };
+
+    template <typename Variant, typename T>
+    inline constexpr std::size_t index_of_v = index_of<Variant, T>::value;
+
     TEST_CASE("Read Language_version")
     {
         std::pmr::string const json_data = R"JSON(
@@ -34,9 +52,7 @@ namespace h
             .patch = 3,
         };
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<Language_version> const output = h::json::read<Language_version>(reader, input_stream);
+        std::optional<Language_version> const output = h::json::read<Language_version>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -53,35 +69,32 @@ namespace h
             .patch = 3,
         };
 
-        std::string const expected = "{\"major\":1,\"minor\":2,\"patch\":3}";
+        std::pmr::string const expected = "{\"major\":1,\"minor\":2,\"patch\":3}";
 
-        rapidjson::StringBuffer output_stream;
-        rapidjson::Writer<rapidjson::StringBuffer> writer{ output_stream };
-        h::json::write(writer, input);
+        std::pmr::string const actual = h::json::write(input);
 
-        std::string const actual = output_stream.GetString();
         CHECK(actual == expected);
     }
 
     TEST_CASE("Read Type_reference with Fundamental_type")
     {
-        std::pmr::string const json_data = R"JSON(
-            {
-                "data": {
-                    "type": "Fundamental_type",
+        std::string const json_data = std::format(R"JSON(
+            {{
+                "data": {{
+                    "index": {},
                     "value": "Byte"
-                }
-            }
-        )JSON";
+                }}
+            }}
+)JSON",
+            index_of_v<Type_reference::Data_type, Fundamental_type>
+        );
 
         Type_reference const expected
         {
             .data = Fundamental_type::Byte
         };
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<Type_reference> const output = h::json::read<Type_reference>(reader, input_stream);
+        std::optional<Type_reference> const output = h::json::read<Type_reference>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -96,31 +109,33 @@ namespace h
             .data = Fundamental_type::Byte
         };
 
-        std::string const expected = "{\"data\":{\"type\":\"Fundamental_type\",\"value\":\"Byte\"}}";
+        std::pmr::string const expected = std::pmr::string{std::format(
+            "{{\"data\":{{\"index\":{},\"value\":\"Byte\"}}}}",
+            index_of_v<Type_reference::Data_type, Fundamental_type>
+        )};
 
-        rapidjson::StringBuffer output_stream;
-        rapidjson::Writer<rapidjson::StringBuffer> writer{ output_stream };
-        h::json::write(writer, input);
+        std::pmr::string const actual = h::json::write(input);
 
-        std::string const actual = output_stream.GetString();
         CHECK(actual == expected);
     }
 
     TEST_CASE("Read Type_reference with Custom_type_reference")
     {
-        std::pmr::string const json_data = R"JSON(
-            {
-                "data": {
-                    "type": "Custom_type_reference",
-                    "value": {
-                        "module_reference": {
+        std::string const json_data = std::format(R"JSON(
+            {{
+                "data": {{
+                    "index": {},
+                    "value": {{
+                        "module_reference": {{
                             "name": "module_foo"
-                        },
+                        }},
                         "name": "custom_name"
-                    }
-                }
-            }
-        )JSON";
+                    }}
+                }}
+            }}
+)JSON",
+            index_of_v<Type_reference::Data_type, Custom_type_reference>
+        );
 
         Type_reference const expected
         {
@@ -133,9 +148,7 @@ namespace h
             }
         };
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<Type_reference> const output = h::json::read<Type_reference>(reader, input_stream);
+        std::optional<Type_reference> const output = h::json::read<Type_reference>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -156,13 +169,13 @@ namespace h
             }
         };
 
-        std::string const expected = "{\"data\":{\"type\":\"Custom_type_reference\",\"value\":{\"module_reference\":{\"name\":\"module_foo\"},\"name\":\"custom_name\"}}}";
+        std::pmr::string const expected = std::pmr::string{std::format(
+            "{{\"data\":{{\"index\":{},\"value\":{{\"module_reference\":{{\"name\":\"module_foo\"}},\"name\":\"custom_name\"}}}}}}",
+            index_of_v<Type_reference::Data_type, Custom_type_reference>
+        )};
 
-        rapidjson::StringBuffer output_stream;
-        rapidjson::Writer<rapidjson::StringBuffer> writer{ output_stream };
-        h::json::write(writer, input);
+        std::pmr::string const actual = h::json::write(input);
 
-        std::string const actual = output_stream.GetString();
         CHECK(actual == expected);
     }
 
@@ -187,9 +200,7 @@ namespace h
             .additional_operation = Binary_operation::Add
         };
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<Assignment_expression> const output = h::json::read<Assignment_expression>(reader, input_stream);
+        std::optional<Assignment_expression> const output = h::json::read<Assignment_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -206,13 +217,10 @@ namespace h
             .additional_operation = Binary_operation::Add
         };
 
-        std::string const expected = "{\"left_hand_side\":{\"expression_index\":1},\"right_hand_side\":{\"expression_index\":2},\"additional_operation\":\"Add\"}";
+        std::pmr::string const expected = "{\"additional_operation\":\"Add\",\"left_hand_side\":{\"expression_index\":1},\"right_hand_side\":{\"expression_index\":2}}";
 
-        rapidjson::StringBuffer output_stream;
-        rapidjson::Writer<rapidjson::StringBuffer> writer{ output_stream };
-        h::json::write(writer, input);
+        std::pmr::string const actual = h::json::write(input);
 
-        std::string const actual = output_stream.GetString();
         CHECK(actual == expected);
     }
 
@@ -236,9 +244,7 @@ namespace h
             .additional_operation = std::nullopt
         };
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<Assignment_expression> const output = h::json::read<Assignment_expression>(reader, input_stream);
+        std::optional<Assignment_expression> const output = h::json::read<Assignment_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -255,106 +261,109 @@ namespace h
             .additional_operation = std::nullopt
         };
 
-        std::string const expected = "{\"left_hand_side\":{\"expression_index\":1},\"right_hand_side\":{\"expression_index\":2}}";
+        std::pmr::string const expected = "{\"left_hand_side\":{\"expression_index\":1},\"right_hand_side\":{\"expression_index\":2}}";
 
-        rapidjson::StringBuffer output_stream;
-        rapidjson::Writer<rapidjson::StringBuffer> writer{ output_stream };
-        h::json::write(writer, input);
+        std::pmr::string const actual = h::json::write(input);
 
-        std::string const actual = output_stream.GetString();
         CHECK(actual == expected);
     }
 
     TEST_CASE("Read If_expression")
     {
-        std::pmr::string const json_data = R"JSON(
-            {
-                "series": {
+        std::string const json_data = std::format(R"JSON(
+            {{
+                "series": {{
                     "size": 2,
                     "elements": [
-                        {
-                            "condition": {
-                                "expressions": {
+                        {{
+                            "condition": {{
+                                "expressions": {{
                                     "size": 1,
                                     "elements": [
-                                        {
-                                            "data": {
-                                                "type": "Variable_expression",
-                                                "value": {
+                                        {{
+                                            "data": {{
+                                                "index": {},
+                                                "value": {{
                                                     "name": "some_boolean"
-                                                }
-                                            }
-                                        }
+                                                }}
+                                            }}
+                                        }}
                                     ]
-                                }
-                            },
-                            "then_statements": {
+                                }}
+                            }},
+                            "then_statements": {{
                                 "size": 1,
                                 "elements": [
-                                    {
-                                        "expressions": {
+                                    {{
+                                        "expressions": {{
                                             "size": 2,
                                             "elements": [
-                                                {
-                                                    "data": {
-                                                        "type": "Return_expression",
-                                                        "value": {
-                                                            "expression": {
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
+                                                            "expression": {{
                                                                 "expression_index": 1
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "data": {
-                                                        "type": "Variable_expression",
-                                                        "value": {
+                                                            }}
+                                                        }}
+                                                    }}
+                                                }},
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
                                                             "name": "value"
-                                                        }
-                                                    }
-                                                }
+                                                        }}
+                                                    }}
+                                                }}
                                             ]
-                                        }
-                                    }
+                                        }}
+                                    }}
                                 ]
-                            }
-                        },
-                        {
-                            "then_statements": {
+                            }}
+                        }},
+                        {{
+                            "then_statements": {{
                                 "size": 1,
                                 "elements": [
-                                    {
-                                        "expressions": {
+                                    {{
+                                        "expressions": {{
                                             "size": 2,
                                             "elements": [
-                                                {
-                                                    "data": {
-                                                        "type": "Return_expression",
-                                                        "value": {
-                                                            "expression": {
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
+                                                            "expression": {{
                                                                 "expression_index": 3
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "data": {
-                                                        "type": "Variable_expression",
-                                                        "value": {
+                                                            }}
+                                                        }}
+                                                    }}
+                                                }},
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
                                                             "name": "value"
-                                                        }
-                                                    }
-                                                }
+                                                        }}
+                                                    }}
+                                                }}
                                             ]
-                                        }
-                                    }
+                                        }}
+                                    }}
                                 ]
-                            }
-                        }
+                            }}
+                        }}
                     ]
-                }
-            }
-        )JSON";
+                }}
+            }}
+)JSON",
+        index_of_v<Expression::Data_type, Variable_expression>,
+        index_of_v<Expression::Data_type, Return_expression>,
+        index_of_v<Expression::Data_type, Variable_expression>,
+        index_of_v<Expression::Data_type, Return_expression>,
+        index_of_v<Expression::Data_type, Variable_expression>
+    );
 
         std::pmr::vector<Condition_statement_pair> expected_series
         {
@@ -430,9 +439,7 @@ namespace h
             .series = std::move(expected_series)
         };
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<If_expression> const output = h::json::read<If_expression>(reader, input_stream);
+        std::optional<If_expression> const output = h::json::read<If_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -516,13 +523,17 @@ namespace h
             .series = std::move(input_series)
         };
 
-        std::string const expected = "{\"series\":{\"size\":2,\"elements\":[{\"condition\":{\"expressions\":{\"size\":1,\"elements\":[{\"data\":{\"type\":\"Variable_expression\",\"value\":{\"name\":\"some_boolean\"}}}]}},\"then_statements\":{\"size\":1,\"elements\":[{\"expressions\":{\"size\":2,\"elements\":[{\"data\":{\"type\":\"Return_expression\",\"value\":{\"expression\":{\"expression_index\":1}}}},{\"data\":{\"type\":\"Variable_expression\",\"value\":{\"name\":\"value\"}}}]}}]}},{\"then_statements\":{\"size\":1,\"elements\":[{\"expressions\":{\"size\":2,\"elements\":[{\"data\":{\"type\":\"Return_expression\",\"value\":{\"expression\":{\"expression_index\":3}}}},{\"data\":{\"type\":\"Variable_expression\",\"value\":{\"name\":\"value\"}}}]}}]}}]}}";
+        std::pmr::string const expected = std::pmr::string{std::format(
+            "{{\"series\":{{\"elements\":[{{\"condition\":{{\"expressions\":{{\"elements\":[{{\"data\":{{\"index\":{},\"value\":{{\"name\":\"some_boolean\"}}}}}}],\"size\":1}}}},\"then_statements\":{{\"elements\":[{{\"expressions\":{{\"elements\":[{{\"data\":{{\"index\":{},\"value\":{{\"expression\":{{\"expression_index\":1}}}}}}}},{{\"data\":{{\"index\":{},\"value\":{{\"name\":\"value\"}}}}}}],\"size\":2}}}}],\"size\":1}}}},{{\"then_statements\":{{\"elements\":[{{\"expressions\":{{\"elements\":[{{\"data\":{{\"index\":{},\"value\":{{\"expression\":{{\"expression_index\":3}}}}}}}},{{\"data\":{{\"index\":{},\"value\":{{\"name\":\"value\"}}}}}}],\"size\":2}}}}],\"size\":1}}}}],\"size\":2}}}}",
+            index_of_v<Expression::Data_type, Variable_expression>,
+            index_of_v<Expression::Data_type, Return_expression>,
+            index_of_v<Expression::Data_type, Variable_expression>,
+            index_of_v<Expression::Data_type, Return_expression>,
+            index_of_v<Expression::Data_type, Variable_expression>
+        )};
 
-        rapidjson::StringBuffer output_stream;
-        rapidjson::Writer<rapidjson::StringBuffer> writer{ output_stream };
-        h::json::write(writer, input);
+        std::pmr::string const actual = h::json::write(input);
 
-        std::string const actual = output_stream.GetString();
         CHECK(actual == expected);
     }
 
@@ -540,9 +551,7 @@ namespace h
             .name = "variable_name"
         };
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<Variable_expression> const output = h::json::read<Variable_expression>(reader, input_stream);
+        std::optional<Variable_expression> const output = h::json::read<Variable_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -586,9 +595,7 @@ namespace h
             .operation = Binary_operation::Subtract
         };
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<Binary_expression> const output = h::json::read<Binary_expression>(reader, input_stream);
+        std::optional<Binary_expression> const output = h::json::read<Binary_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -637,9 +644,7 @@ namespace h
             .arguments = std::move(arguments)
         };
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<Call_expression> const output = h::json::read<Call_expression>(reader, input_stream);
+        std::optional<Call_expression> const output = h::json::read<Call_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -721,91 +726,96 @@ namespace h
 
     TEST_CASE("Read Function_declaration")
     {
-        std::pmr::string const json_data = R"JSON(
-            {
+        std::string const json_data = std::format(R"JSON(
+            {{
                 "name": "Add",
-                "type": {
-                    "input_parameter_types": {
+                "type": {{
+                    "input_parameter_types": {{
                         "size": 2,
                         "elements": [
-                            {
-                                "data": {
-                                    "type": "Fundamental_type",
+                            {{
+                                "data": {{
+                                    "index": {},
                                     "value": "Byte"
-                                }
-                            },
-                            {
-                                "data": {
-                                    "type": "Fundamental_type",
+                                }}
+                            }},
+                            {{
+                                "data": {{
+                                    "index": {},
                                     "value": "Byte"
-                                }
-                            }
+                                }}
+                            }}
                         ]
-                    },
-                    "output_parameter_types": {
+                    }},
+                    "output_parameter_types": {{
                         "size": 1,
                         "elements": [
-                            {
-                                "data": {
-                                    "type": "Fundamental_type",
+                            {{
+                                "data": {{
+                                    "index": {},
                                     "value": "Byte"
-                                }
-                            }
+                                }}
+                            }}
                         ]            
-                    },
+                    }},
                     "is_variadic": false
-                },
-                "input_parameter_names": {
+                }},
+                "input_parameter_names": {{
                     "size": 2,
                     "elements": [
                         "lhs", "rhs"
                     ]
-                },
-                "output_parameter_names": {
+                }},
+                "output_parameter_names": {{
                     "size": 1,
                     "elements": [
                         "sum"
                     ]
-                },
+                }},
                 "linkage": "External",
-                "source_location": {
-                    "range": {
-                        "start": {
+                "source_location": {{
+                    "range": {{
+                        "start": {{
                             "line": 2,
                             "column": 6
-                        },
-                        "end": {
+                        }},
+                        "end": {{
                             "line": 4,
                             "column": 2
-                        }
-                    }
-                },
-                "input_parameter_source_positions": {
+                        }}
+                    }}
+                }},
+                "input_parameter_source_positions": {{
                     "size": 1,
                     "elements": [
-                        {
+                        {{
                             "line": 3,
                             "column": 22
-                        }
+                        }}
                     ]
-                },
-                "output_parameter_source_positions": {
+                }},
+                "output_parameter_source_positions": {{
                     "size": 1,
                     "elements": [
-                        {
+                        {{
                             "line": 3,
                             "column": 38
-                        }
+                        }}
                     ]
-                }
-            }
-        )JSON";
+                }},
+                "is_test": false,
+                "preconditions": {{"size": 0, "elements": []}},
+                "postconditions": {{"size": 0, "elements": []}}
+            }}
+)JSON",
+            index_of_v<Type_reference::Data_type, Fundamental_type>,
+            index_of_v<Type_reference::Data_type, Fundamental_type>,
+            index_of_v<Type_reference::Data_type, Fundamental_type>
+        );
 
         h::Function_declaration const expected = create_expected_function_declaration();
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<h::Function_declaration> const output = h::json::read<h::Function_declaration>(reader, input_stream);
+        std::optional<h::Function_declaration> const output = h::json::read<h::Function_declaration>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -817,13 +827,10 @@ namespace h
     {
         h::Function_declaration const input = {};
 
-        std::string const expected = "{\"name\":\"\",\"type\":{\"input_parameter_types\":{\"size\":0,\"elements\":[]},\"output_parameter_types\":{\"size\":0,\"elements\":[]},\"is_variadic\":false},\"input_parameter_names\":{\"size\":0,\"elements\":[]},\"output_parameter_names\":{\"size\":0,\"elements\":[]},\"linkage\":\"External\",\"is_test\":false,\"preconditions\":{\"size\":0,\"elements\":[]},\"postconditions\":{\"size\":0,\"elements\":[]}}";
+        std::pmr::string const expected = "{\"input_parameter_names\":{\"elements\":[],\"size\":0},\"is_test\":false,\"linkage\":\"External\",\"name\":\"\",\"output_parameter_names\":{\"elements\":[],\"size\":0},\"postconditions\":{\"elements\":[],\"size\":0},\"preconditions\":{\"elements\":[],\"size\":0},\"type\":{\"input_parameter_types\":{\"elements\":[],\"size\":0},\"is_variadic\":false,\"output_parameter_types\":{\"elements\":[],\"size\":0}}}";
 
-        rapidjson::StringBuffer output_stream;
-        rapidjson::Writer<rapidjson::StringBuffer> writer{ output_stream };
-        h::json::write(writer, input);
+        std::pmr::string const actual = h::json::write(input);
 
-        std::string const actual = output_stream.GetString();
         CHECK(actual == expected);
     }
 
@@ -883,70 +890,73 @@ namespace h
 
     TEST_CASE("Read Function_definition")
     {
-        std::pmr::string const json_data = R"JSON(
-        {
+        std::string const json_data = std::format(R"JSON(
+        {{
             "name": "Add",
-            "statements": {
+            "statements": {{
                 "size": 1,
                 "elements": [
-                    {
-                        "expressions": {
+                    {{
+                        "expressions": {{
                             "size": 4,
                             "elements": 
                             [
-                                {
-                                    "data": {
-                                        "type": "Variable_expression",
-                                        "value": {
+                                {{
+                                    "data": {{
+                                        "index": {},
+                                        "value": {{
                                             "name": "lhs"
-                                        }
-                                    }
-                                },
-                                {
-                                    "data": {
-                                        "type": "Variable_expression",
-                                        "value": {
+                                        }}
+                                    }}
+                                }},
+                                {{
+                                    "data": {{
+                                        "index": {},
+                                        "value": {{
                                             "name": "rhs"
-                                        }
-                                    }
-                                },
-                                {
-                                    "data": {
-                                        "type": "Binary_expression",
-                                        "value": {
-                                            "left_hand_side": {
+                                        }}
+                                    }}
+                                }},
+                                {{
+                                    "data": {{
+                                        "index": {},
+                                        "value": {{
+                                            "left_hand_side": {{
                                                 "expression_index": 0
-                                            },
-                                            "right_hand_side": {
+                                            }},
+                                            "right_hand_side": {{
                                                 "expression_index": 1
-                                            },
+                                            }},
                                             "operation": "Add"
-                                        }
-                                    }
-                                },
-                                {
-                                    "data": {
-                                        "type": "Return_expression",
-                                        "value": {
-                                            "expression": {
+                                        }}
+                                    }}
+                                }},
+                                {{
+                                    "data": {{
+                                        "index": {},
+                                        "value": {{
+                                            "expression": {{
                                                 "expression_index": 2
-                                            }
-                                        }
-                                    }
-                                }
+                                            }}
+                                        }}
+                                    }}
+                                }}
                             ]
-                        }
-                    }
+                        }}
+                    }}
                 ]
-            }
-        }
-        )JSON";
+            }}
+        }}
+)JSON",
+            index_of_v<Expression::Data_type, Variable_expression>,
+            index_of_v<Expression::Data_type, Variable_expression>,
+            index_of_v<Expression::Data_type, Binary_expression>,
+            index_of_v<Expression::Data_type, Return_expression>
+        );
 
         h::Function_definition const expected = create_expected_function_definition();
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<h::Function_definition> const output = h::json::read<h::Function_definition>(reader, input_stream);
+        std::optional<h::Function_definition> const output = h::json::read<h::Function_definition>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -998,193 +1008,201 @@ namespace h
 
     TEST_CASE("Read Module")
     {
-        std::pmr::string const json_data = R"JSON(
-        {
-            "language_version": {
+        std::string const json_data = std::format(R"JSON(
+        {{
+            "language_version": {{
                 "major": 1,
                 "minor": 2,
                 "patch": 3
-            },
+            }},
             "name": "module_name",
             "content_hash": 12089789297091071925,
-            "dependencies": {
-                "alias_imports": {
+            "dependencies": {{
+                "alias_imports": {{
                     "size": 1,
                     "elements": [
-                        {
+                        {{
                             "module_name": "C.Standard_library",
                             "alias": "Cstl",
-                            "usages": {
+                            "usages": {{
                                 "size": 1,
                                 "elements": [
                                     "puts"
                                 ]
-                            }
-                        }
+                            }}
+                        }}
                     ]
-                }
-            },
-            "export_declarations": {
-                "function_declarations": {
+                }}
+            }},
+            "export_declarations": {{
+                "function_declarations": {{
                     "size": 1,
                     "elements": [
-                        {
+                        {{
                             "name": "Add",
-                            "type": {
-                                "input_parameter_types": {
+                            "type": {{
+                                "input_parameter_types": {{
                                     "size": 2,
                                     "elements": [
-                                        {
-                                            "data": {
-                                                "type": "Fundamental_type",
+                                        {{
+                                            "data": {{
+                                                "index": {},
                                                 "value": "Byte"
-                                            }
-                                        },
-                                        {
-                                            "data": {
-                                                "type": "Fundamental_type",
+                                            }}
+                                        }},
+                                        {{
+                                            "data": {{
+                                                "index": {},
                                                 "value": "Byte"
-                                            }
-                                        }
+                                            }}
+                                        }}
                                     ]
-                                },
-                                "output_parameter_types": {
+                                }},
+                                "output_parameter_types": {{
                                     "size": 1,
                                     "elements": [
-                                        {
-                                            "data": {
-                                                "type": "Fundamental_type",
+                                        {{
+                                            "data": {{
+                                                "index": {},
                                                 "value": "Byte"
-                                            }
-                                        }
+                                            }}
+                                        }}
                                     ]
-                                },
+                                }},
                                 "is_variadic": false
-                            },
-                            "input_parameter_names": {
+                            }},
+                            "input_parameter_names": {{
                                 "size": 2,
                                 "elements": [
                                     "lhs", "rhs"
                                 ]
-                            },
-                            "output_parameter_names": {
+                            }},
+                            "output_parameter_names": {{
                                 "size": 1,
                                 "elements": [
                                     "sum"
                                 ]
-                            },
+                            }},
                             "linkage": "External",
-                            "source_location": {
-                                "range": {
-                                    "start": {
+                            "source_location": {{
+                                "range": {{
+                                    "start": {{
                                         "line": 2,
                                         "column": 6
-                                    },
-                                    "end": {
+                                    }},
+                                    "end": {{
                                         "line": 4,
                                         "column": 2
-                                    }
-                                }
-                            },
-                            "input_parameter_source_positions": {
+                                    }}
+                                }}
+                            }},
+                            "input_parameter_source_positions": {{
                                 "size": 1,
                                 "elements": [
-                                    {
+                                    {{
                                         "line": 3,
                                         "column": 22
-                                    }
+                                    }}
                                 ]
-                            },
-                            "output_parameter_source_positions": {
+                            }},
+                            "output_parameter_source_positions": {{
                                 "size": 1,
                                 "elements": [
-                                    {
+                                    {{
                                         "line": 3,
                                         "column": 38
-                                    }
+                                    }}
                                 ]
-                            }
-                        }
+                            }},
+                            "is_test": false
+                        }}
                     ]
-                }
-            },
-            "internal_declarations": {
-                "function_declarations": {
+                }}
+            }},
+            "internal_declarations": {{
+                "function_declarations": {{
                     "size": 0,
                     "elements": []
-                }
-            },
-            "definitions": {
-                "function_definitions": {
+                }}
+            }},
+            "instanced_declarations": {{}},
+            "definitions": {{
+                "function_definitions": {{
                     "size": 1,
                     "elements": [
-                        {
+                        {{
                             "name": "Add",
-                            "statements": {
+                            "statements": {{
                                 "size": 1,
                                 "elements": [
-                                    {
-                                        "expressions": {
+                                    {{
+                                        "expressions": {{
                                             "size": 4,
                                             "elements": 
                                             [
-                                                {
-                                                    "data": {
-                                                        "type": "Variable_expression",
-                                                        "value": {
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
                                                             "name": "lhs"
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "data": {
-                                                        "type": "Variable_expression",
-                                                        "value": {
+                                                        }}
+                                                    }}
+                                                }},
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
                                                             "name": "rhs"
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "data": {
-                                                        "type": "Binary_expression",
-                                                        "value": {
-                                                            "left_hand_side": {
+                                                        }}
+                                                    }}
+                                                }},
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
+                                                            "left_hand_side": {{
                                                                 "expression_index": 0
-                                                            },
-                                                            "right_hand_side": {
+                                                            }},
+                                                            "right_hand_side": {{
                                                                 "expression_index": 1
-                                                            },
+                                                            }},
                                                             "operation": "Add"
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "data": {
-                                                        "type": "Return_expression",
-                                                        "value": {
-                                                            "expression": {
+                                                        }}
+                                                    }}
+                                                }},
+                                                {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
+                                                            "expression": {{
                                                                 "expression_index": 2
-                                                            }
-                                                        }
-                                                    }
-                                                }
+                                                            }}
+                                                        }}
+                                                    }}
+                                                }}
                                             ]
-                                        }
-                                    }
+                                        }}
+                                    }}
                                 ]
-                            }
-                        }
+                            }}
+                        }}
                     ]
-                }
-            }
-        }
-        )JSON";
+                }}
+            }}
+        }}
+)JSON",
+            index_of_v<Type_reference::Data_type, Fundamental_type>,
+            index_of_v<Type_reference::Data_type, Fundamental_type>,
+            index_of_v<Type_reference::Data_type, Fundamental_type>,
+            index_of_v<Expression::Data_type, Variable_expression>,
+            index_of_v<Expression::Data_type, Variable_expression>,
+            index_of_v<Expression::Data_type, Binary_expression>,
+            index_of_v<Expression::Data_type, Return_expression>
+        );
 
         h::Module const expected = create_expected_module();
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<h::Module> const output = h::json::read<h::Module>(reader, input_stream);
+        std::optional<h::Module> const output = h::json::read<h::Module>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -1250,142 +1268,152 @@ namespace h
 
     TEST_CASE("Read Struct_declaration")
     {
-        std::pmr::string const json_data = R"JSON(
-            {
+        std::string const json_data = std::format(R"JSON(
+            {{
                 "name": "My_struct",
-                "member_names": {
+                "member_names": {{
                     "size": 3,
                     "elements": [
                         "first",
                         "second",
                         "third"
                     ]
-                },
-                "member_types": {
+                }},
+                "member_types": {{
                     "size": 3,
                     "elements": [
-                        {
-                            "data": {
-                                "type": "Integer_type",
-                                "value": {
+                        {{
+                            "data": {{
+                                "index": {},
+                                "value": {{
                                     "number_of_bits": 32,
                                     "is_signed": false
-                                }
-                            }
-                        },
-                        {
-                            "data": {
-                                "type": "Integer_type",
-                                "value": {
+                                }}
+                            }}
+                        }},
+                        {{
+                            "data": {{
+                                "index": {},
+                                "value": {{
                                     "number_of_bits": 32,
                                     "is_signed": false
-                                }
-                            }
-                        },
-                        {
-                            "data": {
-                                "type": "Integer_type",
-                                "value": {
+                                }}
+                            }}
+                        }},
+                        {{
+                            "data": {{
+                                "index": {},
+                                "value": {{
                                     "number_of_bits": 32,
                                     "is_signed": false
-                                }
-                            }
-                        }
+                                }}
+                            }}
+                        }}
                     ]
-                },
-                "member_bit_fields": {
+                }},
+                "member_bit_fields": {{
                     "size": 3,
                     "elements": [
                         24,
                         8,
                         null
                     ]
-                },
-                "member_default_values": {
+                }},
+                "member_default_values": {{
                     "size": 3,
                     "elements": [
-                        {
-                            "expressions": {
+                        {{
+                            "expressions": {{
                                 "size": 1,
                                 "elements": [
-                                    {
-                                        "data": {
-                                            "type": "Constant_expression",
-                                            "value": {
-                                                "type": {
-                                                    "data": {
-                                                        "type": "Integer_type",
-                                                        "value": {
+                                    {{
+                                        "data": {{
+                                            "index": {},
+                                            "value": {{
+                                                "type": {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
                                                             "number_of_bits": 32,
                                                             "is_signed": false
-                                                        }
-                                                    }
-                                                },
+                                                        }}
+                                                    }}
+                                                }},
                                                 "data": "0"
-                                            }
-                                        }
-                                    }
+                                            }}
+                                        }}
+                                    }}
                                 ]
-                            }
-                        },
-                        {
-                            "expressions": {
+                            }}
+                        }},
+                        {{
+                            "expressions": {{
                                 "size": 1,
                                 "elements": [
-                                    {
-                                        "data": {
-                                            "type": "Constant_expression",
-                                            "value": {
-                                                "type": {
-                                                    "data": {
-                                                        "type": "Integer_type",
-                                                        "value": {
+                                    {{
+                                        "data": {{
+                                            "index": {},
+                                            "value": {{
+                                                "type": {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
                                                             "number_of_bits": 32,
                                                             "is_signed": false
-                                                        }
-                                                    }
-                                                },
+                                                        }}
+                                                    }}
+                                                }},
                                                 "data": "0"
-                                            }
-                                        }
-                                    }
+                                            }}
+                                        }}
+                                    }}
                                 ]
-                            }
-                        },
-                        {
-                            "expressions": {
+                            }}
+                        }},
+                        {{
+                            "expressions": {{
                                 "size": 1,
                                 "elements": [
-                                    {
-                                        "data": {
-                                            "type": "Constant_expression",
-                                            "value": {
-                                                "type": {
-                                                    "data": {
-                                                        "type": "Integer_type",
-                                                        "value": {
+                                    {{
+                                        "data": {{
+                                            "index": {},
+                                            "value": {{
+                                                "type": {{
+                                                    "data": {{
+                                                        "index": {},
+                                                        "value": {{
                                                             "number_of_bits": 32,
                                                             "is_signed": false
-                                                        }
-                                                    }
-                                                },
+                                                        }}
+                                                    }}
+                                                }},
                                                 "data": "0"
-                                            }
-                                        }
-                                    }
+                                            }}
+                                        }}
+                                    }}
                                 ]
-                            }
-                        }
+                            }}
+                        }}
                     ]
-                }
-            }
-        )JSON";
+                }},
+                "is_packed": false,
+                "is_literal": false
+            }}
+)JSON",
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Expression::Data_type, Constant_expression>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Expression::Data_type, Constant_expression>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Expression::Data_type, Constant_expression>,
+            index_of_v<Type_reference::Data_type, Integer_type>
+        );
 
         h::Struct_declaration const expected = create_expected_struct_declaration();
 
-        rapidjson::Reader reader;
-        rapidjson::StringStream input_stream{ json_data.c_str() };
-        std::optional<h::Struct_declaration> const output = h::json::read<h::Struct_declaration>(reader, input_stream);
+        std::optional<h::Struct_declaration> const output = h::json::read<h::Struct_declaration>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -1397,13 +1425,21 @@ namespace h
     {
         h::Struct_declaration const input = create_expected_struct_declaration();
 
-        std::string const expected = R"({"name":"My_struct","member_types":{"size":3,"elements":[{"data":{"type":"Integer_type","value":{"number_of_bits":32,"is_signed":false}}},{"data":{"type":"Integer_type","value":{"number_of_bits":32,"is_signed":false}}},{"data":{"type":"Integer_type","value":{"number_of_bits":32,"is_signed":false}}}]},"member_names":{"size":3,"elements":["first","second","third"]},"member_bit_fields":{"size":3,"elements":[24,8,null]},"member_default_values":{"size":3,"elements":[{"expressions":{"size":1,"elements":[{"data":{"type":"Constant_expression","value":{"type":{"data":{"type":"Integer_type","value":{"number_of_bits":32,"is_signed":false}}},"data":"0"}}}]}},{"expressions":{"size":1,"elements":[{"data":{"type":"Constant_expression","value":{"type":{"data":{"type":"Integer_type","value":{"number_of_bits":32,"is_signed":false}}},"data":"0"}}}]}},{"expressions":{"size":1,"elements":[{"data":{"type":"Constant_expression","value":{"type":{"data":{"type":"Integer_type","value":{"number_of_bits":32,"is_signed":false}}},"data":"0"}}}]}}]},"is_packed":false,"is_literal":false,"member_comments":{"size":0,"elements":[]}})";
+        std::pmr::string const expected = std::pmr::string{std::format(
+            R"({{"is_literal":false,"is_packed":false,"member_bit_fields":{{"elements":[24,8,null],"size":3}},"member_comments":{{"elements":[],"size":0}},"member_default_values":{{"elements":[{{"expressions":{{"elements":[{{"data":{{"index":{},"value":{{"data":"0","type":{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}}}}}}}}],"size":1}}}},{{"expressions":{{"elements":[{{"data":{{"index":{},"value":{{"data":"0","type":{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}}}}}}}}],"size":1}}}},{{"expressions":{{"elements":[{{"data":{{"index":{},"value":{{"data":"0","type":{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}}}}}}}}],"size":1}}}}],"size":3}},"member_names":{{"elements":["first","second","third"],"size":3}},"member_types":{{"elements":[{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}},{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}},{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}}],"size":3}},"name":"My_struct"}})",
+            index_of_v<Expression::Data_type, Constant_expression>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Expression::Data_type, Constant_expression>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Expression::Data_type, Constant_expression>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Type_reference::Data_type, Integer_type>,
+            index_of_v<Type_reference::Data_type, Integer_type>
+        )};
 
-        rapidjson::StringBuffer output_stream;
-        rapidjson::Writer<rapidjson::StringBuffer> writer{ output_stream };
-        h::json::write(writer, input);
+        std::pmr::string const actual = h::json::write(input);
 
-        std::string const actual = output_stream.GetString();
         CHECK(actual == expected);
     }
 }

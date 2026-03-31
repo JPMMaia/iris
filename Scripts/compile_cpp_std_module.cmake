@@ -43,7 +43,3 @@ add_custom_target(std_module_custom_target
 
 add_library(std_module INTERFACE)
 add_dependencies(std_module std_module_custom_target)
-target_compile_options(std_module INTERFACE
-    "/reference \"std=${STD_IFC}\""
-    "/reference \"std.compat=${STD_COMPAT_IFC}\""
-)
