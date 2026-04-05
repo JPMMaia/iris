@@ -41,13 +41,12 @@ root_directory = Path(__file__).resolve().parent.parent
 examples_directory = root_directory.joinpath("Examples")
 extension_directory = root_directory.joinpath("Tools/vscode/H-editor")
 parser_directory = root_directory.joinpath("Source/Parser/tree-sitter-hlang")
-core_package_directory = extension_directory.joinpath("packages/core")
 
 def build_and_test() -> bool:
     if not run_command(parser_directory.as_posix(), "npm run test_tree_sitter"):
         return False
     
-    if not run_command(extension_directory.as_posix(), "npm run test:scripts"):
+    if not run_command(extension_directory.as_posix(), "npm run test"):
         return False
     
     build_compiler("debug")
@@ -64,13 +63,7 @@ def build_and_test() -> bool:
 
 
 def test_language_server() -> bool:
-    arguments = [
-        extension_directory.as_posix(),
-        extension_directory.joinpath("out/packages/client/src/test").as_posix(),
-        extension_directory.joinpath("packages/client/test_fixture").as_posix()
-    ];
-    arguments_string = " ".join(arguments)
-    run_command(extension_directory.as_posix(), "node ./out/packages/client/src/test/runTest.js " + arguments_string)
+    run_command(extension_directory.as_posix(), "rpm run test")
 
 def build_compiler(configuration: str) -> None:
     run_command(root_directory.as_posix(), "cmake -S . -B build")
@@ -92,8 +85,8 @@ def generate_examples() -> None:
         destination_file = examples_directory.joinpath("hl").joinpath(source_file.stem + ".hl")
         parse_file(examples_directory, source_file, destination_file)
 
-def install_hlang(configuration: str, destination_directory: Path) -> None:
-    run_command(root_directory.as_posix(), "cmake --install build --config " + configuration + " --prefix " + destination_directory.as_posix())
+def install_hlang(destination_directory: Path) -> None:
+    run_command(root_directory.as_posix(), "cmake --install build --prefix " + destination_directory.as_posix())
         
 # Execute commands
 def main() -> None:
@@ -111,7 +104,6 @@ def main() -> None:
 
     install_hlang_command = subparsers.add_parser("install_hlang", help="Install Hlang")
     install_hlang_command.add_argument("destination_directory")
-    install_hlang_command.add_argument("--configuration", default="release")
 
     test_language_server_command = subparsers.add_parser("test_language_server", help="Tests the language server")
 
@@ -124,7 +116,7 @@ def main() -> None:
     elif args.command == "generate_examples":
         generate_examples()
     elif args.command == "install_hlang":
-        install_hlang(args.configuration, Path(args.destination_directory))
+        install_hlang(Path(args.destination_directory))
     elif args.command == "test_language_server":
         if not test_language_server():
             exit(-1)

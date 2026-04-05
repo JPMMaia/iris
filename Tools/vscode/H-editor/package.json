@@ -1,7 +1,7 @@
 {
-  "name": "hlang-language-server",
-  "displayName": "Hlang Language Server",
-  "description": "Language server for the Hlang programming language",
+  "name": "hlang",
+  "displayName": "Hlang Extension",
+  "description": "Provides support for the Hlang programming language",
   "version": "0.0.1",
   "publisher": "JPMMaia",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "vscode": "^1.95.0"
   },
   "categories": [],
-  "main": "./dist/client.js",
+  "main": "./out/extension.js",
   "activationEvents": [],
   "contributes": {
     "breakpoints": [
@@ -25,25 +25,25 @@
       "type": "object",
       "title": "Configuration",
       "properties": {
-        "hlang_language_server.hlang_executable": {
+        "hlang.hlang_executable": {
           "scope": "resource",
           "type": "string",
           "default": "hlang",
           "description": "Specify the file path to the hlang executable."
         },
-        "hlang_language_server.hlang_language_server_executable": {
+        "hlang.hlang_language_server_executable": {
           "scope": "resource",
           "type": "string",
           "default": "hlang_language_server",
           "description": "Specify the file path to the hlang language server executable."
         },
-        "hlang_language_server.repositories": {
+        "hlang.repositories": {
           "scope": "resource",
           "type": "array",
           "default": [],
           "description": "Specify repositories that specify additional projects that can be added as dependencies to your project."
         },
-        "hlang_language_server.trace.server": {
+        "hlang.trace.server": {
           "scope": "window",
           "type": "string",
           "enum": [
@@ -74,56 +74,30 @@
     ]
   },
   "scripts": {
-    "compile": "tsc -b",
-    "compile:client_test": "tsc -b ./packages/client/src/test && npm run webpack:client && npm run webpack:server",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
-    "watch": "npm run prebuild && tsc -b -w",
-    "watch:client": "webpack --mode development --config ./packages/client/webpack.config.js --watch",
-    "watch:client_test": "tsc -b -w ./packages/client/src/test",
-    "watch:server": "webpack --mode development --config ./packages/server/webpack.config.js --watch",
-    "watch:parser": "tsc -b -w ./packages/parser",
-    "test:extension": "sh ./scripts/e2e.sh",
-    "test:scripts": "mocha",
-    "clean": "rimraf out",
-    "webpack:development": "npm run compile && npm run webpack:client-dev && npm run webpack:server-dev && npm run webpack:parser-dev",
-    "webpack:client-dev": "tsc -b && tsc -b ./packages/client/src/test && webpack --mode development --config ./packages/client/webpack.config.js",
-    "webpack:server-dev": "webpack --mode development --config ./packages/server/webpack.config.js",
-    "webpack:parser-dev": "webpack --mode development --config ./packages/parser/webpack.config.js",
-    "webpack:production": "npm run compile && npm run webpack:client && npm run webpack:server && npm run webpack:parser",
-    "webpack:client": "webpack --mode production --config ./packages/client/webpack.config.js --devtool hidden-source-map",
-    "webpack:server": "webpack --mode production --config ./packages/server/webpack.config.js --devtool hidden-source-map",
-    "webpack:parser": "webpack --mode production --config ./packages/parser/webpack.config.js --devtool hidden-source-map",
-    "vscode:prepublish": "npm run webpack:client",
-    "webpack": "npm run compile && npm run webpack:client && npm run webpack:server",
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "lint": "eslint",
     "package": "vsce package",
-    "prebuild": "cpy dist/tree-sitter-hlang.wasm out/packages/core/src/"
+    "test": "vscode-test",
+    "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.9",
     "@types/node": "^22.13.9",
-    "@types/object-hash": "^3.0.6",
     "@types/vscode": "^1.95.0",
     "@typescript-eslint/eslint-plugin": "^8.12.2",
     "@typescript-eslint/parser": "^8.12.2",
-    "cpy-cli": "^5.0.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.14.0",
-    "merge-options": "^3.0.4",
+    "glob": "^13.0.6",
     "mocha": "^10.8.2",
-    "rimraf": "^6.0.1",
-    "ts-loader": "^9.5.1",
-    "ts-node": "^10.9.2",
-    "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.6.3",
-    "webpack-cli": "^5.1.4"
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.0"
   },
   "dependencies": {
     "@vscode/vsce": "^3.6.0",
-    "fast-array-diff": "^1.1.0",
-    "object-hash": "^3.0.0"
+    "vscode-languageclient": "^9.0.1"
   },
-  "private": true,
-  "workspaces": [
-    "packages/client"
-  ]
+  "private": true
 }

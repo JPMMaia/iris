@@ -29,13 +29,13 @@ if (WIN32)
    add_custom_command(
       TARGET H_builder_executable
       POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG_CL} ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/clang-cl.exe
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG_CL} ${CMAKE_CURRENT_BINARY_DIR}/clang-cl.exe
    )
 else()
    find_program(PROGRAM_CLANG "clang++.exe" REQUIRED)
    add_custom_command(
       TARGET H_builder_executable
       POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG} ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/clang++
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG} ${CMAKE_CURRENT_BINARY_DIR}/clang++
    )
 endif ()

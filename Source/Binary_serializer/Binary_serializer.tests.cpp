@@ -227,7 +227,7 @@ namespace h::binary_serializer
         {
             .language_version = language_version,
             .name = "module_name",
-            .content_hash = 12089789297091071925,
+            .content_hash = 12089789297091071925ull,
             .dependencies = std::move(dependencies),
             .export_declarations = std::move(export_declarations),
             .internal_declarations = Module_declarations{},
@@ -241,6 +241,37 @@ namespace h::binary_serializer
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
         h::Module const input = create_core_module();
+
+        std::optional<std::pmr::vector<std::byte>> const data = serialize_module(
+            input,
+            output_allocator,
+            temporaries_allocator
+        );
+        REQUIRE(data.has_value());
+
+        std::optional<h::Module> const output = deserialize_module(
+            data.value()
+        );
+        REQUIRE(output.has_value());
+
+        CHECK(input == output.value());
+    }
+
+    TEST_CASE("Test binary serialization of instanced declarations")
+    {
+        std::pmr::polymorphic_allocator<> output_allocator;
+        std::pmr::polymorphic_allocator<> temporaries_allocator;
+
+        h::Struct_declaration const declaration = create_struct_declaration();
+        h::Module const input
+        {
+            .instanced_declarations = {
+                .struct_declarations = {
+                    declaration,
+                    declaration
+                }
+            }
+        };
 
         std::optional<std::pmr::vector<std::byte>> const data = serialize_module(
             input,

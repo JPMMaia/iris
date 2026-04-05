@@ -273,7 +273,7 @@ namespace h::compiler
             if (!core_module.has_value())
                 return std::nullopt;
             
-            h::json::write<h::Module>(parsed_file_path, core_module.value());
+            h::json::write_module_to_file(parsed_file_path, core_module.value());
 
             return Parsed_module_info
             {
@@ -591,7 +591,7 @@ namespace h::compiler
                     {}
                 );
                 if (core_module.has_value())
-                    h::json::write<h::Module>(parsed_file_path, core_module.value());
+                    h::json::write_module_to_file(parsed_file_path, core_module.value());
 
                 {
                     std::optional<std::pmr::string> const module_name = read_module_name(source_file_path);
@@ -786,7 +786,7 @@ namespace h::compiler
                     {}
                 );
                 if (core_module.has_value())
-                    h::json::write<h::Module>(parsed_file_path, core_module.value());
+                    h::json::write_module_to_file(parsed_file_path, core_module.value());
 
                 {
                     std::optional<std::pmr::string> const module_name = read_module_name(source_file_path);

@@ -1,12 +1,4 @@
-#include <algorithm>
-#include <compare>
-#include <filesystem>
-#include <span>
-#include <stdexcept>
-#include <string_view>
-#include <system_error>
-#include <variant>
-#include <vector>
+#include <iosfwd>
 
 import h.common;
 import h.common.filesystem;
@@ -18,7 +10,9 @@ import h.json_serializer.operators;
 
 using h::json::operators::operator<<;
 
-#include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
+
+import std;
 
 namespace h::c
 {
@@ -193,7 +187,7 @@ namespace h::c
 
         {
             h::Type_reference const c_char_type_reference{ .data = h::Fundamental_type::C_char };
-            h::Type_reference const c_char_const_pointer_type_reference{ .data = h::Pointer_type{.element_type = c_char_type_reference, .is_mutable = false } };
+            h::Type_reference const c_char_const_pointer_type_reference{ .data = h::Pointer_type{.element_type = {c_char_type_reference}, .is_mutable = false } };
             CHECK(actual.type.input_parameter_types == std::pmr::vector<h::Type_reference>{c_char_const_pointer_type_reference});
         }
 
@@ -701,7 +695,7 @@ namespace h::c
         REQUIRE(actual.type.has_value());
         CHECK(actual.type.value() == uint32_type);
         
-        CHECK(actual.is_mutable == false);
+        CHECK(actual.global_type == h::Global_variable_type::Macro);
     }
 
     TEST_CASE("Import vulkan.h C header creates 'VkClearColorValue' union")
@@ -1061,7 +1055,7 @@ struct My_data
     }
 
     
-    TEST_CASE("Global constants are imported as constants")
+    TEST_CASE("Global variables are imported correctly")
     {
         std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "global_constants";
         std::filesystem::create_directories(root_directory_path);
@@ -1090,7 +1084,7 @@ Sint32 my_global_2 = 0;
             h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[0];
             CHECK(declaration.name == "my_global_0");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.is_mutable == false);
+            CHECK(declaration.global_type == h::Global_variable_type::Constant);
             
             CHECK(declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::Float32));
             REQUIRE(declaration.type.has_value());
@@ -1103,7 +1097,7 @@ Sint32 my_global_2 = 0;
             h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[1];
             CHECK(declaration.name == "my_global_1");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.is_mutable == true);
+            CHECK(declaration.global_type == h::Global_variable_type::Mutable);
             
             CHECK(declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::Float32));
             REQUIRE(declaration.type.has_value());
@@ -1116,7 +1110,7 @@ Sint32 my_global_2 = 0;
             h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[2];
             CHECK(declaration.name == "my_global_2");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.is_mutable == true);
+            CHECK(declaration.global_type == h::Global_variable_type::Mutable);
             
             CHECK(declaration.type == create_custom_type_reference("c.My_data", "Sint32"));
             REQUIRE(declaration.type.has_value());
@@ -1126,7 +1120,7 @@ Sint32 my_global_2 = 0;
         }
     }
 
-    TEST_CASE("Macros constants are imported as constants")
+    TEST_CASE("Macros constants are imported as global variable macros")
     {
         std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "macro_constants";
         std::filesystem::create_directories(root_directory_path);
@@ -1156,6 +1150,7 @@ Sint32 my_global_2 = 0;
             h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[0];
             CHECK(declaration.name == "MY_INT");
             CHECK(declaration.name == declaration.unique_name.value());
+            CHECK(declaration.global_type == h::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
             CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
@@ -1168,6 +1163,7 @@ Sint32 my_global_2 = 0;
             h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[1];
             CHECK(declaration.name == "MY_FLOAT");
             CHECK(declaration.name == declaration.unique_name.value());
+            CHECK(declaration.global_type == h::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
             CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::Float32));
@@ -1180,6 +1176,7 @@ Sint32 my_global_2 = 0;
             h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[2];
             CHECK(declaration.name == "MY_DOUBLE");
             CHECK(declaration.name == declaration.unique_name.value());
+            CHECK(declaration.global_type == h::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
             CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::Float64));
@@ -1192,6 +1189,7 @@ Sint32 my_global_2 = 0;
             h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[3];
             CHECK(declaration.name == "MY_STRING");
             CHECK(declaration.name == declaration.unique_name.value());
+            CHECK(declaration.global_type == h::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
             CHECK(*declaration.type == h::create_c_string_type_reference(true));
@@ -1204,12 +1202,59 @@ Sint32 my_global_2 = 0;
             h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[4];
             CHECK(declaration.name == "MY_UINT64");
             CHECK(declaration.name == declaration.unique_name.value());
+            CHECK(declaration.global_type == h::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
             CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::C_ulonglong));
             CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "20") }));
 
             CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 9, 9, 9, 10));
+        }
+    }
+
+    TEST_CASE("Static global constants are imported as global variable macros")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "static_constants";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+static const int MY_VAR = 1;
+const int my_global = 2;
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
+        h::common::write_to_file(header_file_path, header_content);
+
+        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        h::Module const& header_module = header_module_optional.value();
+
+        CHECK(header_module.source_file_path == header_file_path);
+
+        {
+            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[0];
+            CHECK(declaration.name == "MY_VAR");
+            CHECK(declaration.name == declaration.unique_name.value());
+            CHECK(declaration.global_type == h::Global_variable_type::Macro);
+            
+            REQUIRE(declaration.type.has_value());
+            CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "1") }));
+
+            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 2, 18, 2, 19));
+        }
+
+        {
+            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[1];
+            CHECK(declaration.name == "my_global");
+            CHECK(declaration.name == declaration.unique_name.value());
+            CHECK(declaration.global_type == h::Global_variable_type::Constant);
+            
+            REQUIRE(declaration.type.has_value());
+            CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "2") }));
+
+            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 3, 11, 3, 12));
         }
     }
 

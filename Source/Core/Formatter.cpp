@@ -170,6 +170,17 @@ namespace h
         return std::nullopt;
     }
 
+    static bool is_test_declaration(Declaration const& declaration)
+    {
+        if (std::holds_alternative<h::Function_declaration const*>(declaration.data))
+        {
+            h::Function_declaration const& function_declaration = *std::get<h::Function_declaration const*>(declaration.data);
+            return function_declaration.is_test;
+        }
+
+        return false;
+    }
+
     static void add_format_declaration(
         String_buffer& buffer,
         h::Module const& core_module,
@@ -183,6 +194,12 @@ namespace h
         if (comment.has_value())
         {
             add_comment(buffer, comment.value(), 0);
+            add_new_line(buffer);
+        }
+
+        if (is_test_declaration(declaration))
+        {
+            add_text(buffer, "@test");
             add_new_line(buffer);
         }
 
@@ -276,6 +293,7 @@ namespace h
         bool const does_not_end_with_semicolon =
             std::holds_alternative<h::Block_expression>(expression.data) ||
             std::holds_alternative<h::Comment_expression>(expression.data) ||
+            std::holds_alternative<h::Compile_time_expression>(expression.data) ||
             std::holds_alternative<h::For_loop_expression>(expression.data) ||
             std::holds_alternative<h::If_expression>(expression.data) ||
             std::holds_alternative<h::Switch_expression>(expression.data) ||
@@ -391,7 +409,7 @@ namespace h
         else if (std::holds_alternative<Compile_time_expression>(expression.data))
         {
             Compile_time_expression const& value = std::get<Compile_time_expression>(expression.data);
-            add_format_expression_compile_time(buffer, statement, value, options);
+            add_format_expression_compile_time(buffer, statement, value, indentation, options);
         }
         else if (std::holds_alternative<Continue_expression>(expression.data))
         {
@@ -823,11 +841,12 @@ namespace h
         String_buffer& buffer,
         Statement const& statement,
         Compile_time_expression const& expression,
+        std::uint32_t const indentation,
         Format_options const& options
     )
     {
-        add_text(buffer, "comptime ");
-        add_format_expression(buffer, statement, get_expression(statement, expression.expression), 0, options);
+        add_text(buffer, "compile_time ");
+        add_format_expression(buffer, statement, get_expression(statement, expression.expression), indentation, options);
     }
 
     void add_format_expression_constant(
@@ -1466,7 +1485,23 @@ namespace h
         add_text(buffer, " ");
         add_text(buffer, expression.name);
         add_text(buffer, ": ");
-        add_format_type_name(buffer, expression.type, options);
+
+        Expression const& declared_type_expression = get_expression(statement, expression.type);
+        if (std::holds_alternative<Type_expression>(declared_type_expression.data))
+        {
+            Type_expression const& type_expression = std::get<Type_expression>(declared_type_expression.data);
+            add_format_type_name(buffer, type_expression.type, options);
+        }
+        else if (std::holds_alternative<Reflection_expression>(declared_type_expression.data))
+        {
+            Reflection_expression const& reflection_expression = std::get<Reflection_expression>(declared_type_expression.data);
+            add_format_expression_reflection(buffer, statement, reflection_expression, options);
+        }
+        else
+        {
+            add_text(buffer, "<invalid_type_expression>");
+        }
+
         add_text(buffer, " = ");
         add_format_expression(buffer, statement, get_expression(statement, expression.right_hand_side), outside_indentation, options);
     }
@@ -2012,7 +2047,14 @@ namespace h
         Format_options const& options
     )
     {
-        add_text(buffer, declaration.is_mutable ? "mutable " : "var ");
+        if (declaration.global_type == h::Global_variable_type::Constant)
+            add_text(buffer, "var");
+        else if (declaration.global_type == h::Global_variable_type::Mutable)
+            add_text(buffer, "mutable");
+        else if (declaration.global_type == h::Global_variable_type::Macro)
+            add_text(buffer, "macro");
+
+        add_text(buffer, " ");
         add_text(buffer, declaration.name);
 
         if (declaration.type.has_value())

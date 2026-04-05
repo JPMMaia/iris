@@ -181,34 +181,51 @@
           "name": "Reflection_identifier"
         },
         {
-          "type": "STRING",
-          "value": "("
-        },
-        {
           "type": "CHOICE",
           "members": [
             {
               "type": "SEQ",
               "members": [
                 {
-                  "type": "SYMBOL",
-                  "name": "Generic_expression"
+                  "type": "STRING",
+                  "value": "("
                 },
                 {
-                  "type": "REPEAT",
-                  "content": {
-                    "type": "SEQ",
-                    "members": [
-                      {
-                        "type": "STRING",
-                        "value": ","
-                      },
-                      {
-                        "type": "SYMBOL",
-                        "name": "Generic_expression"
-                      }
-                    ]
-                  }
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "SEQ",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "Generic_expression"
+                        },
+                        {
+                          "type": "REPEAT",
+                          "content": {
+                            "type": "SEQ",
+                            "members": [
+                              {
+                                "type": "STRING",
+                                "value": ","
+                              },
+                              {
+                                "type": "SYMBOL",
+                                "name": "Generic_expression"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
+                },
+                {
+                  "type": "STRING",
+                  "value": ")"
                 }
               ]
             },
@@ -216,10 +233,6 @@
               "type": "BLANK"
             }
           ]
-        },
-        {
-          "type": "STRING",
-          "value": ")"
         }
       ]
     },
@@ -710,7 +723,7 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "Global_variable_mutability"
+          "name": "Global_variable_type"
         },
         {
           "type": "SYMBOL",
@@ -755,7 +768,7 @@
       "type": "SYMBOL",
       "name": "Identifier"
     },
-    "Global_variable_mutability": {
+    "Global_variable_type": {
       "type": "CHOICE",
       "members": [
         {
@@ -765,6 +778,10 @@
         {
           "type": "STRING",
           "value": "mutable"
+        },
+        {
+          "type": "STRING",
+          "value": "macro"
         }
       ]
     },
@@ -1438,6 +1455,10 @@
         {
           "type": "SYMBOL",
           "name": "Expression_comment"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_compile_time"
         },
         {
           "type": "SEQ",
@@ -2297,6 +2318,32 @@
     "Expression_comment": {
       "type": "SYMBOL",
       "name": "Comment"
+    },
+    "Expression_compile_time": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "compile_time"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_compile_time_statements"
+        }
+      ]
+    },
+    "Expression_compile_time_statements": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "Expression_for_loop"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_if"
+        }
+      ]
     },
     "Expression_constant": {
       "type": "CHOICE",
@@ -3195,8 +3242,17 @@
       ]
     },
     "Expression_variable_declaration_type": {
-      "type": "SYMBOL",
-      "name": "Type"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "Type"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_reflection_call"
+        }
+      ]
     },
     "Expression_variable_mutability": {
       "type": "CHOICE",

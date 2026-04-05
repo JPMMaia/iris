@@ -1,6 +1,7 @@
 module;
 
 #include <compare>
+#include <deque>
 #include <filesystem>
 #include <memory_resource>
 #include <optional>
@@ -358,13 +359,20 @@ namespace h
     export bool operator==(Statement const& lhs, Statement const& rhs);
 #endif
 
+    export enum class Global_variable_type
+    {
+        Constant = 0,
+        Mutable,
+        Macro
+    };
+
     export struct Global_variable_declaration
     {
         std::pmr::string name;
         std::optional<std::pmr::string> unique_name;
         std::optional<Type_reference> type;
         Statement initial_value;
-        bool is_mutable;
+        Global_variable_type global_type;
         std::optional<std::pmr::string> comment;
         std::optional<Source_range_location> source_location;
 
@@ -500,6 +508,7 @@ namespace h
         std::pmr::vector<std::pmr::string> input_parameter_names;
         std::pmr::vector<std::pmr::string> output_parameter_names;
         Linkage linkage;
+        bool is_test;
         std::pmr::vector<Function_condition> preconditions;
         std::pmr::vector<Function_condition> postconditions;
         std::optional<std::pmr::string> comment;
@@ -1053,7 +1062,7 @@ namespace h
     {
         std::pmr::string name;
         bool is_mutable;
-        Type_reference type;
+        Expression_index type;
         Expression_index right_hand_side;
 
 #if HACK_SPACESHIP_OPERATOR
@@ -1062,6 +1071,11 @@ namespace h
         friend auto operator<=>(Variable_declaration_with_type_expression const&, Variable_declaration_with_type_expression const&) = default;
 #endif
     };
+
+    export std::optional<Type_reference> get_variable_declaration_with_type_expression_type(
+        Statement const& statement,
+        Variable_declaration_with_type_expression const& expression
+    );
 
     export struct While_loop_expression
     {
@@ -1244,9 +1258,22 @@ namespace h
 #endif
     };
 
+    export struct Module_instanced_declarations
+    {
+        std::pmr::deque<Struct_declaration> struct_declarations;
+        std::pmr::deque<Union_declaration> union_declarations;
+        std::pmr::deque<Function_declaration> function_declarations;
+
+#if HACK_SPACESHIP_OPERATOR
+        friend std::strong_ordering operator<=>(Module_instanced_declarations const&, Module_instanced_declarations const&) = default;
+#else
+        friend auto operator<=>(Module_instanced_declarations const&, Module_instanced_declarations const&) = default;
+#endif
+    };
+
     export struct Module_definitions
     {
-        std::pmr::vector<Function_definition> function_definitions;
+        std::pmr::deque<Function_definition> function_definitions;
 
 #if HACK_SPACESHIP_OPERATOR
         friend std::strong_ordering operator<=>(Module_definitions const&, Module_definitions const&) = default;
@@ -1263,6 +1290,7 @@ namespace h
         Module_dependencies dependencies;
         Module_declarations export_declarations;
         Module_declarations internal_declarations;
+        Module_instanced_declarations instanced_declarations;
         Module_definitions definitions;
         std::optional<std::pmr::string> comment;
         std::optional<std::filesystem::path> source_file_path;

@@ -1,0 +1,27 @@
+module compile_time_if;
+
+var g_debug = true;
+
+export function run_0() -> (result: Int32)
+{
+    compile_time if g_debug
+    {
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
+}
+
+export function run_1() -> (result: Int32)
+{
+    compile_time if !g_debug
+    {
+        return 2;
+    }
+    else
+    {
+        return 3;
+    }
+}

@@ -1051,16 +1051,16 @@ namespace h::compiler
         std::string_view const function_name,
         std::span<h::Statement const> const statements,
         std::optional<Source_range> const source_range
+    );
+
+    static std::pmr::vector<h::compiler::Diagnostic> validate_function_return_expressions_with_statement_expression(
+        h::Module const& core_module,
+        std::string_view const function_name,
+        h::Statement const& last_statement,
+        h::Expression const& last_statement_expression,
+        std::optional<Source_range> const source_range
     )
     {
-        if (statements.empty())
-            return create_function_missing_return_diagnostic(core_module, function_name, source_range);
-
-        h::Statement const& last_statement = statements[statements.size() - 1];
-        if (last_statement.expressions.empty())
-            return create_function_missing_return_diagnostic(core_module, function_name, source_range);
-
-        h::Expression const& last_statement_expression = last_statement.expressions[0];
         if (std::holds_alternative<h::Return_expression>(last_statement_expression.data))
         {
             return {};
@@ -1069,6 +1069,12 @@ namespace h::compiler
         {
             h::Block_expression const& block_expression = std::get<h::Block_expression>(last_statement_expression.data);
             return validate_function_return_expressions_with_statements(core_module, function_name, block_expression.statements, source_range);
+        }
+        else if (std::holds_alternative<h::Compile_time_expression>(last_statement_expression.data))
+        {
+            h::Compile_time_expression const& compile_time_expression = std::get<h::Compile_time_expression>(last_statement_expression.data);
+            h::Expression const& right_side_expression = last_statement.expressions[compile_time_expression.expression.expression_index];
+            return validate_function_return_expressions_with_statement_expression(core_module, function_name, last_statement, right_side_expression, source_range);
         }
         else if (std::holds_alternative<h::If_expression>(last_statement_expression.data))
         {
@@ -1104,6 +1110,24 @@ namespace h::compiler
         {
             return create_function_missing_return_diagnostic(core_module, function_name, source_range);
         }
+    }
+
+    static std::pmr::vector<h::compiler::Diagnostic> validate_function_return_expressions_with_statements(
+        h::Module const& core_module,
+        std::string_view const function_name,
+        std::span<h::Statement const> const statements,
+        std::optional<Source_range> const source_range
+    )
+    {
+        if (statements.empty())
+            return create_function_missing_return_diagnostic(core_module, function_name, source_range);
+
+        h::Statement const& last_statement = statements[statements.size() - 1];
+        if (last_statement.expressions.empty())
+            return create_function_missing_return_diagnostic(core_module, function_name, source_range);
+
+        h::Expression const& last_statement_expression = last_statement.expressions[0];
+        return validate_function_return_expressions_with_statement_expression(core_module, function_name, last_statement, last_statement_expression, source_range);
     }
 
     static std::pmr::vector<h::compiler::Diagnostic> validate_function_return_expressions(
@@ -1349,9 +1373,13 @@ namespace h::compiler
                 {
                     h::Variable_declaration_with_type_expression const& variable_declaration_with_type = std::get<h::Variable_declaration_with_type_expression>(expression.data);
 
-                    new_scope.variables.push_back(
-                        create_variable(variable_declaration_with_type.name, variable_declaration_with_type.type, variable_declaration_with_type.is_mutable, false, expression.source_range)
-                    );
+                    std::optional<h::Type_reference> const variable_type = h::get_variable_declaration_with_type_expression_type(statement, variable_declaration_with_type);
+                    if (variable_type.has_value())
+                    {
+                        new_scope.variables.push_back(
+                            create_variable(variable_declaration_with_type.name, std::move(variable_type.value()), variable_declaration_with_type.is_mutable, false, expression.source_range)
+                        );
+                    }
                 }
             }
         }
@@ -2157,7 +2185,23 @@ namespace h::compiler
         if (is_builtin_type_reference(callable_type.value()))
         {
             h::Builtin_type_reference const& builtin_type_reference = std::get<h::Builtin_type_reference>(callable_type->data);
-            if (builtin_type_reference.value == "create_array_slice_from_pointer")
+            if (builtin_type_reference.value == "check")
+            {
+                h::Function_type function_type
+                {
+                    .input_parameter_types = { h::create_bool_type_reference() },
+                    .output_parameter_types = {},
+                    .is_variadic = false,
+                };
+
+                return h::Function_pointer_type
+                {
+                    .type = std::move(function_type),
+                    .input_parameter_names = { "condition" },
+                    .output_parameter_names = {}
+                };
+            }
+            else if (builtin_type_reference.value == "create_array_slice_from_pointer")
             {
                 std::pmr::vector<h::Type_reference> element_type;
 
@@ -3025,16 +3069,17 @@ namespace h::compiler
 
         std::optional<h::Type_reference> const expected_type = 
             !parameters.function_declaration->type.output_parameter_types.empty() ?
-            std::optional<h::Type_reference>{parameters.function_declaration->type.output_parameter_types[0]} :
+            get_underlying_type(parameters.declaration_database, parameters.function_declaration->type.output_parameter_types[0]) :
             std::optional<h::Type_reference>{std::nullopt};
 
         if (expression.expression.has_value())
         {
             std::optional<h::Type_reference> const& provided_type = get_expression_type_from_type_info(parameters.expression_types, expression.expression.value());
+            std::optional<h::Type_reference> const underlying_provided_type = provided_type.has_value() ? get_underlying_type(parameters.declaration_database, provided_type.value()) : std::optional<h::Type_reference>{};
 
-            if (!are_compatible_types(parameters.declaration_database, provided_type, expected_type))
+            if (!are_compatible_types(parameters.declaration_database, underlying_provided_type, expected_type))
             {
-                std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, provided_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, underlying_provided_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
                 std::pmr::string const expected_type_name = h::format_type_reference(parameters.core_module, expected_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 return
@@ -3450,14 +3495,14 @@ namespace h::compiler
                         )
                     };
                 }
-                else if (is_constant_global_variable(parameters.core_module.name, operand_expression, parameters.declaration_database))
+                else if (is_macro_global_variable(parameters.core_module.name, operand_expression, parameters.declaration_database))
                 {
                     return
                     {
                         create_error_diagnostic(
                             parameters.core_module.source_file_path,
                             create_sub_source_range(source_range, 0, 1),
-                            "Cannot take address of a global constant."
+                            "Cannot take address of a global macro."
                         )
                     };
                 }
@@ -3545,12 +3590,25 @@ namespace h::compiler
         }
         
         h::Expression const& right_hand_side = parameters.statement.expressions[expression.right_hand_side.expression_index];
-        h::Type_reference const& type = expression.type;
+        std::optional<h::Type_reference> const type_optional = h::get_variable_declaration_with_type_expression_type(parameters.statement, expression);
+        if (!type_optional.has_value())
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format("Invalid declared type expression for variable '{}'.", expression.name)
+                )
+            };
+        }
+
+        h::Type_reference const& type = type_optional.value();
 
         if (std::holds_alternative<h::Instantiate_expression>(right_hand_side.data) && !std::holds_alternative<h::Array_slice_type>(type.data))
         {
             std::optional<Declaration> const declaration_optional = find_underlying_declaration(parameters.declaration_database, type);
-            if (!declaration_optional.has_value() || (!std::holds_alternative<h::Struct_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Union_declaration const*>(declaration_optional->data)))
+            if (!declaration_optional.has_value() || (!std::holds_alternative<h::Struct_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Union_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Type_constructor const*>(declaration_optional->data)))
             {
                 return
                 {
@@ -3727,7 +3785,7 @@ namespace h::compiler
             if (std::holds_alternative<h::Variable_declaration_with_type_expression>(expression.data))
             {
                 h::Variable_declaration_with_type_expression const& data = std::get<h::Variable_declaration_with_type_expression>(expression.data);
-                return data.type;
+                return h::get_variable_declaration_with_type_expression_type(statement, data);
             }
         }
 
@@ -3905,6 +3963,25 @@ namespace h::compiler
         );
     }
 
+    static bool is_declaration_value_computable_at_compile_time(Declaration const& declaration)
+    {
+        if (std::holds_alternative<h::Enum_declaration const*>(declaration.data))
+        {
+            return true;
+        }
+        else if (std::holds_alternative<h::Global_variable_declaration const*>(declaration.data))
+        {
+            h::Global_variable_declaration const& global_variable_declaration = *std::get<h::Global_variable_declaration const*>(declaration.data);
+            return global_variable_declaration.global_type != Global_variable_type::Mutable;
+        }
+        else if (std::holds_alternative<h::Function_declaration const*>(declaration.data))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     bool is_computable_at_compile_time(
         h::Module const& core_module,
         h::compiler::Scope const& scope,
@@ -3937,13 +4014,7 @@ namespace h::compiler
                         access_expression.member_name
                     );
                     if (declaration.has_value())
-                    {
-                        if (std::holds_alternative<h::Global_variable_declaration const*>(declaration->data))
-                        {
-                            h::Global_variable_declaration const& global_variable_declaration = *std::get<h::Global_variable_declaration const*>(declaration->data);
-                            return !global_variable_declaration.is_mutable;
-                        }
-                    }
+                        return is_declaration_value_computable_at_compile_time(declaration.value());
                 }
             }
         }
@@ -4027,14 +4098,50 @@ namespace h::compiler
 
             return true;
         }
+        else if (std::holds_alternative<h::Unary_expression>(expression.data))
+        {
+            h::Unary_expression const& unary_expression = std::get<h::Unary_expression>(expression.data);
+
+            switch (unary_expression.operation)
+            {
+                case h::Unary_operation::Pre_increment:
+                case h::Unary_operation::Post_increment:
+                case h::Unary_operation::Pre_decrement:
+                case h::Unary_operation::Post_decrement:
+                case h::Unary_operation::Indirection:
+                case h::Unary_operation::Address_of:
+                    return false;
+                default:
+                    break;
+            }
+
+            return is_computable_at_compile_time(
+                core_module,
+                scope,
+                statement,
+                statement.expressions[unary_expression.expression.expression_index],
+                expression_type,
+                expression_types,
+                declaration_database
+            );
+        }
         else if (std::holds_alternative<h::Variable_expression>(expression.data))
         {
             h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
             Variable const* const variable = find_variable_from_scope(scope, variable_expression.name);
-            if (variable == nullptr)
-                return false;
+            if (variable != nullptr)
+                return variable->is_compile_time;
 
-            return variable->is_compile_time;
+            std::optional<Declaration> const declaration = find_declaration(
+                declaration_database,
+                core_module.name,
+                variable_expression.name
+            );
+
+            if (declaration.has_value())
+                return is_declaration_value_computable_at_compile_time(declaration.value());
+            
+            return false;
         }
 
         return false;
@@ -4083,7 +4190,7 @@ namespace h::compiler
         if (global_variable == nullptr)
             return false;
 
-        return !global_variable->is_mutable;
+        return global_variable->global_type == h::Global_variable_type::Constant;
     }
 
     bool is_mutable_global_variable(
@@ -4100,7 +4207,24 @@ namespace h::compiler
         if (global_variable == nullptr)
             return false;
 
-        return global_variable->is_mutable;
+        return global_variable->global_type == h::Global_variable_type::Mutable;
+    }
+
+    bool is_macro_global_variable(
+        std::string_view const current_module_name,
+        h::Expression const& expression,
+        Declaration_database const& declaration_database
+    )
+    {
+        Global_variable_declaration const* const global_variable = get_global_variable(
+            current_module_name,
+            expression,
+            declaration_database
+        );
+        if (global_variable == nullptr)
+            return false;
+
+        return global_variable->global_type == h::Global_variable_type::Macro;
     }
 
     std::optional<h::Source_range> get_statement_source_range(

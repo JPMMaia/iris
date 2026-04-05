@@ -290,7 +290,7 @@ namespace h::binary_serializer
         serialize(serializer, value.unique_name);
         serialize(serializer, value.type);
         serialize(serializer, value.initial_value);
-        serialize(serializer, value.is_mutable);
+        serialize(serializer, value.global_type);
         serialize(serializer, value.comment);
         serialize(serializer, value.source_location);
     }
@@ -302,7 +302,7 @@ namespace h::binary_serializer
         deserialize(deserializer, value.unique_name);
         deserialize(deserializer, value.type);
         deserialize(deserializer, value.initial_value);
-        deserialize(deserializer, value.is_mutable);
+        deserialize(deserializer, value.global_type);
         deserialize(deserializer, value.comment);
         deserialize(deserializer, value.source_location);
     }
@@ -466,6 +466,7 @@ namespace h::binary_serializer
         serialize(serializer, value.input_parameter_names);
         serialize(serializer, value.output_parameter_names);
         serialize(serializer, value.linkage);
+        serialize(serializer, value.is_test);
         serialize(serializer, value.preconditions);
         serialize(serializer, value.postconditions);
         serialize(serializer, value.comment);
@@ -483,6 +484,7 @@ namespace h::binary_serializer
         deserialize(deserializer, value.input_parameter_names);
         deserialize(deserializer, value.output_parameter_names);
         deserialize(deserializer, value.linkage);
+        deserialize(deserializer, value.is_test);
         deserialize(deserializer, value.preconditions);
         deserialize(deserializer, value.postconditions);
         deserialize(deserializer, value.comment);
@@ -1234,6 +1236,22 @@ namespace h::binary_serializer
     }
 
     export template <>
+    void serialize(Serializer& serializer, Module_instanced_declarations const& value)
+    {
+        serialize(serializer, value.struct_declarations);
+        serialize(serializer, value.union_declarations);
+        serialize(serializer, value.function_declarations);
+    }
+
+    export template <>
+    void deserialize(Deserializer& deserializer, Module_instanced_declarations& value)
+    {
+        deserialize(deserializer, value.struct_declarations);
+        deserialize(deserializer, value.union_declarations);
+        deserialize(deserializer, value.function_declarations);
+    }
+
+    export template <>
     void serialize(Serializer& serializer, Module_definitions const& value)
     {
         serialize(serializer, value.function_definitions);
@@ -1254,6 +1272,7 @@ namespace h::binary_serializer
         serialize(serializer, value.dependencies);
         serialize(serializer, value.export_declarations);
         serialize(serializer, value.internal_declarations);
+        serialize(serializer, value.instanced_declarations);
         serialize(serializer, value.definitions);
         serialize(serializer, value.comment);
         serialize(serializer, value.source_file_path);
@@ -1268,6 +1287,7 @@ namespace h::binary_serializer
         deserialize(deserializer, value.dependencies);
         deserialize(deserializer, value.export_declarations);
         deserialize(deserializer, value.internal_declarations);
+        deserialize(deserializer, value.instanced_declarations);
         deserialize(deserializer, value.definitions);
         deserialize(deserializer, value.comment);
         deserialize(deserializer, value.source_file_path);

@@ -371,7 +371,7 @@ namespace h::compiler
 
     void add_struct_declarations(
         Clang_module_data const& clang_module_data,
-        Module const& core_module,
+        std::string_view const module_name,
         std::span<Struct_declaration const> const struct_declarations,
         LLVM_type_map& llvm_type_map
     )
@@ -380,7 +380,7 @@ namespace h::compiler
         {
             llvm::Type* const converted_type = convert_type(
                 clang_module_data,
-                core_module.name,
+                module_name,
                 struct_declaration.name
             );
 
@@ -454,7 +454,6 @@ namespace h::compiler
                 clang_module_data,
                 core_module.name,
                 struct_declaration,
-                std::nullopt,
                 {}
             );
 
@@ -527,15 +526,14 @@ namespace h::compiler
                 llvm_debug_builder.getOrCreateArray(elements)
             );
 
-            //llvm_debug_builder.replaceTemporary(llvm::TempDIType(llvm_forward_declaration_debug_type), llvm_struct_debug_type);
-            llvm_forward_declaration_debug_type->replaceAllUsesWith(llvm_struct_debug_type);
-            llvm_debug_type_map[struct_declaration.name] = llvm_struct_debug_type;
+            llvm_debug_builder.replaceTemporary(llvm::TempDIType(llvm_forward_declaration_debug_type), llvm_struct_debug_type);
+            llvm_debug_type_map[struct_declaration.name] = llvm::TypedTrackingMDRef<llvm::DIType>{llvm_struct_debug_type};
         }
     }
 
     void add_union_declarations(
         Clang_module_data const& clang_module_data,
-        Module const& core_module,
+        std::string_view const module_name,
         std::span<Union_declaration const> const union_declarations,
         LLVM_type_map& llvm_type_map
     )
@@ -544,7 +542,7 @@ namespace h::compiler
         {
             llvm::Type* const converted_type = convert_type(
                 clang_module_data,
-                core_module.name,
+                module_name,
                 union_declaration.name
             );
 
@@ -653,9 +651,8 @@ namespace h::compiler
                 llvm_debug_builder.getOrCreateArray(elements)
             );
 
-            //llvm_debug_builder.replaceTemporary(llvm::TempDIType(llvm_forward_declaration_debug_type), llvm_union_debug_type);
-            llvm_forward_declaration_debug_type->replaceAllUsesWith(llvm_union_debug_type);
-            llvm_debug_type_map[union_declaration.name] = llvm_union_debug_type;
+            llvm_debug_builder.replaceTemporary(llvm::TempDIType(llvm_forward_declaration_debug_type), llvm_union_debug_type);
+            llvm_debug_type_map[union_declaration.name] = llvm::TypedTrackingMDRef<llvm::DIType>{llvm_union_debug_type};
         }
     }
 
@@ -667,7 +664,6 @@ namespace h::compiler
         {
             .builtin = create_builtin_types(llvm_context),
             .name_to_llvm_type = {},
-            .type_instance_to_llvm_type = {},
         };
     }
 
@@ -697,24 +693,81 @@ namespace h::compiler
         add_enum_types(llvm_context, core_module.export_declarations.enum_declarations, llvm_type_map);
         add_enum_types(llvm_context, core_module.internal_declarations.enum_declarations, llvm_type_map);
 
-        add_struct_declarations(clang_module_data, core_module, core_module.export_declarations.struct_declarations, llvm_type_map);
-        add_struct_declarations(clang_module_data, core_module, core_module.internal_declarations.struct_declarations, llvm_type_map);
+        add_struct_declarations(clang_module_data, core_module.name, core_module.export_declarations.struct_declarations, llvm_type_map);
+        add_struct_declarations(clang_module_data, core_module.name, core_module.internal_declarations.struct_declarations, llvm_type_map);
+        for (h::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
+        {
+            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
+            assert(instance_custom_type_reference.has_value());
 
-        add_union_declarations(clang_module_data, core_module, core_module.export_declarations.union_declarations, llvm_type_map);
-        add_union_declarations(clang_module_data, core_module, core_module.internal_declarations.union_declarations, llvm_type_map);
+            std::pmr::string const& instance_module_name = instance_custom_type_reference->module_reference.name;
+            LLVM_type_map& instance_llvm_type_map = type_database.name_to_llvm_type[instance_module_name];
+
+            llvm::Type* const converted_type = convert_type(
+                clang_module_data,
+                instance_module_name,
+                struct_declaration.name
+            );
+            instance_llvm_type_map.insert(std::make_pair(struct_declaration.name, converted_type));
+        }
+
+        add_union_declarations(clang_module_data, core_module.name, core_module.export_declarations.union_declarations, llvm_type_map);
+        add_union_declarations(clang_module_data, core_module.name, core_module.internal_declarations.union_declarations, llvm_type_map);
+        for (h::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
+        {
+            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
+            assert(instance_custom_type_reference.has_value());
+
+            std::pmr::string const& instance_module_name = instance_custom_type_reference->module_reference.name;
+            LLVM_type_map& instance_llvm_type_map = type_database.name_to_llvm_type[instance_module_name];
+            
+            llvm::Type* const converted_type = convert_type(
+                clang_module_data,
+                instance_module_name,
+                union_declaration.name
+            );
+
+            instance_llvm_type_map.insert(std::make_pair(union_declaration.name, converted_type));
+        }
 
         add_alias_types(llvm_context, llvm_data_layout, core_module.export_declarations.alias_type_declarations, core_module, type_database, llvm_type_map);
         add_alias_types(llvm_context, llvm_data_layout, core_module.internal_declarations.alias_type_declarations, core_module, type_database, llvm_type_map);
+    }
 
-        for (std::pair<Type_instance const, clang::RecordDecl*> const& pair : clang_module_data.declaration_database.instances)
-        {
-            clang::RecordDecl* const record_declaration = pair.second;
-            llvm::Type* const clang_type = convert_type(clang_module_data, record_declaration);
-            type_database.type_instance_to_llvm_type.emplace(pair.first, clang_type);
-            
-            std::pmr::string const mangled_name = mangle_type_instance_name(pair.first);
-            type_database.name_to_llvm_type[pair.first.type_constructor.module_reference.name].insert(std::make_pair(mangled_name, clang_type));
-        }
+    void add_struct_declaration_to_type_database(
+        Type_database& type_database,
+        Clang_module_data const& clang_module_data,
+        Module const& core_module,
+        Struct_declaration const& struct_declaration
+    )
+    {
+        LLVM_type_map& llvm_type_map = type_database.name_to_llvm_type[core_module.name];
+        
+        llvm::Type* const converted_type = convert_type(
+            clang_module_data,
+            core_module.name,
+            struct_declaration.name
+        );
+
+        llvm_type_map.insert(std::make_pair(struct_declaration.name, converted_type));
+    }
+
+    void add_union_declaration_to_type_database(
+        Type_database& type_database,
+        Clang_module_data const& clang_module_data,
+        Module const& core_module,
+        Union_declaration const& union_declaration
+    )
+    {
+        LLVM_type_map& llvm_type_map = type_database.name_to_llvm_type[core_module.name];
+
+        llvm::Type* const converted_type = convert_type(
+            clang_module_data,
+            core_module.name,
+            union_declaration.name
+        );
+
+        llvm_type_map.insert(std::make_pair(union_declaration.name, converted_type));
     }
 
     void add_module_debug_types(
@@ -751,6 +804,14 @@ namespace h::compiler
         set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module, core_module.export_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
         set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module, core_module.internal_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
     }
+
+    llvm::DIType* create_void_type(
+        llvm::DIBuilder& llvm_debug_builder
+    )
+    {
+        return llvm_debug_builder.createBasicType("void", 0, llvm::dwarf::DW_ATE_unsigned);
+    }
+    
 
     llvm::DIType* array_slice_type_to_llvm_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
@@ -1021,7 +1082,7 @@ namespace h::compiler
         Debug_type_database const& debug_type_database
     )
     {
-        llvm::DIType* const pointed_type = !type.element_type.empty() ? type_reference_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, type.element_type[0], debug_type_database) : nullptr;
+        llvm::DIType* const pointed_type = !type.element_type.empty() ? type_reference_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, type.element_type[0], debug_type_database) : create_void_type(llvm_debug_builder);
         return llvm_debug_builder.createPointerType(pointed_type, llvm_data_layout.getPointerSizeInBits());
     }
 
@@ -1075,20 +1136,6 @@ namespace h::compiler
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
             return llvm::PointerType::get(llvm_context, 0);
-            
-            /*Function_pointer_type const& data = std::get<Function_pointer_type>(type_reference.data);
-
-            llvm::FunctionType* const llvm_function_type = create_llvm_function_type(
-                llvm_context,
-                llvm_data_layout,
-                data.type.input_parameter_types,
-                data.type.output_parameter_types,
-                data.type.is_variadic,
-                type_database,
-                {}
-            );
-
-            return llvm_function_type;*/
         }
         else if (std::holds_alternative<Integer_type>(type_reference.data))
         {
@@ -1100,12 +1147,82 @@ namespace h::compiler
             Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
             return pointer_type_to_llvm_type(llvm_context, llvm_data_layout, data, type_database);
         }
+
+        throw std::runtime_error{ "Not implemented." };
+    }
+
+    static llvm::Type* pointer_type_to_llvm_type_on_demand(
+        llvm::LLVMContext& llvm_context,
+        llvm::DataLayout const& llvm_data_layout,
+        Module const& core_module,
+        Pointer_type const type,
+        Declaration_database const& declaration_database,
+        Clang_context const& clang_context
+    )
+    {
+        llvm::Type* pointed_type =
+            !type.element_type.empty() ?
+            type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, type.element_type[0], declaration_database, clang_context) :
+            llvm::PointerType::get(llvm::Type::getInt8Ty(llvm_context), 0);
+        return pointed_type->getPointerTo();
+    }
+
+    llvm::Type* type_reference_to_llvm_type_on_demand(
+        llvm::LLVMContext& llvm_context,
+        llvm::DataLayout const& llvm_data_layout,
+        Module const& core_module,
+        Type_reference const& type_reference,
+        Declaration_database const& declaration_database,
+        Clang_context const& clang_context
+    )
+    {
+        if (std::holds_alternative<Array_slice_type>(type_reference.data))
+        {
+            llvm::Type* const byte_pointer_type = llvm::Type::getInt8Ty(llvm_context)->getPointerTo();
+            llvm::Type* const uint64_type = llvm::Type::getInt64Ty(llvm_context);
+            return llvm::StructType::create({ byte_pointer_type, uint64_type }, "__hl_array_slice");
+        }
+        else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
+        {
+            throw std::runtime_error{ "Builtin_type_reference on-demand conversion is not implemented." };
+        }
+        else if (std::holds_alternative<Constant_array_type>(type_reference.data))
+        {
+            Constant_array_type const& data = std::get<Constant_array_type>(type_reference.data);
+            llvm::Type* const llvm_element_type = type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, data.value_type, declaration_database, clang_context);
+            return llvm::ArrayType::get(llvm_element_type, data.size);
+        }
+        else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
+        {
+            Custom_type_reference const& data = std::get<Custom_type_reference>(type_reference.data);
+            std::string_view const module_name = find_module_name(core_module, data.module_reference);
+            return convert_type_on_demand(clang_context, declaration_database, module_name, data.name);
+        }
+        else if (std::holds_alternative<Fundamental_type>(type_reference.data))
+        {
+            Fundamental_type const data = std::get<Fundamental_type>(type_reference.data);
+            Builtin_types const builtin_types = create_builtin_types(llvm_context);
+            return fundamental_type_to_llvm_type(llvm_context, llvm_data_layout, data, builtin_types);
+        }
+        else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
+        {
+            return llvm::PointerType::get(llvm_context, 0);
+        }
+        else if (std::holds_alternative<Integer_type>(type_reference.data))
+        {
+            Integer_type const& data = std::get<Integer_type>(type_reference.data);
+            return integer_type_to_llvm_type(llvm_context, data);
+        }
+        else if (std::holds_alternative<Pointer_type>(type_reference.data))
+        {
+            Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
+            return pointer_type_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, data, declaration_database, clang_context);
+        }
         else if (std::holds_alternative<Type_instance>(type_reference.data))
         {
             Type_instance const& data = std::get<Type_instance>(type_reference.data);
-
-            llvm::Type* const llvm_type = type_database.type_instance_to_llvm_type.at(data);
-            return llvm_type;
+            std::pmr::string const mangled_name = mangle_type_instance_name(data);
+            throw std::runtime_error{ std::format("Cannot evaluate reflection for unresolved type instance '{}'.", mangled_name) };
         }
 
         throw std::runtime_error{ "Not implemented." };
@@ -1122,6 +1239,21 @@ namespace h::compiler
             return llvm::Type::getVoidTy(llvm_context);
 
         return type_reference_to_llvm_type(llvm_context, llvm_data_layout, type_reference[0], type_database);
+    }
+
+    llvm::Type* type_reference_to_llvm_type_on_demand(
+        llvm::LLVMContext& llvm_context,
+        llvm::DataLayout const& llvm_data_layout,
+        Module const& core_module,
+        std::span<Type_reference const> const type_reference,
+        Declaration_database const& declaration_database,
+        Clang_context const& clang_context
+    )
+    {
+        if (type_reference.empty())
+            return llvm::Type::getVoidTy(llvm_context);
+
+        return type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, type_reference[0], declaration_database, clang_context);
     }
 
     std::pmr::vector<llvm::Type*> type_references_to_llvm_types(
@@ -1216,7 +1348,7 @@ namespace h::compiler
     )
     {
         if (type_reference.empty())
-            return nullptr;
+            return create_void_type(llvm_debug_builder);
 
         return type_reference_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, type_reference[0], debug_type_database);
     }

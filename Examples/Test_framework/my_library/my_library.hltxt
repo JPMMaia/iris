@@ -1,0 +1,12 @@
+module my_library;
+
+export function add(a: Int32, b: Int32) -> (result: Int32)
+{
+    return a + b;
+}
+
+@test
+function test_add() -> ()
+{
+    check(add(1, 2) == 3);
+}

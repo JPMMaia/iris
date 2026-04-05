@@ -106,6 +106,7 @@ namespace h::parser
         Parse_node const& node,
         h::Linkage const linkage,
         std::optional<std::string_view> const& unique_name,
+        bool const is_test,
         std::optional<std::pmr::string> const& comment,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -269,6 +270,15 @@ namespace h::parser
     );
 
     h::Cast_expression node_to_expression_cast(
+        h::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    h::Compile_time_expression node_to_expression_compile_time(
         h::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,

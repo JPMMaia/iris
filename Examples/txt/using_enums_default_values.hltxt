@@ -1,0 +1,15 @@
+module Enums_default_values;
+
+export enum My_enum
+{
+    Value_0,
+    Value_1,
+    Value_2,
+}
+
+export function use_enums() -> ()
+{
+    var v0 = My_enum.Value_0;
+    var v1 = My_enum.Value_1;
+    var v2 = My_enum.Value_2;
+}

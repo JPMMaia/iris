@@ -24,11 +24,14 @@ import h.compiler.analysis;
 import h.compiler.artifact;
 import h.compiler.clang_code_generation;
 import h.compiler.clang_compiler;
+import h.compiler.clang_data;
 import h.compiler.compile_commands_generator;
 import h.compiler.linker;
 import h.compiler.profiler;
 import h.compiler.repository;
 import h.compiler.target;
+import h.compiler.test_framework;
+import h.compiler.types;
 import h.c_header_converter;
 import h.c_header_exporter;
 import h.json_serializer;
@@ -80,23 +83,44 @@ namespace h::compiler
         all_header_search_paths.push_back(build_directory_path / "include");
         all_header_search_paths.insert(all_header_search_paths.end(), header_search_paths.begin(), header_search_paths.end());
 
+        std::pmr::vector<std::filesystem::path> all_repository_paths(output_allocator);
+        all_repository_paths.reserve(repository_paths.size() + 1);
+        all_repository_paths.insert(all_repository_paths.end(), repository_paths.begin(), repository_paths.end());
+
+        if (builder_options.is_test_mode)
+        {
+            std::filesystem::path const standard_repository_file_path = h::common::get_standard_repository_file_path();
+            auto const location = std::find(all_repository_paths.begin(), all_repository_paths.end(), standard_repository_file_path);
+            if (location == all_repository_paths.end())
+                all_repository_paths.push_back(standard_repository_file_path);
+        }
+
         return
         {
             .target = target,
             .build_directory_path = build_directory_path,
             .header_search_paths = std::move(all_header_search_paths),
-            .repositories = get_repositories(repository_paths),
+            .repositories = get_repositories(all_repository_paths),
             .compilation_options = compilation_options,
             .profiler = {},
             .use_profiler = true,
             .output_module_json = false,
             .output_llvm_ir = builder_options.output_llvm_ir,
+            .is_test_mode = builder_options.is_test_mode,
         };
     }
 
     void build_artifact(
         Builder& builder,
         std::filesystem::path const& artifact_file_path
+    )
+    {
+        build_artifacts(builder, { &artifact_file_path, 1 });
+    }
+
+    void build_artifacts(
+        Builder& builder,
+        std::span<std::filesystem::path const> const artifact_file_paths
     )
     {
         start_timer(get_profiler(builder), "build_artifact");
@@ -110,8 +134,9 @@ namespace h::compiler
         create_directory_if_it_does_not_exist(hl_build_directory);
 
         std::pmr::vector<Artifact> const artifacts = get_sorted_artifacts(
-            { &artifact_file_path, 1 },
+            artifact_file_paths,
             builder.repositories,
+            builder.is_test_mode,
             output_allocator,
             temporaries_allocator
         );
@@ -128,6 +153,23 @@ namespace h::compiler
             output_allocator,
             temporaries_allocator
         );
+        if (builder.is_test_mode)
+            core_modules.reserve(core_modules.size() + artifact_file_paths.size());
+        std::span<h::Module const> const non_test_modules = core_modules;
+
+        if (builder.is_test_mode)
+        {
+            std::pmr::vector<h::Module> const test_artifact_modules = create_test_artifact_modules(
+                builder,
+                artifact_file_paths,
+                artifacts,
+                core_modules,
+                builder.compilation_options,
+                temporaries_allocator
+            );
+            assert(core_modules.size() + test_artifact_modules.size() <= core_modules.capacity());
+            core_modules.insert(core_modules.end(), test_artifact_modules.begin(), test_artifact_modules.end());
+        }
 
         Modules_and_declaration_database modules_and_declaration_database = import_and_export_c_headers(
             builder,
@@ -151,10 +193,17 @@ namespace h::compiler
         if (!compile_cpp_and_write_to_bitcode_files(builder, artifacts, llvm_data, compilation_options, temporaries_allocator))
             h::common::print_message_and_exit(std::format("Failed to compile c++."));
 
+        h::compiler::Clang_context clang_context = h::compiler::create_clang_context(
+            *llvm_data.context,
+            llvm_data.clang_data,
+            "Hl_clang_module"
+        );
+
         start_timer(get_profiler(builder), "process_modules_and_create_compilation_database");
         // TODO make const
         Compilation_database compilation_database = process_modules_and_create_compilation_database(
             llvm_data,
+            std::move(clang_context),
             sorted_modules,
             modules_and_declaration_database.declaration_database, // TODO this does a copy
             output_allocator,
@@ -172,19 +221,51 @@ namespace h::compiler
 
         compile_and_write_to_bitcode_files(
             builder,
-            core_modules,
+            non_test_modules,
             module_name_to_file_path_map,
             llvm_data,
             compilation_database,
-            compilation_options
+            compilation_options,
+            false
         );
 
+        if (builder.is_test_mode)
+        {
+            h::compiler::Compilation_options test_compilation_options = compilation_options;
+            test_compilation_options.is_test_mode = true;
+            compile_and_write_to_bitcode_files(
+                builder,
+                core_modules,
+                module_name_to_file_path_map,
+                llvm_data,
+                compilation_database,
+                test_compilation_options,
+                true
+            );
+        }
+
+        std::pmr::vector<h::compiler::Artifact const*> const artifacts_to_link = get_artifact_pointers(artifacts, temporaries_allocator);
         link_artifacts(
             builder,
             artifacts,
-            compilation_options,
+            artifacts_to_link,
+            compilation_options.debug,
+            false,
             temporaries_allocator
         );
+
+        if (builder.is_test_mode)
+        {
+            std::pmr::vector<h::compiler::Artifact const*> const artifacts_to_test = filter_test_artifacts(artifact_file_paths, artifacts, core_modules, temporaries_allocator);
+            link_artifacts(
+                builder,
+                artifacts,
+                artifacts_to_test,
+                compilation_options.debug,
+                true,
+                temporaries_allocator
+            );
+        }
 
         if (builder.target.operating_system == "windows")
         {
@@ -220,7 +301,10 @@ namespace h::compiler
 
             std::optional<std::filesystem::path> const dependency_location = h::compiler::get_artifact_location(repositories, dependency.artifact_name);
             if (!dependency_location.has_value())
-                h::common::print_message_and_exit(std::format("Could not find dependency {}.", dependency.artifact_name));
+            {
+                std::fprintf(stderr, "Could not find dependency '%s'.", dependency.artifact_name.c_str());
+                continue;
+            }
 
             std::filesystem::path const dependency_configuration_file_path = dependency_location.value();
 
@@ -241,11 +325,35 @@ namespace h::compiler
     std::pmr::vector<Artifact> get_sorted_artifacts(
         std::span<std::filesystem::path const> const artifact_file_paths,
         std::span<Repository const> repositories,
+        bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         std::pmr::vector<Artifact> artifacts{temporaries_allocator};
+
+        if (is_test_mode)
+        {
+            auto const location = std::find_if(artifacts.begin(), artifacts.end(), [](Artifact const& artifact) -> bool { return artifact.name == "Cpp_standard_library"; });
+            if (location == artifacts.end())
+            {
+                std::optional<std::filesystem::path> const cpp_standard_library_artifact_file_path = h::compiler::get_artifact_location(repositories, "Cpp_standard_library");
+                if (!cpp_standard_library_artifact_file_path.has_value())
+                    h::common::print_message_and_exit("Could not find dependency 'Cpp_standard_library'");
+
+                Artifact const artifact = get_artifact(cpp_standard_library_artifact_file_path.value());
+
+                add_artifact_dependencies(
+                    artifacts,
+                    artifact,
+                    repositories,
+                    output_allocator,
+                    temporaries_allocator
+                );
+                
+                artifacts.push_back(artifact);
+            }
+        }
 
         for (std::filesystem::path const& artifact_file_path : artifact_file_paths)
         {
@@ -403,7 +511,7 @@ namespace h::compiler
         {
             std::filesystem::path const output_module_json_filename = std::format("{}.hlb.json", header_module_name);
             std::filesystem::path const output_module_json_path = get_hl_build_directory(build_directory_path) / output_module_json_filename;
-            h::json::write<h::Module>(output_module_json_path, *header_module);
+            h::json::write_module_to_file(output_module_json_path, *header_module);
         }
 
         return header_module.value();
@@ -643,6 +751,8 @@ namespace h::compiler
     )
     {
         start_timer(get_profiler(builder), "import_and_export_c_headers");
+
+        create_directory_if_it_does_not_exist(builder.build_directory_path / "artifacts");
 
         Declaration_database declaration_database = create_declaration_database();
 
@@ -916,6 +1026,41 @@ namespace h::compiler
             }
         }
 
+        if (builder.is_test_mode)
+        {
+            std::filesystem::path const tests_main_file_path = h::common::get_tests_main_file_path();
+
+            std::filesystem::path const output_assembly_file = build_directory_path / std::format("hlang.tests_main.{}", extension);
+            std::filesystem::path const output_dependency_file = build_directory_path / std::format("hlang.tests_main.d");
+
+            if (!is_compiled_cpp_up_to_date(output_dependency_file))
+            {
+                std::array<std::pmr::string, 1> const additional_flags
+                {
+                    "-std=c++20",
+                };
+
+                bool const success = compile_cpp(
+                    *llvm_data.clang_data.compiler_instance,
+                    llvm_data.target_triple,
+                    tests_main_file_path,
+                    output_assembly_file,
+                    output_dependency_file,
+                    build_directory_path,
+                    {},
+                    additional_flags,
+                    use_clang_cl,
+                    compilation_options.debug,
+                    temporaries_allocator
+                );
+                if (!success)
+                {
+                    end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
+                    return false;
+                }
+            }
+        }
+
         end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
         return true;
     }
@@ -984,7 +1129,7 @@ namespace h::compiler
             {
                 std::filesystem::path const output_module_json_filename = std::format("{}.hlb.json", module_name.value());
                 std::filesystem::path const output_module_json_path = get_hl_build_directory(builder.build_directory_path) / output_module_json_filename;
-                h::json::write<h::Module>(output_module_json_path, core_module.value());
+                h::json::write_module_to_file(output_module_json_path, core_module.value());
             }
 
             core_modules[index] = std::move(core_module.value());
@@ -997,6 +1142,84 @@ namespace h::compiler
         end_timer(get_profiler(builder), "parse_source_files_and_cache");
 
         return core_modules;
+    }
+
+    std::pmr::vector<h::Module> create_test_artifact_modules(
+        Builder& builder,
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        std::span<Artifact const> const artifacts,
+        std::span<h::Module const> const core_modules,
+        Compilation_options const& compilation_options,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        start_timer(get_profiler(builder), "create_test_artifact_modules");
+
+        bool const use_objects = builder.compilation_options.output_debug_code_view;
+        std::string_view const extension = use_objects ? "obj" : "bc";
+
+        std::pmr::vector<h::Module> test_modules{temporaries_allocator};
+
+        for (std::filesystem::path const& artifact_file_path : artifact_file_paths)
+        {
+            auto const artifact_location = std::find_if(artifacts.begin(), artifacts.end(), [&](Artifact const& artifact) -> bool { return artifact.file_path == artifact_file_path; });
+            if (artifact_location == artifacts.end())
+                continue;
+
+            Artifact const& artifact = *artifact_location;
+
+            std::pmr::vector<std::filesystem::path> const hlang_source_files = get_artifact_hlang_source_files(
+                artifact,
+                temporaries_allocator,
+                temporaries_allocator
+            );
+
+            std::pmr::string const test_module_name = h::compiler::get_test_module_name(artifact.name);
+            std::filesystem::path const output_assembly_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}.{}", test_module_name, extension);
+            if (std::filesystem::exists(output_assembly_file))
+            {
+                bool is_up_to_date = true;
+
+                for (std::filesystem::path const& source_file : hlang_source_files)
+                {
+                    if (is_file_newer_than(source_file, output_assembly_file))
+                    {
+                        is_up_to_date = false;
+                        break;
+                    }
+                }
+
+                if (is_up_to_date)
+                    continue;
+            }
+
+            std::pmr::vector<h::Module const*> artifact_core_modules;
+            artifact_core_modules.reserve(hlang_source_files.size());
+
+            for (std::filesystem::path const& source_file_path : hlang_source_files)
+            {
+                std::optional<std::pmr::string> const module_name = h::parser::read_module_name(source_file_path);
+                if (!module_name.has_value())
+                    h::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
+
+                auto const location = std::find_if(core_modules.begin(), core_modules.end(), [&](h::Module const& core_module) -> bool { return core_module.name == module_name.value(); });
+                if (location != core_modules.end())
+                    artifact_core_modules.push_back(&(*location));
+            }
+
+            std::optional<h::Module> test_module = create_test_module(
+                artifact.name,
+                artifact_core_modules,
+                temporaries_allocator
+            );
+
+            if (test_module.has_value())
+                test_modules.push_back(std::move(test_module.value()));
+        }
+
+        end_timer(get_profiler(builder), "create_test_artifact_modules");
+
+        return test_modules;
     }
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> create_module_name_to_file_path_map(
@@ -1027,72 +1250,136 @@ namespace h::compiler
         return std::pmr::unordered_map<std::pmr::string, std::filesystem::path>{std::move(map), output_allocator};
     }
 
+    static void compile_and_write_to_bitcode_file(
+        Builder& builder,
+        h::Module const& core_module,
+        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
+        LLVM_data& llvm_data,
+        Compilation_database const& compilation_database,
+        Compilation_options const& compilation_options,
+        bool const is_test_mode
+    )
+    {
+        bool const use_objects = compilation_options.output_debug_code_view;
+        std::string_view const extension = use_objects ? "obj" : "bc";
+        std::string_view const test_extension = is_test_mode ? ".test" : "";
+
+        std::filesystem::path const output_assembly_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}{}.{}", core_module.name, test_extension, extension);
+        std::filesystem::path const output_llvm_ir_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}{}.{}", core_module.name, test_extension, "ll");
+
+        if (std::filesystem::exists(output_assembly_file))
+        {
+            if (!builder.output_llvm_ir || std::filesystem::exists(output_llvm_ir_file))
+            {
+                auto const input_module_file_iterator = module_name_to_file_path_map.find(core_module.name);
+
+                if (input_module_file_iterator != module_name_to_file_path_map.end() && std::filesystem::exists(input_module_file_iterator->second) && is_file_newer_than(output_assembly_file, input_module_file_iterator->second))
+                {
+                    return;
+                }
+            }
+        }
+
+        ::printf("Compiling '%s'%s\n", core_module.name.c_str(), is_test_mode ? " tests" : "");
+        if (core_module.source_file_path.has_value())
+            ::printf("    input is \"%s\"\n", core_module.source_file_path->generic_string().c_str());
+        if (builder.output_llvm_ir)
+            ::printf("    output llvm IR is \"%s\"\n", output_llvm_ir_file.generic_string().c_str());
+        ::printf("    output is \"%s\"\n", output_assembly_file.generic_string().c_str());
+
+        std::unique_ptr<llvm::Module> llvm_module = create_llvm_module(
+            llvm_data,
+            core_module,
+            module_name_to_file_path_map,
+            compilation_database,
+            compilation_options
+        );
+
+        if (builder.output_llvm_ir)
+            h::compiler::write_llvm_ir_to_file(*llvm_module, output_llvm_ir_file);
+
+        if (use_objects)
+            h::compiler::write_object_file(llvm_data, *llvm_module, output_assembly_file);
+        else
+            h::compiler::write_bitcode_to_file(llvm_data, *llvm_module, output_assembly_file);
+    }
+
     void compile_and_write_to_bitcode_files(
         Builder& builder,
         std::span<h::Module const> const core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         LLVM_data& llvm_data,
-        Compilation_database& compilation_database,
-        Compilation_options const& compilation_options
+        Compilation_database const& compilation_database,
+        Compilation_options const& compilation_options,
+        bool is_test_mode
     )
     {
         start_timer(get_profiler(builder), "compile_and_write_to_bitcode_files");
 
         // TODO to paralelize, llvm_data and compilation_database should be const
 
-        bool const use_objects = builder.compilation_options.output_debug_code_view;
-        std::string_view const extension = use_objects ? "obj" : "bc";
-
         for (std::size_t index = 0; index < core_modules.size(); ++index)
         {
             h::Module const& core_module = core_modules[index];
-
-            std::filesystem::path const output_assembly_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}.{}", core_module.name, extension);
-            std::filesystem::path const output_llvm_ir_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}.{}", core_module.name, "ll");
-
-            if (std::filesystem::exists(output_assembly_file))
-            {
-                if (!builder.output_llvm_ir || std::filesystem::exists(output_llvm_ir_file))
-                {
-                    std::filesystem::path const& input_module_file = module_name_to_file_path_map.at(core_module.name);
-
-                    if (is_file_newer_than(output_assembly_file, input_module_file))
-                    {
-                        continue;
-                    }
-                }
-            }
-
-            ::printf("Compiling '%s'\n", core_module.name.c_str());
-            if (core_module.source_file_path.has_value())
-                ::printf("    input is \"%s\"\n", core_module.source_file_path->generic_string().c_str());
-            if (builder.output_llvm_ir)
-                ::printf("    output llvm IR is \"%s\"\n", output_llvm_ir_file.generic_string().c_str());
-            ::printf("    output is \"%s\"\n", output_assembly_file.generic_string().c_str());
-
-            std::unique_ptr<llvm::Module> llvm_module = create_llvm_module(
-                llvm_data,
+            compile_and_write_to_bitcode_file(
+                builder,
                 core_module,
                 module_name_to_file_path_map,
+                llvm_data,
                 compilation_database,
-                compilation_options
+                compilation_options,
+                is_test_mode
             );
-
-            if (builder.output_llvm_ir)
-                h::compiler::write_llvm_ir_to_file(*llvm_module, output_llvm_ir_file);
-
-            if (use_objects)
-                h::compiler::write_object_file(llvm_data, *llvm_module, output_assembly_file);
-            else
-                h::compiler::write_bitcode_to_file(llvm_data, *llvm_module, output_assembly_file);
         }
 
         end_timer(get_profiler(builder), "compile_and_write_to_bitcode_files");
     }
 
-    std::pmr::vector<std::filesystem::path> get_artifact_bitcode_files(
+    std::pmr::vector<h::compiler::Artifact const*> get_artifact_pointers(
+        std::span<h::compiler::Artifact const> const artifacts,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::vector<h::compiler::Artifact const*> output{output_allocator};
+        output.reserve(artifacts.size());
+
+        for (h::compiler::Artifact const& artifact : artifacts)
+            output.push_back(&artifact);
+
+        return output;
+    }
+
+    std::pmr::vector<h::compiler::Artifact const*> filter_test_artifacts(
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        std::span<h::compiler::Artifact const> const artifacts,
+        std::span<h::Module const> const core_modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::vector<h::compiler::Artifact const*> output{output_allocator};
+        output.reserve(artifacts.size());
+
+        for (std::filesystem::path const& artifact_file_path : artifact_file_paths)
+        {
+            auto const artifact_location = std::find_if(artifacts.begin(), artifacts.end(), [&](Artifact const& artifact) -> bool { return artifact.file_path == artifact_file_path; });
+            if (artifact_location == artifacts.end())
+                continue;
+
+            std::pmr::string const test_module_name = h::compiler::get_test_module_name(artifact_location->name);
+            auto const test_location = std::find_if(core_modules.begin(), core_modules.end(), [&](h::Module const& core_module) -> bool { return core_module.name == test_module_name; });
+            if (test_location == core_modules.end())
+                continue;
+
+            output.push_back(&(*artifact_location));
+        }
+
+        return output;
+    }
+
+    static std::pmr::vector<std::filesystem::path> get_artifact_bitcode_files(
         Builder const& builder,
         Artifact const& artifact,
+        bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -1108,6 +1395,7 @@ namespace h::compiler
 
         bool const use_objects = builder.compilation_options.output_debug_code_view;
         std::string_view const extension = use_objects ? "obj" : "bc";
+        std::string_view const test_extension = is_test_mode ? ".test" : "";
 
         for (std::filesystem::path const& source_file_path : hlang_source_files)
         {
@@ -1115,7 +1403,7 @@ namespace h::compiler
             if (!module_name.has_value())
                 h::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
 
-            std::filesystem::path bitcode_file = build_directory_path / std::format("{}.{}", module_name.value(), extension);
+            std::filesystem::path bitcode_file = build_directory_path / std::format("{}{}.{}", module_name.value(), test_extension, extension);
             bitcode_files.push_back(std::move(bitcode_file));
         }
         
@@ -1131,6 +1419,16 @@ namespace h::compiler
             bitcode_files.push_back(std::move(bitcode_file));
         }
 
+        if (is_test_mode)
+        {
+            std::filesystem::path main_test_bitcode_file = build_directory_path / std::format("hlang.tests_main.{}", extension);
+            bitcode_files.push_back(std::move(main_test_bitcode_file));
+
+            std::pmr::string const test_module_name = h::compiler::get_test_module_name(artifact.name);
+            std::filesystem::path generated_test_bitcode_file = build_directory_path / std::format("{}.test.{}", test_module_name, extension);
+            bitcode_files.push_back(std::move(generated_test_bitcode_file));
+        }
+
         return bitcode_files;
     }
 
@@ -1140,13 +1438,13 @@ namespace h::compiler
         std::pmr::vector<std::pmr::string> dll_names;
     };
 
-    void add_dependency_libraries(
+    static void add_dependency_libraries(
         Artifact_libraries& artifact_libraries,
         Artifact const& artifact,
         std::span<Artifact const> const artifacts,
         h::compiler::Target const& target,
         std::filesystem::path const& build_directory_path,
-        h::compiler::Compilation_options const& compilation_options
+        bool const is_debug
     )
     {
         if (artifact.info.has_value())
@@ -1155,7 +1453,7 @@ namespace h::compiler
             {
                 Library_info const& library_info = std::get<Library_info>(*artifact.info);
         
-                std::optional<h::compiler::External_library_info> const external_library = h::compiler::get_external_library(library_info.external_libraries, target, compilation_options.debug, true);
+                std::optional<h::compiler::External_library_info> const external_library = h::compiler::get_external_library(library_info.external_libraries, target, is_debug, true);
                 if (external_library.has_value())
                 {
                     for (std::pmr::string const& name : external_library->names)
@@ -1192,17 +1490,18 @@ namespace h::compiler
                 artifacts,
                 target,
                 build_directory_path,
-                compilation_options
+                is_debug
             );
         }
     }
 
-    Artifact_libraries get_artifact_libraries_for_linking(
+    static Artifact_libraries get_artifact_libraries_for_linking(
         Artifact const& artifact,
         std::span<Artifact const> const artifacts,
         h::compiler::Target const& target,
         std::filesystem::path const& build_directory_path,
-        h::compiler::Compilation_options const& compilation_options,
+        bool const is_debug,
+        bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -1219,8 +1518,24 @@ namespace h::compiler
             artifacts,
             target,
             build_directory_path,
-            compilation_options
+            is_debug
         );
+
+        if (is_test_mode)
+        {
+            auto const artifact_location = std::find_if(artifacts.begin(), artifacts.end(), [](Artifact const& artifact) -> bool { return artifact.name == "Cpp_standard_library"; });
+            if (artifact_location == artifacts.end())
+                h::common::print_message_and_exit("Could not find artifact 'Cpp_standard_library'");
+
+            add_dependency_libraries(
+                artifact_libraries,
+                *artifact_location,
+                artifacts,
+                target,
+                build_directory_path,
+                is_debug
+            );
+        }
 
         return
         {
@@ -1232,19 +1547,22 @@ namespace h::compiler
     void link_artifacts(
         Builder& builder,
         std::span<Artifact const> const artifacts,
-        h::compiler::Compilation_options const& compilation_options,
+        std::span<Artifact const* const> const artifacts_to_link,
+        bool const debug,
+        bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         start_timer(get_profiler(builder), "link_artifacts");
 
-        for (std::size_t index = 0; index < artifacts.size(); ++index)
+        for (std::size_t index = 0; index < artifacts_to_link.size(); ++index)
         {
-            Artifact const& artifact = artifacts[index];
+            Artifact const& artifact = *artifacts_to_link[index];
 
             std::pmr::vector<std::filesystem::path> const bitcode_files = get_artifact_bitcode_files(
                 builder,
                 artifact,
+                is_test_mode,
                 temporaries_allocator
             );
             if (bitcode_files.empty())
@@ -1255,17 +1573,39 @@ namespace h::compiler
                 artifacts,
                 builder.target,
                 builder.build_directory_path,
-                compilation_options,
+                debug,
+                is_test_mode,
                 temporaries_allocator,
                 temporaries_allocator
             );
 
-            if (artifact.type == Artifact_type::Library)
+            if (is_test_mode)
+            {
+                h::compiler::Linker_options const linker_options
+                {
+                    .entry_point = "main",
+                    .debug = debug,
+                    .link_type = h::compiler::Link_type::Executable
+                };
+
+                std::filesystem::path const output = builder.build_directory_path / "bin" / (artifact.name + ".hlang.test");
+                create_directory_if_it_does_not_exist(output.parent_path());
+
+                bool const result = h::compiler::link(
+                    bitcode_files,
+                    artifact_libraries.libraries,
+                    output,
+                    linker_options
+                );
+                if (!result)
+                    h::common::print_message_and_exit(std::format("Failed to link executable '{}.test'.", artifact.name));
+            }
+            else if (artifact.type == Artifact_type::Library)
             {
                 h::compiler::Linker_options const linker_options
                 {
                     .entry_point = std::nullopt,
-                    .debug = compilation_options.debug,
+                    .debug = debug,
                     .link_type = h::compiler::Link_type::Static_library
                 };
 
@@ -1288,7 +1628,7 @@ namespace h::compiler
                 h::compiler::Linker_options const linker_options
                 {
                     .entry_point = executable_info.entry_point,
-                    .debug = compilation_options.debug,
+                    .debug = debug,
                     .link_type = h::compiler::Link_type::Executable
                 };
 
@@ -1451,6 +1791,7 @@ namespace h::compiler
         std::pmr::vector<Artifact> const artifacts = get_sorted_artifacts(
             { &artifact_file_path, 1 },
             builder.repositories,
+            false,
             temporaries_allocator,
             temporaries_allocator
         );
@@ -1465,5 +1806,19 @@ namespace h::compiler
         );
 
         write_compile_commands_to_file(commands, output_file_path);
+    }
+
+    std::pmr::vector<std::filesystem::path> find_artifact_file_paths(
+        std::filesystem::path const& path,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        return h::common::search_files(
+            path,
+            "hlang_artifact.json",
+            temporaries_allocator,
+            output_allocator
+        );
     }
 }

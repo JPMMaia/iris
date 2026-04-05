@@ -6,6 +6,7 @@ import h.compiler.compile_commands_generator;
 import h.compiler.target;
 
 #include <filesystem>
+#include <fstream>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -58,29 +59,30 @@ namespace h::compiler
 
     void test_builder(
         std::string_view const project_name,
-        std::filesystem::path const& main_artifact_path,
+        std::pmr::vector<std::filesystem::path> const& artifact_paths,
         h::compiler::Target const& target,
         std::span<std::filesystem::path const> const additional_repository_paths,
-        std::span<std::filesystem::path const> const expected_output_paths
+        std::span<std::filesystem::path const> const expected_output_paths,
+        std::optional<std::string_view> const temporary_directory_name = std::nullopt,
+        h::compiler::Builder_options const builder_options = {}
     )
     {
         std::filesystem::path const temporary_directory_path = std::filesystem::temp_directory_path();
-        std::filesystem::path const build_directory_path = temporary_directory_path / project_name;
-        std::filesystem::path const artifact_file_path = g_examples_directory / project_name / main_artifact_path;
+        std::filesystem::path const build_directory_path = temporary_directory_path / (temporary_directory_name.has_value() ? temporary_directory_name.value() : project_name);
+
+        std::pmr::vector<std::filesystem::path> artifact_absolute_paths;
+        artifact_absolute_paths.reserve(artifact_paths.size());
+        for (std::filesystem::path const& relative_path : artifact_paths)
+            artifact_absolute_paths.push_back(g_examples_directory / project_name / relative_path);
 
         std::pmr::vector<std::filesystem::path> header_search_directories = h::common::get_default_header_search_directories();
         
         std::pmr::vector<std::filesystem::path> repository_paths{ g_standard_repository_file_path };
         repository_paths.insert(repository_paths.end(), additional_repository_paths.begin(), additional_repository_paths.end());
 
-        h::compiler::Compilation_options const compilation_options
-        {
-
-        };
-
         std::filesystem::remove_all(build_directory_path);
 
-        Builder_options const builder_options
+        h::compiler::Compilation_options const compilation_options
         {
         };
 
@@ -94,7 +96,7 @@ namespace h::compiler
             {}
         );
     
-        build_artifact(builder, artifact_file_path);
+        build_artifacts(builder, artifact_absolute_paths);
 
         for (std::filesystem::path const& expected_output_path : expected_output_paths)
         {
@@ -160,7 +162,7 @@ namespace h::compiler
             std::filesystem::path{"bin"} / get_binary_name("Hello_world", target)
         };
 
-        test_builder("Hello_world", "hlang_artifact.json", target, {}, expected_output_paths);
+        test_builder("Hello_world", {"hlang_artifact.json"}, target, {}, expected_output_paths);
     }
 
     TEST_CASE("Build Link_with_library", "[Builder]")
@@ -178,7 +180,7 @@ namespace h::compiler
             std::filesystem::path{"bin"} / get_binary_name("my_app", target),
         };
 
-        test_builder("Link_with_library", "my_app/hlang_artifact.json", target, repository_paths, expected_output_paths);
+        test_builder("Link_with_library", {"my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
     TEST_CASE("Build Mix_with_cpp", "[Builder]")
@@ -198,7 +200,7 @@ namespace h::compiler
             std::filesystem::path{"bin"} / get_binary_name("my_app", target)
         };
 
-        test_builder("Mix_with_cpp", "my_app/hlang_artifact.json", target, repository_paths, expected_output_paths);
+        test_builder("Mix_with_cpp", {"my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
     TEST_CASE("Build Mix_with_cpp compile commands", "[Builder]")
@@ -248,7 +250,7 @@ namespace h::compiler
                 }
             };
 
-            test_compile_commands(build_directory_path, artifact_file_path, output_file_path, target, repository_paths, expected_compile_commands);
+            test_compile_commands(build_directory_path, {artifact_file_path}, output_file_path, target, repository_paths, expected_compile_commands);
         }
     }
 
@@ -266,7 +268,7 @@ namespace h::compiler
             std::filesystem::path{"include"} / "my_library" / "module_a.hpp",
         };
 
-        test_builder("Export_c_header", "hlang_artifact.json", target, repository_paths, expected_output_paths);
+        test_builder("Export_c_header", {"hlang_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
     TEST_CASE("Build Export_and_import_c_header", "[Builder]")
@@ -286,6 +288,123 @@ namespace h::compiler
             std::filesystem::path{"include"} / "my_library" / "module_a.hpp",
         };
 
-        test_builder("Export_and_import_c_header", "hlang_artifact.json", target, repository_paths, expected_output_paths);
+        test_builder("Export_and_import_c_header", {"hlang_artifact.json"}, target, repository_paths, expected_output_paths);
+    }
+
+    TEST_CASE("Build Test_framework my_app in non-test mode", "[Builder]")
+    {
+        h::compiler::Target const target = h::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework" / "hlang_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "my_library.hlb",
+            std::filesystem::path{"artifacts"} / "my_app.hlb",
+            std::filesystem::path{"bin"} / get_binary_name("my_app", target)
+        };
+
+        test_builder("Test_framework", {"my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths);
+    }
+
+    TEST_CASE("Build Test_framework my_library in test mode", "[Builder]")
+    {
+        h::compiler::Target const target = h::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework" / "hlang_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "my_library.test.bc",
+            std::filesystem::path{"artifacts"} / "my_library.generated_tests_information.test.bc",
+            std::filesystem::path{"bin"} / get_binary_name("my_library.hlang.test", target)
+        };
+
+        test_builder("Test_framework", {"my_library/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_0", {.is_test_mode = true});
+    }
+
+    TEST_CASE("Build Test_framework my_app in test mode", "[Builder]")
+    {
+        h::compiler::Target const target = h::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework" / "hlang_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "my_library.bc",
+            std::filesystem::path{"artifacts"} / "my_app.test.bc",
+            std::filesystem::path{"artifacts"} / "my_app.generated_tests_information.test.bc",
+            std::filesystem::path{"bin"} / get_binary_name("my_app.hlang.test", target)
+        };
+
+        test_builder("Test_framework", {"my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_1", {.is_test_mode = true});
+    }
+
+    TEST_CASE("Build Test_framework my_library and my_app in test mode", "[Builder]")
+    {
+        h::compiler::Target const target = h::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework" / "hlang_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "my_library.bc",
+            std::filesystem::path{"artifacts"} / "my_library.test.bc",
+            std::filesystem::path{"artifacts"} / "my_library.generated_tests_information.test.bc",
+            std::filesystem::path{"artifacts"} / "my_app.test.bc",
+            std::filesystem::path{"artifacts"} / "my_app.generated_tests_information.test.bc",
+            std::filesystem::path{"bin"} / get_binary_name("my_library.hlang.test", target),
+            std::filesystem::path{"bin"} / get_binary_name("my_app.hlang.test", target)
+        };
+
+        test_builder("Test_framework", {"my_library/hlang_artifact.json", "my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_2", {.is_test_mode = true});
+    }
+
+    TEST_CASE("Build Test_framework empty_app in test mode", "[Builder]")
+    {
+        h::compiler::Target const target = h::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework" / "hlang_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "empty_app.bc"
+        };
+
+        test_builder("Test_framework", {"empty_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_3", {.is_test_mode = true});
+    }
+
+    TEST_CASE("Locate artifacts in a directory", "[Builder]")
+    {
+        std::filesystem::path const root = std::filesystem::temp_directory_path() / "builder_artifact_search";
+        std::filesystem::remove_all(root);
+        std::filesystem::create_directories(root / "subdir");
+        {
+            std::ofstream{ root / "hlang_artifact.json" };
+            std::ofstream{ root / "subdir" / "hlang_artifact.json" };
+        }
+
+        std::pmr::vector<std::filesystem::path> const found = h::compiler::find_artifact_file_paths(root, {}, {});
+
+        CHECK(found.size() == 2);
+        for (std::filesystem::path const& artifact_file_path : found)
+        {
+            CHECK(artifact_file_path.filename() == "hlang_artifact.json");
+        }
     }
 }

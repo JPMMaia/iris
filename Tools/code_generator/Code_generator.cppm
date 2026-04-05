@@ -1,15 +1,6 @@
-module;
-
-#include <istream>
-#include <ostream>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
-
 export module h.tools.code_generator;
+
+import std;
 
 namespace h::tools::code_generator
 {
@@ -88,9 +79,7 @@ namespace h::tools::code_generator
 
     export void generate_json_operators_code(
         std::istream& input_stream,
-        std::ostream& output_stream,
-        std::string_view const export_module_name,
-        std::string_view const namespace_name
+        std::ostream& output_stream
     );
 
     export void generate_json_data(
@@ -109,6 +98,16 @@ namespace h::tools::code_generator
     );
 
     export void generate_serialize_binary_code(
+        std::istream& input_stream,
+        std::ostream& output_stream
+    );
+
+    export void generate_serialize_json_code(
+        std::istream& input_stream,
+        std::ostream& output_stream
+    );
+
+    export void generate_expressions_visitor(
         std::istream& input_stream,
         std::ostream& output_stream
     );

@@ -45,7 +45,7 @@ int main(int const argc, char const* const* argv)
     if (!core_module.has_value())
         return -1;
     
-    h::json::write<h::Module>(output_file_path, core_module.value());
+    h::json::write_module_to_file(output_file_path, core_module.value());
 
     return 0;
 }

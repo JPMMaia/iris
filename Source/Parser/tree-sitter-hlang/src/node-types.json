@@ -504,6 +504,40 @@
     }
   },
   {
+    "type": "Expression_compile_time",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_compile_time_statements",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_compile_time_statements",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_for_loop",
+          "named": true
+        },
+        {
+          "type": "Expression_if",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "Expression_constant",
     "named": true,
     "fields": {},
@@ -1200,6 +1234,10 @@
       "required": true,
       "types": [
         {
+          "type": "Expression_reflection_call",
+          "named": true
+        },
+        {
           "type": "Type",
           "named": true
         }
@@ -1716,11 +1754,11 @@
           "named": true
         },
         {
-          "type": "Global_variable_mutability",
+          "type": "Global_variable_name",
           "named": true
         },
         {
-          "type": "Global_variable_name",
+          "type": "Global_variable_type",
           "named": true
         },
         {
@@ -1729,11 +1767,6 @@
         }
       ]
     }
-  },
-  {
-    "type": "Global_variable_mutability",
-    "named": true,
-    "fields": {}
   },
   {
     "type": "Global_variable_name",
@@ -1749,6 +1782,11 @@
         }
       ]
     }
+  },
+  {
+    "type": "Global_variable_type",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "Identifier_with_dots",
@@ -1981,6 +2019,10 @@
         },
         {
           "type": "Expression_comment",
+          "named": true
+        },
+        {
+          "type": "Expression_compile_time",
           "named": true
         },
         {
@@ -2607,6 +2649,10 @@
     "named": false
   },
   {
+    "type": "compile_time",
+    "named": false
+  },
+  {
     "type": "default",
     "named": false
   },
@@ -2660,6 +2706,10 @@
   },
   {
     "type": "in",
+    "named": false
+  },
+  {
+    "type": "macro",
     "named": false
   },
   {

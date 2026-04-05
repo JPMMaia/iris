@@ -1,5 +1,23 @@
 module H.Builtin;
 
+export enum Type_kind
+{
+    Int,
+    Uint,
+    Float,
+    Bool,
+    Struct,
+    Union,
+    Enum,
+    Pointer,
+    Array_slice,
+    Constant_array,
+    Function_pointer,
+    Builtin,
+    Custom,
+    Null_pointer,
+}
+
 export struct Generic_array_slice
 {
     data: *Byte = null;

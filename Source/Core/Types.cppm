@@ -434,7 +434,11 @@ namespace h
             else if (std::holds_alternative<Variable_declaration_with_type_expression>(expression.data))
             {
                 Variable_declaration_with_type_expression const& data = std::get<Variable_declaration_with_type_expression>(expression.data);
-                return visit_type_references(data.type, predicate);
+
+                if (data.type.expression_index >= statement.expressions.size())
+                    return false;
+
+                return visit_type_references(statement.expressions[data.type.expression_index], statement, predicate);
             }
 
             return false;
@@ -748,6 +752,20 @@ namespace h
         return visit_type_references(core_module, declaration_name, call_recursive);
     }
 
+    export template <typename Function_t>
+        bool visit_type_references_recursively(
+            h::Module const& core_module,
+            Function_t predicate
+        )
+    {
+        auto const call_recursive = [&](std::string_view const declaration_name, h::Type_reference const& type_reference) -> bool
+        {
+            return visit_type_references_recursively(type_reference, predicate);
+        };
+
+        return visit_type_references(core_module, call_recursive);
+    }
+
     export template <typename Value_t, typename Function_t>
         bool visit_type_references_recursively_with_declaration_name(
             Value_t const& value,
@@ -1003,4 +1021,28 @@ namespace h
 
         return false;
     }
+
+    export bool replace_parameter_types_by_instance_arguments(
+        Type_reference& type_reference,
+        std::span<Function_constructor_parameter const> function_constructor_parameters,
+        std::span<Statement const> instance_arguments
+    );
+
+    export bool replace_parameter_types_by_instance_arguments(
+        Type_reference& type_reference,
+        std::span<Type_constructor_parameter const> type_constructor_parameters,
+        std::span<Statement const> instance_arguments
+    );
+
+    export bool replace_parameter_types_by_instance_arguments(
+        Function_type& function_type,
+        std::span<Function_constructor_parameter const> function_constructor_parameters,
+        std::span<Statement const> instance_arguments
+    );
+
+    export bool replace_parameter_types_by_instance_arguments(
+        Function_type& function_type,
+        std::span<Type_constructor_parameter const> type_constructor_parameters,
+        std::span<Statement const> instance_arguments
+    );
 }

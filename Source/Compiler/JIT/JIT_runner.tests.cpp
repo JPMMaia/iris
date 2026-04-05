@@ -94,7 +94,7 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = "./**/*.hltxt"
+                    .include = {"./**/*.hltxt"}
                 }
             },
             .info = h::compiler::Executable_info
@@ -188,7 +188,7 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = "./**/*.hltxt"
+                    .include = {"./**/*.hltxt"}
                 }
             },
             .info = h::compiler::Executable_info
@@ -275,7 +275,7 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = "./**/*.hltxt"
+                    .include = {"./**/*.hltxt"}
                 }
             },
             .info = h::compiler::Executable_info
@@ -355,7 +355,7 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = "./**/*.hltxt"
+                    .include = {"./**/*.hltxt"}
                 }
             },
             .info = h::compiler::Executable_info
@@ -472,7 +472,7 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = "./**/*.hltxt"
+                    .include = {"./**/*.hltxt"}
                 }
             },
             .info = h::compiler::Executable_info
@@ -557,7 +557,7 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = "./**/*.hltxt"
+                    .include = {"./**/*.hltxt"}
                 }
             },
             .info = h::compiler::Executable_info
@@ -660,7 +660,7 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = "./**/*.hltxt"
+                    .include = {"./**/*.hltxt"}
                 }
             },
             .info = h::compiler::Executable_info
@@ -755,7 +755,7 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = "./**/*.hltxt"
+                    .include = {"./**/*.hltxt"}
                 }
             },
             .info = h::compiler::Executable_info
@@ -867,7 +867,7 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = "./**/*.hltxt"
+                    .include = {"./**/*.hltxt"}
                 }
             },
             .info = h::compiler::Executable_info

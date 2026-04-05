@@ -1,0 +1,52 @@
+=========================
+Test framework
+=========================
+
+module Test_framework;
+
+@test
+function test_addition() -> ()
+{
+    check(1 + 2 == 3);
+}
+
+---
+
+(Module
+  (Module_head
+    (Module_declaration
+      (Module_name
+        (Identifier_with_dots
+          (Identifier)))))
+  (Declaration
+    (Declaration_attribute
+      (Reflection_identifier))
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters)
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_call
+              (Generic_expression
+                (Expression_variable
+                  (Variable_name
+                    (Identifier))))
+              (Expression_call_arguments
+                (Generic_expression_or_instantiate
+                  (Generic_expression
+                    (Expression_binary
+                      (Generic_expression
+                        (Expression_binary
+                          (Generic_expression
+                            (Expression_constant
+                              (Number)))
+                          (Generic_expression
+                            (Expression_constant
+                              (Number)))))
+                      (Generic_expression
+                        (Expression_constant
+                          (Number))))))))))))))

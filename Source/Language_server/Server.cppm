@@ -1,5 +1,6 @@
 module;
 
+#include <filesystem>
 #include <functional>
 #include <span>
 #include <vector>
@@ -11,6 +12,7 @@ export module h.language_server.server;
 import h.compiler.artifact;
 import h.compiler.builder;
 import h.compiler.diagnostic;
+import h.compiler.target;
 import h.core;
 import h.core.declarations;
 import h.parser.parse_tree;

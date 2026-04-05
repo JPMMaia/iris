@@ -11,6 +11,7 @@ target_sources(H_core
       FILES
          "Core.cppm"
          "Declarations.cppm"
+         "Expressions_visitor.cppm"
          "Expressions.cppm"
          "Formatter.cppm"
          "Hash.cppm"
@@ -39,3 +40,5 @@ else()
    target_include_directories(H_core PRIVATE ${XXHASH_INCLUDE_DIRS})
    target_link_libraries(H_core PRIVATE PkgConfig::XXHASH)
 endif()
+
+add_dependencies(H_core Generate_h_core_expressions_visitor)

@@ -8,98 +8,77 @@
 		"version": "0.2.0",
 		"configurations": [
 			{
-				"name": "Generate read JSON",
-				"type": "node",
+				"name": "Generate JSON serializer",
+				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/Debug/H_Tools_Generate_JSON.exe",
+				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
 				"args": [
-					"read",
-					"h.json_serializer.read_json",
-					"h::json",
-					"h.core",
+					"serialize_json_code",
 					"${workspaceFolder}/Source/Core/Core.cppm",
-					"${workspaceFolder}/Source/JSON_serializer/Read_json.cppm"
+					"${workspaceFolder}/Source/JSON_serializer/Generated.cppm"
 				],
-				"cwd": "${fileDirname}",
-			},
-			{
-				"name": "Generate write JSON",
-				"type": "lldb-dap",
-				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/Debug/H_Tools_Generate_JSON.exe",
-				"args": [
-					"write",
-					"h.json_serializer.write_json",
-					"h::json",
-					"h.core",
-					"${workspaceFolder}/Source/Core/Core.cppm",
-					"${workspaceFolder}/Source/JSON_serializer/Write_json.cppm"
-				],
-				"cwd": "${fileDirname}"
+				"cwd": "${workspaceFolder}",
 			},
 			{
 				"name": "Generate JSON operators",
-				"type": "lldb-dap",
+				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/Debug/H_Tools_Generate_JSON.exe",
+				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
 				"args": [
 					"operators",
-					"h.json_serializer.operators",
-					"h::json",
-					"h.core",
 					"${workspaceFolder}/Source/Core/Core.cppm",
 					"${workspaceFolder}/Source/JSON_serializer/Operators.cppm"
 				],
-				"cwd": "${fileDirname}"
+				"cwd": "${workspaceFolder}"
 			},
 			{
 				"name": "Replace Compiler Tests",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/tests_result_replacer/Debug/H_Tools_Replace_tests_results.exe",
+				"program": "${workspaceFolder}/build/Tools/tests_result_replacer/H_Tools_Replace_tests_results.exe",
 				"args": [
-					"${workspaceFolder}/build/Source/Compiler/Debug/H_compiler_tests.exe",
+					"${workspaceFolder}/build/Source/Compiler/H_compiler_tests.exe",
 					"${workspaceFolder}/Source/Compiler/Compiler.tests.cpp",
 				],
-				"cwd": "${fileDirname}"
+				"cwd": "${workspaceFolder}"
 			},
 			{
 				"name": "C Header Importer tests",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Interoperability/Debug/H_c_header_importer_tests.exe",
+				"program": "${workspaceFolder}/build/Source/Interoperability/H_c_header_importer_tests.exe",
 				"args": [],
-				"cwd": "${fileDirname}",
+				"cwd": "${workspaceFolder}",
 			},
 			{
 				"name": "Generate TypeScript interface",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/Debug/H_Tools_Generate_JSON.exe",
+				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
 				"args": [
 					"typescript_interface",
 					"${workspaceFolder}/Source/Core/Core.cppm",
 					"${workspaceFolder}/Tools/vscode/H-editor/src/core/Core_interface.ts"
 				],
-				"cwd": "${fileDirname}",
+				"cwd": "${workspaceFolder}",
 			},
 			{
 				"name": "Generate TypeScript intermediate representation",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/Debug/H_Tools_Generate_JSON.exe",
+				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
 				"args": [
 					"typescript_intermediate_representation",
 					"${workspaceFolder}/Source/Core/Core.cppm",
 					"${workspaceFolder}/Tools/vscode/H-editor/src/core/Core_intermediate_representation.ts"
 				],
-				"cwd": "${fileDirname}",
+				"cwd": "${workspaceFolder}",
 			},
 			{
 				"name": "hlang build-executable",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"build-executable",
 					"${workspaceFolder}/Examples/hl/hello_world.hl",
@@ -113,7 +92,7 @@
 				"name": "hlang build-artifact",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"build-artifact",
 					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/hlang_artifact.json",
@@ -127,16 +106,44 @@
 				"name": "hlang build-artifact rts-game",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"build-artifact",
 					"--output-llvm-ir",
 					"--artifact-file=${workspaceFolder}/../rts-game/source/game/hlang_artifact.json",
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/Libraries/hlang_repository.json",
+					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
 					"--repository=${workspaceFolder}/../HLang_Local_Repository/hlang_repository.json",
 					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
+				],
+				"cwd": "${workspaceFolder}/build",
+			},
+			{
+				"name": "hlang build-tests rts-game",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
+				"args": [
+					"build-tests",
+					"--output-llvm-ir",
+					"--artifact-file=${workspaceFolder}/../rts-game/source/game/hlang_artifact.json",
+					"--build-directory=${workspaceFolder}/../rts-game/build",
+					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
+					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
+					"--repository=${workspaceFolder}/../HLang_Local_Repository/hlang_repository.json",
+					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
+				],
+				"cwd": "${workspaceFolder}/build",
+			},
+			{
+				"name": "Debug rts-game tests",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/../rts-game/build/bin/game.test.exe",
+				"args": [
+					"--list-tests",
+					"--output-format=json:${workspaceFolder}/test.json"
 				],
 				"cwd": "${workspaceFolder}/build",
 			},
@@ -144,7 +151,7 @@
 				"name": "hlang run-with-jit",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"run-with-jit",
 					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/hlang_artifact.json",
@@ -158,7 +165,7 @@
 				"name": "hlang run-with-jit MythologyEngine",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"run-with-jit",
 					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/hlang_artifact.json",
@@ -173,7 +180,7 @@
 				"name": "hlang import-c-header",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"import-c-header",
 					"c.complex",
@@ -190,7 +197,7 @@
 				"name": "hlang print-struct-layout",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"print-struct-layout",
 					"${workspaceFolder}/Tools/vscode/H-editor/packages/client/test_fixture/build/no_artifact/code_lens_0.generated.hl",
@@ -202,14 +209,14 @@
 				"name": "hlang generate-compile-commands rts-game",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"generate-compile-commands",
 					"--artifact-file=${workspaceFolder}/../rts-game/source/game/hlang_artifact.json",
 					"--output-file=${workspaceFolder}/../rts-game/build/compile_commands.json",
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/Libraries/hlang_repository.json",
+					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
 					"--repository=${workspaceFolder}/../HLang_Local_Repository/hlang_repository.json",
 					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
 				],
@@ -219,7 +226,7 @@
 				"name": "Run Language Server",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Language_server/Debug/hlang_language_server.exe",
+				"program": "${workspaceFolder}/build/Source/Language_server/hlang_language_server.exe",
 				"args": [],
 				"cwd": "${workspaceFolder}/build"
 			},
@@ -236,16 +243,17 @@
 				"runtimeExecutable": "${execPath}",
 				"args": [
 					"--extensionDevelopmentPath=${workspaceRoot}/Tools/vscode/H-editor",
-					"--trace-warnings"
-				],
-				"outFiles": [
-					"${workspaceRoot}/Tools/vscode/H-editor/out/**/*.js"
+					"--trace-warnings",
+					"--disable-extensions"
 				],
 				"sourceMaps": true,
 				"autoAttachChildProcesses": true,
+				"outFiles": [
+					"${workspaceRoot}/Tools/vscode/H-editor/out/**/*.js"
+				],
 				"env": {
 					"mode": "debug",
-					"hlang_language_server": "${workspaceFolder}/build/Source/Language_server/Debug/hlang_language_server.exe"
+					"hlang_language_server": "${workspaceFolder}/build/Source/Language_server/hlang_language_server.exe"
 				}
 			},
 			{
@@ -253,28 +261,20 @@
 				"type": "extensionHost",
 				"request": "launch",
 				"runtimeExecutable": "${execPath}",
-				"args": [
-					"--extensionDevelopmentPath=${workspaceRoot}/Tools/vscode/H-editor",
-					"--extensionTestsPath=${workspaceRoot}/Tools/vscode/H-editor/out/packages/client/src/test",
-					"${workspaceRoot}/Tools/vscode/H-editor/packages/client/test_fixture",
-					"--disable-extensions"
-				],
-				"outFiles": [
-					"${workspaceRoot}/Tools/vscode/H-editor/out/**/*.js"
-				],
-				"sourceMaps": true,
+				"testConfiguration": "${workspaceFolder}/Tools/vscode/H-editor/.vscode-test.mjs",
+				"args": [],
 				"autoAttachChildProcesses": true,
 				"preLaunchTask": "Build Language Client and Server",
 				"env": {
 					"mode": "debug",
-					"hlang_language_server": "${workspaceFolder}/build/Source/Language_server/Debug/hlang_language_server.exe"
+					"hlang_language_server": "${workspaceFolder}/build/Source/Language_server/hlang_language_server.exe"
 				}
 			},
 			{
 				"name": "Parser",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Parser/Debug/hlang_parser.exe",
+				"program": "${workspaceFolder}/build/Source/Parser/hlang_parser.exe",
 				"args": [
 					"${workspaceFolder}/Examples/txt/hello_world.hltxt",
 					"${workspaceFolder}/build/tmp/hello_world.hl",
@@ -285,7 +285,7 @@
 				"name": "Compiler Tests",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Compiler/Debug/H_compiler_tests.exe",
+				"program": "${workspaceFolder}/build/Source/Compiler/H_compiler_tests.exe",
 				"args": [
 					"[JIT]"
 				],
@@ -299,6 +299,22 @@
 				"args": [
 					"generate_examples"
 				],
+			},
+			{
+				"name": "Test VSCode extension",
+				"type": "extensionHost",
+				"request": "launch",
+				"runtimeExecutable": "${execPath}",
+				"testConfiguration": "${workspaceFolder}/Tools/vscode/H-editor/.vscode-test.mjs",
+				"args": [
+				],
+				"outFiles": [
+					"${workspaceRoot}/Tools/vscode/H-editor/out/**/*.js"
+				],
+				"preLaunchTask": "Build Language Client",
+				"env": {
+					"hlang_language_server": "${workspaceFolder}/build/Source/Language_server/hlang_language_server.exe"
+				}
 			},
 		],
 		"compounds": [
@@ -324,6 +340,19 @@
 	},
 	"tasks": {
 		"version": "2.0.0",
+		"windows": {
+			"options": {
+				"shell": {
+					"executable": "cmd.exe",
+					"args": [
+						"/c",
+						"\"C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/VsDevCmd.bat\"",
+						"-arch=x64",
+						"&"
+					]
+				}
+			}
+		},
 		"tasks": [
 			{
 				"label": "Package VSCode Extension",
@@ -345,6 +374,7 @@
 			{
 				"label": "Build Language Server",
 				"command": "cmake",
+				"type": "shell",
 				"args": [
 					"--build",
 					"${workspaceFolder}/build",
@@ -358,10 +388,10 @@
 			{
 				"label": "Build Language Client",
 				"command": "npm",
-				"type": "shell",
+				"type": "process",
 				"args": [
 					"run",
-					"webpack:client-dev"
+					"compile"
 				],
 				"presentation": {
 					"reveal": "always"
@@ -382,6 +412,7 @@
 			{
 				"label": "Build Debug",
 				"command": "cmake",
+				"type": "shell",
 				"args": [
 					"--build",
 					"${workspaceFolder}/build"
@@ -391,16 +422,42 @@
 				]
 			},
 			{
+				"label": "CMake Configure Debug",
+				"command": "cmake",
+				"type": "shell",
+				"args": [
+					"-S",
+					"${workspaceFolder}",
+					"-B",
+					"build",
+					"-DCMAKE_BUILD_TYPE=Debug"
+				]
+			},
+			{
+				"label": "CMake Configure Release",
+				"command": "cmake",
+				"type": "shell",
+				"args": [
+					"-S",
+					"${workspaceFolder}",
+					"-B",
+					"build",
+					"-DCMAKE_BUILD_TYPE=Release"
+				]
+			},
+			{
 				"label": "Build Release",
 				"command": "cmake",
+				"type": "shell",
 				"args": [
 					"--build",
-					"${workspaceFolder}/build",
-					"--config",
-					"release"
+					"${workspaceFolder}/build"
 				],
 				"problemMatcher": [
 					"$msCompile"
+				],
+				"dependsOn": [
+					"CMake Configure Release"
 				]
 			},
 			{
@@ -429,9 +486,7 @@
 				"args": [
 					"${workspaceFolder}/Scripts/build_utilities.py",
 					"install_hlang",
-					"${workspaceFolder}/../Hlang_install",
-					"--configuration",
-					"release"
+					"${workspaceFolder}/../Hlang_install"
 				],
 				"presentation": {
 					"reveal": "always"
@@ -569,6 +624,34 @@
 				"cwd": "${workspaceFolder}/build",
 			}
 		],
-		"editor.formatOnSave": false
+		"editor.formatOnSave": false,
+		"terminal.integrated.profiles.windows": {
+			"x64 Native Tools": {
+				"path": "C:/Windows/System32/cmd.exe",
+				"args": [
+					"/k",
+					"C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/VsDevCmd.bat",
+					"-arch=x64"
+				]
+			}
+		},
+		"C_Cpp.default.cppStandard": "c++23",
+		"C_Cpp.default.cStandard": "c23",
+		"C_Cpp.default.compileCommands": [
+			"${workspaceFolder}/build/compile_commands.json"
+		],
+		"cmake.automaticReconfigure": false,
+		"cmake.buildBeforeRun": false,
+		"cmake.configureOnEdit": false,
+		"cmake.enableAutomaticKitScan": false,
+		"chat.tools.terminal.autoApprove": {
+			"/^powershell -Command \"\\. \\$PROFILE ; Enter-VsDevEnv ; cd 'C:\\\\Users\\\\JPMMa\\\\Desktop\\\\source\\\\H' ; cmake --build build --target H_compiler\"$/": {
+				"approve": true,
+				"matchCommandLine": true
+			},
+			"Enter-VsDevEnv": true,
+			".\\build\\Source\\Compiler\\H_compiler_tests.exe": true,
+			"cmake": true
+		}
 	}
 }

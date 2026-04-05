@@ -2,6 +2,7 @@ module my_app;
 
 import my_library as my_library;
 
+@unique_name("main")
 export function main() -> (result: Int32)
 {
     return my_library.hello_from_library();

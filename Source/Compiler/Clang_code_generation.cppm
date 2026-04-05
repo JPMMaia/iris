@@ -23,6 +23,7 @@ module;
 
 #include <memory>
 #include <memory_resource>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -40,14 +41,45 @@ import h.compiler.types;
 
 namespace h::compiler
 {
+    export void add_clang_struct_declaration(
+        Clang_declaration_database& clang_declaration_database,
+        clang::ASTContext& clang_ast_context,
+        h::Module const& core_module,
+        h::Struct_declaration const& struct_declaration,
+        Declaration_database const& declaration_database
+    );
+
+    export void add_clang_union_declaration(
+        Clang_declaration_database& clang_declaration_database,
+        clang::ASTContext& clang_ast_context,
+        h::Module const& core_module,
+        h::Union_declaration const& union_declaration,
+        Declaration_database const& declaration_database
+    );
+
+    export void add_clang_function_declaration(
+        Clang_declaration_database& clang_declaration_database,
+        clang::ASTContext& clang_ast_context,
+        std::string_view const module_name,
+        h::Function_declaration const& function_declaration,
+        Declaration_database const& declaration_database
+    );
+
+    export void add_clang_function_declarations(
+        Clang_declaration_database& clang_declaration_database,
+        clang::ASTContext& clang_ast_context,
+        h::Module const& core_module,
+        Declaration_database const& declaration_database
+    );
+
     export llvm::FunctionType* create_llvm_function_type(
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         std::string_view const module_name,
         std::string_view const function_name
     );
 
     export llvm::FunctionType* convert_to_llvm_function_type(
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         Declaration_database const& declaration_database,
         h::Function_type const& function_type
     );
@@ -55,7 +87,7 @@ namespace h::compiler
     export void set_llvm_function_argument_names(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         h::Function_declaration const& function_declaration,
         llvm::Function& llvm_function,
         Declaration_database const& declaration_database,
@@ -74,7 +106,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         h::Module const& core_module,
@@ -103,7 +135,7 @@ namespace h::compiler
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
         llvm::Function& llvm_parent_function,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         h::Module const& core_module,
         h::Function_type const& function_type,
         llvm::FunctionType& llvm_function_type,
@@ -117,7 +149,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         h::Module const& core_module,
         h::Function_declaration const& function_declaration,
         llvm::Function& llvm_function,
@@ -132,7 +164,7 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         h::Module const& core_module,
         h::Function_type const& function_type,
         llvm::Function& llvm_function,
@@ -144,12 +176,19 @@ namespace h::compiler
 
     export void set_function_definition_attributes(
         llvm::LLVMContext& llvm_context,
-        Clang_module_data& clang_module_data,
+        Clang_module_data const& clang_module_data,
         llvm::Function& llvm_function
     );
 
     export llvm::Type* convert_type(
         Clang_module_data const& clang_module_data,
+        std::string_view const module_name,
+        std::string_view const declaration_name
+    );
+
+    export llvm::Type* convert_type_on_demand(
+        Clang_context const& clang_context,
+        Declaration_database const& declaration_database,
         std::string_view const module_name,
         std::string_view const declaration_name
     );
@@ -162,11 +201,6 @@ namespace h::compiler
     export llvm::FunctionType* convert_function_type(
         Clang_module_data const& clang_module_data,
         clang::FunctionDecl* const function_declaration
-    );
-
-    export llvm::FunctionType* get_instance_call_llvm_function_type(
-        Clang_module_data const& clang_module_data,
-        Instance_call_key const& key
     );
 
     export struct Clang_struct_member_bit_field_info
@@ -185,7 +219,6 @@ namespace h::compiler
         Clang_module_data const& clang_module_data,
         std::string_view const module_name,
         Struct_declaration const& struct_declaration,
-        std::optional<h::Type_instance> const& type_instance,
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 
@@ -198,7 +231,6 @@ namespace h::compiler
         std::string_view const access_member_name,
         std::string_view const module_name,
         Struct_declaration const& struct_declaration,
-        std::optional<h::Type_instance> const& type_instance,
         Type_database const& type_database
     );
 
@@ -211,7 +243,6 @@ namespace h::compiler
         std::string_view const access_member_name,
         std::string_view const module_name,
         Struct_declaration const& struct_declaration,
-        std::optional<h::Type_instance> const& type_instance,
         Value_and_type const& value_to_store,
         Type_database const& type_database
     );
@@ -258,10 +289,22 @@ namespace h::compiler
         unsigned int const optimization_level
     );
 
+    export Clang_context create_clang_context(
+        llvm::LLVMContext& llvm_context,
+        Clang_data const& clang_data,
+        std::string_view const module_name
+    );
+
     export Clang_declaration_database create_clang_declaration_database(
         llvm::LLVMContext& llvm_context,
         Clang_data const& clang_data,
         std::span<h::Module const* const> const core_modules,
+        Declaration_database const& declaration_database
+    );
+
+    export Clang_module_data create_clang_module_data(
+        Clang_context&& clang_context,
+        std::span<h::Module const* const> const sorted_modules,
         Declaration_database const& declaration_database
     );
 

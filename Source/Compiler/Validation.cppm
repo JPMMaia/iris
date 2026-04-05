@@ -362,6 +362,12 @@ namespace h::compiler
         Declaration_database const& declaration_database
     );
 
+    bool is_macro_global_variable(
+        std::string_view const current_module_name,
+        h::Expression const& expression,
+        Declaration_database const& declaration_database
+    );
+
     std::optional<h::Source_range> get_statement_source_range(
         h::Statement const& statement
     );

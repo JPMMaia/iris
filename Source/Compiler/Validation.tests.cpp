@@ -290,6 +290,7 @@ enum My_enum
     b = 1 + 2,
     c = a + b,
     d = get_value(),
+    e = -1,
 }
 )";
 
@@ -397,6 +398,8 @@ function get_value() -> (result: Int32)
 
 var my_global_0 = 0;
 var my_global_1 = get_value();
+var my_global_2 = get_value;
+var my_global_3 = [0, 1, 2];
 )";
 
         std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
@@ -414,17 +417,19 @@ var my_global_1 = get_value();
         test_validate_module(input, {}, expected_diagnostics);
     }
 
-    TEST_CASE("Validates that pointers to global constants do not exist", "[Validation][Global_variable]")
+    TEST_CASE("Validates that pointers to global macros do not exist", "[Validation][Global_variable]")
     {
         std::string_view const input = R"(module Test;
 
 mutable my_global_0 = 0;
 var my_global_1 = 0;
+macro my_global_2 = 0;
 
 function run() -> ()
 {
     var a = &my_global_0;
     var b = &my_global_1;
+    var c = &my_global_2;
 }
 )";
 
@@ -432,10 +437,10 @@ function run() -> ()
         {
             h::compiler::Diagnostic
             {
-                .range = create_source_range(9, 13, 9, 14),
+                .range = create_source_range(11, 13, 11, 14),
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
-                .message = "Cannot take address of a global constant.",
+                .message = "Cannot take address of a global macro.",
                 .related_information = {},
             }
         };
@@ -785,6 +790,27 @@ function add(first: Int32, second: Int32) -> (result: Int32)
                 .message = "Variable 'beep' does not exist.",
                 .related_information = {},
             }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+
+    TEST_CASE("Validates that alias type can be return from function", "[Validation][Function_contracts]")
+    {
+        std::string_view const input = R"(module Test;
+
+using My_alias = *mutable Int32;
+
+function foo() -> (result: My_alias)
+{
+    var value: My_alias = null;
+    return value;
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
         };
 
         test_validate_module(input, {}, expected_diagnostics);

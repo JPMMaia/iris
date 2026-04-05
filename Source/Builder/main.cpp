@@ -191,7 +191,22 @@ int main(int const argc, char const* const* argv)
     add_output_llvm_ir_argument(build_artifact_command);
     add_function_contract_options_argument(build_artifact_command);
     program.add_subparser(build_artifact_command);
-
+    
+    // hlang build-tests [--artifact-file=<artifact_file>]... [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
+    argparse::ArgumentParser build_tests_command("build-tests");
+    build_tests_command.add_description("Build one or more artifacts in test mode. If no artifacts are specified the current working directory is searched for hlang_artifact.json files.");
+    build_tests_command.add_argument("--artifact-file")
+        .help("Path to an artifact file")
+        .default_value<std::vector<std::string>>({})
+        .append();
+    add_build_directory_argument(build_tests_command);
+    add_header_search_path_argument(build_tests_command);
+    add_repository_argument(build_tests_command);
+    add_no_debug_argument(build_tests_command);
+    add_output_llvm_ir_argument(build_tests_command);
+    add_function_contract_options_argument(build_tests_command);
+    program.add_subparser(build_tests_command);
+    
     // hlang run-with-jit [--artifact-file=<artifact_file>] [--build-directory=<build_directory>] [--header-search-path=<header_search_path>]... [--repository=<repository_path>]...
     argparse::ArgumentParser run_with_jit_command("run-with-jit");
     run_with_jit_command.add_description("Use Just-in-time (JIT) compilation and run the program. Any changes detected during runtime will be applied.");
@@ -286,6 +301,54 @@ int main(int const argc, char const* const* argv)
         try
         {
             h::compiler::build_artifact(builder, artifact_file_path);
+        }
+        catch (std::exception const& error)
+        {
+            std::cerr << error.what() << std::endl;
+            std::cerr << program;
+            std::exit(1);
+        }
+    }
+    else if (program.is_subcommand_used("build-tests"))
+    {
+        print_arguments(argc, argv);
+
+        argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("build-tests");
+
+        std::vector<std::string> const artifact_strings = subprogram.get<std::vector<std::string>>("--artifact-file");
+        std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
+        std::pmr::vector<std::filesystem::path> const header_search_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--header-search-path"));
+        std::pmr::vector<std::filesystem::path> repository_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
+        bool const no_debug = subprogram.get<bool>("--no-debug");
+        h::compiler::Contract_options const contract_options = get_function_contract_options_argument(subprogram);
+
+        h::compiler::Target const target = h::compiler::get_default_target();
+        h::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options);
+
+        h::compiler::Builder_options const builder_options =
+        {
+            .output_llvm_ir = subprogram.get<bool>("--output-llvm-ir"),
+            .is_test_mode = true,
+        };
+
+        h::compiler::Builder builder = h::compiler::create_builder(
+            target,
+            build_directory_path,
+            header_search_paths,
+            repository_paths,
+            compilation_options,
+            builder_options,
+            {}
+        );
+
+        std::pmr::vector<std::filesystem::path> artifact_paths =
+            artifact_strings.empty() ?
+            h::compiler::find_artifact_file_paths(std::filesystem::current_path(), {}, {}) :
+            convert_to_path(artifact_strings);
+
+        try
+        {
+            h::compiler::build_artifacts(builder, artifact_paths);
         }
         catch (std::exception const& error)
         {

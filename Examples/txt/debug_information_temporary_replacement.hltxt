@@ -1,0 +1,13 @@
+module Debug_information_temporary_replacement;
+
+struct My_struct {
+    a: *My_struct = null;
+    b: My_alias = null;
+}
+
+using My_alias = *My_struct;
+
+function run() -> ()
+{
+    var instance: My_struct = {};
+}

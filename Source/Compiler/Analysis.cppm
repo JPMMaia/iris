@@ -218,7 +218,7 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 
-    void add_import_usage(
+    export void add_import_usage(
         h::Module& core_module,
         std::string_view const alias,
         std::string_view const usage
@@ -325,9 +325,13 @@ namespace h::compiler
                 else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(expression.data))
                 {
                     h::Variable_declaration_with_type_expression const& data = std::get<h::Variable_declaration_with_type_expression>(expression.data);
-                    scope.variables.push_back(
-                        create_variable(data.name, data.type, data.is_mutable, false, expression.source_range)
-                    );
+                    std::optional<h::Type_reference> const type_reference = h::get_variable_declaration_with_type_expression_type(statement, data);
+                    if (type_reference.has_value())
+                    {
+                        scope.variables.push_back(
+                            create_variable(data.name, std::move(type_reference.value()), data.is_mutable, false, expression.source_range)
+                        );
+                    }
                 }
                 else if (std::holds_alternative<h::While_loop_expression>(expression.data))
                 {

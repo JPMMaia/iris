@@ -38,6 +38,8 @@ export struct My_struct_3
     };
 }
 
+var g_v0: My_struct = { a: 0, b: 1 };
+
 export function use_structs(my_struct: My_struct) -> ()
 {
     var a = my_struct.a;

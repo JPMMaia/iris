@@ -52,6 +52,6 @@ struct My_data_2
         h::common::write_to_file(main_file_path, main_content);
 
         std::optional<std::uint64_t> const file_hash = h::c::calculate_header_file_hash(main_file_path, std::nullopt, {});
-        CHECK(*file_hash == 15268198287479747170);
+        CHECK(*file_hash == 15268198287479747170ull);
     }
 }

@@ -136,6 +136,7 @@ namespace h
     bool debug = false;
     std::string_view target_triple = "x86_64-pc-linux-gnu";
     h::compiler::Contract_options contract_options = h::compiler::Contract_options::Log_error_and_abort;
+    bool is_test_mode = false;
   };
 
   void test_create_llvm_module(
@@ -170,6 +171,7 @@ namespace h
       .is_optimized = false,
       .debug = test_options.debug,
       .contract_options = test_options.contract_options,
+      .is_test_mode = test_options.is_test_mode,
     };
 
     h::compiler::LLVM_data llvm_data = h::compiler::initialize_llvm(compilation_options);
@@ -1344,6 +1346,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_0 = internal constant [3 x i8] c"%d\00"
 
 ; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
 define void @Break_expressions_run_breaks(i32 noundef %"arguments[0].size") #0 {
 entry:
   %size = alloca i32, align 4
@@ -1489,9 +1494,6 @@ entry:
   ret void
 }
 
-; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
-
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
@@ -1596,6 +1598,67 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Compile Time For", "[LLVM_IR]")
+  {
+    char const* const input_file = "compile_time_for.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private void @compile_time_for_foo(i64 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i64, align 8
+  store i64 %"arguments[0].index", ptr %index, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private void @compile_time_for_run() #0 {
+entry:
+  call void @compile_time_for_foo(i64 noundef 0)
+  call void @compile_time_for_foo(i64 noundef 1)
+  call void @compile_time_for_foo(i64 noundef 2)
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Compile Time If", "[LLVM_IR]")
+  {
+    char const* const input_file = "compile_time_if.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+@compile_time_if_g_debug = constant i8 1
+
+; Function Attrs: convergent
+define i32 @compile_time_if_run_0() #0 {
+entry:
+  ret i32 0
+}
+
+; Function Attrs: convergent
+define i32 @compile_time_if_run_1() #0 {
+entry:
+  ret i32 3
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Constant Expressions", "[LLVM_IR]")
   {
     char const* const input_file = "constant_expressions.hltxt";
@@ -1606,7 +1669,10 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     std::string const header_content = R"(
 
 typedef unsigned long long My_flags;
-static const My_flags g_global = 0x800000000ULL;
+static const My_flags g_global_0 = 0x800000000ULL;
+const My_flags g_global_1 = 0x000000001ULL;
+My_flags g_global_2 = 0x000000002ULL;
+My_flags g_global_unused = 0x000000003ULL;
 )";
 
     std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
@@ -1617,11 +1683,22 @@ static const My_flags g_global = 0x800000000ULL;
     };
 
     char const* const expected_llvm_ir = R"(
+@g_global_1 = external constant i64
+@g_global_2 = external global i64
+@Constant_expressions_g_global_0 = constant i32 0
+@Constant_expressions_g_global_1 = global i32 0
+
 ; Function Attrs: convergent
 define void @Constant_expressions_run() #0 {
 entry:
   %v0 = alloca i64, align 8
+  %v1 = alloca i64, align 8
+  %v2 = alloca i64, align 8
   store i64 34359738368, ptr %v0, align 8
+  %0 = load i64, ptr @g_global_1, align 8
+  store i64 %0, ptr %v1, align 8
+  %1 = load i64, ptr @g_global_2, align 8
+  store i64 %1, ptr %v2, align 8
   ret void
 }
 
@@ -1731,6 +1808,9 @@ Vector2i add(Vector2i lhs, Vector2i rhs);
 %struct.Vector2i = type {{ i32, i32 }}
 
 ; Function Attrs: convergent
+declare i64 @add(i64 noundef, i64 noundef) #0
+
+; Function Attrs: convergent
 define i32 @Debug_information_run() #0 !dbg !3 {{
 entry:
   %a = alloca %struct.Vector2i, align 4, !dbg !8
@@ -1764,9 +1844,6 @@ entry:
   %16 = add i32 %13, %15, !dbg !11
   ret i32 %16, !dbg !20
 }}
-
-; Function Attrs: convergent
-declare i64 @add(i64 noundef, i64 noundef) #0
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
 declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
@@ -2301,6 +2378,58 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !12 = !DILocation(line: 8, column: 9, scope: !3)
 !13 = !DILocation(line: 10, column: 9, scope: !3)
 !14 = !DILocation(line: 12, column: 9, scope: !3)
+)", g_test_source_files_path.generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
+  }
+
+  TEST_CASE("Compile Debug Information Temporary Replacement", "[LLVM_IR]")
+  {
+    char const* const input_file = "debug_information_temporary_replacement.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+%struct.Debug_information_temporary_replacement_My_struct = type {{ ptr, ptr }}
+
+; Function Attrs: convergent
+define private void @Debug_information_temporary_replacement_run() #0 !dbg !3 {{
+entry:
+  %instance = alloca %struct.Debug_information_temporary_replacement_My_struct, align 8, !dbg !7
+  %0 = getelementptr inbounds %struct.Debug_information_temporary_replacement_My_struct, ptr %instance, i32 0, i32 0, !dbg !7
+  store ptr null, ptr %0, align 8, !dbg !7
+  %1 = getelementptr inbounds %struct.Debug_information_temporary_replacement_My_struct, ptr %instance, i32 0, i32 1, !dbg !7
+  store ptr null, ptr %1, align 8, !dbg !7
+  call void @llvm.dbg.declare(metadata ptr %instance, metadata !8, metadata !DIExpression()), !dbg !7
+  ret void, !dbg !7
+}}
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
+
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
+
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_temporary_replacement.hltxt", directory: "{}")
+!3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_temporary_replacement_run", scope: null, file: !2, line: 10, type: !4, scopeLine: 11, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
+!4 = !DISubroutineType(types: !5)
+!5 = !{{null}}
+!6 = !{{}}
+!7 = !DILocation(line: 12, column: 5, scope: !3)
+!8 = !DILocalVariable(name: "instance", scope: !3, file: !2, line: 12, type: !9)
+!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "Debug_information_temporary_replacement_My_struct", file: !2, line: 3, size: 128, align: 8, elements: !10)
+!10 = !{{!11, !13}}
+!11 = !DIDerivedType(tag: DW_TAG_member, name: "a", file: !2, line: 4, baseType: !12, size: 64, align: 64)
+!12 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !9, size: 64)
+!13 = !DIDerivedType(tag: DW_TAG_member, name: "b", file: !2, line: 5, baseType: !14, size: 64, align: 64, offset: 64)
+!14 = !DIDerivedType(tag: DW_TAG_typedef, name: "Debug_information_temporary_replacement_My_alias", file: !2, line: 8, baseType: !12)
 )", g_test_source_files_path.generic_string());
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
@@ -2858,21 +2987,21 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
     char const* const expected_llvm_ir = R"(
 %struct.dynamic_array_Allocator = type { ptr, ptr }
-%"struct.dynamic_array_Dynamic_array@10870525800499546629" = type { ptr, i64, i64, %struct.dynamic_array_Allocator }
+%"struct.dynamic_array@Dynamic_array@10870525800499546629" = type { ptr, i64, i64, %struct.dynamic_array_Allocator }
 
-@function_contract_error_string = private unnamed_addr constant [105 x i8] c"In function 'dynamic_array.create@9190698639914732028' precondition 'allocator.allocate != null' failed!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [107 x i8] c"In function 'dynamic_array.create@9190698639914732028' precondition 'allocator.deallocate != null' failed!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [99 x i8] c"In function 'dynamic_array.push_back@15363871578545837817' precondition 'instance != null' failed!\00"
-@function_contract_error_string.3 = private unnamed_addr constant [100 x i8] c"In function 'dynamic_array.push_back@15363871578545837817' assert 'Allocation did not fail' failed!\00"
-@function_contract_error_string.4 = private unnamed_addr constant [93 x i8] c"In function 'dynamic_array.get@11326571526526506051' precondition 'instance != null' failed!\00"
-@function_contract_error_string.5 = private unnamed_addr constant [101 x i8] c"In function 'dynamic_array.get@11326571526526506051' precondition 'index < instance->length' failed!\00"
+@function_contract_error_string = private unnamed_addr constant [125 x i8] c"In function 'dynamic_array_usage.dynamic_array@create@9190698639914732028' precondition 'allocator.allocate != null' failed!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [127 x i8] c"In function 'dynamic_array_usage.dynamic_array@create@9190698639914732028' precondition 'allocator.deallocate != null' failed!\00"
+@function_contract_error_string.2 = private unnamed_addr constant [119 x i8] c"In function 'dynamic_array_usage.dynamic_array@push_back@15363871578545837817' precondition 'instance != null' failed!\00"
+@function_contract_error_string.3 = private unnamed_addr constant [120 x i8] c"In function 'dynamic_array_usage.dynamic_array@push_back@15363871578545837817' assert 'Allocation did not fail' failed!\00"
+@function_contract_error_string.4 = private unnamed_addr constant [113 x i8] c"In function 'dynamic_array_usage.dynamic_array@get@11326571526526506051' precondition 'instance != null' failed!\00"
+@function_contract_error_string.5 = private unnamed_addr constant [121 x i8] c"In function 'dynamic_array_usage.dynamic_array@get@11326571526526506051' precondition 'index < instance->length' failed!\00"
 
 ; Function Attrs: convergent
 define private void @dynamic_array_usage_run() #0 {
 entry:
   %allocator = alloca %struct.dynamic_array_Allocator, align 8
-  %0 = alloca %"struct.dynamic_array_Dynamic_array@10870525800499546629", align 8
-  %instance = alloca %"struct.dynamic_array_Dynamic_array@10870525800499546629", align 8
+  %0 = alloca %"struct.dynamic_array@Dynamic_array@10870525800499546629", align 8
+  %instance = alloca %"struct.dynamic_array@Dynamic_array@10870525800499546629", align 8
   %element = alloca i32, align 4
   %1 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %allocator, i32 0, i32 0
   store ptr null, ptr %1, align 8
@@ -2882,20 +3011,20 @@ entry:
   %4 = load ptr, ptr %3, align 8
   %5 = getelementptr inbounds { ptr, ptr }, ptr %allocator, i32 0, i32 1
   %6 = load ptr, ptr %5, align 8
-  call void @"dynamic_array_create@9190698639914732028"(ptr dead_on_unwind noalias writable sret(%"struct.dynamic_array_Dynamic_array@10870525800499546629") align 8 %0, ptr %4, ptr %6)
-  %7 = load %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %0, align 8
-  store %"struct.dynamic_array_Dynamic_array@10870525800499546629" %7, ptr %instance, align 8
-  call void @"dynamic_array_push_back@15363871578545837817"(ptr noundef %instance, i32 noundef 1)
-  %8 = call i32 @"dynamic_array_get@11326571526526506051"(ptr noundef %instance, i64 noundef 0)
+  call void @"dynamic_array@create@9190698639914732028"(ptr dead_on_unwind noalias writable sret(%"struct.dynamic_array@Dynamic_array@10870525800499546629") align 8 %0, ptr %4, ptr %6)
+  %7 = load %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %0, align 8
+  store %"struct.dynamic_array@Dynamic_array@10870525800499546629" %7, ptr %instance, align 8
+  call void @"dynamic_array@push_back@15363871578545837817"(ptr noundef %instance, i32 noundef 1)
+  %8 = call i32 @"dynamic_array@get@11326571526526506051"(ptr noundef %instance, i64 noundef 0)
   store i32 %8, ptr %element, align 4
   ret void
 }
 
 ; Function Attrs: convergent
-define private void @"dynamic_array_create@9190698639914732028"(ptr dead_on_unwind noalias writable sret(%"struct.dynamic_array_Dynamic_array@10870525800499546629") align 8 %return.instance, ptr %"arguments[0].allocator_0", ptr %"arguments[0].allocator_1") #0 {
+define private void @"dynamic_array@create@9190698639914732028"(ptr dead_on_unwind noalias writable sret(%"struct.dynamic_array@Dynamic_array@10870525800499546629") align 8 %return.instance, ptr %"arguments[0].allocator_0", ptr %"arguments[0].allocator_1") #0 {
 entry:
   %allocator = alloca %struct.dynamic_array_Allocator, align 8
-  %0 = alloca %"struct.dynamic_array_Dynamic_array@10870525800499546629", align 8
+  %0 = alloca %"struct.dynamic_array@Dynamic_array@10870525800499546629", align 8
   %1 = getelementptr inbounds { ptr, ptr }, ptr %allocator, i32 0, i32 0
   store ptr %"arguments[0].allocator_0", ptr %1, align 8
   %2 = getelementptr inbounds { ptr, ptr }, ptr %allocator, i32 0, i32 1
@@ -2917,14 +3046,14 @@ condition_fail:                                   ; preds = %entry
   unreachable
 
 condition_success1:                               ; preds = %condition_success
-  %10 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 0
+  %10 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 0
   store ptr null, ptr %10, align 8
-  %11 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 1
+  %11 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 1
   store i64 0, ptr %11, align 8
-  %12 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 2
+  %12 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 2
   store i64 0, ptr %12, align 8
   %13 = load %struct.dynamic_array_Allocator, ptr %allocator, align 8
-  %14 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 3
+  %14 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 3
   store %struct.dynamic_array_Allocator %13, ptr %14, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return.instance, ptr align 8 %0, i64 40, i1 false)
   ret void
@@ -2936,7 +3065,7 @@ condition_fail2:                                  ; preds = %condition_success
 }
 
 ; Function Attrs: convergent
-define private void @"dynamic_array_push_back@15363871578545837817"(ptr noundef %"arguments[0].instance", i32 noundef %"arguments[1].element") #0 {
+define private void @"dynamic_array@push_back@15363871578545837817"(ptr noundef %"arguments[0].instance", i32 noundef %"arguments[1].element") #0 {
 entry:
   %instance = alloca ptr, align 8
   %element = alloca i32, align 4
@@ -2952,10 +3081,10 @@ entry:
 
 condition_success:                                ; preds = %entry
   %2 = load ptr, ptr %instance, align 8
-  %3 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %2, i32 0, i32 1
+  %3 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %2, i32 0, i32 1
   %4 = load i64, ptr %3, align 8
   %5 = load ptr, ptr %instance, align 8
-  %6 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %5, i32 0, i32 2
+  %6 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %5, i32 0, i32 2
   %7 = load i64, ptr %6, align 8
   %8 = icmp eq i64 %4, %7
   br i1 %8, label %if_s0_then, label %if_s1_after
@@ -2967,7 +3096,7 @@ condition_fail:                                   ; preds = %entry
 
 if_s0_then:                                       ; preds = %condition_success
   %10 = load ptr, ptr %instance, align 8
-  %11 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %10, i32 0, i32 2
+  %11 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %10, i32 0, i32 2
   %12 = load i64, ptr %11, align 8
   %13 = add i64 %12, 1
   %14 = mul i64 2, %13
@@ -2976,7 +3105,7 @@ if_s0_then:                                       ; preds = %condition_success
   %16 = mul i64 %15, 4
   store i64 %16, ptr %allocation_size_in_bytes, align 8
   %17 = load ptr, ptr %instance, align 8
-  %18 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %17, i32 0, i32 3
+  %18 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %17, i32 0, i32 3
   %19 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %18, i32 0, i32 0
   %20 = load ptr, ptr %19, align 8
   %21 = load i64, ptr %allocation_size_in_bytes, align 8
@@ -2988,20 +3117,20 @@ if_s0_then:                                       ; preds = %condition_success
 
 if_s1_after:                                      ; preds = %condition_success1, %condition_success
   %25 = load ptr, ptr %instance, align 8
-  %26 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %25, i32 0, i32 1
+  %26 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %25, i32 0, i32 1
   %27 = load i64, ptr %26, align 8
   store i64 %27, ptr %index, align 8
   %28 = load i64, ptr %index, align 8
   %29 = load ptr, ptr %instance, align 8
-  %30 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %29, i32 0, i32 0
+  %30 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %29, i32 0, i32 0
   %31 = load ptr, ptr %30, align 8
   %array_element_pointer = getelementptr i32, ptr %31, i64 %28
   %32 = load i32, ptr %element, align 4
   store i32 %32, ptr %array_element_pointer, align 4
   %33 = load ptr, ptr %instance, align 8
-  %34 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %33, i32 0, i32 1
+  %34 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %33, i32 0, i32 1
   %35 = load ptr, ptr %instance, align 8
-  %36 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %35, i32 0, i32 1
+  %36 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %35, i32 0, i32 1
   %37 = load i64, ptr %36, align 8
   %38 = add i64 %37, 1
   store i64 %38, ptr %34, align 8
@@ -3009,11 +3138,11 @@ if_s1_after:                                      ; preds = %condition_success1,
 
 condition_success1:                               ; preds = %if_s0_then
   %39 = load ptr, ptr %instance, align 8
-  %40 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %39, i32 0, i32 0
+  %40 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %39, i32 0, i32 0
   %41 = load ptr, ptr %allocation, align 8
   store ptr %41, ptr %40, align 8
   %42 = load ptr, ptr %instance, align 8
-  %43 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %42, i32 0, i32 2
+  %43 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %42, i32 0, i32 2
   %44 = load i64, ptr %new_capacity, align 8
   store i64 %44, ptr %43, align 8
   br label %if_s1_after
@@ -3025,7 +3154,7 @@ condition_fail2:                                  ; preds = %if_s0_then
 }
 
 ; Function Attrs: convergent
-define private i32 @"dynamic_array_get@11326571526526506051"(ptr noundef %"arguments[0].instance", i64 noundef %"arguments[1].index") #0 {
+define private i32 @"dynamic_array@get@11326571526526506051"(ptr noundef %"arguments[0].instance", i64 noundef %"arguments[1].index") #0 {
 entry:
   %instance = alloca ptr, align 8
   %index = alloca i64, align 8
@@ -3038,7 +3167,7 @@ entry:
 condition_success:                                ; preds = %entry
   %2 = load i64, ptr %index, align 8
   %3 = load ptr, ptr %instance, align 8
-  %4 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %3, i32 0, i32 1
+  %4 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %3, i32 0, i32 1
   %5 = load i64, ptr %4, align 8
   %6 = icmp ult i64 %2, %5
   br i1 %6, label %condition_success1, label %condition_fail2
@@ -3051,7 +3180,7 @@ condition_fail:                                   ; preds = %entry
 condition_success1:                               ; preds = %condition_success
   %8 = load i64, ptr %index, align 8
   %9 = load ptr, ptr %instance, align 8
-  %10 = getelementptr inbounds %"struct.dynamic_array_Dynamic_array@10870525800499546629", ptr %9, i32 0, i32 0
+  %10 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %9, i32 0, i32 0
   %11 = load ptr, ptr %10, align 8
   %array_element_pointer = getelementptr i32, ptr %11, i64 %8
   %12 = load i32, ptr %array_element_pointer, align 4
@@ -3109,6 +3238,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
     char const* const expected_llvm_ir = R"(
 @global_0 = internal constant [3 x i8] c"%d\00"
+
+; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
 
 ; Function Attrs: convergent
 define void @For_loop_expressions_run_for_loops() #0 {
@@ -3210,9 +3342,6 @@ entry:
   ret void
 }
 
-; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
-
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
@@ -3284,14 +3413,14 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_0 = internal constant [13 x i8] c"Hello world!\00"
 
 ; Function Attrs: convergent
+declare i32 @puts(ptr noundef) #0
+
+; Function Attrs: convergent
 define i32 @hello_world_main() #0 {
 entry:
   %0 = call i32 @puts(ptr noundef @global_0)
   ret i32 0
 }
-
-; Function Attrs: convergent
-declare i32 @puts(ptr noundef) #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -3320,6 +3449,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_8 = internal constant [5 x i8] c"zero\00"
 @global_9 = internal constant [5 x i8] c"true\00"
 @global_10 = internal constant [6 x i8] c"false\00"
+
+; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
 
 ; Function Attrs: convergent
 define void @If_expressions_run_ifs(i32 noundef %"arguments[0].value") #0 {
@@ -3422,9 +3554,6 @@ entry:
   ret void
 }
 
-; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
-
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
@@ -3523,6 +3652,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.Implicit_arguments_My_struct = type { i32, i32 }
 
 ; Function Attrs: convergent
+declare i32 @Implicit_arguments_get_v0(ptr noundef) #0
+
+; Function Attrs: convergent
 define private void @Implicit_arguments_external_run() #0 {
 entry:
   %instance = alloca %struct.Implicit_arguments_My_struct, align 4
@@ -3541,9 +3673,6 @@ entry:
   store i32 %4, ptr %b, align 4
   ret void
 }
-
-; Function Attrs: convergent
-declare i32 @Implicit_arguments_get_v0(ptr noundef) #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -3694,16 +3823,16 @@ entry:
   %p1 = alloca ptr, align 8
   store ptr %"arguments[0].external_pointer", ptr %external_pointer, align 8
   %0 = load ptr, ptr %external_pointer, align 8
-  %1 = call ptr @"Merge_functions_cast@10621281525101525598"(ptr noundef %0)
+  %1 = call ptr @"Merge_functions@cast@10621281525101525598"(ptr noundef %0)
   store ptr %1, ptr %p0, align 8
   %2 = load ptr, ptr %external_pointer, align 8
-  %3 = call ptr @"Merge_functions_cast@10621281525101525598"(ptr noundef %2)
+  %3 = call ptr @"Merge_functions@cast@10621281525101525598"(ptr noundef %2)
   store ptr %3, ptr %p1, align 8
   ret void
 }
 
 ; Function Attrs: convergent
-define private ptr @"Merge_functions_cast@10621281525101525598"(ptr noundef %"arguments[0].value") #0 {
+define private ptr @"Merge_functions@cast@10621281525101525598"(ptr noundef %"arguments[0].value") #0 {
 entry:
   %value = alloca ptr, align 8
   store ptr %"arguments[0].value", ptr %value, align 8
@@ -4553,6 +4682,79 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Test Framework Non Test Mode", "[LLVM_IR]")
+  {
+    char const* const input_file = "test_framework.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private i32 @Test_framework_add(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = add i32 %0, %1
+  ret i32 %2
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Test Framework Test Mode", "[LLVM_IR]")
+  {
+    char const* const input_file = "test_framework.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+@hlang_test_source_file_path = internal constant [66 x i8] c"{}\00"
+
+; Function Attrs: convergent
+define private i32 @Test_framework_add(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b") #0 {{
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = add i32 %0, %1
+  ret i32 %2
+}}
+
+; Function Attrs: convergent
+define void @Test_framework_test_addition() #0 {{
+entry:
+  %0 = call i32 @Test_framework_add(i32 noundef 1, i32 noundef 2)
+  %1 = icmp eq i32 %0, 3
+  call void @hlang_test_check(i1 noundef zeroext %1, ptr noundef @hlang_test_source_file_path, i64 noundef 11)
+  %2 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
+  %3 = icmp eq i32 %2, 5
+  call void @hlang_test_check(i1 noundef zeroext %3, ptr noundef @hlang_test_source_file_path, i64 noundef 12)
+  ret void
+}}
+
+; Function Attrs: convergent
+declare void @hlang_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+)", (g_test_source_files_path / input_file).generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.is_test_mode = true});
+  }
+
   TEST_CASE("Compile Unary Expressions", "[LLVM_IR]")
   {
     char const* const input_file = "unary_expressions.hltxt";
@@ -4632,6 +4834,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_0 = internal constant [24 x i8] c"Value: %d, pointer: %p\0A\00"
 
 ; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
 define void @Use_printf_run() #0 {
 entry:
   %a = alloca i32, align 4
@@ -4640,9 +4845,6 @@ entry:
   %1 = call i32 (ptr, ...) @printf(ptr noundef @global_0, i32 noundef %0, ptr noundef %a)
   ret void
 }
-
-; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -4804,6 +5006,33 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Using Enum Default Values", "[LLVM_IR]")
+  {
+    char const* const input_file = "using_enums_default_values.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define void @Enums_default_values_use_enums() #0 {
+entry:
+  %v0 = alloca i32, align 4
+  %v1 = alloca i32, align 4
+  %v2 = alloca i32, align 4
+  store i32 0, ptr %v0, align 4
+  store i32 1, ptr %v1, align 4
+  store i32 2, ptr %v2, align 4
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Using Enums Duplicate", "[LLVM_IR]")
   {
     char const* const input_file = "using_enums_duplicate.hltxt";
@@ -4923,17 +5152,17 @@ entry:
   %a = alloca i32, align 4
   %b = alloca float, align 4
   %c = alloca i32, align 4
-  %0 = call i32 @"Function_constructor_add@10481941949038830817"(i32 noundef 1, i32 noundef 2)
+  %0 = call i32 @"Function_constructor@add@10481941949038830817"(i32 noundef 1, i32 noundef 2)
   store i32 %0, ptr %a, align 4
-  %1 = call float @"Function_constructor_add@4195550094456234142"(float noundef 3.000000e+00, float noundef 4.000000e+00)
+  %1 = call float @"Function_constructor@add@4195550094456234142"(float noundef 3.000000e+00, float noundef 4.000000e+00)
   store float %1, ptr %b, align 4
-  %2 = call i32 @"Function_constructor_add@10481941949038830817"(i32 noundef 1, i32 noundef 2)
+  %2 = call i32 @"Function_constructor@add@10481941949038830817"(i32 noundef 1, i32 noundef 2)
   store i32 %2, ptr %c, align 4
   ret void
 }
 
 ; Function Attrs: convergent
-define private i32 @"Function_constructor_add@10481941949038830817"(i32 noundef %"arguments[0].first", i32 noundef %"arguments[1].second") #0 {
+define private i32 @"Function_constructor@add@10481941949038830817"(i32 noundef %"arguments[0].first", i32 noundef %"arguments[1].second") #0 {
 entry:
   %first = alloca i32, align 4
   %second = alloca i32, align 4
@@ -4946,7 +5175,7 @@ entry:
 }
 
 ; Function Attrs: convergent
-define private float @"Function_constructor_add@4195550094456234142"(float noundef %"arguments[0].first", float noundef %"arguments[1].second") #0 {
+define private float @"Function_constructor@add@4195550094456234142"(float noundef %"arguments[0].first", float noundef %"arguments[1].second") #0 {
 entry:
   %first = alloca float, align 4
   %second = alloca float, align 4
@@ -4984,8 +5213,11 @@ float my_global = 0.0f;
     };
 
     char const* const expected_llvm_ir = R"(
+@my_global = external global float
+@Global_variables_my_global_constant_0 = constant float 1.000000e+00
+@Global_variables_my_global_constant_1 = constant float 1.000000e+00
 @Global_variables_my_global_variable_0 = global float 1.000000e+00
-@my_global = global float 0.000000e+00
+@Global_variables_my_global_array = constant [3 x i32] [i32 1, i32 2, i32 3]
 
 ; Function Attrs: convergent
 define void @Global_variables_use_global_variables(float noundef %"arguments[0].parameter") #0 {
@@ -4995,18 +5227,57 @@ entry:
   %b = alloca ptr, align 8
   %c = alloca float, align 4
   %d = alloca float, align 4
+  %e = alloca float, align 4
+  %f = alloca i32, align 4
   store float %"arguments[0].parameter", ptr %parameter, align 4
-  %0 = load float, ptr @Global_variables_my_global_variable_0, align 4
-  %1 = fadd float 2.000000e+00, %0
-  %2 = load float, ptr %parameter, align 4
-  %3 = fadd float %1, %2
-  store float %3, ptr %a, align 4
+  %0 = load float, ptr @Global_variables_my_global_constant_0, align 4
+  %1 = load float, ptr @Global_variables_my_global_constant_1, align 4
+  %2 = fadd float %0, %1
+  %3 = load float, ptr @Global_variables_my_global_variable_0, align 4
+  %4 = fadd float %2, %3
+  %5 = load float, ptr %parameter, align 4
+  %6 = fadd float %4, %5
+  store float %6, ptr %a, align 4
   store ptr @Global_variables_my_global_variable_0, ptr %b, align 8
   store float 2.000000e+00, ptr %c, align 4
-  %4 = load float, ptr @my_global, align 4
-  store float %4, ptr %d, align 4
+  %7 = load float, ptr @my_global, align 4
+  store float %7, ptr %d, align 4
+  store float 1.000000e+00, ptr %e, align 4
+  %8 = load i32, ptr getelementptr inbounds ([3 x i32], ptr @Global_variables_my_global_array, i32 0, i32 1), align 4
+  store i32 %8, ptr %f, align 4
   ret void
 }
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Using Global Variables 2", "[LLVM_IR]")
+  {
+    char const* const input_file = "using_global_variables_2.hltxt";
+
+    std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "using_global_variables";
+    std::filesystem::create_directories(root_directory_path);
+
+    std::string const header_content = R"(
+void foo();
+)";
+
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+        { "my_module", header_module_file_path }
+    };
+
+    char const* const expected_llvm_ir = R"(
+@Global_variables_2_my_global_array = constant [1 x ptr] [ptr @foo]
+@Global_variables_2_my_global_array_2 = constant i32 1
+
+; Function Attrs: convergent
+declare void @foo() #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -5027,6 +5298,8 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.Structs_My_struct_2 = type { %struct.Structs_My_struct, %struct.Structs_My_struct, %struct.Structs_My_struct }
 %struct.Structs_My_struct_3 = type { i32, %union.Structs_My_Union }
 %union.Structs_My_Union = type { %struct.Structs_My_struct_2 }
+
+@Structs_g_v0 = constant %struct.Structs_My_struct { i32 0, i32 1 }
 
 ; Function Attrs: convergent
 define void @Structs_use_structs(i64 noundef %"arguments[0].my_struct") #0 {
@@ -5187,38 +5460,38 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     };
 
     char const* const expected_llvm_ir = R"(
-%"struct.Type_constructor_Dynamic_array@9266664480299747837" = type { ptr, i64 }
-%"struct.Type_constructor_Dynamic_array@12246575587352456780" = type { ptr, i64 }
-%struct.Type_constructor_My_struct = type { %"struct.Type_constructor_Dynamic_array@13825035046261308487" }
-%"struct.Type_constructor_Dynamic_array@13825035046261308487" = type { ptr, i64 }
-%"struct.Type_constructor_Dynamic_array@11091932333614297595" = type { ptr, i64 }
+%"struct.Type_constructor@Dynamic_array@9266664480299747837" = type { ptr, i64 }
+%"struct.Type_constructor@Dynamic_array@12246575587352456780" = type { ptr, i64 }
+%struct.Type_constructor_My_struct = type { %"struct.Type_constructor@Dynamic_array@13825035046261308487" }
+%"struct.Type_constructor@Dynamic_array@13825035046261308487" = type { ptr, i64 }
+%"struct.Type_constructor@Dynamic_array@11091932333614297595" = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define private void @Type_constructor_run(ptr %"arguments[0].instance_0_0", i64 %"arguments[0].instance_0_1") #0 {
 entry:
-  %instance_0 = alloca %"struct.Type_constructor_Dynamic_array@9266664480299747837", align 8
-  %instance_1 = alloca %"struct.Type_constructor_Dynamic_array@12246575587352456780", align 8
+  %instance_0 = alloca %"struct.Type_constructor@Dynamic_array@9266664480299747837", align 8
+  %instance_1 = alloca %"struct.Type_constructor@Dynamic_array@12246575587352456780", align 8
   %instance_2 = alloca %struct.Type_constructor_My_struct, align 8
-  %0 = alloca %"struct.Type_constructor_Dynamic_array@13825035046261308487", align 8
-  %instance_3 = alloca %"struct.Type_constructor_Dynamic_array@11091932333614297595", align 8
+  %0 = alloca %"struct.Type_constructor@Dynamic_array@13825035046261308487", align 8
+  %instance_3 = alloca %"struct.Type_constructor@Dynamic_array@11091932333614297595", align 8
   %1 = getelementptr inbounds { ptr, i64 }, ptr %instance_0, i32 0, i32 0
   store ptr %"arguments[0].instance_0_0", ptr %1, align 8
   %2 = getelementptr inbounds { ptr, i64 }, ptr %instance_0, i32 0, i32 1
   store i64 %"arguments[0].instance_0_1", ptr %2, align 8
-  %3 = getelementptr inbounds %"struct.Type_constructor_Dynamic_array@12246575587352456780", ptr %instance_1, i32 0, i32 0
+  %3 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@12246575587352456780", ptr %instance_1, i32 0, i32 0
   store ptr null, ptr %3, align 8
-  %4 = getelementptr inbounds %"struct.Type_constructor_Dynamic_array@12246575587352456780", ptr %instance_1, i32 0, i32 1
+  %4 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@12246575587352456780", ptr %instance_1, i32 0, i32 1
   store i64 0, ptr %4, align 8
-  %5 = getelementptr inbounds %"struct.Type_constructor_Dynamic_array@13825035046261308487", ptr %0, i32 0, i32 0
+  %5 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@13825035046261308487", ptr %0, i32 0, i32 0
   store ptr null, ptr %5, align 8
-  %6 = getelementptr inbounds %"struct.Type_constructor_Dynamic_array@13825035046261308487", ptr %0, i32 0, i32 1
+  %6 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@13825035046261308487", ptr %0, i32 0, i32 1
   store i64 0, ptr %6, align 8
-  %7 = load %"struct.Type_constructor_Dynamic_array@13825035046261308487", ptr %0, align 8
+  %7 = load %"struct.Type_constructor@Dynamic_array@13825035046261308487", ptr %0, align 8
   %8 = getelementptr inbounds %struct.Type_constructor_My_struct, ptr %instance_2, i32 0, i32 0
-  store %"struct.Type_constructor_Dynamic_array@13825035046261308487" %7, ptr %8, align 8
-  %9 = getelementptr inbounds %"struct.Type_constructor_Dynamic_array@11091932333614297595", ptr %instance_3, i32 0, i32 0
+  store %"struct.Type_constructor@Dynamic_array@13825035046261308487" %7, ptr %8, align 8
+  %9 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@11091932333614297595", ptr %instance_3, i32 0, i32 0
   store ptr null, ptr %9, align 8
-  %10 = getelementptr inbounds %"struct.Type_constructor_Dynamic_array@11091932333614297595", ptr %instance_3, i32 0, i32 1
+  %10 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@11091932333614297595", ptr %instance_3, i32 0, i32 1
   store i64 0, ptr %10, align 8
   ret void
 }
@@ -5237,11 +5510,22 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     {
     };
 
+    // TODO currently Unions_g_v5 is zero initialized (which it shouldn't)
     char const* const expected_llvm_ir = R"(
 %union.Unions_My_union = type { i32 }
 %union.Unions_My_union_2 = type { i64 }
 %union.Unions_My_union_3 = type { i64 }
+%union.Unions_My_union_4 = type { %struct.Unions_Big_struct }
+%struct.Unions_Big_struct = type { i64, i64, i64, i64 }
 %struct.Unions_My_struct = type { i32 }
+
+@Unions_g_v0 = constant %union.Unions_My_union zeroinitializer
+@Unions_g_v1 = constant %union.Unions_My_union_2 { i64 1 }
+@Unions_g_v2 = constant %union.Unions_My_union_2 { i64 2 }
+@Unions_g_v3 = constant %union.Unions_My_union_3 { i64 3 }
+@Unions_g_v4 = constant %union.Unions_My_union_3 { i64 4 }
+@Unions_g_v5 = constant %union.Unions_My_union_4 zeroinitializer
+@Unions_g_v6 = constant %union.Unions_My_union_4 { %struct.Unions_Big_struct { i64 6, i64 7, i64 8, i64 9 } }
 
 ; Function Attrs: convergent
 define void @Unions_use_unions(i32 noundef %"arguments[0].my_union", i32 noundef %"arguments[1].my_union_tag") #0 {
@@ -5393,6 +5677,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_0 = internal constant [3 x i8] c"%d\00"
 
 ; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
 define void @While_loop_expressions_run_while_loops(i32 noundef %"arguments[0].size") #0 {
 entry:
   %size = alloca i32, align 4
@@ -5478,9 +5765,6 @@ entry:
   %1 = call i32 (ptr, ...) @printf(ptr noundef @global_0, i32 noundef %0)
   ret void
 }
-
-; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -5714,6 +5998,9 @@ void foo(My_struct argument);
 %struct.My_struct = type { i32, i32, i32, i32 }
 
 ; Function Attrs: convergent
+declare void @foo(i64, i64) #0
+
+; Function Attrs: convergent
 define private void @c_interoperability_run() #0 {
 entry:
   %instance = alloca %struct.My_struct, align 4
@@ -5733,9 +6020,6 @@ entry:
   ret void
 }
 
-; Function Attrs: convergent
-declare void @foo(i64, i64) #0
-
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
@@ -5746,6 +6030,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
   {
     char const* const expected_llvm_ir = R"(
 %struct.My_struct = type { i32, i32, i32, i32 }
+
+; Function Attrs: convergent
+declare void @foo(ptr noundef) #0
 
 ; Function Attrs: convergent
 define private void @c_interoperability_run() #0 {
@@ -5764,9 +6051,6 @@ entry:
   call void @foo(ptr noundef %0)
   ret void
 }
-
-; Function Attrs: convergent
-declare void @foo(ptr noundef) #0
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
 declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1

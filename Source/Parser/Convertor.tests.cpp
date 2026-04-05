@@ -250,6 +250,18 @@ namespace h::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts compile_time_for.hltxt", "[Convertor]")
+    {
+        std::string_view const input_file = "compile_time_for.hltxt";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts compile_time_if.hltxt", "[Convertor]")
+    {
+        std::string_view const input_file = "compile_time_if.hltxt";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts constant_array_expressions.hltxt", "[Convertor]")
     {
         std::string_view const input_file = "constant_array_expressions.hltxt";
@@ -463,6 +475,12 @@ namespace h::parser
     TEST_CASE("Converts ternary_condition_expressions.hltxt", "[Convertor]")
     {
         std::string_view const input_file = "ternary_condition_expressions.hltxt";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts test_framework.hltxt", "[Convertor]")
+    {
+        std::string_view const input_file = "test_framework.hltxt";
         test_convertor(input_file);
     }
 

@@ -7,6 +7,8 @@ module;
 
 module h.common.filesystem_common;
 
+import h.common.filesystem;
+
 namespace h::common
 {
     std::optional<std::filesystem::path> search_file(
@@ -58,5 +60,29 @@ namespace h::common
         }
 
         return std::pmr::vector<std::filesystem::path>{std::move(found_files), output_allocator};
+    }
+
+    std::filesystem::path get_share_path(std::filesystem::path const& relative_path)
+    {
+        std::filesystem::path const current_directory_include_path = std::filesystem::current_path().parent_path() / "share" / "hlang" / relative_path;
+        if (std::filesystem::exists(current_directory_include_path))
+            return current_directory_include_path;
+        std::filesystem::path const executable_directory_include_path = get_executable_directory().parent_path() / "share" / "hlang" / relative_path;
+        return executable_directory_include_path;
+    }
+
+    std::filesystem::path get_builtin_include_directory()
+    {
+        return get_share_path("include");
+    }
+
+    std::filesystem::path get_tests_main_file_path()
+    {
+        return get_share_path("source/tests_main.cpp");
+    }
+
+    std::filesystem::path get_standard_repository_file_path()
+    {
+        return get_share_path("libraries/hlang_repository.json");
     }
 }

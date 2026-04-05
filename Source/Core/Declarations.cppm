@@ -70,8 +70,6 @@ namespace h
     export struct Declaration_database
     {
         std::pmr::unordered_map<Module_name, Declaration_map, String_hash, String_equal> map;
-        std::pmr::unordered_map<Type_instance, Declaration_instance_storage, Type_instance_hash> instances;
-        std::pmr::unordered_map<Instance_call_key, Function_expression, Instance_call_key_hash> call_instances;
     };
 
     export Declaration_database create_declaration_database();
@@ -93,7 +91,28 @@ namespace h
 
     export void add_declarations(
         Declaration_database& database,
+        std::string_view const module_name,
+        bool const are_export,
+        Module_declarations const& declarations
+    );
+
+    export void add_declarations(
+        Declaration_database& database,
         Module const& core_module
+    );
+
+    export void add_struct_declaration(
+        Declaration_database& database,
+        std::string_view const module_name,
+        bool const is_export,
+        h::Struct_declaration const& declaration
+    );
+
+    export void add_function_declaration(
+        Declaration_database& database,
+        std::string_view const module_name,
+        bool const is_export,
+        h::Function_declaration const& declaration
     );
 
     export void add_instance_type_struct_declaration(
@@ -138,6 +157,12 @@ namespace h
         std::string_view const declaration_name
     );
 
+    export std::optional<Declaration> find_declaration_in_instanced_module_declarations(
+        h::Module_instanced_declarations const& declarations,
+        std::string_view const module_name,
+        std::string_view const declaration_name
+    );
+
     export std::optional<Type_reference> get_underlying_type(
         Declaration_database const& declaration_database,
         Type_reference const& type_reference
@@ -163,8 +188,8 @@ namespace h
         Alias_type_declaration const& declaration
     );
 
-    Declaration_instance_storage instantiate_type_instance(
-        Declaration_database& declaration_database,
+    export Declaration_instance_storage instantiate_type_instance(
+        Declaration_database const& declaration_database,
         Type_instance const& type_instance
     );
 
@@ -172,28 +197,28 @@ namespace h
         Type_instance const& type_instance
     );
 
-    export void add_instantiated_type_instances(
-        Declaration_database& declaration_database,
-        h::Module const& core_module
-    );
-
-    export void add_instantiated_type_instances(
-        Declaration_database& declaration_database,
-        h::Function_expression const& function_expression
+    export std::optional<h::Custom_type_reference> unmangle_type_instance_name(
+        std::string_view const name
     );
 
     export std::optional<Custom_type_reference> get_function_constructor_type_reference(
         Declaration_database const& declaration_database,
+        h::Module const& core_module,
         Expression const& expression,
-        Statement const& statement,
-        std::string_view const current_module_name
+        Statement const& statement
     );
 
     export Instance_call_key create_instance_call_key(
         Declaration_database const& declaration_database,
+        h::Module const& core_module,
         Instance_call_expression const& expression,
-        Statement const& statement,
-        std::string_view const current_module_name
+        Statement const& statement
+    );
+
+    export Function_constructor const* get_function_constructor(
+        Declaration_database const& declaration_database,
+        std::string_view const module_name,
+        std::string_view const declaration_name
     );
 
     export Function_constructor const* get_function_constructor(
@@ -203,18 +228,23 @@ namespace h
 
     export Function_constructor const* get_function_constructor(
         Declaration_database const& declaration_database,
+        h::Module const& core_module,
         Expression const& expression,
-        Statement const& statement,
-        std::string_view const current_module_name
+        Statement const& statement
     );
 
-    export Function_expression const* get_instance_call_function_expression(
+    export std::optional<Function_expression> get_instance_call_function_expression(
         Declaration_database const& declaration_database,
+        Module const& core_module,
         Instance_call_key const& key
     );
 
     export std::string mangle_instance_call_name(
         Instance_call_key const& key
+    );
+
+    export std::optional<h::Custom_type_reference> unmangle_instance_call_name(
+        std::string_view const name
     );
 
     export Function_expression create_instance_call_expression_value(
@@ -223,16 +253,11 @@ namespace h
         Instance_call_key const& key
     );
 
-    std::pair<Instance_call_key, Function_expression> create_instance_call_expression_value(
-        Declaration_database& declaration_database,
+    export std::pair<Instance_call_key, Function_expression> create_instance_call_expression_value(
+        Declaration_database const& declaration_database,
         Instance_call_expression const& expression,
         Statement const& statement,
         std::string_view const current_module_name
-    );
-
-    export void add_instance_call_expression_values(
-        Declaration_database& declaration_database,
-        h::Module const& core_module
     );
 
     export std::optional<std::string_view> get_declaration_unique_name(

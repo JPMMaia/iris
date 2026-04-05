@@ -79,3 +79,15 @@ add_custom_command(
     VERBATIM
 )
 add_custom_target(H_Binary_serializer_generate DEPENDS "${H_ROOT_DIR}/Source/Binary_serializer/Generated.cppm")
+
+add_custom_command(
+    OUTPUT "${H_ROOT_DIR}/Source/Core/Expressions_visitor.cppm"
+    COMMAND H_Tools_Generate_JSON
+                ARGS
+                "expressions_visitor"
+                "${H_ROOT_DIR}/Source/Core/Core.cppm"
+                "${H_ROOT_DIR}/Source/Core/Expressions_visitor.cppm"
+    DEPENDS H_Tools_Generate_JSON "${H_ROOT_DIR}/Source/Core/Core.cppm"
+    VERBATIM
+)
+add_custom_target(Generate_h_core_expressions_visitor DEPENDS "${H_ROOT_DIR}/Source/Core/Expressions_visitor.cppm")

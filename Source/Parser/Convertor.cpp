@@ -4,6 +4,7 @@ module;
 #include <filesystem>
 #include <memory_resource>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -424,7 +425,8 @@ namespace h::parser
 
     struct Declaration_attributes
     {
-        std::optional<std::string_view> unique_name;
+        std::optional<std::string_view> unique_name = std::nullopt;
+        bool is_test = false;
     };
 
     Declaration_attributes get_declaration_attributes(
@@ -453,6 +455,10 @@ namespace h::parser
 
                     attributes.unique_name = get_string_content(get_node_value(tree, unique_name_node));
                 }
+            }
+            else if (name == "@test")
+            {
+                attributes.is_test = true;
             }
         }
 
@@ -515,6 +521,7 @@ namespace h::parser
                 function_declaration_node.value(),
                 is_export ? h::Linkage::External : h::Linkage::Private,
                 declaration_attributes.unique_name,
+                declaration_attributes.is_test,
                 comment,
                 output_allocator,
                 temporaries_allocator
@@ -1063,10 +1070,16 @@ namespace h::parser
     {
         h::Global_variable_declaration output = {};
 
-        std::optional<Parse_node> const mutability_node = get_child_node(tree, node, 0);
-        if (mutability_node.has_value())
+        std::optional<Parse_node> const global_type_node = get_child_node(tree, node, 0);
+        if (global_type_node.has_value())
         {
-            output.is_mutable = get_node_value(tree, mutability_node.value()) == "mutable";
+            std::string_view const type_value = get_node_value(tree, global_type_node.value());
+            if (type_value == "mutable")
+                output.global_type = h::Global_variable_type::Mutable;
+            else if (type_value == "macro")
+                output.global_type = h::Global_variable_type::Macro;
+            else
+                output.global_type = h::Global_variable_type::Constant;
         }
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, 1);
@@ -1189,12 +1202,14 @@ namespace h::parser
         Parse_node const& node,
         h::Linkage const linkage,
         std::optional<std::string_view> const& unique_name,
+        bool const is_test,
         std::optional<std::pmr::string> const& comment,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Function_declaration output;
+        h::Function_declaration output = {};
+        output.is_test = is_test;
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, "Function_name");
         if (name_node.has_value())
@@ -1771,6 +1786,10 @@ namespace h::parser
         {
             expression.data = node_to_expression_comment(tree, expression_node, output_allocator, temporaries_allocator);
         }
+        else if (expression_type == "Expression_compile_time")
+        {
+            expression.data = node_to_expression_compile_time(statement, module_info, tree, expression_node, output_allocator, temporaries_allocator);
+        }
         else if (expression_type == "Expression_constant")
         {
             expression.data = node_to_expression_constant(tree, expression_node, output_allocator);
@@ -2255,6 +2274,36 @@ namespace h::parser
         return output;
     }
 
+    h::Compile_time_expression node_to_expression_compile_time(
+        h::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {        
+        std::optional<Parse_node> choice_node = get_child_node(tree, node, 1);
+        if (!choice_node.has_value())
+            return {};
+
+        std::optional<Parse_node> expression_node = get_child_node(tree, choice_node.value(), 0);
+        if (!expression_node.has_value())
+            return {};
+
+        h::Compile_time_expression output = {};
+        output.expression = node_to_expression(
+            statement,
+            module_info,
+            tree,
+            expression_node.value(),
+            output_allocator,
+            temporaries_allocator
+        );
+
+        return output;
+    }
+
     h::Constant_expression node_to_expression_constant(
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2621,6 +2670,7 @@ namespace h::parser
             node,
             h::Linkage::Private,
             std::nullopt,
+            false,
             std::nullopt,
             output_allocator,
             temporaries_allocator
@@ -3138,9 +3188,26 @@ namespace h::parser
             std::optional<Parse_node> const type_node = get_child_node(tree, declaration_type_node.value(), 0);
             if (type_node.has_value())
             {
-                std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
-                if (type.has_value())
-                    output.type = std::move(type.value());
+                h::Expression type_expression = {};
+                type_expression.source_range = get_node_source_range(declaration_type_node.value());
+
+                std::string_view const declaration_type_symbol = get_node_symbol(type_node.value());
+                if (declaration_type_symbol == "Type")
+                {
+                    std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+                    if (type.has_value())
+                    {
+                        type_expression.data = h::Type_expression{ .type = std::move(type.value()) };
+                        output.type = h::Expression_index{ .expression_index = statement.expressions.size() };
+                        statement.expressions.push_back(std::move(type_expression));
+                    }
+                }
+                else if (declaration_type_symbol == "Expression_reflection_call")
+                {
+                    type_expression.data = node_to_expression_reflection(statement, module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+                    output.type = h::Expression_index{ .expression_index = statement.expressions.size() };
+                    statement.expressions.push_back(std::move(type_expression));
+                }
             }
         }
         

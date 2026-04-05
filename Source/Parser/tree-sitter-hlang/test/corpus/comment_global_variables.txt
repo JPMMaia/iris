@@ -19,7 +19,7 @@ export var My_global_variable = 1.0f32;
   (Declaration
     (Comment)
     (Global_variable
-      (Global_variable_mutability)
+      (Global_variable_type)
       (Global_variable_name
         (Identifier))
       (Generic_expression_or_instantiate

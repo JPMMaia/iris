@@ -292,7 +292,7 @@ namespace h::language_server
                 h::Global_variable_declaration const& data = *std::get<h::Global_variable_declaration const*>(declaration.data);
 
                 items.push_back(
-                    create_completion_item(data.name, data.is_mutable ? lsp::CompletionItemKind::Variable : lsp::CompletionItemKind::Constant)
+                    create_completion_item(data.name, data.global_type == h::Global_variable_type::Macro ? lsp::CompletionItemKind::Constant : lsp::CompletionItemKind::Variable)
                 );
             }
             else if (std::holds_alternative<h::Function_constructor const*>(declaration.data))

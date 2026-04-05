@@ -79,16 +79,16 @@ namespace h::compiler
         std::optional<h::Type_reference> const& expected_type
     )
     {
-        std::pmr::string provided_type_json = provided_type.has_value() ? h::json::write_to_string(provided_type.value()) : std::pmr::string{"null"};
-        std::pmr::string expected_type_json = expected_type.has_value() ? h::json::write_to_string(expected_type.value()) : std::pmr::string{"null"};
+        std::pmr::string provided_type_json = provided_type.has_value() ? h::json::write(provided_type.value()) : std::pmr::string{"null"};
+        std::pmr::string expected_type_json = expected_type.has_value() ? h::json::write(expected_type.value()) : std::pmr::string{"null"};
 
         nlohmann::ordered_json output;
         
         if (provided_type.has_value())
-            output["provided_type"] = nlohmann::ordered_json::parse(h::json::write_to_string(provided_type.value()));
+            output["provided_type"] = nlohmann::ordered_json::parse(h::json::write(provided_type.value()));
         
         if (expected_type.has_value())
-            output["expected_type"] = nlohmann::ordered_json::parse(h::json::write_to_string(expected_type.value()));
+            output["expected_type"] = nlohmann::ordered_json::parse(h::json::write(expected_type.value()));
         
         return std::pmr::string{output.dump()};
     }

@@ -56,8 +56,12 @@ namespace h::compiler
     export struct Clang_declaration_database
     {
         std::pmr::unordered_map<std::pmr::string, Clang_module_declarations, h::String_hash, h::String_equal> map;
-        std::pmr::unordered_map<h::Type_instance, clang::RecordDecl*, Type_instance_hash> instances;
-        std::pmr::unordered_map<h::Instance_call_key, clang::FunctionDecl*, Instance_call_key_hash> call_instances;
+    };
+
+    export struct Clang_context
+    {
+        clang::ASTContext& ast_context;
+        std::unique_ptr<clang::CodeGenerator> code_generator;
     };
 
     export struct Clang_module_data

@@ -16,7 +16,6 @@
         }
     ],
     "executable": {
-        "source": "hello_world.hltxt",
-        "entry_point": "hello_world_main"
+        "source": "hello_world.hltxt"
     }
 }

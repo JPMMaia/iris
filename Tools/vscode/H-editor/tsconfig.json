@@ -2,22 +2,15 @@
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "Node",
-    "target": "ES2022",
+    "target": "ES2024",
     "lib": [
-      "es2020",
-      "DOM"
+      "es2024"
     ],
     "outDir": "./out",
-    "rootDir": ".",
     "sourceMap": true,
-    "types": [
-      "@types/node",
-      "mocha"
-    ]
+    "strict": true,
+    "rootDir": "src",
   },
-  "include": [
-    "packages/client/src/**/*.ts"
-  ],
   "exclude": [
     "node_modules",
     ".vscode-test"

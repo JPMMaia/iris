@@ -287,7 +287,7 @@ namespace h::language_server
         if (!configuration.isObject())
             return {};
 
-        lsp::json::Any const& extension_settings = configuration.object().get("hlang_language_server");
+        lsp::json::Any const& extension_settings = configuration.object().get("hlang");
         if (!extension_settings.isObject())
             return {};
 
@@ -493,6 +493,7 @@ namespace h::language_server
             std::pmr::vector<h::compiler::Artifact> artifacts = h::compiler::get_sorted_artifacts(
                 artifact_file_paths,
                 builder.repositories,
+                false,
                 output_allocator,
                 temporaries_allocator
             );

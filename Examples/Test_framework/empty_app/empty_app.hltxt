@@ -1,0 +1,7 @@
+module empty_app;
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return 0;
+}
