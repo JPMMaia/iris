@@ -1067,7 +1067,7 @@ namespace h::tools::code_generator
                     continue;
                 }
 
-                if (string.front() == '#')
+                if (string.front() == '#' || string.starts_with("//"))
                 {
                     std::getline(input_stream, string);
                     continue;
