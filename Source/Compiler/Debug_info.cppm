@@ -3,12 +3,9 @@ module;
 #include <llvm/IR/DIBuilder.h>
 #include <llvm/IR/IRBuilder.h>
 
-#include <memory>
-#include <string>
-#include <vector>
-#include <unordered_map>
-
 export module h.compiler.debug_info;
+
+import std;
 
 import h.compiler.types;
 import h.core;
@@ -62,5 +59,14 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder,
         Debug_info& debug_info,
         std::optional<h::Source_range> const& source_range
+    );
+
+    export using Debug_type_names = std::pmr::vector<std::pmr::string>;
+    export using Debug_type_names_per_module = std::pmr::unordered_map<std::pmr::string, Debug_type_names>;
+
+    export Debug_type_names_per_module create_requested_dependency_debug_types(
+        Module const& core_module,
+        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
+        std::pmr::polymorphic_allocator<> const& allocator
     );
 }

@@ -39,6 +39,7 @@ module;
 #include <span>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -1114,6 +1115,12 @@ namespace h::compiler
             llvm_data_layout
         );
 
+        Debug_type_names_per_module const requested_debug_types = create_requested_dependency_debug_types(
+            core_module,
+            core_module_dependencies,
+            {}
+        );
+
         std::pmr::vector<h::Module const*> const sorted_core_module_dependencies = sort_core_modules(core_module_dependencies, nullptr, {}, {});
 
         for (h::Module const* module_dependency : sorted_core_module_dependencies)
@@ -1123,6 +1130,10 @@ namespace h::compiler
                 //h::common::print_message_and_exit(std::format("Module '{}' did not contain source file path for debugging!", module_dependency->name));
                 continue;
             }
+
+            auto const allowed_types_location = requested_debug_types.find(module_dependency->name);
+            if (allowed_types_location == requested_debug_types.end() || allowed_types_location->second.empty())
+                continue;
 
             llvm::DIFile* const llvm_dependency_debug_file = llvm_debug_builder->createFile(module_dependency->source_file_path->filename().generic_string(), module_dependency->source_file_path->parent_path().generic_string());
             llvm_debug_files.emplace(*core_module.source_file_path, llvm_dependency_debug_file);
@@ -1646,7 +1657,7 @@ namespace h::compiler
             }
         };
 
-        auto const process_type = [&](std::string_view const declaration_name, h::Type_reference const& type_reference) -> bool
+        auto const process_type = [&](h::Type_reference const& type_reference) -> bool
         {
             if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
             {
@@ -1657,7 +1668,7 @@ namespace h::compiler
             return false;
         };
 
-        h::visit_type_references(
+        h::visit_type_references_recursively(
             core_module,
             process_type
         );
