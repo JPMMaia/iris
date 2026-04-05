@@ -140,18 +140,18 @@ namespace h
     }
 
     std::size_t get_or_create_expression_slot(
-        h::Statement& statement
+        std::pmr::vector<h::Expression>& expressions
     )
     {
-        for (std::size_t index = 0; index < statement.expressions.size(); ++index)
+        for (std::size_t index = 0; index < expressions.size(); ++index)
         {
-            h::Expression const& expression = statement.expressions[index];
+            h::Expression const& expression = expressions[index];
             if (std::holds_alternative<h::Invalid_expression>(expression.data))
                 return index;
         }
 
-        statement.expressions.push_back(h::Expression{.data = h::Invalid_expression{}});
-        return statement.expressions.size() - 1;
+        expressions.push_back(h::Expression{.data = h::Invalid_expression{}});
+        return expressions.size() - 1;
     }
 
     std::size_t find_expression_index(
@@ -175,13 +175,16 @@ namespace h
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        assert(new_statement.expressions.size() == 1);
-
         std::size_t const expression_index = find_expression_index(statement, expression);
-
         invalidate_expression_and_descendants(statement, expression_index, temporaries_allocator);
-        std::size_t const new_expression_index = get_or_create_expression_slot(statement);
-        statement.expressions[new_expression_index] = new_statement.expressions[0];
+
+        statement.expressions[expression_index] = new_statement.expressions[0];
+
+        if (new_statement.expressions.size() > 1)
+        {
+            offset_expression_indices(statement.expressions[expression_index], static_cast<std::uint64_t>(statement.expressions.size() - 1));
+            add_expressions_to_expressions(statement.expressions, {&new_statement.expressions[1], new_statement.expressions.size() - 1});
+        }
     }
 
     void offset_expression_indices(
@@ -291,36 +294,23 @@ namespace h
             }
             else if constexpr (std::is_same_v<T, Variable_declaration_with_type_expression>)
             {
+                offset_index(data.type);
                 offset_index(data.right_hand_side);
             }
             // All other types have no parent-level Expression_index fields.
         }, expression.data);
     }
 
-    std::pmr::vector<Expression_index> add_statements_as_expressions(
+    void add_expressions_to_expressions(
         std::pmr::vector<h::Expression>& output,
-        std::span<h::Statement const> const statements
+        std::span<h::Expression const> const expressions
     )
     {
-        std::pmr::vector<Expression_index> statement_indices{output.get_allocator().resource()};
-        statement_indices.reserve(statements.size());
+        std::size_t const offset = output.size();
+        
+        output.insert(output.end(), expressions.begin(), expressions.end());
 
-        for (h::Statement const& statement : statements)
-        {
-            std::size_t const offset = output.size();
-            if (statement.expressions.empty())
-            {
-                statement_indices.push_back(h::Expression_index{});
-                continue;
-            }
-
-            statement_indices.push_back(h::Expression_index{.expression_index = static_cast<std::uint64_t>(offset)});
-            output.insert(output.end(), statement.expressions.begin(), statement.expressions.end());
-
-            for (std::size_t i = offset; i < output.size(); ++i)
-                offset_expression_indices(output[i], static_cast<std::uint64_t>(offset));
-        }
-
-        return statement_indices;
+        for (std::size_t index = offset; index < output.size(); ++index)
+            offset_expression_indices(output[index], static_cast<std::uint64_t>(offset));
     }
 }

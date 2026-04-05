@@ -61,9 +61,9 @@ namespace h
         std::uint64_t offset
     );
 
-    export std::pmr::vector<Expression_index> add_statements_as_expressions(
+    export void add_expressions_to_expressions(
         std::pmr::vector<h::Expression>& output,
-        std::span<h::Statement const> const statements
+        std::span<h::Expression const> const expressions
     );
 
     export template<typename Expression_type>

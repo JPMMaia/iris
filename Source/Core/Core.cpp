@@ -598,6 +598,7 @@ namespace h
         else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(current_expression.data))
         {
             Variable_declaration_with_type_expression& data = std::get<Variable_declaration_with_type_expression>(current_expression.data);
+            data.type = copy_expressions_to_new_statement(destination_statement, source_statement, data.type);
             data.right_hand_side = copy_expressions_to_new_statement(destination_statement, source_statement, data.right_hand_side);
         }
         else if (std::holds_alternative<h::Variable_expression>(current_expression.data))
@@ -614,6 +615,21 @@ namespace h
         destination_statement.expressions[destination_expression_index] = std::move(current_expression);
 
         return h::Expression_index{.expression_index = destination_expression_index};
+    }
+
+    std::optional<Type_reference> get_variable_declaration_with_type_expression_type(
+        Statement const& statement,
+        Variable_declaration_with_type_expression const& expression
+    )
+    {
+        if (expression.type.expression_index >= statement.expressions.size())
+            return std::nullopt;
+
+        h::Expression const& type_expression = statement.expressions[expression.type.expression_index];
+        if (!std::holds_alternative<h::Type_expression>(type_expression.data))
+            return std::nullopt;
+
+        return std::get<h::Type_expression>(type_expression.data).type;
     }
 
     bool is_builtin_function_name(

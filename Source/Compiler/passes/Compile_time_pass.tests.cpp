@@ -104,6 +104,40 @@ namespace h::compiler
         return h::compiler::tests::format_core_module_to_text(context.core_module);
     }
 
+    static void run_compile_time_pass(
+        h::compiler::tests::Parsed_module_context& context,
+        std::string_view const function_name
+    )
+    {
+        h::Function_declaration* function_declaration = h::compiler::tests::find_mutable_function_declaration(context.core_module, function_name);
+        REQUIRE(function_declaration != nullptr);
+
+        h::Function_definition* function_definition = h::compiler::tests::find_mutable_function_definition(context.core_module, function_name);
+        REQUIRE(function_definition != nullptr);
+
+        Compile_time_runtime_context runtime_context = create_compile_time_runtime_context(context.core_module, context.declaration_database);
+
+        std::pmr::polymorphic_allocator<> output_allocator;
+        std::pmr::polymorphic_allocator<> temporaries_allocator;
+
+        Compile_time_parameters const parameters =
+        {
+            .core_module = context.core_module,
+            .output_allocator = output_allocator,
+            .temporaries_allocator = temporaries_allocator,
+            .llvm_context = *runtime_context.llvm_data.context,
+            .llvm_data_layout = runtime_context.llvm_data.data_layout,
+            .declaration_database = context.declaration_database,
+            .clang_context = runtime_context.clang_context,
+        };
+
+        run_compile_time_pass_on_function(
+            *function_declaration,
+            *function_definition,
+            parameters
+        );
+    }
+
     TEST_CASE("Evaluates compile_time if with true condition", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_if;
@@ -280,6 +314,224 @@ export function run_alignment() -> (result: Int32)
 )";
 
         std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_alignment");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection type_name", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+export function run_type_name() -> ()
+{
+    var value = @type_name::<Int32>();
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+export function run_type_name() -> ()
+{
+    var value = "Int32"c;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_type_name");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection member_count", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_count() -> (result: Int32)
+{
+    var value = @member_count::<Pair>();
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_count() -> (result: Int32)
+{
+    var value = 2u64;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_member_count");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection member_type", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_type() -> ()
+{
+    var value: @member_type::<Pair>(0u64) = 0;
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_type() -> ()
+{
+    var value: Int32 = 0;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_member_type");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("member_type records H.Builtin Type_kind import usage", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+import H.Builtin as Builtin;
+
+struct Metadata
+{
+    kind: Builtin.Type_kind = Builtin.Type_kind.Int;
+}
+
+export function run_member_type_usage() -> ()
+{
+    var value: @member_type::<Metadata>(0u64) = Builtin.Type_kind.Struct;
+}
+)";
+
+        h::compiler::tests::Parsed_module_context context = h::compiler::tests::parse_module_context(input, {});
+        run_compile_time_pass(context, "run_member_type_usage");
+
+        Import_module_with_alias const* const builtin_import = find_import_module_with_alias(context.core_module, "Builtin");
+        REQUIRE(builtin_import != nullptr);
+
+        auto const location = std::find(
+            builtin_import->usages.begin(),
+            builtin_import->usages.end(),
+            "Type_kind"
+        );
+
+        CHECK(location != builtin_import->usages.end());
+    }
+
+    TEST_CASE("Evaluates compile_time reflection member_offset", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_offset() -> (result: Int32)
+{
+    var value = @member_offset::<Pair>(1u64);
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_offset() -> (result: Int32)
+{
+    var value = 32u64;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_member_offset");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection member_name", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_name() -> ()
+{
+    var value = @member_name::<Pair>(1u64);
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_name() -> ()
+{
+    var value = "second"c;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_member_name");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection get_type_kind", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+export function run_get_type_kind() -> ()
+{
+    var kind = @get_type_kind::<Int32>();
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+export function run_get_type_kind() -> ()
+{
+    var kind = Type_kind.Int;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_get_type_kind");
 
         CHECK(expected == actual);
     }

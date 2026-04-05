@@ -434,7 +434,11 @@ namespace h
             else if (std::holds_alternative<Variable_declaration_with_type_expression>(expression.data))
             {
                 Variable_declaration_with_type_expression const& data = std::get<Variable_declaration_with_type_expression>(expression.data);
-                return visit_type_references(data.type, predicate);
+
+                if (data.type.expression_index >= statement.expressions.size())
+                    return false;
+
+                return visit_type_references(statement.expressions[data.type.expression_index], statement, predicate);
             }
 
             return false;

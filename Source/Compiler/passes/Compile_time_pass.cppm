@@ -22,7 +22,7 @@ namespace h::compiler
 
     export struct Compile_time_parameters
     {
-        h::Module const& core_module;
+        h::Module& core_module;
         std::pmr::polymorphic_allocator<> const& output_allocator;
         std::pmr::polymorphic_allocator<> const& temporaries_allocator;
         llvm::LLVMContext& llvm_context;

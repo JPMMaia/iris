@@ -249,7 +249,7 @@ module.exports = grammar({
     Expression_variable: $ => $.Variable_name,
     Expression_variable_declaration: $ => seq($.Expression_variable_mutability, $.Variable_name, "=", $.Generic_expression),
     Expression_variable_declaration_with_type: $ => seq($.Expression_variable_mutability, $.Variable_name, ":", $.Expression_variable_declaration_type, "=", $.Generic_expression_or_instantiate),
-    Expression_variable_declaration_type: $ => $.Type,
+    Expression_variable_declaration_type: $ => choice($.Type, $.Expression_reflection_call),
     Expression_variable_mutability: $ => choice("var", "mutable"),
     Expression_while_loop: $ => seq("while", $.Generic_expression, $.Expression_while_loop_statements),
     Expression_while_loop_statements: $ => seq("{",  repeat($.Statement), "}"),

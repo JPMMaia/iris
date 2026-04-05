@@ -498,9 +498,14 @@ namespace h::compiler
         else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(expression.data))
         {
             h::Variable_declaration_with_type_expression& data = std::get<h::Variable_declaration_with_type_expression>(expression.data);
-            scope.variables.push_back(
-                create_variable(data.name, data.type, data.is_mutable, false, expression.source_range)
-            );
+
+            std::optional<h::Type_reference> const variable_type = h::get_variable_declaration_with_type_expression_type(statement, data);
+            if (variable_type.has_value())
+            {
+                scope.variables.push_back(
+                    create_variable(data.name, std::move(variable_type.value()), data.is_mutable, false, expression.source_range)
+                );
+            }
         }
         else if (std::holds_alternative<h::While_loop_expression>(expression.data))
         {
@@ -694,7 +699,7 @@ namespace h::compiler
             {
                 h::Variable_declaration_with_type_expression const& declaration_expression = std::get<h::Variable_declaration_with_type_expression>(current_expression.data);
                 if (declaration_expression.right_hand_side.expression_index == expression_index)
-                    return declaration_expression.type;
+                    return h::get_variable_declaration_with_type_expression_type(statement, declaration_expression);
             }
         }
 
@@ -2216,9 +2221,14 @@ namespace h::compiler
                     else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(first_expression.data))
                     {
                         h::Variable_declaration_with_type_expression const& variable = std::get<h::Variable_declaration_with_type_expression>(first_expression.data);
-                        output->variables.push_back(
-                            create_variable(variable.name, variable.type, variable.is_mutable, false, first_expression.source_range)
-                        );
+
+                        std::optional<h::Type_reference> const variable_type = h::get_variable_declaration_with_type_expression_type(statement, variable);
+                        if (variable_type.has_value())
+                        {
+                            output->variables.push_back(
+                                create_variable(variable.name, std::move(variable_type.value()), variable.is_mutable, false, first_expression.source_range)
+                            );
+                        }
                     }
                 }
             }

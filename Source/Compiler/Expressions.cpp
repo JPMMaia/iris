@@ -3828,7 +3828,11 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
         Type_database& type_database = parameters.type_database;
 
-        Type_reference const& core_type = expression.type;
+        std::optional<Type_reference> const core_type_optional = h::get_variable_declaration_with_type_expression_type(statement, expression);
+        if (!core_type_optional.has_value())
+            throw std::runtime_error{"Variable declaration with type has invalid type expression!"};
+
+        Type_reference const& core_type = core_type_optional.value();
 
         llvm::Type* const llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, core_type, type_database);
 

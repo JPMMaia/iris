@@ -11,7 +11,9 @@ import std.compat;
 
 import h.compiler.types;
 import h.core;
+import h.core.declarations;
 import h.core.expressions;
+import h.core.formatter;
 import h.core.types;
 
 namespace h::compiler
@@ -73,6 +75,44 @@ namespace h::compiler
                 },
             },
         };
+    }
+
+    static h::Statement create_type_expression_statement(Type_reference type)
+    {
+        return h::Statement
+        {
+            .expressions = {
+                h::Expression
+                {
+                    .data = h::Type_expression
+                    {
+                        .type = std::move(type)
+                    }
+                },
+            },
+        };
+    }
+
+    static void add_import_usage_for_module(
+        h::Module& core_module,
+        std::string_view const module_name,
+        std::string_view const usage,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        auto const location = std::find_if(
+            core_module.dependencies.alias_imports.begin(),
+            core_module.dependencies.alias_imports.end(),
+            [&](Import_module_with_alias const& alias_import) -> bool { return alias_import.module_name == module_name; }
+        );
+        if (location == core_module.dependencies.alias_imports.end())
+            return;
+
+        auto const usage_location = std::find(location->usages.begin(), location->usages.end(), usage);
+        if (usage_location != location->usages.end())
+            return;
+
+        location->usages.push_back(std::pmr::string{usage, output_allocator});
     }
 
     static Compile_time_value_and_type create_value_and_type(
@@ -149,6 +189,129 @@ namespace h::compiler
         }
 
         return std::nullopt;
+    }
+
+    static std::uint64_t get_required_reflection_index_argument(
+        h::Statement const& statement,
+        h::Reflection_expression const& expression,
+        std::string_view const function_name,
+        Compile_time_parameters const& parameters
+    )
+    {
+        if (expression.arguments.size() != 1)
+            throw std::runtime_error{ std::format("{}() requires exactly one argument!", function_name) };
+
+        h::Expression_index const index_expression_index = expression.arguments[0];
+        if (index_expression_index.expression_index >= statement.expressions.size())
+            throw std::runtime_error{ std::format("{}() has an invalid argument index!", function_name) };
+
+        h::Expression const& index_expression = statement.expressions[index_expression_index.expression_index];
+        std::optional<Compile_time_value_and_type> const index_value = evaluate_compile_time_expression(statement, index_expression, parameters);
+        if (!index_value.has_value())
+            throw std::runtime_error{ std::format("{}() argument must be a compile-time integer constant!", function_name) };
+
+        std::optional<Compile_time_integer_value> const integer_value = get_integer_from_value(index_value.value());
+        if (!integer_value.has_value())
+            throw std::runtime_error{ std::format("{}() argument must be an integer constant!", function_name) };
+
+        if (integer_value->is_signed)
+        {
+            if (integer_value->signed_value < 0)
+                throw std::runtime_error{ std::format("{}() argument must be >= 0!", function_name) };
+
+            return static_cast<std::uint64_t>(integer_value->signed_value);
+        }
+
+        return integer_value->unsigned_value;
+    }
+
+    static std::pmr::string get_type_kind_member_name(
+        Type_reference const& type_reference,
+        Compile_time_parameters const& parameters
+    )
+    {
+        std::optional<Type_reference> const underlying_type = get_underlying_type(parameters.declaration_database, type_reference);
+        Type_reference const& resolved_type = underlying_type.value_or(type_reference);
+
+        if (std::holds_alternative<h::Array_slice_type>(resolved_type.data))
+            return std::pmr::string{"Array_slice", parameters.output_allocator};
+
+        if (std::holds_alternative<h::Builtin_type_reference>(resolved_type.data))
+            return std::pmr::string{"Builtin", parameters.output_allocator};
+
+        if (std::holds_alternative<h::Constant_array_type>(resolved_type.data))
+            return std::pmr::string{"Constant_array", parameters.output_allocator};
+
+        if (std::holds_alternative<h::Custom_type_reference>(resolved_type.data))
+        {
+            std::optional<h::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, resolved_type);
+            if (!declaration.has_value())
+                return std::pmr::string{"Custom", parameters.output_allocator};
+
+            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+                return std::pmr::string{"Struct", parameters.output_allocator};
+            if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+                return std::pmr::string{"Union", parameters.output_allocator};
+            if (std::holds_alternative<h::Enum_declaration const*>(declaration->data))
+                return std::pmr::string{"Enum", parameters.output_allocator};
+
+            return std::pmr::string{"Custom", parameters.output_allocator};
+        }
+
+        if (std::holds_alternative<h::Fundamental_type>(resolved_type.data))
+        {
+            h::Fundamental_type const fundamental_type = std::get<h::Fundamental_type>(resolved_type.data);
+            switch (fundamental_type)
+            {
+                case h::Fundamental_type::Bool:
+                case h::Fundamental_type::C_bool:
+                    return std::pmr::string{"Bool", parameters.output_allocator};
+                case h::Fundamental_type::Float16:
+                case h::Fundamental_type::Float32:
+                case h::Fundamental_type::Float64:
+                case h::Fundamental_type::C_longdouble:
+                    return std::pmr::string{"Float", parameters.output_allocator};
+                case h::Fundamental_type::Byte:
+                case h::Fundamental_type::C_uchar:
+                case h::Fundamental_type::C_ushort:
+                case h::Fundamental_type::C_uint:
+                case h::Fundamental_type::C_ulong:
+                case h::Fundamental_type::C_ulonglong:
+                    return std::pmr::string{"Uint", parameters.output_allocator};
+                case h::Fundamental_type::C_char:
+                case h::Fundamental_type::C_schar:
+                case h::Fundamental_type::C_short:
+                case h::Fundamental_type::C_int:
+                case h::Fundamental_type::C_long:
+                case h::Fundamental_type::C_longlong:
+                    return std::pmr::string{"Int", parameters.output_allocator};
+                case h::Fundamental_type::String:
+                case h::Fundamental_type::Any_type:
+                    return std::pmr::string{"Builtin", parameters.output_allocator};
+                default:
+                    return std::pmr::string{"Builtin", parameters.output_allocator};
+            }
+        }
+
+        if (std::holds_alternative<h::Function_pointer_type>(resolved_type.data))
+            return std::pmr::string{"Function_pointer", parameters.output_allocator};
+
+        if (std::holds_alternative<h::Integer_type>(resolved_type.data))
+        {
+            h::Integer_type const& integer_type = std::get<h::Integer_type>(resolved_type.data);
+            return std::pmr::string{integer_type.is_signed ? "Int" : "Uint", parameters.output_allocator};
+        }
+
+        if (std::holds_alternative<h::Null_pointer_type>(resolved_type.data))
+            return std::pmr::string{"Null_pointer", parameters.output_allocator};
+
+        if (std::holds_alternative<h::Pointer_type>(resolved_type.data))
+            return std::pmr::string{"Pointer", parameters.output_allocator};
+
+        if (std::holds_alternative<h::Type_instance>(resolved_type.data))
+            return std::pmr::string{"Custom", parameters.output_allocator};
+
+        return std::pmr::string{"Custom", parameters.output_allocator};
     }
 
     static void replace_variable_with_constant_in_statement(
@@ -433,6 +596,205 @@ namespace h::compiler
                 create_integer_type_type_reference(64, false),
                 std::move(data)
             ));
+        }
+        else if (expression.name == "type_name")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "type_name() requires exactly one type argument!" };
+
+            if (!expression.arguments.empty())
+                throw std::runtime_error{ "type_name() does not take runtime arguments!" };
+
+            std::pmr::string const type_name = format_type_reference(
+                parameters.core_module,
+                expression.type_arguments[0],
+                parameters.output_allocator,
+                parameters.temporaries_allocator
+            );
+
+            return create_value_and_type(create_constant_expression_statement(
+                create_c_string_type_reference(false),
+                type_name
+            ));
+        }
+        else if (expression.name == "member_count")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "member_count() requires exactly one type argument!" };
+
+            if (!expression.arguments.empty())
+                throw std::runtime_error{ "member_count() does not take runtime arguments!" };
+
+            Type_reference const& type_reference = expression.type_arguments[0];
+            std::optional<h::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
+            if (!declaration.has_value())
+                throw std::runtime_error{ "member_count() could not resolve declaration for type argument!" };
+
+            std::uint64_t member_count = 0;
+            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+            {
+                h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration->data);
+                member_count = struct_declaration.member_types.size();
+            }
+            else if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+            {
+                h::Union_declaration const& union_declaration = *std::get<h::Union_declaration const*>(declaration->data);
+                member_count = union_declaration.member_types.size();
+            }
+            else
+            {
+                throw std::runtime_error{ "member_count() requires a struct or union type argument!" };
+            }
+
+            return create_value_and_type(create_constant_expression_statement(
+                create_integer_type_type_reference(64, false),
+                std::pmr::string{std::to_string(member_count)}
+            ));
+        }
+        else if (expression.name == "member_type")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "member_type() requires exactly one type argument!" };
+
+            std::uint64_t const member_index = get_required_reflection_index_argument(statement, expression, "member_type", parameters);
+
+            Type_reference const& type_reference = expression.type_arguments[0];
+            std::optional<h::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
+            if (!declaration.has_value())
+                throw std::runtime_error{ "member_type() could not resolve declaration for type argument!" };
+
+            std::optional<Type_reference> output_type = std::nullopt;
+            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+            {
+                h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration->data);
+                if (member_index >= struct_declaration.member_types.size())
+                    throw std::runtime_error{ "member_type() index is out of bounds!" };
+
+                output_type = struct_declaration.member_types[member_index];
+            }
+            else if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+            {
+                h::Union_declaration const& union_declaration = *std::get<h::Union_declaration const*>(declaration->data);
+                if (member_index >= union_declaration.member_types.size())
+                    throw std::runtime_error{ "member_type() index is out of bounds!" };
+
+                output_type = union_declaration.member_types[member_index];
+            }
+            else
+            {
+                throw std::runtime_error{ "member_type() requires a struct or union type argument!" };
+            }
+
+            add_import_usage_for_module(parameters.core_module, "H.Builtin", "Type_kind", parameters.output_allocator);
+
+            return create_value_and_type(create_type_expression_statement(output_type.value()));
+        }
+        else if (expression.name == "member_offset")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "member_offset() requires exactly one type argument!" };
+
+            std::uint64_t const member_index = get_required_reflection_index_argument(statement, expression, "member_offset", parameters);
+
+            Type_reference const& type_reference = expression.type_arguments[0];
+            std::optional<h::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
+            if (!declaration.has_value())
+                throw std::runtime_error{ "member_offset() could not resolve declaration for type argument!" };
+
+            std::uint64_t offset_in_bits = 0;
+            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+            {
+                h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration->data);
+                if (member_index >= struct_declaration.member_types.size())
+                    throw std::runtime_error{ "member_offset() index is out of bounds!" };
+
+                llvm::Type* const llvm_type = type_reference_to_llvm_type_on_demand(
+                    parameters.llvm_context,
+                    parameters.llvm_data_layout,
+                    parameters.core_module,
+                    type_reference,
+                    parameters.declaration_database,
+                    parameters.clang_context
+                );
+                if (!llvm::StructType::classof(llvm_type))
+                    throw std::runtime_error{ "member_offset() expected a StructType in LLVM!" };
+
+                llvm::StructType* const llvm_struct_type = llvm::cast<llvm::StructType>(llvm_type);
+                llvm::StructLayout const* const llvm_struct_layout = parameters.llvm_data_layout.getStructLayout(llvm_struct_type);
+                offset_in_bits = 8 * llvm_struct_layout->getElementOffset(member_index);
+            }
+            else if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+            {
+                h::Union_declaration const& union_declaration = *std::get<h::Union_declaration const*>(declaration->data);
+                if (member_index >= union_declaration.member_types.size())
+                    throw std::runtime_error{ "member_offset() index is out of bounds!" };
+
+                offset_in_bits = 0;
+            }
+            else
+            {
+                throw std::runtime_error{ "member_offset() requires a struct or union type argument!" };
+            }
+
+            return create_value_and_type(create_constant_expression_statement(
+                create_integer_type_type_reference(64, false),
+                std::pmr::string{std::to_string(offset_in_bits)}
+            ));
+        }
+        else if (expression.name == "member_name")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "member_name() requires exactly one type argument!" };
+
+            std::uint64_t const member_index = get_required_reflection_index_argument(statement, expression, "member_name", parameters);
+
+            Type_reference const& type_reference = expression.type_arguments[0];
+            std::optional<h::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
+            if (!declaration.has_value())
+                throw std::runtime_error{ "member_name() could not resolve declaration for type argument!" };
+
+            std::pmr::string member_name{parameters.output_allocator};
+            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+            {
+                h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration->data);
+                if (member_index >= struct_declaration.member_names.size())
+                    throw std::runtime_error{ "member_name() index is out of bounds!" };
+
+                member_name = struct_declaration.member_names[member_index];
+            }
+            else if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+            {
+                h::Union_declaration const& union_declaration = *std::get<h::Union_declaration const*>(declaration->data);
+                if (member_index >= union_declaration.member_names.size())
+                    throw std::runtime_error{ "member_name() index is out of bounds!" };
+
+                member_name = union_declaration.member_names[member_index];
+            }
+            else
+            {
+                throw std::runtime_error{ "member_name() requires a struct or union type argument!" };
+            }
+
+            return create_value_and_type(create_constant_expression_statement(
+                create_c_string_type_reference(false),
+                std::move(member_name)
+            ));
+        }
+        else if (expression.name == "get_type_kind")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "get_type_kind() requires exactly one type argument!" };
+
+            if (!expression.arguments.empty())
+                throw std::runtime_error{ "get_type_kind() does not take runtime arguments!" };
+
+            std::pmr::string const member_name = get_type_kind_member_name(expression.type_arguments[0], parameters);
+            h::Statement enum_statement =
+            {
+                .expressions = create_enum_value_expressions("Type_kind", member_name)
+            };
+
+            return create_value_and_type(std::move(enum_statement));
         }
         else
         {

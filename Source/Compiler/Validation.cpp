@@ -1373,9 +1373,13 @@ namespace h::compiler
                 {
                     h::Variable_declaration_with_type_expression const& variable_declaration_with_type = std::get<h::Variable_declaration_with_type_expression>(expression.data);
 
-                    new_scope.variables.push_back(
-                        create_variable(variable_declaration_with_type.name, variable_declaration_with_type.type, variable_declaration_with_type.is_mutable, false, expression.source_range)
-                    );
+                    std::optional<h::Type_reference> const variable_type = h::get_variable_declaration_with_type_expression_type(statement, variable_declaration_with_type);
+                    if (variable_type.has_value())
+                    {
+                        new_scope.variables.push_back(
+                            create_variable(variable_declaration_with_type.name, std::move(variable_type.value()), variable_declaration_with_type.is_mutable, false, expression.source_range)
+                        );
+                    }
                 }
             }
         }
@@ -3586,7 +3590,20 @@ namespace h::compiler
         }
         
         h::Expression const& right_hand_side = parameters.statement.expressions[expression.right_hand_side.expression_index];
-        h::Type_reference const& type = expression.type;
+        std::optional<h::Type_reference> const type_optional = h::get_variable_declaration_with_type_expression_type(parameters.statement, expression);
+        if (!type_optional.has_value())
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format("Invalid declared type expression for variable '{}'.", expression.name)
+                )
+            };
+        }
+
+        h::Type_reference const& type = type_optional.value();
 
         if (std::holds_alternative<h::Instantiate_expression>(right_hand_side.data) && !std::holds_alternative<h::Array_slice_type>(type.data))
         {
@@ -3768,7 +3785,7 @@ namespace h::compiler
             if (std::holds_alternative<h::Variable_declaration_with_type_expression>(expression.data))
             {
                 h::Variable_declaration_with_type_expression const& data = std::get<h::Variable_declaration_with_type_expression>(expression.data);
-                return data.type;
+                return h::get_variable_declaration_with_type_expression_type(statement, data);
             }
         }
 

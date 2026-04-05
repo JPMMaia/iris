@@ -149,6 +149,7 @@ namespace h
         {
             Variable_declaration_with_type_expression const& data = std::get<Variable_declaration_with_type_expression>(expression.data);
 
+            visit_expressions_recursively(statement, statement.expressions[data.type.expression_index], predicate);
             visit_expressions_recursively(statement, statement.expressions[data.right_hand_side.expression_index], predicate);
         }
         

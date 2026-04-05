@@ -3242,8 +3242,17 @@
       ]
     },
     "Expression_variable_declaration_type": {
-      "type": "SYMBOL",
-      "name": "Type"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "Type"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_reflection_call"
+        }
+      ]
     },
     "Expression_variable_mutability": {
       "type": "CHOICE",

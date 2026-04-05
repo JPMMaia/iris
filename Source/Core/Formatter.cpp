@@ -1485,7 +1485,23 @@ namespace h
         add_text(buffer, " ");
         add_text(buffer, expression.name);
         add_text(buffer, ": ");
-        add_format_type_name(buffer, expression.type, options);
+
+        Expression const& declared_type_expression = get_expression(statement, expression.type);
+        if (std::holds_alternative<Type_expression>(declared_type_expression.data))
+        {
+            Type_expression const& type_expression = std::get<Type_expression>(declared_type_expression.data);
+            add_format_type_name(buffer, type_expression.type, options);
+        }
+        else if (std::holds_alternative<Reflection_expression>(declared_type_expression.data))
+        {
+            Reflection_expression const& reflection_expression = std::get<Reflection_expression>(declared_type_expression.data);
+            add_format_expression_reflection(buffer, statement, reflection_expression, options);
+        }
+        else
+        {
+            add_text(buffer, "<invalid_type_expression>");
+        }
+
         add_text(buffer, " = ");
         add_format_expression(buffer, statement, get_expression(statement, expression.right_hand_side), outside_indentation, options);
     }

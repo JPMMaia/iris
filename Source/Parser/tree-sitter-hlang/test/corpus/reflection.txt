@@ -39,3 +39,86 @@ export function run() -> ()
                       (Type_name
                         (Identifier))))
                   (Expression_call_arguments))))))))))
+
+=========================
+Reflection type declaration
+=========================
+
+module Reflection_type_declaration;
+
+struct Pair
+{
+  first: Int32 = 0;
+  second: Int32 = 0;
+}
+
+export function run() -> ()
+{
+    var value: @member_type::<Pair>(0u64) = 0;
+}
+
+---
+
+(Module
+  (Module_head
+    (Module_declaration
+      (Module_name
+        (Identifier_with_dots
+          (Identifier)))))
+  (Declaration
+    (Struct
+      (Struct_name
+        (Identifier))
+      (Struct_members
+        (Struct_member
+          (Struct_member_name
+            (Identifier))
+          (Struct_member_type
+            (Type
+              (Type_name
+                (Identifier))))
+          (Generic_expression_or_instantiate
+            (Generic_expression
+              (Expression_constant
+                (Number)))))
+        (Struct_member
+          (Struct_member_name
+            (Identifier))
+          (Struct_member_type
+            (Type
+              (Type_name
+                (Identifier))))
+          (Generic_expression_or_instantiate
+            (Generic_expression
+              (Expression_constant
+                (Number))))))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters)
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration_with_type
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Expression_variable_declaration_type
+                (Expression_reflection_call
+                  (Reflection_identifier)
+                  (Expression_reflection_call_type_arguments
+                    (Type
+                      (Type_name
+                        (Identifier))))
+                  (Expression_call_arguments
+                    (Generic_expression_or_instantiate
+                      (Generic_expression
+                        (Expression_constant
+                          (Number)))))))
+              (Generic_expression_or_instantiate
+                (Generic_expression
+                  (Expression_constant
+                    (Number)))))))))))

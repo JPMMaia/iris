@@ -1062,7 +1062,7 @@ namespace h
     {
         std::pmr::string name;
         bool is_mutable;
-        Type_reference type;
+        Expression_index type;
         Expression_index right_hand_side;
 
 #if HACK_SPACESHIP_OPERATOR
@@ -1071,6 +1071,11 @@ namespace h
         friend auto operator<=>(Variable_declaration_with_type_expression const&, Variable_declaration_with_type_expression const&) = default;
 #endif
     };
+
+    export std::optional<Type_reference> get_variable_declaration_with_type_expression_type(
+        Statement const& statement,
+        Variable_declaration_with_type_expression const& expression
+    );
 
     export struct While_loop_expression
     {

@@ -3188,9 +3188,26 @@ namespace h::parser
             std::optional<Parse_node> const type_node = get_child_node(tree, declaration_type_node.value(), 0);
             if (type_node.has_value())
             {
-                std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
-                if (type.has_value())
-                    output.type = std::move(type.value());
+                h::Expression type_expression = {};
+                type_expression.source_range = get_node_source_range(declaration_type_node.value());
+
+                std::string_view const declaration_type_symbol = get_node_symbol(type_node.value());
+                if (declaration_type_symbol == "Type")
+                {
+                    std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+                    if (type.has_value())
+                    {
+                        type_expression.data = h::Type_expression{ .type = std::move(type.value()) };
+                        output.type = h::Expression_index{ .expression_index = statement.expressions.size() };
+                        statement.expressions.push_back(std::move(type_expression));
+                    }
+                }
+                else if (declaration_type_symbol == "Expression_reflection_call")
+                {
+                    type_expression.data = node_to_expression_reflection(statement, module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+                    output.type = h::Expression_index{ .expression_index = statement.expressions.size() };
+                    statement.expressions.push_back(std::move(type_expression));
+                }
             }
         }
         
