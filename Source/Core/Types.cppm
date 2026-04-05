@@ -752,6 +752,20 @@ namespace h
         return visit_type_references(core_module, declaration_name, call_recursive);
     }
 
+    export template <typename Function_t>
+        bool visit_type_references_recursively(
+            h::Module const& core_module,
+            Function_t predicate
+        )
+    {
+        auto const call_recursive = [&](std::string_view const declaration_name, h::Type_reference const& type_reference) -> bool
+        {
+            return visit_type_references_recursively(type_reference, predicate);
+        };
+
+        return visit_type_references(core_module, call_recursive);
+    }
+
     export template <typename Value_t, typename Function_t>
         bool visit_type_references_recursively_with_declaration_name(
             Value_t const& value,
