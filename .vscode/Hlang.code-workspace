@@ -17,7 +17,7 @@
 					"${workspaceFolder}/Source/Core/Core.cppm",
 					"${workspaceFolder}/Source/JSON_serializer/Generated.cppm"
 				],
-				"cwd": "${fileDirname}",
+				"cwd": "${workspaceFolder}",
 			},
 			{
 				"name": "Generate JSON operators",
@@ -29,7 +29,7 @@
 					"${workspaceFolder}/Source/Core/Core.cppm",
 					"${workspaceFolder}/Source/JSON_serializer/Operators.cppm"
 				],
-				"cwd": "${fileDirname}"
+				"cwd": "${workspaceFolder}"
 			},
 			{
 				"name": "Replace Compiler Tests",
@@ -40,7 +40,7 @@
 					"${workspaceFolder}/build/Source/Compiler/H_compiler_tests.exe",
 					"${workspaceFolder}/Source/Compiler/Compiler.tests.cpp",
 				],
-				"cwd": "${fileDirname}"
+				"cwd": "${workspaceFolder}"
 			},
 			{
 				"name": "C Header Importer tests",
@@ -48,7 +48,7 @@
 				"request": "launch",
 				"program": "${workspaceFolder}/build/Source/Interoperability/H_c_header_importer_tests.exe",
 				"args": [],
-				"cwd": "${fileDirname}",
+				"cwd": "${workspaceFolder}",
 			},
 			{
 				"name": "Generate TypeScript interface",
@@ -60,7 +60,7 @@
 					"${workspaceFolder}/Source/Core/Core.cppm",
 					"${workspaceFolder}/Tools/vscode/H-editor/src/core/Core_interface.ts"
 				],
-				"cwd": "${fileDirname}",
+				"cwd": "${workspaceFolder}",
 			},
 			{
 				"name": "Generate TypeScript intermediate representation",
@@ -72,7 +72,7 @@
 					"${workspaceFolder}/Source/Core/Core.cppm",
 					"${workspaceFolder}/Tools/vscode/H-editor/src/core/Core_intermediate_representation.ts"
 				],
-				"cwd": "${fileDirname}",
+				"cwd": "${workspaceFolder}",
 			},
 			{
 				"name": "hlang build-executable",
