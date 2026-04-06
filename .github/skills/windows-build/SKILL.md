@@ -35,9 +35,9 @@ then stop and aks the user to solve the issue manually.
 
 Building a CMake target with Ninja might trigger errors from other files. To keep the session more efficient and focused it might preferable to compile a single file.
 
-To compile a single file named `file_name.cpp` run:
+To compile a single file named `path/to/file_name.cpp` run:
 
-`python3 ./Scripts/build_file.py file_name.cpp`
+`python3 ./Scripts/build_file.py path/to/file_name.cpp`
 
 ## Running tests
 
