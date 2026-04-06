@@ -533,6 +533,36 @@ namespace h
         }
     }
 
+    std::pmr::string format_expression(
+        h::Module const& core_module,
+        Statement const& statement,
+        Expression const& expression,
+        std::uint32_t indentation,
+        bool const add_semicolon,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        Format_options const options
+        {
+            .alias_imports = core_module.dependencies.alias_imports,
+            .output_allocator = output_allocator,
+            .temporaries_allocator = temporaries_allocator,
+        };
+
+        String_buffer buffer;
+
+        add_format_expression(
+            buffer,
+            statement,
+            expression,
+            indentation,
+            options
+        );
+
+        return to_string(buffer);
+    }
+
     void add_format_expression_access(
         String_buffer& buffer,
         Statement const& statement,
