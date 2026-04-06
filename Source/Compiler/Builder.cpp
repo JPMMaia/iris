@@ -193,24 +193,6 @@ namespace h::compiler
         if (!compile_cpp_and_write_to_bitcode_files(builder, artifacts, llvm_data, compilation_options, temporaries_allocator))
             h::common::print_message_and_exit(std::format("Failed to compile c++."));
 
-        h::compiler::Clang_context clang_context = h::compiler::create_clang_context(
-            *llvm_data.context,
-            llvm_data.clang_data,
-            "Hl_clang_module"
-        );
-
-        start_timer(get_profiler(builder), "process_modules_and_create_compilation_database");
-        // TODO make const
-        Compilation_database compilation_database = process_modules_and_create_compilation_database(
-            llvm_data,
-            std::move(clang_context),
-            sorted_modules,
-            modules_and_declaration_database.declaration_database, // TODO this does a copy
-            output_allocator,
-            temporaries_allocator
-        );
-        end_timer(get_profiler(builder), "process_modules_and_create_compilation_database");
-
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map = create_module_name_to_file_path_map(
             builder,
             header_modules,
@@ -224,7 +206,7 @@ namespace h::compiler
             non_test_modules,
             module_name_to_file_path_map,
             llvm_data,
-            compilation_database,
+            modules_and_declaration_database.declaration_database,
             compilation_options,
             false
         );
@@ -238,7 +220,7 @@ namespace h::compiler
                 core_modules,
                 module_name_to_file_path_map,
                 llvm_data,
-                compilation_database,
+                modules_and_declaration_database.declaration_database,
                 test_compilation_options,
                 true
             );
@@ -1255,7 +1237,7 @@ namespace h::compiler
         h::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         LLVM_data& llvm_data,
-        Compilation_database const& compilation_database,
+        Declaration_database const& declaration_database,
         Compilation_options const& compilation_options,
         bool const is_test_mode
     )
@@ -1291,7 +1273,7 @@ namespace h::compiler
             llvm_data,
             core_module,
             module_name_to_file_path_map,
-            compilation_database,
+            declaration_database,
             compilation_options
         );
 
@@ -1309,7 +1291,7 @@ namespace h::compiler
         std::span<h::Module const> const core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         LLVM_data& llvm_data,
-        Compilation_database const& compilation_database,
+        Declaration_database const& declaration_database,
         Compilation_options const& compilation_options,
         bool is_test_mode
     )
@@ -1326,7 +1308,7 @@ namespace h::compiler
                 core_module,
                 module_name_to_file_path_map,
                 llvm_data,
-                compilation_database,
+                declaration_database,
                 compilation_options,
                 is_test_mode
             );

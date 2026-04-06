@@ -1838,7 +1838,7 @@ namespace h::compiler
         LLVM_data& llvm_data,
         Clang_context&& clang_context,
         std::span<h::Module const* const> const sorted_modules,
-        Declaration_database declaration_database,
+        Declaration_database& declaration_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -1857,7 +1857,6 @@ namespace h::compiler
 
         return Compilation_database
         {
-            .declaration_database = std::move(declaration_database),
             .clang_module_data = std::move(clang_module_data),
             .type_database = std::move(type_database),
         };
@@ -1865,15 +1864,46 @@ namespace h::compiler
 
     std::unique_ptr<llvm::Module> create_llvm_module(
         LLVM_data& llvm_data,
-        h::Module const& core_module,
+        h::Module core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        Compilation_database const& compilation_database,
+        Declaration_database declaration_database,
         Compilation_options const& compilation_options
     )
     {
         std::pmr::unordered_map<std::pmr::string, h::Module> core_module_dependencies = create_dependency_core_modules(
             core_module,
             module_name_to_file_path_map
+        );
+
+        std::pmr::vector<h::Module const*> const sorted_core_modules = sort_core_modules(core_module_dependencies, &core_module, {}, {});
+
+        Clang_context clang_context = create_clang_context(
+            *llvm_data.context,
+            llvm_data.clang_data,
+            "Hl_clang_module"
+        );
+
+        {
+            All_passes_parameters const pass_parameters
+            {
+                .llvm_context = *llvm_data.context,
+                .llvm_data_layout = llvm_data.data_layout,
+                .declaration_database = declaration_database,
+                .clang_context = clang_context,
+                .output_allocator = {},
+                .temporaries_allocator = {},
+            };
+
+            run_all_passes_on_module(core_module, pass_parameters);
+        }
+
+         Compilation_database compilation_database = process_modules_and_create_compilation_database(
+            llvm_data,
+            std::move(clang_context),
+            sorted_core_modules,
+            declaration_database,
+            {},
+            {}
         );
 
         std::unique_ptr<llvm::Module> llvm_module = create_module(
@@ -1884,7 +1914,7 @@ namespace h::compiler
             core_module,
             core_module_dependencies,
             std::nullopt,
-            compilation_database.declaration_database,
+            declaration_database,
             compilation_database.type_database,
             compilation_options
         );
