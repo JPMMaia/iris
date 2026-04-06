@@ -328,6 +328,12 @@ namespace h::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts decimal_expressions.hltxt", "[Convertor]")
+    {
+        std::string_view const input_file = "decimal_expressions.hltxt";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts defer_expressions.hltxt", "[Convertor]")
     {
         std::string_view const input_file = "defer_expressions.hltxt";

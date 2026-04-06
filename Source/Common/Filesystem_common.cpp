@@ -85,4 +85,9 @@ namespace h::common
     {
         return get_share_path("libraries/hlang_repository.json");
     }
+
+    std::filesystem::path get_visualizers_file_path()
+    {
+        return get_share_path("visualizers");
+    }
 }

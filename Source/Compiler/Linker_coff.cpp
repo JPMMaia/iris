@@ -16,6 +16,7 @@ module;
 module h.compiler.linker;
 
 import h.common;
+import h.common.filesystem_common;
 
 LLD_HAS_DRIVER(coff);
 
@@ -42,7 +43,13 @@ namespace h::compiler
         }
 
         if (options.debug)
+        {
             arguments_storage.push_back("/debug:full");
+
+            // Natvis
+            std::filesystem::path const visualizers_path = h::common::get_visualizers_file_path();
+            arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "hlang_decimal.natvis").generic_string()));
+        }
 
         // Provides mainCRTStartup
         arguments_storage.push_back(options.debug ? "/defaultlib:msvcrtd.lib" : "/defaultlib:msvcrt.lib");

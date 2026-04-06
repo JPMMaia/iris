@@ -995,6 +995,13 @@ namespace h
             add_text(buffer, signed_suffix);
             add_integer_text(buffer, static_cast<std::uint64_t>(integer_type.number_of_bits));
         }
+        else if (std::holds_alternative<h::Decimal_type>(type.data))
+        {
+            h::Decimal_type const decimal_type = std::get<h::Decimal_type>(type.data);
+            add_text(buffer, expression.data);
+            add_text(buffer, "d");
+            add_integer_text(buffer, static_cast<std::uint64_t>(decimal_type.scale));
+        }
         else if (h::is_c_string(type))
         {
             add_text(buffer, "\"");
@@ -1655,6 +1662,12 @@ namespace h
             add_format_custom_type_reference(
                 buffer, value, options
             );
+        }
+        else if (std::holds_alternative<Decimal_type>(type.data))
+        {
+            Decimal_type const& value = std::get<Decimal_type>(type.data);
+            add_text(buffer, "Decimal");
+            add_integer_text(buffer, static_cast<std::uint64_t>(value.scale));
         }
         else if (std::holds_alternative<Fundamental_type>(type.data))
         {

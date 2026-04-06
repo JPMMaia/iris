@@ -28,4 +28,6 @@ namespace h::common
     export std::filesystem::path get_tests_main_file_path();
 
     export std::filesystem::path get_standard_repository_file_path();
+
+    export std::filesystem::path get_visualizers_file_path();
 }

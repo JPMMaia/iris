@@ -1,0 +1,68 @@
+module Decimal_expressions;
+
+export function decimal_constants() -> ()
+{
+    var a: Decimal2 = 0.15d2;
+    var b: Decimal4 = 1.57d4;
+    var c: Decimal7 = 123.4567d7;
+    var d: Decimal2 = 100d2;
+}
+
+export function decimal_32_arithmetic(x: Decimal4, y: Decimal4) -> ()
+{
+    var sum: Decimal4 = x + y;
+    var diff: Decimal4 = x - y;
+    var product: Decimal4 = x * y;
+    var quotient: Decimal4 = x / y;
+}
+
+export function decimal_64_arithmetic(x: Decimal7, y: Decimal7) -> ()
+{
+    var sum: Decimal7 = x + y;
+    var diff: Decimal7 = x - y;
+    var product: Decimal7 = x * y;
+    var quotient: Decimal7 = x / y;
+}
+
+export function decimal_casts(
+    i32_value: Int32,
+    i64_value: Int64,
+    f32_value: Float32,
+    f64_value: Float64,
+    d4_value: Decimal4,
+    d7_value: Decimal7
+) -> ()
+{
+    var i32_to_d4: Decimal4 = i32_value as Decimal4;
+    var i32_to_d7: Decimal7 = i32_value as Decimal7;
+    var i64_to_d4: Decimal4 = i64_value as Decimal4;
+    var i64_to_d7: Decimal7 = i64_value as Decimal7;
+
+    var d4_to_i32: Int32 = d4_value as Int32;
+    var d4_to_i64: Int64 = d4_value as Int64;
+    var d7_to_i32: Int32 = d7_value as Int32;
+    var d7_to_i64: Int64 = d7_value as Int64;
+
+    var f32_to_d4: Decimal4 = f32_value as Decimal4;
+    var f32_to_d7: Decimal7 = f32_value as Decimal7;
+    var f64_to_d4: Decimal4 = f64_value as Decimal4;
+    var f64_to_d7: Decimal7 = f64_value as Decimal7;
+
+    var d4_to_f32: Float32 = d4_value as Float32;
+    var d4_to_f64: Float64 = d4_value as Float64;
+    var d7_to_f32: Float32 = d7_value as Float32;
+    var d7_to_f64: Float64 = d7_value as Float64;
+
+    var d4_to_d7: Decimal7 = d4_value as Decimal7;
+    var d7_to_d4: Decimal4 = d7_value as Decimal4;
+
+    var rounded_positive_i32: Int32 = (0.50d2 as Int32);
+    var rounded_negative_i32: Int32 = (-0.50d2 as Int32);
+    var rounded_positive_i64: Int64 = (0.5000000d7 as Int64);
+    var rounded_negative_i64: Int64 = (-0.5000000d7 as Int64);
+
+    var rounded_f32_positive_d4: Decimal4 = (1.23455f32 as Decimal4);
+    var rounded_f32_negative_d4: Decimal4 = (-1.23455f32 as Decimal4);
+    var rounded_f64_positive_d7: Decimal7 = (2.50000005f64 as Decimal7);
+    var rounded_f64_negative_d7: Decimal7 = (-2.50000005f64 as Decimal7);
+}

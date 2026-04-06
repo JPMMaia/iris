@@ -53,6 +53,12 @@ namespace h
     export bool is_signed_integer(Type_reference const& type);
     export bool is_unsigned_integer(Type_reference const& type);
 
+    export Type_reference create_decimal_type_reference(std::uint32_t scale);
+    export bool is_decimal(Type_reference const& type);
+    export std::uint32_t get_decimal_scale(Type_reference const& type);
+    export std::uint32_t get_decimal_size_in_bits(std::uint32_t const scale);
+    export Type_reference get_decimal_backing_type_reference(std::uint32_t scale);
+
     export bool is_number_or_c_number(Type_reference const& type);
 
     export Type_reference create_null_pointer_type_type_reference();
@@ -146,6 +152,10 @@ namespace h
             return false;
         }
         else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
+        {
+            return false;
+        }
+        else if (std::holds_alternative<Decimal_type>(type_reference.data))
         {
             return false;
         }

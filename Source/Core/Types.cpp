@@ -123,6 +123,39 @@ namespace h
         return std::holds_alternative<Custom_type_reference>(type.data);
     }
 
+    Type_reference create_decimal_type_reference(std::uint32_t const scale)
+    {
+        return Type_reference
+        {
+            .data = Decimal_type
+            {
+                .scale = scale,
+            }
+        };
+    }
+
+    bool is_decimal(Type_reference const& type)
+    {
+        return std::holds_alternative<Decimal_type>(type.data);
+    }
+
+    std::uint32_t get_decimal_scale(Type_reference const& type)
+    {
+        return std::get<Decimal_type>(type.data).scale;
+    }
+
+    std::uint32_t get_decimal_size_in_bits(std::uint32_t const scale)
+    {
+        // N <= 6: 32-bits; N >= 7: 64-bits
+        return scale <= 6 ? 32 : 64;
+    }
+
+    Type_reference get_decimal_backing_type_reference(std::uint32_t const scale)
+    {
+        std::uint32_t const bits = get_decimal_size_in_bits(scale);
+        return create_integer_type_type_reference(bits, true);
+    }
+
     Custom_type_reference fix_custom_type_reference(
         Custom_type_reference type,
         Module const& core_module
@@ -412,6 +445,9 @@ namespace h
             return true;
         
         if (is_floating_point(type))
+            return true;
+
+        if (is_decimal(type))
             return true;
 
         if (std::holds_alternative<Fundamental_type>(type.data))

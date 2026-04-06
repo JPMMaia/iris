@@ -1854,7 +1854,7 @@ namespace h::compiler
         }
         else if (is_comparison_binary_operation(operation))
         {
-            if (!is_integer(type) && !is_floating_point(type))
+            if (!is_integer(type) && !is_floating_point(type) && !is_decimal(type))
             {
                 return
                 {
@@ -1888,7 +1888,7 @@ namespace h::compiler
         }
         else if (is_numeric_binary_operation(operation))
         {
-            if (!is_integer(type) && !is_floating_point(type))
+            if (!is_integer(type) && !is_floating_point(type) && !is_decimal(type))
             {
                 return
                 {
@@ -3425,7 +3425,7 @@ namespace h::compiler
             }
             case Unary_operation::Minus:
             {
-                if (!is_integer(type) && !is_floating_point(type))
+                if (!is_integer(type) && !is_floating_point(type) && !is_decimal(type))
                 {
                     return
                     {

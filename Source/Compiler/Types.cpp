@@ -1062,6 +1062,47 @@ namespace h::compiler
         return llvm_debug_builder.createBasicType(name, type.number_of_bits, encoding);
     }
 
+    llvm::DIType* decimal_type_to_llvm_debug_type(
+        llvm::DIBuilder& llvm_debug_builder,
+        Decimal_type const type
+    )
+    {
+        static llvm::DINamespace* scope = llvm_debug_builder.createNameSpace(nullptr, "h", false);
+
+        std::uint32_t const bits = type.scale <= 6 ? 32 : 64;
+        std::string const name = std::format("Decimal{}", type.scale);
+        llvm::DIType* const storage_type = llvm_debug_builder.createBasicType(std::format("{}_storage", name), bits, llvm::dwarf::DW_ATE_signed);
+
+        std::array<llvm::Metadata*, 1> const elements
+        {
+            llvm_debug_builder.createMemberType(
+                scope,
+                "raw",
+                nullptr,
+                0,
+                bits,
+                bits,
+                0,
+                llvm::DINode::FlagZero,
+                storage_type
+            )
+        };
+
+        llvm::DIType* decimal_type = llvm_debug_builder.createStructType(
+            scope,
+            name,
+            nullptr,
+            0,
+            bits,
+            bits,
+            llvm::DINode::FlagZero,
+            nullptr,
+            llvm_debug_builder.getOrCreateArray(elements)
+        );
+
+        return decimal_type;
+    }
+
     llvm::Type* pointer_type_to_llvm_type(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
@@ -1142,6 +1183,12 @@ namespace h::compiler
             Integer_type const& data = std::get<Integer_type>(type_reference.data);
             return integer_type_to_llvm_type(llvm_context, data);
         }
+        else if (std::holds_alternative<Decimal_type>(type_reference.data))
+        {
+            Decimal_type const& data = std::get<Decimal_type>(type_reference.data);
+            std::uint32_t const bits = data.scale <= 6 ? 32 : 64;
+            return llvm::Type::getIntNTy(llvm_context, bits);
+        }
         else if (std::holds_alternative<Pointer_type>(type_reference.data))
         {
             Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
@@ -1212,6 +1259,12 @@ namespace h::compiler
         {
             Integer_type const& data = std::get<Integer_type>(type_reference.data);
             return integer_type_to_llvm_type(llvm_context, data);
+        }
+        else if (std::holds_alternative<Decimal_type>(type_reference.data))
+        {
+            Decimal_type const& data = std::get<Decimal_type>(type_reference.data);
+            std::uint32_t const bits = data.scale <= 6 ? 32 : 64;
+            return llvm::Type::getIntNTy(llvm_context, bits);
         }
         else if (std::holds_alternative<Pointer_type>(type_reference.data))
         {
@@ -1328,6 +1381,11 @@ namespace h::compiler
         {
             Integer_type const& data = std::get<Integer_type>(type_reference.data);
             return integer_type_to_llvm_debug_type(llvm_debug_builder, data);
+        }
+        else if (std::holds_alternative<Decimal_type>(type_reference.data))
+        {
+            Decimal_type const& data = std::get<Decimal_type>(type_reference.data);
+            return decimal_type_to_llvm_debug_type(llvm_debug_builder, data);
         }
         else if (std::holds_alternative<Pointer_type>(type_reference.data))
         {

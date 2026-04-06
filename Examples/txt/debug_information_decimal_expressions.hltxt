@@ -1,0 +1,9 @@
+module Debug_information_decimal_expressions;
+
+export function decimal_constants() -> ()
+{
+    var a: Decimal2 = 0.15d2;
+    var b: Decimal4 = 1.57d4;
+    var c: Decimal7 = 123.4567d7;
+    var d: Decimal2 = 100d2;
+}

@@ -164,6 +164,17 @@ namespace h
 #endif
     };
 
+    export struct Decimal_type
+    {
+        std::uint32_t scale; // 1 to 18; scale N means value is (integer / 10^N)
+
+#if HACK_SPACESHIP_OPERATOR
+        friend std::strong_ordering operator<=>(Decimal_type const& lhs, Decimal_type const& rhs) = default;
+#else
+        friend auto operator<=>(Decimal_type const& lhs, Decimal_type const& rhs) = default;
+#endif
+    };
+
     export struct Array_slice_type
     {
         std::pmr::vector<Type_reference> element_type;
@@ -304,6 +315,7 @@ namespace h
             Builtin_type_reference,
             Constant_array_type,
             Custom_type_reference,
+            Decimal_type,
             Fundamental_type,
             Function_pointer_type,
             Integer_type,

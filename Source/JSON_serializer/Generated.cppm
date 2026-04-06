@@ -335,6 +335,20 @@ namespace h::json
     }
 
     export template <>
+    JSON to_json(Decimal_type const& value)
+    {
+        JSON data;
+        data["scale"] = to_json(value.scale);
+        return data;
+    }
+
+    export template <>
+    void from_json(JSON const& data, Decimal_type& value)
+    {
+        from_json(data.at("scale"), value.scale);
+    }
+
+    export template <>
     JSON to_json(Array_slice_type const& value)
     {
         JSON data;

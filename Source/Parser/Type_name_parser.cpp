@@ -35,6 +35,28 @@ namespace h::parser
         }
     }
 
+    static std::optional<Type_reference> parse_decimal_type_name(
+        std::string_view const type_name
+    )
+    {
+        if (!type_name.starts_with("Decimal"))
+            return std::nullopt;
+
+        std::string_view const scale_string = type_name.substr(7); // "Decimal" is 7 characters
+        if (scale_string.empty() || scale_string.size() > 2)
+            return std::nullopt;
+
+        char buffer[3] = { '\0', '\0', '\0' };
+        for (std::size_t index = 0; index < scale_string.size(); ++index)
+            buffer[index] = scale_string[index];
+
+        int const scale = std::atoi(buffer);
+        if (scale < 1 || scale > 18)
+            return std::nullopt;
+
+        return create_decimal_type_reference(static_cast<std::uint32_t>(scale));
+    }
+
     static std::optional<Fundamental_type> parse_fundamental_type_name(
         std::string_view const type_name
     )
@@ -92,6 +114,10 @@ namespace h::parser
         std::optional<Type_reference> const integer_type = parse_integer_type_name(type_name);
         if (integer_type.has_value())
             return integer_type.value();
+
+        std::optional<Type_reference> const decimal_type = parse_decimal_type_name(type_name);
+        if (decimal_type.has_value())
+            return decimal_type.value();
 
         std::optional<Fundamental_type> const fundamental_type = parse_fundamental_type_name(type_name);
         if (fundamental_type.has_value())

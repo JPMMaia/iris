@@ -2436,6 +2436,12 @@ namespace h::compiler
 
             return clang_ast_context.getConstantArrayType(*element_type, array_size_value, nullptr, clang::ArraySizeModifier::Normal, 0);
         }
+        else if (std::holds_alternative<h::Decimal_type>(type_reference.data))
+        {
+            h::Decimal_type const decimal_type = std::get<h::Decimal_type>(type_reference.data);
+            std::uint32_t const number_of_bits = get_decimal_size_in_bits(decimal_type.scale);
+            return clang_ast_context.getIntTypeForBitwidth(number_of_bits, 1);
+        }
         else if (std::holds_alternative<h::Fundamental_type>(type_reference.data))
         {
             h::Fundamental_type const fundamental_type = std::get<h::Fundamental_type>(type_reference.data);

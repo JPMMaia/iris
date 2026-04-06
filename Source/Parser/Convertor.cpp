@@ -2382,6 +2382,27 @@ namespace h::parser
                 }
             }
 
+            if (first_character == 'd')
+            {
+                std::string_view const scale_string = suffix.substr(1);
+                if (!scale_string.empty() && scale_string.size() <= 2)
+                {
+                    char buffer[3] = { '\0', '\0', '\0' };
+                    for (std::size_t i = 0; i < scale_string.size(); ++i)
+                        buffer[i] = scale_string[i];
+
+                    int const scale = std::atoi(buffer);
+                    if (scale >= 1 && scale <= 18)
+                    {
+                        return
+                        {
+                            .type = create_decimal_type_reference(static_cast<std::uint32_t>(scale)),
+                            .data = create_string(value_without_suffix, output_allocator),
+                        };
+                    }
+                }
+            }
+
             if (first_character == 'c')
             {
                 if (suffix == "cc")

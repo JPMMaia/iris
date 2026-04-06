@@ -1031,6 +1031,14 @@ namespace h::compiler
         return first == second;
     }
 
+    std::int64_t compute_decimal_scale(std::uint32_t const n)
+    {
+        std::int64_t v = 1;
+        for (std::uint32_t i = 0; i < n; ++i)
+            v *= 10;
+        return v;
+    }
+
     Value_and_type create_binary_operation_instruction(
         llvm::IRBuilder<>& llvm_builder,
         Value_and_type const& left_hand_side,
@@ -1069,6 +1077,16 @@ namespace h::compiler
                     .type = type
                 };
             }
+            else if (is_decimal(type))
+            {
+                // Decimal add/sub: same backing integer operation, no scaling needed
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = llvm_builder.CreateAdd(left_hand_side.value, right_hand_side.value),
+                    .type = type
+                };
+            }
             break;
         }
         case Binary_operation::Subtract: {
@@ -1087,6 +1105,15 @@ namespace h::compiler
                 {
                     .name = "",
                     .value = llvm_builder.CreateFSub(left_hand_side.value, right_hand_side.value),
+                    .type = type
+                };
+            }
+            else if (is_decimal(type))
+            {
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = llvm_builder.CreateSub(left_hand_side.value, right_hand_side.value),
                     .type = type
                 };
             }
@@ -1110,6 +1137,35 @@ namespace h::compiler
                     .value = llvm_builder.CreateFMul(left_hand_side.value, right_hand_side.value),
                     .type = type
                 };
+            }
+            else if (is_decimal(type))
+            {
+                // Decimal(N) * Decimal(N): widen, multiply, divide by 10^N, truncate
+                Decimal_type const& decimal = std::get<Decimal_type>(type.data);
+                std::uint32_t const backing_bits = decimal.scale <= 6 ? 32 : 64;
+                std::uint32_t const wide_bits = backing_bits == 32 ? 64 : 128;
+
+                llvm::LLVMContext& llvm_context = llvm_builder.getContext();
+                llvm::Type* const wide_type = llvm::Type::getIntNTy(llvm_context, wide_bits);
+                llvm::Type* const backing_type = llvm::Type::getIntNTy(llvm_context, backing_bits);
+                
+                // Widen
+                llvm::Value* const lhs_wide = llvm_builder.CreateSExt(left_hand_side.value, wide_type);
+                llvm::Value* const rhs_wide = llvm_builder.CreateSExt(right_hand_side.value, wide_type);
+                
+                // Multiply
+                llvm::Value* const product = llvm_builder.CreateMul(lhs_wide, rhs_wide);
+                
+                // Divide by 10^N
+                std::int64_t const scale_value = compute_decimal_scale(decimal.scale);
+                llvm::APInt const scale_ap{ wide_bits, static_cast<std::uint64_t>(scale_value), true };
+                llvm::Value* const scale_const = llvm::ConstantInt::get(wide_type, scale_ap);
+                llvm::Value* const divided = llvm_builder.CreateSDiv(product, scale_const);
+                
+                // Truncate
+                llvm::Value* const result = llvm_builder.CreateTrunc(divided, backing_type);
+                
+                return Value_and_type { .name = "", .value = result, .type = type };
             }
             break;
         }
@@ -1143,6 +1199,35 @@ namespace h::compiler
                     .value = llvm_builder.CreateFDiv(left_hand_side.value, right_hand_side.value),
                     .type = type
                 };
+            }
+            else if (is_decimal(type))
+            {
+                // Decimal(N) / Decimal(N): widen, multiply lhs by 10^N, divide by rhs, truncate
+                Decimal_type const& decimal = std::get<Decimal_type>(type.data);
+                std::uint32_t const backing_bits = decimal.scale <= 6 ? 32 : 64;
+                std::uint32_t const wide_bits = backing_bits == 32 ? 64 : 128;
+
+                llvm::LLVMContext& llvm_context = llvm_builder.getContext();
+                llvm::Type* const wide_type = llvm::Type::getIntNTy(llvm_context, wide_bits);
+                llvm::Type* const backing_type = llvm::Type::getIntNTy(llvm_context, backing_bits);
+                
+                // Widen
+                llvm::Value* const lhs_wide = llvm_builder.CreateSExt(left_hand_side.value, wide_type);
+                llvm::Value* const rhs_wide = llvm_builder.CreateSExt(right_hand_side.value, wide_type);
+                
+                // Multiply lhs by 10^N
+                std::int64_t const scale_value = compute_decimal_scale(decimal.scale);
+                llvm::APInt const scale_ap{ wide_bits, static_cast<std::uint64_t>(scale_value), true };
+                llvm::Value* const scale_const = llvm::ConstantInt::get(wide_type, scale_ap);
+                llvm::Value* const lhs_scaled = llvm_builder.CreateMul(lhs_wide, scale_const);
+                
+                // Divide by rhs
+                llvm::Value* const divided = llvm_builder.CreateSDiv(lhs_scaled, rhs_wide);
+                
+                // Truncate
+                llvm::Value* const result = llvm_builder.CreateTrunc(divided, backing_type);
+                
+                return Value_and_type { .name = "", .value = result, .type = type };
             }
             break;
         }
@@ -1180,7 +1265,7 @@ namespace h::compiler
             break;
         }
         case Binary_operation::Equal: {
-            if (is_bool(type) || is_integer(type) || is_enum_type(type, left_hand_side.value) || is_pointer(type) || is_function_pointer(type))
+            if (is_bool(type) || is_integer(type) || is_decimal(type) || is_enum_type(type, left_hand_side.value) || is_pointer(type) || is_function_pointer(type))
             {
                 return Value_and_type
                 {
@@ -1201,7 +1286,7 @@ namespace h::compiler
             break;
         }
         case Binary_operation::Not_equal: {
-            if (is_bool(type) || is_integer(type) || is_enum_type(type, left_hand_side.value) || is_pointer(type) || is_function_pointer(type))
+            if (is_bool(type) || is_integer(type) || is_decimal(type) || is_enum_type(type, left_hand_side.value) || is_pointer(type) || is_function_pointer(type))
             {
                 return Value_and_type
                 {
@@ -1252,6 +1337,16 @@ namespace h::compiler
                     .type = create_bool_type_reference()
                 };
             }
+            else if (is_decimal(type))
+            {
+                // Decimal compares as signed integer (backing storage is always signed)
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = llvm_builder.CreateICmpSLT(left_hand_side.value, right_hand_side.value),
+                    .type = create_bool_type_reference()
+                };
+            }
             break;
         }
         case Binary_operation::Less_than_or_equal_to: {
@@ -1282,6 +1377,15 @@ namespace h::compiler
                 {
                     .name = "",
                     .value = llvm_builder.CreateFCmpOLE(left_hand_side.value, right_hand_side.value),
+                    .type = create_bool_type_reference()
+                };
+            }
+            else if (is_decimal(type))
+            {
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = llvm_builder.CreateICmpSLE(left_hand_side.value, right_hand_side.value),
                     .type = create_bool_type_reference()
                 };
             }
@@ -1318,6 +1422,15 @@ namespace h::compiler
                     .type = create_bool_type_reference()
                 };
             }
+            else if (is_decimal(type))
+            {
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = llvm_builder.CreateICmpSGT(left_hand_side.value, right_hand_side.value),
+                    .type = create_bool_type_reference()
+                };
+            }
             break;
         }
         case Binary_operation::Greater_than_or_equal_to: {
@@ -1348,6 +1461,15 @@ namespace h::compiler
                 {
                     .name = "",
                     .value = llvm_builder.CreateFCmpOGE(left_hand_side.value, right_hand_side.value),
+                    .type = create_bool_type_reference()
+                };
+            }
+            else if (is_decimal(type))
+            {
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = llvm_builder.CreateICmpSGE(left_hand_side.value, right_hand_side.value),
                     .type = create_bool_type_reference()
                 };
             }
@@ -1992,6 +2114,134 @@ namespace h::compiler
         throw std::runtime_error{ std::format("Invalid cast!") };
     }
 
+    static Value_and_type create_decimal_cast_expression_value(
+        llvm::LLVMContext& llvm_context,
+        llvm::IRBuilder<>& llvm_builder,
+        Value_and_type const& source,
+        Type_reference const& source_type,
+        Type_reference const& destination_type,
+        llvm::Type* const source_llvm_type,
+        llvm::Type* const destination_llvm_type
+    )
+    {
+        bool const source_is_decimal = is_decimal(source_type);
+        bool const destination_is_decimal = is_decimal(destination_type);
+
+        if (source_is_decimal && destination_is_decimal)
+        {
+            // Decimal(N) -> Decimal(M)
+            std::uint32_t const source_scale = get_decimal_scale(source_type);
+            std::uint32_t const destination_scale = get_decimal_scale(destination_type);
+            std::uint32_t const source_bits = source_scale <= 6 ? 32 : 64;
+            std::uint32_t const destination_bits = destination_scale <= 6 ? 32 : 64;
+            std::uint32_t const wide_bits = std::max(source_bits, destination_bits) == 64 ? 128 : 64;
+
+            llvm::Type* const wide_type = llvm::Type::getIntNTy(llvm_context, wide_bits);
+            llvm::Value* const src_wide = llvm_builder.CreateSExt(source.value, wide_type);
+
+            llvm::Value* result_wide = nullptr;
+            if (destination_scale > source_scale)
+            {
+                // Scale up: multiply by 10^(dst-src)
+                std::int64_t const ratio = compute_decimal_scale(destination_scale - source_scale);
+                llvm::APInt const ratio_ap{ wide_bits, static_cast<std::uint64_t>(ratio), true };
+                llvm::Value* const ratio_const = llvm::ConstantInt::get(wide_type, ratio_ap);
+                result_wide = llvm_builder.CreateMul(src_wide, ratio_const);
+            }
+            else
+            {
+                // Scale down: divide by 10^(src-dst) — truncation toward zero
+                std::int64_t const ratio = compute_decimal_scale(source_scale - destination_scale);
+                llvm::APInt const ratio_ap{ wide_bits, static_cast<std::uint64_t>(ratio), true };
+                llvm::Value* const ratio_const = llvm::ConstantInt::get(wide_type, ratio_ap);
+                result_wide = llvm_builder.CreateSDiv(src_wide, ratio_const);
+            }
+
+            llvm::Type* const destination_llvm = llvm::Type::getIntNTy(llvm_context, destination_bits);
+            llvm::Value* const result = llvm_builder.CreateTrunc(result_wide, destination_llvm);
+            return { .name = "", .value = result, .type = destination_type };
+        }
+        else if (source_is_decimal)
+        {
+            // Decimal(N) -> Integer or Float
+            std::uint32_t const source_scale = get_decimal_scale(source_type);
+            std::int64_t const scale_val = compute_decimal_scale(source_scale);
+
+            if (destination_llvm_type->isIntegerTy())
+            {
+                // Round half away from zero: adj = backing >= 0 ? +half : -half; result = (backing + adj) / scale
+                std::uint32_t const backing_bits = source_scale <= 6 ? 32 : 64;
+                std::uint32_t const wide_bits = backing_bits == 32 ? 64 : 128;
+                llvm::Type* const wide_type = llvm::Type::getIntNTy(llvm_context, wide_bits);
+
+                llvm::Value* const backing_wide = llvm_builder.CreateSExt(source.value, wide_type);
+                llvm::Value* const zero_wide = llvm::ConstantInt::get(wide_type, 0);
+
+                std::int64_t const half_scale = scale_val / 2;
+                llvm::APInt const half_pos_ap{ wide_bits, static_cast<std::uint64_t>(half_scale), true };
+                llvm::APInt const half_neg_ap{ wide_bits, static_cast<std::uint64_t>(-half_scale), true };
+                llvm::Value* const half_pos = llvm::ConstantInt::get(wide_type, half_pos_ap);
+                llvm::Value* const half_neg = llvm::ConstantInt::get(wide_type, half_neg_ap);
+
+                llvm::Value* const is_non_neg = llvm_builder.CreateICmpSGE(backing_wide, zero_wide);
+                llvm::Value* const adjustment = llvm_builder.CreateSelect(is_non_neg, half_pos, half_neg);
+                llvm::Value* const adjusted = llvm_builder.CreateAdd(backing_wide, adjustment);
+
+                llvm::APInt const scale_ap{ wide_bits, static_cast<std::uint64_t>(scale_val), true };
+                llvm::Value* const scale_const = llvm::ConstantInt::get(wide_type, scale_ap);
+                llvm::Value* const divided = llvm_builder.CreateSDiv(adjusted, scale_const);
+
+                // Cast to destination integer size
+                llvm::Value* const result = llvm_builder.CreateTrunc(divided, destination_llvm_type);
+                return { .name = "", .value = result, .type = destination_type };
+            }
+            else if (destination_llvm_type->isHalfTy() || destination_llvm_type->isFloatTy() || destination_llvm_type->isDoubleTy())
+            {
+                // Decimal(N) -> Float: cast backing int to float, divide by float(10^N)
+                llvm::Value* const backing_fp = llvm_builder.CreateSIToFP(source.value, destination_llvm_type);
+                llvm::Value* const scale_fp = llvm::ConstantFP::get(destination_llvm_type, static_cast<double>(scale_val));
+                llvm::Value* const result = llvm_builder.CreateFDiv(backing_fp, scale_fp);
+                return { .name = "", .value = result, .type = destination_type };
+            }
+        }
+        else
+        {
+            // Integer or Float -> Decimal(N)
+            std::uint32_t const destination_scale = get_decimal_scale(destination_type);
+            std::int64_t const scale_val = compute_decimal_scale(destination_scale);
+            std::uint32_t const destination_bits = destination_scale <= 6 ? 32 : 64;
+            llvm::Type* const destination_llvm = llvm::Type::getIntNTy(llvm_context, destination_bits);
+
+            if (source_llvm_type->isIntegerTy())
+            {
+                // Integer -> Decimal(N): extend/trunc source, then multiply by 10^N
+                llvm::Value* const src_extended = llvm_builder.CreateSExtOrTrunc(source.value, destination_llvm);
+                llvm::APInt const scale_ap{ destination_bits, static_cast<std::uint64_t>(scale_val), true };
+                llvm::Value* const scale_const = llvm::ConstantInt::get(destination_llvm, scale_ap);
+                llvm::Value* const result = llvm_builder.CreateMul(src_extended, scale_const);
+                return { .name = "", .value = result, .type = destination_type };
+            }
+            else if (source_llvm_type->isHalfTy() || source_llvm_type->isFloatTy() || source_llvm_type->isDoubleTy())
+            {
+                // Float -> Decimal(N): multiply by 10^N, round half away from zero, convert to int
+                llvm::Value* const scale_fp = llvm::ConstantFP::get(source_llvm_type, static_cast<double>(scale_val));
+                llvm::Value* const scaled_fp = llvm_builder.CreateFMul(source.value, scale_fp);
+
+                // Round half away from zero using FP: add +0.5 or -0.5 based on sign, then truncate
+                llvm::Value* const zero_fp = llvm::ConstantFP::get(source_llvm_type, 0.0);
+                llvm::Value* const half_fp = llvm::ConstantFP::get(source_llvm_type, 0.5);
+                llvm::Value* const neg_half_fp = llvm::ConstantFP::get(source_llvm_type, -0.5);
+                llvm::Value* const is_non_neg = llvm_builder.CreateFCmpOGE(scaled_fp, zero_fp);
+                llvm::Value* const adjustment = llvm_builder.CreateSelect(is_non_neg, half_fp, neg_half_fp);
+                llvm::Value* const rounded_fp = llvm_builder.CreateFAdd(scaled_fp, adjustment);
+                llvm::Value* const result = llvm_builder.CreateFPToSI(rounded_fp, destination_llvm);
+                return { .name = "", .value = result, .type = destination_type };
+            }
+        }
+
+        throw std::runtime_error{ "Decimal cast not fully implemented for requested type combination." };
+    }
+
     Value_and_type create_cast_expression_value(
         Cast_expression const& expression,
         Statement const& statement,
@@ -2026,6 +2276,23 @@ namespace h::compiler
 
         llvm::Type* const source_llvm_type = source.value->getType();
         llvm::Type* const destination_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, destination_type.value(), type_database);
+
+        // Handle Decimal casts specially before falling through to the generic integer/float path.
+        bool const source_is_decimal = is_decimal(source_type.value());
+        bool const destination_is_decimal = is_decimal(destination_type.value());
+
+        if (source_is_decimal || destination_is_decimal)
+        {
+            return create_decimal_cast_expression_value(
+                llvm_context,
+                llvm_builder,
+                source,
+                source_type.value(),
+                destination_type.value(),
+                source_llvm_type,
+                destination_llvm_type
+            );
+        }
 
         std::optional<llvm::Instruction::CastOps> const cast_type = get_cast_type(source_type.value(), *source_llvm_type, destination_type.value(), *destination_llvm_type);
         if (!cast_type.has_value())
@@ -2200,6 +2467,38 @@ namespace h::compiler
             std::uint64_t const data = std::strtoull(expression.data.c_str(), &end, 0);
             llvm::APInt const value{ integer_type.number_of_bits, data, integer_type.is_signed };
 
+            llvm::Value* const instruction = llvm::ConstantInt::get(llvm_type, value);
+
+            return
+            {
+                .name = "",
+                .value = instruction,
+                .type = type
+            };
+        }
+        else if (std::holds_alternative<Decimal_type>(type.data))
+        {
+            Decimal_type const& decimal_type = std::get<Decimal_type>(type.data);
+            std::uint32_t const bits = decimal_type.scale <= 6 ? 32 : 64;
+            llvm::Type* const llvm_type = llvm::Type::getIntNTy(llvm_context, bits);
+
+            // Compute 10^scale multiplier
+            double multiplier = 1.0;
+            for (std::uint32_t i = 0; i < decimal_type.scale; ++i)
+                multiplier *= 10.0;
+
+            // Parse the source decimal string and scale to backing integer
+            char* end_ptr = nullptr;
+            double const float_value = std::strtod(expression.data.c_str(), &end_ptr);
+
+            // Round half away from zero: for positive add 0.5, for negative subtract 0.5
+            double const scaled = float_value * multiplier;
+            std::int64_t const integer_value =
+                scaled >= 0.0 ?
+                static_cast<std::int64_t>(scaled + 0.5) :
+                static_cast<std::int64_t>(scaled - 0.5);
+
+            llvm::APInt const value{ bits, static_cast<std::uint64_t>(integer_value), true };
             llvm::Value* const instruction = llvm::ConstantInt::get(llvm_type, value);
 
             return
@@ -3649,6 +3948,16 @@ namespace h::compiler
                 {
                     .name = "",
                     .value = llvm_builder.CreateFNeg(loaded_value),
+                    .type = type
+                };
+            }
+            else if (is_decimal(type))
+            {
+                llvm::Value* const loaded_value = load_if_needed(value_expression, expression.expression.expression_index, statement, parameters).value;
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = llvm_builder.CreateNeg(loaded_value),
                     .type = type
                 };
             }
