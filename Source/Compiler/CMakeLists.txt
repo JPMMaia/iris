@@ -121,6 +121,7 @@ if(BUILD_TESTING)
    )
 
    target_sources(H_compiler_tests PRIVATE
+      "main.tests.cpp"
       "Builder.tests.cpp"
       "Compiler.tests.cpp"
       "passes/All_passes.tests.cpp"
