@@ -14,6 +14,7 @@ import h.compiler.analysis;
 import h.compiler.diagnostic;
 import h.core;
 import h.core.declarations;
+import h.core.expressions;
 import h.core.formatter;
 import h.core.types;
 import h.language_server.core;
@@ -228,15 +229,16 @@ namespace h::language_server
         h::parser::Parse_tree const& parse_tree,
         h::Module const& core_module,
         h::Struct_declaration const& declaration,
+        h::Statement const& original_statement,
         h::Expression const& original_expression,
         h::Instantiate_expression const& original_instantiate_expression
     )
     {
         h::Instantiate_expression new_instantiate_expression = original_instantiate_expression;
+        std::size_t const original_expression_index = find_expression_index(original_statement, original_expression);
         
-        Statement statement;
-        statement.expressions.push_back({});
-
+        Statement statement = original_statement;
+        
         for (std::size_t index = 0; index < declaration.member_names.size(); ++index)
         {
             std::string_view const& member_name = declaration.member_names[index];
@@ -258,7 +260,7 @@ namespace h::language_server
                     index
                 );
 
-                h::copy_expressions_to_new_statement(statement, member_statement, h::Expression_index{ .expression_index = 0});
+                add_expressions_to_expressions(statement.expressions, member_statement.expressions);
 
                 new_instantiate_expression.members.push_back(
                     h::Instantiate_member_value_pair
@@ -290,16 +292,17 @@ namespace h::language_server
             }
         );
 
-        statement.expressions[0] = h::Expression{new_instantiate_expression};
+        statement.expressions[original_expression_index] = h::Expression{new_instantiate_expression};
 
         std::uint32_t const indentation = calculate_indendation(
             parse_tree,
             original_expression.source_range->start
         );
 
-        std::pmr::string const new_text = h::format_statement(
+        std::pmr::string const new_text = h::format_expression(
             core_module,
             statement,
+            statement.expressions[original_expression_index],
             indentation,
             false,
             {},
@@ -512,6 +515,7 @@ namespace h::language_server
                                     parse_tree,
                                     core_module,
                                     *std::get<h::Struct_declaration const*>(declaration->data),
+                                    statement,
                                     *expression,
                                     instantiate_expression
                                 );
