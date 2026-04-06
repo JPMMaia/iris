@@ -1957,6 +1957,11 @@ namespace h::compiler
             return;
         }
 
+        if (std::holds_alternative<h::Forward_declaration const*>(declaration->data))
+        {
+            return;
+        }
+
         if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
         {
             Struct_declaration const* const struct_declaration = std::get<h::Struct_declaration const*>(declaration->data);
