@@ -1,16 +1,18 @@
 module;
 
+#include <csignal>
 #include <cstdio>
-#include <cstddef>
-#include <filesystem>
-#include <format>
-#include <optional>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
+#include <cstdlib>
+#include <memory_resource>
+
+#if _WIN32
+#include <crtdbg.h>
+#endif
 
 module h.common;
+
+import std;
+import std.compat;
 
 namespace h::common
 {
@@ -183,5 +185,47 @@ namespace h::common
         output.push_back(value.substr(previous_position));
 
         return output;
+    }
+
+    void print_stacktrace()
+    {
+        auto const stacktrace = std::pmr::stacktrace::current(7, 16);
+        std::string const stacktrace_string = std::format("Stacktrace:\n{}\n", stacktrace);
+        std::fprintf(stderr, "%s", stacktrace_string.c_str());
+        std::fflush(stderr);
+    }
+
+    static void signal_handler(int const signal)
+    {
+        std::fprintf(stderr, "Abort signal: %d\n", signal);
+        print_stacktrace();
+        std::exit(-1);
+    }
+
+    static void invalid_parameter_handler(
+        wchar_t const* const expression,
+        wchar_t const* const function,
+        wchar_t const* const file,
+        unsigned int const line,
+        uintptr_t const pReserved
+    )
+    {
+        std::abort();
+    }
+
+    void install_abort_handlers()
+    {
+        std::signal(SIGABRT, signal_handler);
+        std::set_terminate([]() {
+            std::fprintf(stderr, "Unhandled exception!\n");
+            print_stacktrace();
+        });
+
+        #if _WIN32
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+        _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+        _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+        _set_invalid_parameter_handler(invalid_parameter_handler);
+        #endif
     }
 }

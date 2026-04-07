@@ -194,7 +194,7 @@ namespace h::tools::code_generator
         std::stringstream string_stream;
         string_stream << "struct Foo\n";
         string_stream << "{\n";
-        string_stream << "    std::string member_0;\n";
+        string_stream << "    std::string member_0; // A comment\n";
         string_stream << "    std::uint64_t member_1;\n";
         string_stream << "    std::uint64_t member_2;\n";
         string_stream << "};\n";

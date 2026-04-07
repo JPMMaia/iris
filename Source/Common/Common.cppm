@@ -1,11 +1,6 @@
 module;
 
-#include <filesystem>
-#include <optional>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
+import std;
 
 export module h.common;
 
@@ -32,4 +27,6 @@ namespace h::common
     export std::pmr::vector<std::pmr::string> convert_path_to_string(std::span<std::filesystem::path const> const values, std::pmr::polymorphic_allocator<> output_allocator);
 
     export std::pmr::vector<std::string_view> split_string(std::string_view const value, char const seperator, std::pmr::polymorphic_allocator<> const& output_allocator);
+
+    export void install_abort_handlers();
 }

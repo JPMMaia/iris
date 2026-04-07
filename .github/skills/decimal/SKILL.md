@@ -47,3 +47,10 @@ Int64 must be used for multiplication and division intermediate results if the b
 
 Decimals can be casted from and to different numeric types (like Float32 or Int64).
 Decimals can also be casted between different decimal types (e.g. Decimal3 and Decimal6).
+Arithmetric operations between different scales (Decimal3 with Decimal6) is disallowed. Explicit cast is required.
+Arithmetric operations between different numeric types (e.g. Int/Float) are disallowed.
+No implicit casts, explicit cast is always required.
+
+#### Rounding
+
+When casting Decimal to Integer, round half away from zero: 0.5 rounds to 1, -0.5 to -1.

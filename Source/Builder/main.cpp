@@ -1,14 +1,12 @@
 #include <argparse/argparse.hpp>
 
-#include <filesystem>
-#include <iostream>
-#include <map>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <vector>
+#include <csignal>
+
+import std;
+import std.compat;
 
 import h.c_header_converter;
+import h.common;
 import h.compiler;
 import h.compiler.builder;
 import h.compiler.expressions;
@@ -178,6 +176,8 @@ h::compiler::Compilation_options create_compilation_options(
 
 int main(int const argc, char const* const* argv)
 {
+    h::common::install_abort_handlers();
+
     argparse::ArgumentParser program("hlang");
 
     // hlang build-artifact [--artifact-file=<artifact_file>] [--build-directory=<build_directory>] [--header-search-path=<header_search_path>]... [--repository=<repository_path>]...

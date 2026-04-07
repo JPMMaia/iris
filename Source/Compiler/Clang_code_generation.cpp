@@ -1957,6 +1957,11 @@ namespace h::compiler
             return;
         }
 
+        if (std::holds_alternative<h::Forward_declaration const*>(declaration->data))
+        {
+            return;
+        }
+
         if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
         {
             Struct_declaration const* const struct_declaration = std::get<h::Struct_declaration const*>(declaration->data);
@@ -2435,6 +2440,12 @@ namespace h::compiler
             llvm::APInt const array_size_value(64, constant_array_type.size, false);
 
             return clang_ast_context.getConstantArrayType(*element_type, array_size_value, nullptr, clang::ArraySizeModifier::Normal, 0);
+        }
+        else if (std::holds_alternative<h::Decimal_type>(type_reference.data))
+        {
+            h::Decimal_type const decimal_type = std::get<h::Decimal_type>(type_reference.data);
+            std::uint32_t const number_of_bits = get_decimal_size_in_bits(decimal_type.scale);
+            return clang_ast_context.getIntTypeForBitwidth(number_of_bits, 1);
         }
         else if (std::holds_alternative<h::Fundamental_type>(type_reference.data))
         {

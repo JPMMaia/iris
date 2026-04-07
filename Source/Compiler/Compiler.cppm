@@ -129,7 +129,6 @@ namespace h::compiler
 
     export struct Compilation_database
     {
-        Declaration_database declaration_database;
         Clang_module_data clang_module_data;
         Type_database type_database;
     };
@@ -138,16 +137,16 @@ namespace h::compiler
         LLVM_data& llvm_data,
         Clang_context&& clang_context,
         std::span<h::Module const* const> const sorted_modules,
-        Declaration_database declaration_database,
+        Declaration_database& declaration_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     export std::unique_ptr<llvm::Module> create_llvm_module(
         LLVM_data& llvm_data,
-        h::Module const& core_module,
+        h::Module core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        Compilation_database const& compilation_database,
+        Declaration_database declaration_database,
         Compilation_options const& compilation_options
     );
 

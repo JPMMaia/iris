@@ -533,6 +533,36 @@ namespace h
         }
     }
 
+    std::pmr::string format_expression(
+        h::Module const& core_module,
+        Statement const& statement,
+        Expression const& expression,
+        std::uint32_t indentation,
+        bool const add_semicolon,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        Format_options const options
+        {
+            .alias_imports = core_module.dependencies.alias_imports,
+            .output_allocator = output_allocator,
+            .temporaries_allocator = temporaries_allocator,
+        };
+
+        String_buffer buffer;
+
+        add_format_expression(
+            buffer,
+            statement,
+            expression,
+            indentation,
+            options
+        );
+
+        return to_string(buffer);
+    }
+
     void add_format_expression_access(
         String_buffer& buffer,
         Statement const& statement,
@@ -994,6 +1024,13 @@ namespace h
             std::string_view const signed_suffix = integer_type.is_signed ? "i" : "u";
             add_text(buffer, signed_suffix);
             add_integer_text(buffer, static_cast<std::uint64_t>(integer_type.number_of_bits));
+        }
+        else if (std::holds_alternative<h::Decimal_type>(type.data))
+        {
+            h::Decimal_type const decimal_type = std::get<h::Decimal_type>(type.data);
+            add_text(buffer, expression.data);
+            add_text(buffer, "d");
+            add_integer_text(buffer, static_cast<std::uint64_t>(decimal_type.scale));
         }
         else if (h::is_c_string(type))
         {
@@ -1655,6 +1692,12 @@ namespace h
             add_format_custom_type_reference(
                 buffer, value, options
             );
+        }
+        else if (std::holds_alternative<Decimal_type>(type.data))
+        {
+            Decimal_type const& value = std::get<Decimal_type>(type.data);
+            add_text(buffer, "Decimal");
+            add_integer_text(buffer, static_cast<std::uint64_t>(value.scale));
         }
         else if (std::holds_alternative<Fundamental_type>(type.data))
         {

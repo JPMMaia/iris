@@ -123,7 +123,7 @@ namespace h::compiler
         std::span<h::Module const> const core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         LLVM_data& llvm_data,
-        Compilation_database const& compilation_database,
+        Declaration_database const& declaration_database,
         Compilation_options const& compilation_options,
         bool const is_test_mode
     );
