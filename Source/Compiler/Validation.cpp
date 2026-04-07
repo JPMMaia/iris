@@ -421,6 +421,60 @@ namespace h::compiler
         return diagnostics;
     }
 
+    std::pmr::vector<h::compiler::Diagnostic> validate_soa_array_type(
+        h::Module const& core_module,
+        h::Type_reference const& type,
+        Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        (void)temporaries_allocator;
+
+        h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(type.data);
+        if (soa_array_type.value_type.empty())
+            return {};
+
+        h::Type_reference const& element_type = soa_array_type.value_type.front();
+
+        if (!is_custom_type_reference(element_type))
+        {
+            return
+            {
+                create_error_diagnostic_with_code(
+                    core_module.source_file_path,
+                    element_type.source_range.has_value() ? element_type.source_range : type.source_range,
+                    "Soa_array element type must be a struct type.",
+                    Diagnostic_code::Soa_element_type_not_a_struct,
+                    {}
+                )
+            };
+        }
+
+        std::optional<Declaration> const declaration = find_declaration(
+            declaration_database,
+            element_type
+        );
+
+        if (!declaration.has_value())
+            return {};
+
+        if (!std::holds_alternative<Struct_declaration const*>(declaration.value().data))
+        {
+            return
+            {
+                create_error_diagnostic_with_code(
+                    core_module.source_file_path,
+                    element_type.source_range.has_value() ? element_type.source_range : type.source_range,
+                    "Soa_array element type must be a struct type.",
+                    Diagnostic_code::Soa_element_type_not_a_struct,
+                    {}
+                )
+            };
+        }
+
+        return {};
+    }
+
     std::pmr::vector<h::compiler::Diagnostic> validate_type_reference(
         h::Module const& core_module,
         h::Type_reference const& type,
@@ -440,6 +494,15 @@ namespace h::compiler
         else if (std::holds_alternative<h::Integer_type>(type.data))
         {
             return validate_integer_type(
+                core_module,
+                type,
+                declaration_database,
+                temporaries_allocator
+            );
+        }
+        else if (std::holds_alternative<h::Soa_array_type>(type.data))
+        {
+            return validate_soa_array_type(
                 core_module,
                 type,
                 declaration_database,
@@ -2815,6 +2878,18 @@ namespace h::compiler
             return Declaration{ .data = &temporary_storage[0], .module_name = "H.Builtin", .is_export = true };
         }
 
+        if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate.data))
+        {
+            h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(type_to_instantiate.data);
+            if (soa_array_type.value_type.empty())
+                return std::nullopt;
+
+            return find_underlying_declaration(
+                declaration_database,
+                soa_array_type.value_type.front()
+            );
+        }
+
         std::optional<Declaration> const declaration_optional = find_underlying_declaration(
             declaration_database,
             type_to_instantiate
@@ -2869,6 +2944,18 @@ namespace h::compiler
                     parameters.core_module.source_file_path,
                     source_range,
                     "Could not deduce type to instantiate."
+                )
+            };
+        }
+
+        if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate->data) && expression.type == Instantiate_expression_type::Explicit)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    "Explicit Soa_array brace initialization is not implemented. Use [ ... ] initializer syntax."
                 )
             };
         }
@@ -3605,7 +3692,11 @@ namespace h::compiler
 
         h::Type_reference const& type = type_optional.value();
 
-        if (std::holds_alternative<h::Instantiate_expression>(right_hand_side.data) && !std::holds_alternative<h::Array_slice_type>(type.data))
+        if (
+            std::holds_alternative<h::Instantiate_expression>(right_hand_side.data) &&
+            !std::holds_alternative<h::Array_slice_type>(type.data) &&
+            !std::holds_alternative<h::Soa_array_type>(type.data)
+        )
         {
             std::optional<Declaration> const declaration_optional = find_underlying_declaration(parameters.declaration_database, type);
             if (!declaration_optional.has_value() || (!std::holds_alternative<h::Struct_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Union_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Type_constructor const*>(declaration_optional->data)))

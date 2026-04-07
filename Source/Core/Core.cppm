@@ -268,6 +268,18 @@ namespace h
 #endif
     };
 
+    export struct Soa_array_type
+    {
+        std::pmr::vector<Type_reference> value_type;
+        std::uint64_t size;
+
+#if HACK_SPACESHIP_OPERATOR
+        friend std::strong_ordering operator<=>(Soa_array_type const&, Soa_array_type const&) = default;
+#else
+        friend auto operator<=>(Soa_array_type const&, Soa_array_type const&) = default;
+#endif
+    };
+
     export struct Custom_type_reference
     {
         Module_reference module_reference;
@@ -322,6 +334,7 @@ namespace h
             Null_pointer_type,
             Parameter_type,
             Pointer_type,
+            Soa_array_type,
             Type_instance
         >;
 

@@ -1032,6 +1032,51 @@ namespace h::compiler
         {
             h::Access_array_expression const& data = std::get<h::Access_array_expression>(expression.data);
 
+            h::Expression const& left_hand_side_expression = statement.expressions[data.expression.expression_index];
+            if (std::holds_alternative<h::Dereference_and_access_expression>(left_hand_side_expression.data))
+            {
+                h::Dereference_and_access_expression const& dereference_and_access_expression = std::get<h::Dereference_and_access_expression>(left_hand_side_expression.data);
+
+                std::optional<Type_info> const soa_type_info = get_expression_type_info(
+                    core_module,
+                    nullptr,
+                    scope,
+                    statement,
+                    statement.expressions[dereference_and_access_expression.expression.expression_index],
+                    std::nullopt,
+                    declaration_database
+                );
+                if (
+                    soa_type_info.has_value() &&
+                    std::holds_alternative<h::Soa_array_type>(soa_type_info->type.data)
+                )
+                {
+                    h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(soa_type_info->type.data);
+                    if (soa_array_type.value_type.empty())
+                        return std::nullopt;
+
+                    std::optional<Declaration> const declaration = find_declaration(
+                        declaration_database,
+                        soa_array_type.value_type[0]
+                    );
+                    if (!declaration.has_value())
+                        return std::nullopt;
+
+                    std::optional<h::Type_reference> const member_type = get_declaration_member_type(
+                        declaration.value(),
+                        dereference_and_access_expression.member_name
+                    );
+                    if (!member_type.has_value())
+                        return std::nullopt;
+
+                    return Type_info
+                    {
+                        .type = member_type.value(),
+                        .is_mutable = soa_type_info->is_mutable,
+                    };
+                }
+            }
+
             std::optional<Type_info> const lhs_type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);;
             std::optional<h::Type_reference> const lhs_type_reference = lhs_type_info.has_value() ? std::optional<h::Type_reference>{lhs_type_info->type} : std::optional<h::Type_reference>{std::nullopt};
             if (!lhs_type_reference.has_value())
@@ -1052,6 +1097,18 @@ namespace h::compiler
             else if (std::holds_alternative<h::Constant_array_type>(lhs_type_reference->data))
             {
                 h::Constant_array_type const& array_type = std::get<h::Constant_array_type>(lhs_type_reference->data);
+                if (array_type.value_type.empty())
+                    return std::nullopt;
+
+                return Type_info
+                {
+                    .type = array_type.value_type[0],
+                    .is_mutable = lhs_type_info->is_mutable,
+                };
+            }
+            else if (std::holds_alternative<h::Soa_array_type>(lhs_type_reference->data))
+            {
+                h::Soa_array_type const& array_type = std::get<h::Soa_array_type>(lhs_type_reference->data);
                 if (array_type.value_type.empty())
                     return std::nullopt;
 
@@ -1439,6 +1496,15 @@ namespace h::compiler
                 return std::nullopt;
 
             if (std::holds_alternative<h::Array_slice_type>(type_to_instantiate->data))
+            {
+                return Type_info
+                {
+                    .type = type_to_instantiate.value(),
+                    .is_mutable = false,
+                };
+            }
+
+            if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate->data))
             {
                 return Type_info
                 {

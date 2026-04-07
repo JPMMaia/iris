@@ -449,6 +449,74 @@ function run() -> ()
     }
 
 
+    TEST_CASE("Validates that Soa_array element type can only be a struct", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+var particles: Soa_array::<Int32, 4> = {};
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(8, 28, 8, 33),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Soa_element_type_not_a_struct,
+                .message = "Soa_array element type must be a struct type.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array element type must exist", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+var particles: Soa_array::<Unknown_particle, 4> = {};
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(3, 28, 3, 44),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Type 'Unknown_particle' does not exist.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array with struct element type is valid", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+using Particle_array = Soa_array::<Particle, 4>;
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+
     TEST_CASE("Validates that struct member names are different from each other", "[Validation][Struct]")
     {
         std::string_view const input = R"(module Test;

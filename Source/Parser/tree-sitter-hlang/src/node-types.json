@@ -1990,6 +1990,40 @@
     }
   },
   {
+    "type": "Soa_array_length",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Number",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Soa_array_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "Soa_array_length",
+          "named": true
+        },
+        {
+          "type": "Type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "Statement",
     "named": true,
     "fields": {},
@@ -2200,6 +2234,10 @@
         },
         {
           "type": "Pointer_type",
+          "named": true
+        },
+        {
+          "type": "Soa_array_type",
           "named": true
         },
         {
@@ -2611,6 +2649,10 @@
   {
     "type": "Reflection_identifier",
     "named": true
+  },
+  {
+    "type": "Soa_array",
+    "named": false
   },
   {
     "type": "String",

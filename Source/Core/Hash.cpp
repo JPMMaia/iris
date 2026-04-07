@@ -184,6 +184,17 @@ namespace h
 
             update_hash(state, &data.is_mutable, sizeof(data.is_mutable));
         }
+        else if (std::holds_alternative<h::Soa_array_type>(type_reference.data))
+        {
+            h::Soa_array_type const& data = std::get<h::Soa_array_type>(type_reference.data);
+
+            for (h::Type_reference const& value_type : data.value_type)
+            {
+                update_hash(state, value_type);
+            }
+
+            update_hash(state, &data.size, sizeof(data.size));
+        }
         else
         {
             h::common::print_message_and_exit("Hash of type reference data is not implemented!");

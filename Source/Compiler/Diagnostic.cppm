@@ -30,6 +30,7 @@ namespace h::compiler
     export enum class Diagnostic_code
     {
         Type_mismatch = 0,
+        Soa_element_type_not_a_struct = 1,
     };
 
     export struct Diagnostic_related_information

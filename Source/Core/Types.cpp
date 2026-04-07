@@ -102,6 +102,23 @@ namespace h
         return std::holds_alternative<Constant_array_type>(type.data);
     }
 
+    Type_reference create_soa_array_type_reference(std::pmr::vector<Type_reference> value_type, std::uint64_t const size)
+    {
+        return Type_reference
+        {
+            .data = Soa_array_type
+            {
+                .value_type = std::move(value_type),
+                .size = size,
+            }
+        };
+    }
+
+    bool is_soa_array_type_reference(Type_reference const& type)
+    {
+        return std::holds_alternative<Soa_array_type>(type.data);
+    }
+
 
     Type_reference create_custom_type_reference(std::string_view const module_name, std::string_view const name)
     {
@@ -558,6 +575,14 @@ namespace h
 
             return constant_array_type.value_type.front();
         }
+        else if (std::holds_alternative<Soa_array_type>(type.data))
+        {
+            Soa_array_type const& soa_array_type = std::get<Soa_array_type>(type.data);
+            if (soa_array_type.value_type.empty())
+                return std::nullopt;
+
+            return soa_array_type.value_type.front();
+        }
         else if (std::holds_alternative<Pointer_type>(type.data))
         {
             Pointer_type const& pointer_type = std::get<Pointer_type>(type.data);
@@ -727,6 +752,15 @@ namespace h
                 for (Type_reference& element_type : pointer_type.element_type)
                 {
                     if (!replace_parameter_types_by_instance_arguments_impl(element_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+            }
+            else if (std::holds_alternative<Soa_array_type>(type_reference.data))
+            {
+                Soa_array_type& soa_array_type = std::get<Soa_array_type>(type_reference.data);
+                for (Type_reference& value_type : soa_array_type.value_type)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(value_type, constructor_parameters, instance_arguments))
                         return false;
                 }
             }

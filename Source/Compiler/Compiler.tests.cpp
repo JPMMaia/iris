@@ -1780,6 +1780,58 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Soa Array Type", "[LLVM_IR]")
+  {
+    char const* const input_file = "soa_array_type.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%__hl_soa_array.0 = type { ptr }
+
+; Function Attrs: convergent
+define private void @soa_array_type_run() #0 {
+entry:
+  %particles = alloca %__hl_soa_array.0, align 8
+  %soa_array_storage = alloca [32 x i8], align 4
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
+  %0 = getelementptr inbounds %__hl_soa_array.0, ptr %particles, i32 0, i32 0
+  store ptr %soa_array_data, ptr %0, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Debug Information C Headers", "[LLVM_IR]")
   {
     char const* const input_file = "debug_information_c_headers.hltxt";

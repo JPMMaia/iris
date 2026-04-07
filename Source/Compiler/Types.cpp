@@ -34,6 +34,18 @@ import h.core.types;
 
 namespace h::compiler
 {
+    static std::uint64_t align_to(
+        std::uint64_t const value,
+        std::uint64_t const alignment
+    )
+    {
+        if (alignment <= 1)
+            return value;
+
+        std::uint64_t const remainder = value % alignment;
+        return remainder == 0 ? value : value + (alignment - remainder);
+    }
+
     bool is_enum_type(Type_reference const& type, llvm::Value* const value)
     {
         return is_custom_type_reference(type) && value->getType()->isIntegerTy();
@@ -908,6 +920,67 @@ namespace h::compiler
         return array_type;
     }
 
+    static llvm::StructType* create_soa_array_llvm_type(
+        llvm::LLVMContext& llvm_context
+    )
+    {
+        llvm::Type* const byte_pointer_type = llvm::Type::getInt8Ty(llvm_context)->getPointerTo();
+        return llvm::StructType::create({ byte_pointer_type }, "__hl_soa_array");
+    }
+
+    llvm::DIType* soa_array_type_to_llvm_debug_type(
+        llvm::DIBuilder& llvm_debug_builder,
+        llvm::DIScope& llvm_debug_scope,
+        llvm::DataLayout const& llvm_data_layout,
+        h::Module const& core_module,
+        Soa_array_type const& type,
+        Debug_type_database const& debug_type_database
+    )
+    {
+        (void)type;
+        (void)debug_type_database;
+
+        unsigned const pointer_size_in_bits = llvm_data_layout.getPointerSizeInBits();
+        llvm::Align const pointer_alignment = llvm_data_layout.getPointerABIAlignment(0);
+
+        llvm::DIType* const byte_type = llvm_debug_builder.createBasicType("Byte", 8, llvm::dwarf::DW_ATE_unsigned_char);
+        llvm::DIType* const byte_pointer_type = llvm_debug_builder.createPointerType(byte_type, pointer_size_in_bits);
+
+        std::array<llvm::Metadata*, 1> const elements
+        {
+            llvm_debug_builder.createMemberType(
+                &llvm_debug_scope,
+                "data",
+                nullptr,
+                0,
+                pointer_size_in_bits,
+                8 * pointer_alignment.value(),
+                0,
+                llvm::DINode::FlagZero,
+                byte_pointer_type
+            ),
+        };
+
+        std::pmr::string const soa_array_name = format_type_reference(
+            core_module,
+            h::Type_reference{ .data = type },
+            {},
+            {}
+        );
+
+        return llvm_debug_builder.createStructType(
+            &llvm_debug_scope,
+            soa_array_name.data(),
+            nullptr,
+            0,
+            pointer_size_in_bits,
+            8 * pointer_alignment.value(),
+            llvm::DINode::FlagZero,
+            nullptr,
+            llvm_debug_builder.getOrCreateArray(elements)
+        );
+    }
+
     llvm::Type* fundamental_type_to_llvm_type(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
@@ -1156,6 +1229,10 @@ namespace h::compiler
             llvm::ArrayType* const llvm_array_type = llvm::ArrayType::get(llvm_element_type, data.size);
             return llvm_array_type;
         }
+        else if (std::holds_alternative<Soa_array_type>(type_reference.data))
+        {
+            return create_soa_array_llvm_type(llvm_context);
+        }
         else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
         {
             Custom_type_reference const& data = std::get<Custom_type_reference>(type_reference.data);
@@ -1238,6 +1315,10 @@ namespace h::compiler
             Constant_array_type const& data = std::get<Constant_array_type>(type_reference.data);
             llvm::Type* const llvm_element_type = type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, data.value_type, declaration_database, clang_context);
             return llvm::ArrayType::get(llvm_element_type, data.size);
+        }
+        else if (std::holds_alternative<Soa_array_type>(type_reference.data))
+        {
+            return create_soa_array_llvm_type(llvm_context);
         }
         else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
         {
@@ -1353,6 +1434,11 @@ namespace h::compiler
         {
             Constant_array_type const& data = std::get<Constant_array_type>(type_reference.data);
             return constant_array_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
+        }
+        else if (std::holds_alternative<Soa_array_type>(type_reference.data))
+        {
+            Soa_array_type const& data = std::get<Soa_array_type>(type_reference.data);
+            return soa_array_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
         }
         else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
         {
@@ -1484,6 +1570,54 @@ namespace h::compiler
         {
             .size = struct_size,
             .alignment = struct_alignment,
+            .members = std::move(members)
+        };
+    }
+
+    Soa_layout calculate_soa_layout(
+        llvm::DataLayout const& llvm_data_layout,
+        Type_database const& type_database,
+        std::string_view const module_name,
+        std::string_view const struct_name,
+        std::uint64_t const array_length
+    )
+    {
+        Struct_layout const struct_layout = calculate_struct_layout(
+            llvm_data_layout,
+            type_database,
+            module_name,
+            struct_name
+        );
+
+        std::pmr::vector<Soa_member_layout> members;
+        members.reserve(struct_layout.members.size());
+
+        std::uint64_t current_offset = 0;
+        std::uint64_t max_alignment = 1;
+
+        for (Struct_member_layout const& member : struct_layout.members)
+        {
+            current_offset = align_to(current_offset, member.alignment);
+            max_alignment = std::max(max_alignment, member.alignment);
+
+            std::uint64_t const block_size = member.size * array_length;
+            members.push_back(
+                Soa_member_layout
+                {
+                    .block_offset = current_offset,
+                    .block_size = block_size,
+                    .element_size = member.size,
+                    .element_alignment = member.alignment,
+                }
+            );
+
+            current_offset += block_size;
+        }
+
+        return
+        {
+            .size = align_to(current_offset, max_alignment),
+            .alignment = max_alignment,
             .members = std::move(members)
         };
     }

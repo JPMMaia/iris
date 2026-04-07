@@ -1760,6 +1760,15 @@ namespace h
 
             add_format_type_name(buffer, value.element_type, options);
         }
+        else if (std::holds_alternative<Soa_array_type>(type.data))
+        {
+            Soa_array_type const& value = std::get<Soa_array_type>(type.data);
+            add_text(buffer, "Soa_array::<");
+            add_format_type_name(buffer, value.value_type, options);
+            add_text(buffer, ", ");
+            add_integer_text(buffer, value.size);
+            add_text(buffer, ">");
+        }
         else if (std::holds_alternative<Type_instance>(type.data))
         {
             Type_instance const& value = std::get<Type_instance>(type.data);
