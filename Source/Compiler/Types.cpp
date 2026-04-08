@@ -931,6 +931,99 @@ namespace h::compiler
         return llvm::StructType::create({ byte_pointer_type }, "__hl_soa_array");
     }
 
+    struct Soa_debug_member_info
+    {
+        std::pmr::string name;
+        std::uint64_t size_in_bytes;
+    };
+
+    static std::pmr::vector<Soa_debug_member_info> get_soa_debug_member_infos(
+        h::Module const& core_module,
+        Soa_array_type const& type,
+        Debug_type_database const& debug_type_database
+    )
+    {
+        if (type.value_type.empty())
+            return {};
+
+        if (!std::holds_alternative<Custom_type_reference>(type.value_type[0].data))
+            return {};
+
+        Custom_type_reference const& element_custom_type_reference = std::get<Custom_type_reference>(type.value_type[0].data);
+        std::string_view const element_module_name = find_module_name(core_module, element_custom_type_reference.module_reference);
+        std::pmr::string const element_module_name_key = std::pmr::string{ element_module_name };
+
+        auto const module_location = debug_type_database.name_to_llvm_debug_type.find(element_module_name_key);
+        if (module_location == debug_type_database.name_to_llvm_debug_type.end())
+            return {};
+
+        auto const type_location = module_location->second.find(element_custom_type_reference.name);
+        if (type_location == module_location->second.end())
+            return {};
+
+        llvm::DIType* const element_debug_type = type_location->second;
+        llvm::DICompositeType const* const composite_type = llvm::dyn_cast<llvm::DICompositeType>(element_debug_type);
+        if (composite_type == nullptr)
+            return {};
+
+        std::pmr::vector<Soa_debug_member_info> member_infos;
+        member_infos.reserve(composite_type->getElements().size());
+
+        for (llvm::Metadata* const element : composite_type->getElements())
+        {
+            llvm::DIDerivedType const* const member_type = llvm::dyn_cast<llvm::DIDerivedType>(element);
+            if (member_type == nullptr || member_type->getTag() != llvm::dwarf::DW_TAG_member)
+                continue;
+
+            std::uint64_t const size_in_bits = member_type->getSizeInBits();
+            std::uint64_t const size_in_bytes = (size_in_bits + 7) / 8;
+
+            member_infos.push_back(
+                Soa_debug_member_info
+                {
+                    .name = std::pmr::string{ member_type->getName().str() },
+                    .size_in_bytes = size_in_bytes,
+                }
+            );
+        }
+
+        return member_infos;
+    }
+
+    static std::pmr::string create_soa_array_debug_type_name(
+        h::Module const& core_module,
+        Soa_array_type const& type,
+        std::span<Soa_debug_member_info const> const member_infos
+    )
+    {
+        std::pmr::string element_type_name = "Unknown";
+        if (!type.value_type.empty())
+        {
+            element_type_name = format_type_reference(
+                core_module,
+                h::Type_reference{ .data = type.value_type[0].data },
+                {},
+                {}
+            );
+        }
+
+        std::pmr::string debug_type_name = std::pmr::string{ std::format(
+            "h::Soa_array_type::<{}, {}, {}",
+            member_infos.size(),
+            element_type_name,
+            type.size
+        ) };
+
+        for (Soa_debug_member_info const& member_info : member_infos)
+        {
+            debug_type_name += std::format(", {}, {}", member_info.name, member_info.size_in_bytes);
+        }
+
+        debug_type_name += ">";
+
+        return debug_type_name;
+    }
+
     llvm::DIType* soa_array_type_to_llvm_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
@@ -940,8 +1033,9 @@ namespace h::compiler
         Debug_type_database const& debug_type_database
     )
     {
-        (void)type;
-        (void)debug_type_database;
+        (void)llvm_debug_scope;
+
+        static llvm::DINamespace* const scope = llvm_debug_builder.createNameSpace(nullptr, "h", false);
 
         unsigned const pointer_size_in_bits = llvm_data_layout.getPointerSizeInBits();
         llvm::Align const pointer_alignment = llvm_data_layout.getPointerABIAlignment(0);
@@ -952,7 +1046,7 @@ namespace h::compiler
         std::array<llvm::Metadata*, 1> const elements
         {
             llvm_debug_builder.createMemberType(
-                &llvm_debug_scope,
+                scope,
                 "data",
                 nullptr,
                 0,
@@ -964,15 +1058,16 @@ namespace h::compiler
             ),
         };
 
-        std::pmr::string const soa_array_name = format_type_reference(
+        std::pmr::vector<Soa_debug_member_info> const member_infos = get_soa_debug_member_infos(
             core_module,
-            h::Type_reference{ .data = type },
-            {},
-            {}
+            type,
+            debug_type_database
         );
 
+        std::pmr::string const soa_array_name = create_soa_array_debug_type_name(core_module, type, member_infos);
+
         return llvm_debug_builder.createStructType(
-            &llvm_debug_scope,
+            scope,
             soa_array_name.data(),
             nullptr,
             0,

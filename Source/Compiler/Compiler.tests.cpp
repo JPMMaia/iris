@@ -1873,6 +1873,82 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Soa Array Type Debug Information", "[LLVM_IR]")
+  {
+    char const* const input_file = "soa_array_type_debug_information.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+%__hl_soa_array = type {{ ptr }}
+
+; Function Attrs: convergent
+define private void @soa_array_type_debug_information_run() #0 !dbg !3 {{
+entry:
+  %particles = alloca %__hl_soa_array, align 8, !dbg !7
+  %soa_array_storage = alloca [32 x i8], align 4, !dbg !7
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0, !dbg !7
+  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0, !dbg !7
+  store ptr %soa_array_data, ptr %0, align 8, !dbg !7
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0, !dbg !7
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4, !dbg !7
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16, !dbg !7
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4, !dbg !7
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0, !dbg !7
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4, !dbg !7
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16, !dbg !7
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4, !dbg !7
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0, !dbg !7
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4, !dbg !7
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16, !dbg !7
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4, !dbg !7
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0, !dbg !7
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4, !dbg !7
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16, !dbg !7
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4, !dbg !7
+  call void @llvm.dbg.declare(metadata ptr %particles, metadata !8, metadata !DIExpression()), !dbg !7
+  ret void, !dbg !7
+}}
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
+
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
+
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "soa_array_type_debug_information.hltxt", directory: "{}")
+!3 = distinct !DISubprogram(name: "run", linkageName: "soa_array_type_debug_information_run", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
+!4 = !DISubroutineType(types: !5)
+!5 = !{{null}}
+!6 = !{{}}
+!7 = !DILocation(line: 11, column: 5, scope: !3)
+!8 = !DILocalVariable(name: "particles", scope: !3, file: !2, line: 11, type: !9)
+!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Soa_array_type::<2, Particle, 4, x, 4, y, 4>", scope: !10, size: 64, align: 64, elements: !11)
+!10 = !DINamespace(name: "h", scope: null)
+!11 = !{{!12}}
+!12 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !10, baseType: !13, size: 64, align: 64)
+!13 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !14, size: 64)
+!14 = !DIBasicType(name: "Byte", size: 8, encoding: DW_ATE_unsigned_char)
+)", g_test_source_files_path.generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
+  }
+
   TEST_CASE("Compile Debug Information C Headers", "[LLVM_IR]")
   {
     char const* const input_file = "debug_information_c_headers.hltxt";

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <!--
+    Soa_array<T,N> debug visualization for Hlang structure-of-arrays types.
+
+    Runtime representation: a single byte pointer (data) pointing to a contiguous
+    block where each member of T has its own column of N elements laid out sequentially:
+      [col_0: N * sizeof(member_0)] [col_1: N * sizeof(member_1)] ...
+
+    Two logical views are provided:
+      1. Per-member arrays  — inspect individual member columns as typed arrays.
+         Because the column layout is encoded in the type name rather than the
+         runtime struct, each column is reachable via pointer arithmetic on data.
+         This view shows the raw data pointer; use member access (particles->x) in
+         the watch window for fully-typed column views.
+      2. Array of elements  — reconstruct each T element from its member columns.
+         Use the watch expression particles[i] to evaluate individual elements.
+
+    Soa_array::<Particle, N> becomes Soa_array<3, Particle, N, x, 4, y, 4, velocity, 4>
+  -->
+
+  <!-- Per-member column view (View 1) -->
+	<Type Name="h::Soa_array::&lt;3,*&gt;">
+    <DisplayString>h::Soa_array::&lt;$T2, $T3&gt;</DisplayString>
+    <Expand>
+        <Item Name="[size]" ExcludeView="simple">$T3</Item>
+		
+		<Synthetic Name="[$T4]">
+			<Expand>
+				<IndexListItems>
+					<Size>$T3</Size>
+					<ValueNode>*((($T5*)data)[$i])</ValueNode>
+				</IndexListItems>
+			</Expand>
+		</Synthetic>
+		
+		<Synthetic Name="[$T6]">
+			<Expand>
+				<IndexListItems>
+					<Size>$T3</Size>
+					<ValueNode>*($T7*)( (((char*)data) + $T3*$T5)[$i] )</ValueNode>
+				</IndexListItems>
+			</Expand>
+		</Synthetic>
+
+		<Synthetic Name="[$T8]">
+			<Expand>
+				<IndexListItems>
+					<Size>$T3</Size>
+					<ValueNode>*($T9*)( (((char*)data) + $T3*$T5 + $T3*$T7)[$i] )</ValueNode>
+				</IndexListItems>
+			</Expand>
+		</Synthetic>
+    </Expand>
+  </Type>
+</AutoVisualizer>

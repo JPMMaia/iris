@@ -1,0 +1,12 @@
+module soa_array_type_debug_information;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    var particles: Soa_array::<Particle, 4> = {};
+}
