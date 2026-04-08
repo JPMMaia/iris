@@ -854,9 +854,9 @@ namespace h::compiler
         llvm::Value* const index_llvm_value = index_value.value;
 
         h::Expression const& indexed_expression = statement.expressions[expression.expression.expression_index];
-        if (std::holds_alternative<Access_expression>(indexed_expression.data))
+        if (std::holds_alternative<Dereference_and_access_expression>(indexed_expression.data))
         {
-            Access_expression const& access_expression = std::get<Access_expression>(indexed_expression.data);
+            Dereference_and_access_expression const& access_expression = std::get<Dereference_and_access_expression>(indexed_expression.data);
             Value_and_type const soa_value = create_expression_value(access_expression.expression.expression_index, statement, parameters);
 
             if (soa_value.type.has_value() && std::holds_alternative<Soa_array_type>(soa_value.type->data))
