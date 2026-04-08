@@ -924,6 +924,9 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context
     )
     {
+        if (llvm::StructType* const existing = llvm::StructType::getTypeByName(llvm_context, "__hl_soa_array"))
+            return existing;
+        
         llvm::Type* const byte_pointer_type = llvm::Type::getInt8Ty(llvm_context)->getPointerTo();
         return llvm::StructType::create({ byte_pointer_type }, "__hl_soa_array");
     }
