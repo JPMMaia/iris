@@ -16,38 +16,45 @@
       2. Array of elements  — reconstruct each T element from its member columns.
          Use the watch expression particles[i] to evaluate individual elements.
 
-    Soa_array::<Particle, N> becomes Soa_array<3, Particle, N, x, 4, y, 4, velocity, 4>
+    Soa_array::<Particle, N> becomes Soa_array<3,Particle,N,x,float,y,float,velocity,float>
   -->
 
+	<Intrinsic Name="calculate_soa_data_pointer" Expression="((char*)data) + count*stride">
+		<Parameter Name="data" Type="void*" />
+		<Parameter Name="count" Type="int" />
+		<Parameter Name="stride" Type="int" />
+	</Intrinsic>
+
   <!-- Per-member column view (View 1) -->
-	<Type Name="h::Soa_array::&lt;3,*&gt;">
-    <DisplayString>h::Soa_array::&lt;$T2, $T3&gt;</DisplayString>
+	<Type Name="h::Soa_array&lt;3,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array::&lt;{"$T1",sb}, {$T2}&gt;</DisplayString>
     <Expand>
-        <Item Name="[size]" ExcludeView="simple">$T3</Item>
-		
-		<Synthetic Name="[$T4]">
+		<Synthetic Name="0">
+			<DisplayString>{"$T3: $T4[]",sb}</DisplayString>
 			<Expand>
 				<IndexListItems>
-					<Size>$T3</Size>
-					<ValueNode>*((($T5*)data)[$i])</ValueNode>
-				</IndexListItems>
-			</Expand>
-		</Synthetic>
-		
-		<Synthetic Name="[$T6]">
-			<Expand>
-				<IndexListItems>
-					<Size>$T3</Size>
-					<ValueNode>*($T7*)( (((char*)data) + $T3*$T5)[$i] )</ValueNode>
+					<Size>$T2</Size>
+					<ValueNode>(($T4*)calculate_soa_data_pointer(data, $T2, 0))[$i]</ValueNode>
 				</IndexListItems>
 			</Expand>
 		</Synthetic>
 
-		<Synthetic Name="[$T8]">
+		<Synthetic Name="1">
+			<DisplayString>{"$T5: $T6[]",sb}</DisplayString>
 			<Expand>
 				<IndexListItems>
-					<Size>$T3</Size>
-					<ValueNode>*($T9*)( (((char*)data) + $T3*$T5 + $T3*$T7)[$i] )</ValueNode>
+					<Size>$T2</Size>
+					<ValueNode>(($T6*)calculate_soa_data_pointer(data, $T2, sizeof($T4)))[$i]</ValueNode>
+				</IndexListItems>
+			</Expand>
+		</Synthetic>
+
+		<Synthetic Name="2">
+			<DisplayString>{"$T7: $T8[]",sb}</DisplayString>
+			<Expand>
+				<IndexListItems>
+					<Size>$T2</Size>
+					<ValueNode>(($T8*)calculate_soa_data_pointer(data, $T2, sizeof($T4)+sizeof($T6)))[$i]</ValueNode>
 				</IndexListItems>
 			</Expand>
 		</Synthetic>

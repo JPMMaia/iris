@@ -26,10 +26,10 @@ import h.common;
 import h.compiler.clang_code_generation;
 import h.compiler.clang_data;
 import h.compiler.common;
+import h.compiler.debug_info_formatter;
 import h.core.hash;
 import h.core;
 import h.core.declarations;
-import h.core.formatter;
 import h.core.types;
 
 namespace h::compiler
@@ -72,9 +72,11 @@ namespace h::compiler
     {
         unsigned const pointer_size_in_bits = llvm_data_layout.getPointerSizeInBits();
 
-        llvm::DIType* const byte_type = llvm_debug_builder.createBasicType("Byte", 8, llvm::dwarf::DW_ATE_unsigned_char);
+        std::pmr::string const byte_type_name = format_debug_primitive_type_name(Fundamental_type::Byte, {});
+        llvm::DIType* const byte_type = llvm_debug_builder.createBasicType(byte_type_name.data(), 8, llvm::dwarf::DW_ATE_unsigned_char);
         llvm::DIType* const byte_pointer_type = llvm_debug_builder.createPointerType(byte_type, pointer_size_in_bits);
-        llvm::DIType* const uint64_type = llvm_debug_builder.createBasicType("Uint64", 64, llvm::dwarf::DW_ATE_unsigned);
+        std::pmr::string const uint64_type_name = format_debug_primitive_type_name(Integer_type{ .number_of_bits = 64, .is_signed = false }, {});
+        llvm::DIType* const uint64_type = llvm_debug_builder.createBasicType(uint64_type_name.data(), 64, llvm::dwarf::DW_ATE_unsigned);
 
         std::array<llvm::Metadata*, 2> const elements
         {
@@ -106,7 +108,7 @@ namespace h::compiler
 
         llvm::DIType* string_type = llvm_debug_builder.createStructType(
             &llvm_scope,
-            "String",
+            "h::String",
             nullptr,
             0,
             size_in_bits,
@@ -844,7 +846,8 @@ namespace h::compiler
             llvm_debug_builder.createUnspecifiedParameter();
 
         llvm::DIType* const element_pointer_type = llvm_debug_builder.createPointerType(element_type, pointer_size_in_bits);
-        llvm::DIType* const uint64_type = llvm_debug_builder.createBasicType("Uint64", 64, llvm::dwarf::DW_ATE_unsigned);
+        std::pmr::string const uint64_type_name = format_debug_primitive_type_name(Integer_type{ .number_of_bits = 64, .is_signed = false }, {});
+        llvm::DIType* const uint64_type = llvm_debug_builder.createBasicType(uint64_type_name.data(), 64, llvm::dwarf::DW_ATE_unsigned);
 
         std::array<llvm::Metadata*, 2> const elements
         {
@@ -874,9 +877,9 @@ namespace h::compiler
 
         unsigned const size_in_bits = pointer_size_in_bits + 64;
 
-        std::pmr::string const array_slice_name = format_type_reference(
+        std::pmr::string const array_slice_name = format_debug_type_name(
             core_module,
-            h::Type_reference{.data = type},
+            h::Type_reference{ .data = type },
             {},
             {}
         );
@@ -931,12 +934,6 @@ namespace h::compiler
         return llvm::StructType::create({ byte_pointer_type }, "__hl_soa_array");
     }
 
-    struct Soa_debug_member_info
-    {
-        std::pmr::string name;
-        std::uint64_t size_in_bytes;
-    };
-
     static std::pmr::vector<Soa_debug_member_info> get_soa_debug_member_infos(
         h::Module const& core_module,
         Soa_array_type const& type,
@@ -975,53 +972,30 @@ namespace h::compiler
             if (member_type == nullptr || member_type->getTag() != llvm::dwarf::DW_TAG_member)
                 continue;
 
-            std::uint64_t const size_in_bits = member_type->getSizeInBits();
-            std::uint64_t const size_in_bytes = (size_in_bits + 7) / 8;
+            std::string member_type_name = "Unknown";
+            llvm::DIType const* member_base_type = member_type->getBaseType();
+            while (llvm::DIDerivedType const* const derived_base_type = llvm::dyn_cast_or_null<llvm::DIDerivedType>(member_base_type))
+            {
+                member_base_type = derived_base_type->getBaseType();
+            }
+
+            if (member_base_type != nullptr)
+            {
+                std::string const candidate = member_base_type->getName().str();
+                if (!candidate.empty())
+                    member_type_name = candidate;
+            }
 
             member_infos.push_back(
                 Soa_debug_member_info
                 {
                     .name = std::pmr::string{ member_type->getName().str() },
-                    .size_in_bytes = size_in_bytes,
+                    .type_name = std::pmr::string{ member_type_name },
                 }
             );
         }
 
         return member_infos;
-    }
-
-    static std::pmr::string create_soa_array_debug_type_name(
-        h::Module const& core_module,
-        Soa_array_type const& type,
-        std::span<Soa_debug_member_info const> const member_infos
-    )
-    {
-        std::pmr::string element_type_name = "Unknown";
-        if (!type.value_type.empty())
-        {
-            element_type_name = format_type_reference(
-                core_module,
-                h::Type_reference{ .data = type.value_type[0].data },
-                {},
-                {}
-            );
-        }
-
-        std::pmr::string debug_type_name = std::pmr::string{ std::format(
-            "h::Soa_array_type::<{}, {}, {}",
-            member_infos.size(),
-            element_type_name,
-            type.size
-        ) };
-
-        for (Soa_debug_member_info const& member_info : member_infos)
-        {
-            debug_type_name += std::format(", {}, {}", member_info.name, member_info.size_in_bytes);
-        }
-
-        debug_type_name += ">";
-
-        return debug_type_name;
     }
 
     llvm::DIType* soa_array_type_to_llvm_debug_type(
@@ -1035,18 +1009,19 @@ namespace h::compiler
     {
         (void)llvm_debug_scope;
 
-        static llvm::DINamespace* const scope = llvm_debug_builder.createNameSpace(nullptr, "h", false);
+        llvm::DINamespace* const builtin_scope = get_builtin_debug_namespace(llvm_debug_builder);
 
         unsigned const pointer_size_in_bits = llvm_data_layout.getPointerSizeInBits();
         llvm::Align const pointer_alignment = llvm_data_layout.getPointerABIAlignment(0);
 
-        llvm::DIType* const byte_type = llvm_debug_builder.createBasicType("Byte", 8, llvm::dwarf::DW_ATE_unsigned_char);
+        std::pmr::string const byte_type_name = format_debug_primitive_type_name(Fundamental_type::Byte, {});
+        llvm::DIType* const byte_type = llvm_debug_builder.createBasicType(byte_type_name.data(), 8, llvm::dwarf::DW_ATE_unsigned_char);
         llvm::DIType* const byte_pointer_type = llvm_debug_builder.createPointerType(byte_type, pointer_size_in_bits);
 
         std::array<llvm::Metadata*, 1> const elements
         {
             llvm_debug_builder.createMemberType(
-                scope,
+                builtin_scope,
                 "data",
                 nullptr,
                 0,
@@ -1064,10 +1039,10 @@ namespace h::compiler
             debug_type_database
         );
 
-        std::pmr::string const soa_array_name = create_soa_array_debug_type_name(core_module, type, member_infos);
+        std::pmr::string const soa_array_name = create_soa_array_debug_type_name(core_module, type, member_infos, {}, {});
 
         return llvm_debug_builder.createStructType(
-            scope,
+            builtin_scope,
             soa_array_name.data(),
             nullptr,
             0,
@@ -1127,46 +1102,48 @@ namespace h::compiler
         Debug_builtin_types const& debug_builtin_types
     )
     {
+        std::pmr::string const type_name = format_debug_primitive_type_name(type, {});
+
         switch (type)
         {
         case Fundamental_type::Bool:
-            return llvm_debug_builder.createBasicType("Bool", 1, llvm::dwarf::DW_ATE_boolean);
+            return llvm_debug_builder.createBasicType(type_name.data(), 1, llvm::dwarf::DW_ATE_boolean);
         case Fundamental_type::Byte:
-            return llvm_debug_builder.createBasicType("Byte", 8, llvm::dwarf::DW_ATE_unsigned_char);
+            return llvm_debug_builder.createBasicType(type_name.data(), 8, llvm::dwarf::DW_ATE_unsigned_char);
         case Fundamental_type::Float16:
-            return llvm_debug_builder.createBasicType("Float16", 16, llvm::dwarf::DW_ATE_float);
+            return llvm_debug_builder.createBasicType(type_name.data(), 16, llvm::dwarf::DW_ATE_float);
         case Fundamental_type::Float32:
-            return llvm_debug_builder.createBasicType("Float32", 32, llvm::dwarf::DW_ATE_float);
+            return llvm_debug_builder.createBasicType(type_name.data(), 32, llvm::dwarf::DW_ATE_float);
         case Fundamental_type::Float64:
-            return llvm_debug_builder.createBasicType("Float64", 64, llvm::dwarf::DW_ATE_float);
+            return llvm_debug_builder.createBasicType(type_name.data(), 64, llvm::dwarf::DW_ATE_float);
         case Fundamental_type::String:
             return debug_builtin_types.string;
         case Fundamental_type::C_bool:
-            return llvm_debug_builder.createBasicType("C_bool", 8, llvm::dwarf::DW_ATE_unsigned_char);
+            return llvm_debug_builder.createBasicType(type_name.data(), 8, llvm::dwarf::DW_ATE_unsigned_char);
         case Fundamental_type::C_char:
-            return llvm_debug_builder.createBasicType("C_char", 8, llvm::dwarf::DW_ATE_signed_char);
+            return llvm_debug_builder.createBasicType(type_name.data(), 8, llvm::dwarf::DW_ATE_signed_char);
         case Fundamental_type::C_schar:
-            return llvm_debug_builder.createBasicType("C_schar", 8, llvm::dwarf::DW_ATE_signed_char);
+            return llvm_debug_builder.createBasicType(type_name.data(), 8, llvm::dwarf::DW_ATE_signed_char);
         case Fundamental_type::C_uchar:
-            return llvm_debug_builder.createBasicType("C_uchar", 8, llvm::dwarf::DW_ATE_unsigned_char);
+            return llvm_debug_builder.createBasicType(type_name.data(), 8, llvm::dwarf::DW_ATE_unsigned_char);
         case Fundamental_type::C_short:
-            return llvm_debug_builder.createBasicType("C_short", 16, llvm::dwarf::DW_ATE_signed);
+            return llvm_debug_builder.createBasicType(type_name.data(), 16, llvm::dwarf::DW_ATE_signed);
         case Fundamental_type::C_ushort:
-            return llvm_debug_builder.createBasicType("C_short", 16, llvm::dwarf::DW_ATE_unsigned);
+            return llvm_debug_builder.createBasicType(type_name.data(), 16, llvm::dwarf::DW_ATE_unsigned);
         case Fundamental_type::C_int:
-            return llvm_debug_builder.createBasicType("c_int", 32, llvm::dwarf::DW_ATE_signed);
+            return llvm_debug_builder.createBasicType(type_name.data(), 32, llvm::dwarf::DW_ATE_signed);
         case Fundamental_type::C_uint:
-            return llvm_debug_builder.createBasicType("C_uint", 32, llvm::dwarf::DW_ATE_unsigned);
+            return llvm_debug_builder.createBasicType(type_name.data(), 32, llvm::dwarf::DW_ATE_unsigned);
         case Fundamental_type::C_long:
-            return llvm_debug_builder.createBasicType("C_long", 32, llvm::dwarf::DW_ATE_signed);
+            return llvm_debug_builder.createBasicType(type_name.data(), 32, llvm::dwarf::DW_ATE_signed);
         case Fundamental_type::C_ulong:
-            return llvm_debug_builder.createBasicType("C_ulong", 32, llvm::dwarf::DW_ATE_unsigned);
+            return llvm_debug_builder.createBasicType(type_name.data(), 32, llvm::dwarf::DW_ATE_unsigned);
         case Fundamental_type::C_longlong:
-            return llvm_debug_builder.createBasicType("C_longlong", 64, llvm::dwarf::DW_ATE_signed);
+            return llvm_debug_builder.createBasicType(type_name.data(), 64, llvm::dwarf::DW_ATE_signed);
         case Fundamental_type::C_ulonglong:
-            return llvm_debug_builder.createBasicType("C_ulonglong", 64, llvm::dwarf::DW_ATE_unsigned);
+            return llvm_debug_builder.createBasicType(type_name.data(), 64, llvm::dwarf::DW_ATE_unsigned);
         case Fundamental_type::C_longdouble:
-            return llvm_debug_builder.createBasicType("C_longdouble", 128, llvm::dwarf::DW_ATE_float);
+            return llvm_debug_builder.createBasicType(type_name.data(), 128, llvm::dwarf::DW_ATE_float);
         default:
             throw std::runtime_error{ "Not implemented." };
         }
@@ -1228,9 +1205,9 @@ namespace h::compiler
         Integer_type const type
     )
     {
-        std::string const name = std::format("{}{}", type.is_signed ? "Int" : "Uint", type.number_of_bits);
+        std::pmr::string const name = format_debug_primitive_type_name(type, {});
         unsigned const encoding = type.is_signed ? llvm::dwarf::DW_ATE_signed : llvm::dwarf::DW_ATE_unsigned;
-        return llvm_debug_builder.createBasicType(name, type.number_of_bits, encoding);
+        return llvm_debug_builder.createBasicType(name.data(), type.number_of_bits, encoding);
     }
 
     llvm::DIType* decimal_type_to_llvm_debug_type(
@@ -1241,7 +1218,7 @@ namespace h::compiler
         static llvm::DINamespace* scope = llvm_debug_builder.createNameSpace(nullptr, "h", false);
 
         std::uint32_t const bits = type.scale <= 6 ? 32 : 64;
-        std::string const name = std::format("Decimal{}", type.scale);
+        std::string const name = std::format("h::Decimal{}", type.scale);
         llvm::DIType* const storage_type = llvm_debug_builder.createBasicType(std::format("{}_storage", name), bits, llvm::dwarf::DW_ATE_signed);
 
         std::array<llvm::Metadata*, 1> const elements
@@ -1745,5 +1722,11 @@ namespace h::compiler
         }();
 
         return llvm::FunctionType::get(llvm_return_type, llvm_input_parameter_types, is_var_arg);
+    }
+
+    llvm::DINamespace* get_builtin_debug_namespace(llvm::DIBuilder& llvm_debug_builder)
+    {
+        static llvm::DINamespace* const builtin_namespace = llvm_debug_builder.createNameSpace(nullptr, "h", false);
+        return builtin_namespace;
     }
 }

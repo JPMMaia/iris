@@ -205,4 +205,6 @@ namespace h::compiler
         Type_database const& type_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
+
+    export llvm::DINamespace* get_builtin_debug_namespace(llvm::DIBuilder& llvm_debug_builder);
 }
