@@ -285,6 +285,40 @@ namespace h::compiler
         return {};
     }
 
+    static Scope create_type_analysis_scope(Expression_parameters const& parameters)
+    {
+        Scope scope{};
+
+        if (parameters.function_declaration.has_value() && parameters.function_declaration.value() != nullptr)
+        {
+            Function_declaration const& function_declaration = *parameters.function_declaration.value();
+            add_parameters_to_scope(
+                scope,
+                function_declaration.input_parameter_names,
+                function_declaration.type.input_parameter_types,
+                function_declaration.input_parameter_source_positions
+            );
+        }
+
+        for (Value_and_type const& local_variable : parameters.local_variables)
+        {
+            if (local_variable.name.empty() || !local_variable.type.has_value())
+                continue;
+
+            scope.variables.push_back(
+                create_variable(
+                    local_variable.name,
+                    local_variable.type.value(),
+                    true,
+                    false,
+                    std::optional<Source_position>{std::nullopt}
+                )
+            );
+        }
+
+        return scope;
+    }
+
     llvm::Constant* fold_constant(
         llvm::Value* const value,
         llvm::DataLayout const& llvm_data_layout
@@ -1149,6 +1183,92 @@ namespace h::compiler
                             parameters.type_database
                         );
                     }
+                }
+            }
+        }
+
+        // Check if this is an indexed SOA array assignment: particles[1] = {...}
+        if (std::holds_alternative<Access_array_expression>(left_hand_side_expression.data))
+        {
+            Access_array_expression const& access_array_expression = std::get<Access_array_expression>(left_hand_side_expression.data);
+
+            Scope const scope = create_type_analysis_scope(parameters);
+            std::optional<Type_reference> const array_base_expression_type = get_expression_type(
+                parameters.core_module,
+                parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
+                scope,
+                statement,
+                statement.expressions[access_array_expression.expression.expression_index],
+                std::nullopt,
+                parameters.declaration_database
+            );
+
+            if (array_base_expression_type.has_value() && std::holds_alternative<Soa_array_type>(array_base_expression_type->data))
+            {
+                // This is a direct indexed access like particles[index]
+                Value_and_type const array_value = create_expression_value(access_array_expression.expression.expression_index, statement, parameters);
+
+                if (array_value.type.has_value() && std::holds_alternative<Soa_array_type>(array_value.type->data))
+                {
+                    // This is an indexed SOA array assignment
+                    Soa_array_type_info const soa_info = get_soa_array_type_info(array_value.type.value(), parameters);
+                    llvm::Value* const data_pointer = load_soa_data_pointer(array_value, parameters);
+
+                    // Get the index value
+                    Value_and_type const index_value = create_loaded_expression_value(access_array_expression.index.expression_index, statement, parameters);
+
+                    // Create a temporary alloca to store the RHS struct value
+                    llvm::Type* const element_llvm_type = type_reference_to_llvm_type(
+                        parameters.llvm_context,
+                        parameters.llvm_data_layout,
+                        *soa_info.element_type,
+                        parameters.type_database
+                    );
+
+                    llvm::AllocaInst* const struct_alloca = create_alloca_instruction(
+                        parameters.llvm_builder,
+                        parameters.llvm_data_layout,
+                        *parameters.llvm_parent_function,
+                        element_llvm_type,
+                        "soa_assignment_struct"
+                    );
+
+                    // Store the RHS struct value to temporary alloca
+                    create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, result.value, struct_alloca);
+
+                    // For each member of the struct, extract from temp alloca and store to SOA layout
+                    for (std::size_t member_index = 0; member_index < soa_info.struct_declaration->member_names.size(); ++member_index)
+                    {
+                        // Extract the member value from the temporary struct alloca
+                        Value_and_type const member_value = generate_load_struct_member_instructions(
+                            parameters.clang_module_data,
+                            parameters.llvm_context,
+                            parameters.llvm_builder,
+                            parameters.llvm_data_layout,
+                            struct_alloca,
+                            soa_info.struct_declaration->member_names[member_index],
+                            soa_info.module_name,
+                            *soa_info.struct_declaration,
+                            parameters.type_database
+                        );
+
+                        // Store the member to the SOA layout
+                        store_soa_member_value(
+                            data_pointer,
+                            soa_info,
+                            member_index,
+                            index_value.value,
+                            member_value,
+                            parameters
+                        );
+                    }
+
+                    return Value_and_type
+                    {
+                        .name = "",
+                        .value = nullptr,
+                        .type = std::nullopt
+                    };
                 }
             }
         }

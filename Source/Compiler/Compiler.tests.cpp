@@ -1799,11 +1799,14 @@ entry:
   %soa_array_storage = alloca [32 x i8], align 4
   %soa_element = alloca %struct.soa_array_type_Particle, align 4
   %p1 = alloca %struct.soa_array_type_Particle, align 4
+  %soa_element19 = alloca %struct.soa_array_type_Particle, align 4
+  %0 = alloca %struct.soa_array_type_Particle, align 4
+  %soa_assignment_struct = alloca %struct.soa_array_type_Particle, align 4
   %x2 = alloca float, align 4
   %y3 = alloca float, align 4
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
-  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
-  store ptr %soa_array_data, ptr %0, align 8
+  %1 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  store ptr %soa_array_data, ptr %1, align 8
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
   store float 0.000000e+00, ptr %soa_member_element_pointer, align 4
@@ -1828,42 +1831,72 @@ entry:
   %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
   %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
   store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
-  %1 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %2 = load ptr, ptr %1, align 8
-  %soa_member_base_pointer15 = getelementptr i8, ptr %2, i64 0
+  %2 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 0
   %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 1
-  %3 = load float, ptr %soa_member_element_pointer16, align 4
-  %4 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element, i32 0, i32 0
-  store float %3, ptr %4, align 4
-  %soa_member_base_pointer17 = getelementptr i8, ptr %2, i64 16
+  %4 = load float, ptr %soa_member_element_pointer16, align 4
+  %5 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element, i32 0, i32 0
+  store float %4, ptr %5, align 4
+  %soa_member_base_pointer17 = getelementptr i8, ptr %3, i64 16
   %soa_member_element_pointer18 = getelementptr float, ptr %soa_member_base_pointer17, i32 1
-  %5 = load float, ptr %soa_member_element_pointer18, align 4
-  %6 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element, i32 0, i32 1
-  store float %5, ptr %6, align 4
-  %7 = load %struct.soa_array_type_Particle, ptr %soa_element, align 4
-  store %struct.soa_array_type_Particle %7, ptr %p1, align 4
-  %8 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %9 = load ptr, ptr %8, align 8
-  %soa_member_base_pointer19 = getelementptr i8, ptr %9, i64 0
-  %soa_member_element_pointer20 = getelementptr float, ptr %soa_member_base_pointer19, i32 2
-  %10 = load float, ptr %soa_member_element_pointer20, align 4
-  store float %10, ptr %x2, align 4
-  %11 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %12 = load ptr, ptr %11, align 8
-  %soa_member_base_pointer21 = getelementptr i8, ptr %12, i64 0
-  %soa_member_element_pointer22 = getelementptr float, ptr %soa_member_base_pointer21, i32 2
-  store float 1.000000e+00, ptr %soa_member_element_pointer22, align 4
-  %13 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %14 = load ptr, ptr %13, align 8
-  %soa_member_base_pointer23 = getelementptr i8, ptr %14, i64 16
-  %soa_member_element_pointer24 = getelementptr float, ptr %soa_member_base_pointer23, i32 3
-  %15 = load float, ptr %soa_member_element_pointer24, align 4
-  store float %15, ptr %y3, align 4
-  %16 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %17 = load ptr, ptr %16, align 8
-  %soa_member_base_pointer25 = getelementptr i8, ptr %17, i64 16
-  %soa_member_element_pointer26 = getelementptr float, ptr %soa_member_base_pointer25, i32 3
-  store float 2.000000e+00, ptr %soa_member_element_pointer26, align 4
+  %6 = load float, ptr %soa_member_element_pointer18, align 4
+  %7 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element, i32 0, i32 1
+  store float %6, ptr %7, align 4
+  %8 = load %struct.soa_array_type_Particle, ptr %soa_element, align 4
+  store %struct.soa_array_type_Particle %8, ptr %p1, align 4
+  %9 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %10 = load ptr, ptr %9, align 8
+  %soa_member_base_pointer20 = getelementptr i8, ptr %10, i64 0
+  %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i32 1
+  %11 = load float, ptr %soa_member_element_pointer21, align 4
+  %12 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 0
+  store float %11, ptr %12, align 4
+  %soa_member_base_pointer22 = getelementptr i8, ptr %10, i64 16
+  %soa_member_element_pointer23 = getelementptr float, ptr %soa_member_base_pointer22, i32 1
+  %13 = load float, ptr %soa_member_element_pointer23, align 4
+  %14 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 1
+  store float %13, ptr %14, align 4
+  %15 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 0
+  store float 3.000000e+00, ptr %15, align 4
+  %16 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 1
+  store float 4.000000e+00, ptr %16, align 4
+  %17 = load %struct.soa_array_type_Particle, ptr %0, align 4
+  %18 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %19 = load ptr, ptr %18, align 8
+  store %struct.soa_array_type_Particle %17, ptr %soa_assignment_struct, align 4
+  %20 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
+  %soa_member_base_pointer24 = getelementptr i8, ptr %19, i64 0
+  %soa_member_element_pointer25 = getelementptr float, ptr %soa_member_base_pointer24, i32 1
+  %21 = load float, ptr %20, align 4
+  store float %21, ptr %soa_member_element_pointer25, align 4
+  %22 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
+  %soa_member_base_pointer26 = getelementptr i8, ptr %19, i64 16
+  %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i32 1
+  %23 = load float, ptr %22, align 4
+  store float %23, ptr %soa_member_element_pointer27, align 4
+  %24 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %25 = load ptr, ptr %24, align 8
+  %soa_member_base_pointer28 = getelementptr i8, ptr %25, i64 0
+  %soa_member_element_pointer29 = getelementptr float, ptr %soa_member_base_pointer28, i32 2
+  %26 = load float, ptr %soa_member_element_pointer29, align 4
+  store float %26, ptr %x2, align 4
+  %27 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %28 = load ptr, ptr %27, align 8
+  %soa_member_base_pointer30 = getelementptr i8, ptr %28, i64 0
+  %soa_member_element_pointer31 = getelementptr float, ptr %soa_member_base_pointer30, i32 2
+  store float 1.000000e+00, ptr %soa_member_element_pointer31, align 4
+  %29 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %30 = load ptr, ptr %29, align 8
+  %soa_member_base_pointer32 = getelementptr i8, ptr %30, i64 16
+  %soa_member_element_pointer33 = getelementptr float, ptr %soa_member_base_pointer32, i32 3
+  %31 = load float, ptr %soa_member_element_pointer33, align 4
+  store float %31, ptr %y3, align 4
+  %32 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %33 = load ptr, ptr %32, align 8
+  %soa_member_base_pointer34 = getelementptr i8, ptr %33, i64 16
+  %soa_member_element_pointer35 = getelementptr float, ptr %soa_member_base_pointer34, i32 3
+  store float 2.000000e+00, ptr %soa_member_element_pointer35, align 4
   ret void
 }
 
