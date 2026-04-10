@@ -461,6 +461,27 @@ suite("Should do completion", () => {
 			]
 		});
 	});
+
+	test("Completes Soa_array dot members", async () => {
+		const document_uri = get_document_uri('projects/other/completion_soa_0.hltxt');
+		await test_completion(document_uri, new vscode.Position(11, 10), {
+			items: [
+				{ label: "data", kind: vscode.CompletionItemKind.Field },
+				{ label: "length", kind: vscode.CompletionItemKind.Field },
+			]
+		}, true);
+	});
+
+	test("Completes Soa_array arrow members", async () => {
+		const document_uri = get_document_uri('projects/other/completion_soa_1.hltxt');
+		await test_completion(document_uri, new vscode.Position(11, 10), {
+			items: [
+				{ label: "velocity", kind: vscode.CompletionItemKind.Field },
+				{ label: "x", kind: vscode.CompletionItemKind.Field },
+				{ label: "y", kind: vscode.CompletionItemKind.Field },
+			]
+		}, true);
+	});
 });
 
 async function test_completion(
