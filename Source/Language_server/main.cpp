@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+import h.common;
+
 import h.compiler.artifact;
 import h.compiler.repository;
 
@@ -45,6 +47,8 @@ using namespace h::language_server;
 
 int main(int const argc, char const* const* argv)
 {
+    h::common::install_abort_handlers();
+
     Message_handler message_handler = create_message_handler();
     process_messages(message_handler);
     return 0;
