@@ -20,7 +20,7 @@ Components:
 
 ### Build the Language Server
 
-The Language Server is built using CMake. The CMake target is `H_language_server`.
+The Language Server is built using CMake. The CMake target is `H_language_server_app`.
 
 ## Language Client
 
@@ -39,15 +39,18 @@ npm run compile
 
 The Language Server is mainly tested through the Language Client tests. The test files are located in `Tools/vscode/H-editor/src/test`. The test fixture is located in `Tools/vscode/H-editor/test_fixture`.
 
-In order to run the tests, we first need build both the Language Server and Language Client.
-We need to define the location of the Language Server executable absolute path using an environment variable: `hlang_language_server=${pwd}/build/Source/Language_server/hlang_language_server.exe` (this might need to be adjusted depending if using Windows or Linux).
+Run the tests using PowerShell from the workspace root:
 
-After that, run the tests using:
-
-```
+```powershell
+Enter-VsDevEnv
+cmake --build build --target H_language_server_app
 cd Tools/vscode/H-editor
-mode=debug npm run test
+npm run compile
+$env:hlang_language_server = "${pwd}/../../../build/Source/Language_server/hlang_language_server.exe"
+npm run test
 ```
+
+Note: do **not** set `mode=debug` when running tests. That mode makes the extension try to attach to a server already listening on port 12345 instead of spawning one, causing all tests to fail with `ECONNREFUSED`.
 
 ## Making changes to the Language Server
 
