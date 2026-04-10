@@ -444,6 +444,42 @@ namespace h::language_server
         return source_position_after_dot;
     }
 
+    static std::optional<std::string_view> find_access_operator_before_source_position(
+        h::parser::Parse_tree const& parse_tree,
+        h::parser::Parse_node const& hint_node,
+        h::Source_position const source_position
+    )
+    {
+        std::uint32_t const end_byte = h::parser::calculate_byte(
+            parse_tree,
+            hint_node,
+            source_position
+        );
+
+        if (end_byte == 0)
+            return std::nullopt;
+
+        std::uint32_t current_byte = end_byte;
+        while (current_byte > 0)
+        {
+            current_byte -= 1;
+
+            char8_t const character = parse_tree.text[current_byte];
+            if (character == ' ' || character == '\t' || character == '\n' || character == '\r')
+                continue;
+
+            if (character == '.')
+                return std::string_view{"."};
+
+            if (character == '>' && current_byte > 0 && parse_tree.text[current_byte - 1] == '-')
+                return std::string_view{"->"};
+
+            return std::nullopt;
+        }
+
+        return std::nullopt;
+    }
+
     static std::optional<lsp::CompletionList> create_access_value_completion_list_for_expression_type(
         Declaration_database const& declaration_database,
         h::Type_reference const& expression_type
@@ -502,16 +538,15 @@ namespace h::language_server
         h::Module const& core_module,
         h::Function_declaration const* const function_declaration,
         h::Function_definition const* const function_definition,
-        h::parser::Parse_node const& node_before,
+        h::parser::Parse_node const& hint_node,
+        std::string_view const access_operator,
         h::Source_position const source_position
     )
     {
-        std::string_view const node_before_value = get_node_value(parse_tree, node_before);
-
         std::optional<h::parser::Parse_node> const node_to_access = h::parser::find_node_before_source_position(
             parse_tree,
-            node_before,
-            get_access_operator_source_position(node_before_value, source_position)
+            hint_node,
+            get_access_operator_source_position(access_operator, source_position)
         );
         if (!node_to_access.has_value())
             return std::nullopt;
@@ -570,11 +605,10 @@ namespace h::language_server
 
         if (function_declaration != nullptr && function_definition != nullptr)
         {
-            h::Source_range const node_before_source_range = h::parser::get_node_source_range(node_before);
-            h::Source_position const scope_source_position = 
-                (node_before_value.ends_with(";") || node_before_value.ends_with(".")) ?
-                h::Source_position{ .line = node_before_source_range.end.line, .column = node_before_source_range.end.column - 1 } :
-                node_before_source_range.end;
+            h::Source_position const scope_source_position = get_access_operator_source_position(
+                access_operator,
+                source_position
+            );
 
             std::optional<h::compiler::Scope> const scope = h::compiler::calculate_scope(
                 core_module,
@@ -596,7 +630,7 @@ namespace h::language_server
                 );
                 if (expression_type.has_value())
                 {
-                    bool const is_dereference_and_access = node_before_value == "->";
+                    bool const is_dereference_and_access = access_operator == "->";
                     if (is_dereference_and_access)
                     {
                         if (is_soa_array_type_reference(expression_type.value()))
@@ -732,9 +766,10 @@ namespace h::language_server
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
         h::Source_position const source_position = to_source_position(position);
+        h::parser::Parse_node const root_node = h::parser::get_root_node(parse_tree);
 
         h::parser::Parse_node const smallest_node = h::parser::get_smallest_node_that_contains_position(
-            h::parser::get_root_node(parse_tree),
+            root_node,
             source_position
         );
         std::string_view const smallest_node_symbol = h::parser::get_node_symbol(smallest_node);
@@ -747,6 +782,10 @@ namespace h::language_server
 
         std::optional<h::parser::Parse_node> const node_before = h::parser::find_node_before_source_position(parse_tree, smallest_node, source_position);
         std::string_view const node_before_value = node_before.has_value() ? h::parser::get_node_value(parse_tree, node_before.value()) : std::string_view{""};
+        std::optional<std::string_view> access_operator =
+            (node_before_value == "." || node_before_value == "->")
+            ? std::optional<std::string_view>{node_before_value}
+            : find_access_operator_before_source_position(parse_tree, root_node, source_position);
 
         if (is_at_import_module_name(node_before_value))
         {
@@ -939,13 +978,13 @@ namespace h::language_server
         {
             std::vector<lsp::CompletionItem> items = {};
 
-            if (expects_type(parse_tree, node_before.value()))
+            if (node_before.has_value() && expects_type(parse_tree, node_before.value()))
             {
                 return create_type_completion_list(declaration_database, core_module);
             }
-            else if (node_before_value == "." || node_before_value == "->")
+            else if (access_operator.has_value())
             {
-                if (expects_access_type(parse_tree, node_before.value()))
+                if (access_operator.value() == "." && node_before.has_value() && expects_access_type(parse_tree, node_before.value()))
                 {
                     std::optional<lsp::CompletionList> module_type_completion_list = create_module_type_completion_list(
                         declaration_database,
@@ -958,10 +997,29 @@ namespace h::language_server
                 }
                 else
                 {
-                    std::optional<lsp::CompletionList> module_value_completion_list = create_access_value_completion_list(declaration_database, parse_tree, core_module, function->declaration, function->definition, node_before.value(), source_position);
+                    h::parser::Parse_node const& access_hint_node = root_node;
+                    std::optional<lsp::CompletionList> module_value_completion_list = create_access_value_completion_list(
+                        declaration_database,
+                        parse_tree,
+                        core_module,
+                        function->declaration,
+                        function->definition,
+                        access_hint_node,
+                        access_operator.value(),
+                        source_position
+                    );
                     if (module_value_completion_list.has_value())
                         return module_value_completion_list.value();
                 }
+            }
+            else if (!node_before.has_value())
+            {
+                return lsp::CompletionList
+                {
+                    .isIncomplete = false,
+                    .items = {},
+                    .itemDefaults = std::nullopt,
+                };
             }
             else
             {

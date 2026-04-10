@@ -2292,7 +2292,7 @@ namespace h::compiler
                 {
                     output = scope;
                 }
-                else if (first_expression.source_range->end == source_position)
+                else if (first_expression.source_range->end.line == source_position.line)
                 {
                     output = scope;
 

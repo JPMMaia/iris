@@ -482,6 +482,17 @@ suite("Should do completion", () => {
 			]
 		}, true);
 	});
+
+	test("Completes Soa_array arrow members with comment on next line", async () => {
+		const document_uri = get_document_uri('projects/other/completion_soa_2.hltxt');
+		await test_completion(document_uri, new vscode.Position(11, 10), {
+			items: [
+				{ label: "velocity", kind: vscode.CompletionItemKind.Field },
+				{ label: "x", kind: vscode.CompletionItemKind.Field },
+				{ label: "y", kind: vscode.CompletionItemKind.Field },
+			]
+		}, true);
+	});
 });
 
 async function test_completion(
