@@ -21,4 +21,7 @@ function run() -> ()
 
     var y3 = particles->y[3];
     particles->y[3] = 2.0f32;
+
+    var length = particles.length;
+    var data = particles.data;
 }

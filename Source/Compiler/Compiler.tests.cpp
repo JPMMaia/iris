@@ -1804,6 +1804,8 @@ entry:
   %soa_assignment_struct = alloca %struct.soa_array_type_Particle, align 4
   %x2 = alloca float, align 4
   %y3 = alloca float, align 4
+  %length = alloca i64, align 8
+  %data = alloca ptr, align 8
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
   %1 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
   store ptr %soa_array_data, ptr %1, align 8
@@ -1897,6 +1899,10 @@ entry:
   %soa_member_base_pointer34 = getelementptr i8, ptr %33, i64 16
   %soa_member_element_pointer35 = getelementptr float, ptr %soa_member_base_pointer34, i32 3
   store float 2.000000e+00, ptr %soa_member_element_pointer35, align 4
+  store i64 4, ptr %length, align 8
+  %34 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %35 = load ptr, ptr %34, align 8
+  store ptr %35, ptr %data, align 8
   ret void
 }
 

@@ -770,6 +770,30 @@ namespace h::compiler
             );
         }
 
+        if (left_hand_side.type.has_value() && h::is_soa_array_type_reference(left_hand_side.type.value()))
+        {
+            h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(left_hand_side.type->data);
+
+            if (expression.member_name == "length")
+            {
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = llvm::ConstantInt::get(llvm::Type::getInt64Ty(parameters.llvm_context), soa_array_type.size),
+                    .type = create_integer_type_type_reference(64, false)
+                };
+            }
+            else if (expression.member_name == "data")
+            {
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = load_soa_data_pointer(left_hand_side, parameters),
+                    .type = create_pointer_type_type_reference({}, true)
+                };
+            }
+        }
+
         {
             std::optional<Custom_type_reference> custom_type_reference = get_custom_type_reference_from_access_expression(expression, left_hand_side, statement, core_module.name);
 

@@ -516,6 +516,41 @@ using Particle_array = Soa_array::<Particle, 4>;
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that Soa_array contains data and length", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    mutable particles: Soa_array::<Particle, 4> = {};
+
+    var length: Uint64 = particles.length;
+    var data = particles.data;
+    var random = particles.random;
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(15, 18, 15, 34),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Member 'random' does not exist in the type 'Soa_array::<Particle, 4>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
 
     TEST_CASE("Validates that struct member names are different from each other", "[Validation][Struct]")
     {
