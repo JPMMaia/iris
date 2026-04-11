@@ -180,12 +180,16 @@ Conceptually equivalent to:
 
 ```
 struct Soa_array_view::<T> {
-    length: Uint64
-    data: pointer_to_member_arrays
+    start_index: Uint64 = 0u64;
+    end_index: Uint64 = 0u64:
+    length: Uint64 = 0u64;
+    data: pointer_to_member_arrays = null;
 }
 ```
 
-`data` is **a single pointer to a contiguous allocation**.
+`data` is **a single pointer to the start of a contiguous allocation**.
+The range of elements in the view is defined by `start_index` and `end_index`.
+`length` is the same value as the `Soa_array` and is needed to calculate the proper offsets.
 
 ```
 
@@ -193,22 +197,44 @@ struct Soa_array_view::<T> {
 
 ## Access Semantics
 
-Identical to `Soa_array`.
+Identical to `Soa_array` but uses runtime `start_index`, `end_index` and `length`.
 
 ---
 
 # Conversion
 
-A `Soa_array` can produce a view:
+A `Soa_array` can produce a view for the whole range (0 to `particles.length`):
 
 ```
 var view = particles.view();
 ```
 
-Type:
+This creates a `Soa_array_view::<Particle>` with the following data:
 
 ```
-Soa_array_view::<T>
+{
+    start_index: 0,
+    end_index: particles.length,
+    length: particles.length,
+    data: particles.data
+}
+```
+
+Optional arguments can be provided too to specify the `start_index` and `end_index`
+
+```
+var subview = particles.view(2, 4);
+```
+
+This creates a `Soa_array_view::<Particle>` with the following data:
+
+```
+{
+    start_index: 2,
+    end_index: 4,
+    length: particles.length,
+    data: particles.data
+}
 ```
 
 ---
