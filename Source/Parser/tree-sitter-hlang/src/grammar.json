@@ -261,6 +261,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "Soa_array_view_type"
+        },
+        {
+          "type": "SYMBOL",
           "name": "Array_slice_type"
         },
         {
@@ -437,6 +441,27 @@
     "Soa_array_length": {
       "type": "SYMBOL",
       "name": "Number"
+    },
+    "Soa_array_view_type": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "Soa_array_view"
+        },
+        {
+          "type": "STRING",
+          "value": "::<"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Type"
+        },
+        {
+          "type": "STRING",
+          "value": ">"
+        }
+      ]
     },
     "Function_pointer_type": {
       "type": "SEQ",

@@ -491,6 +491,20 @@ namespace h::json
     }
 
     export template <>
+    JSON to_json(Soa_array_view_type const& value)
+    {
+        JSON data;
+        data["value_type"] = to_json(value.value_type);
+        return data;
+    }
+
+    export template <>
+    void from_json(JSON const& data, Soa_array_view_type& value)
+    {
+        if (data.contains("value_type")) from_json(data.at("value_type"), value.value_type);
+    }
+
+    export template <>
     JSON to_json(Custom_type_reference const& value)
     {
         JSON data;

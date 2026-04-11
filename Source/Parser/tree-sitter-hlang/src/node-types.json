@@ -2024,6 +2024,21 @@
     }
   },
   {
+    "type": "Soa_array_view_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "Statement",
     "named": true,
     "fields": {},
@@ -2238,6 +2253,10 @@
         },
         {
           "type": "Soa_array_type",
+          "named": true
+        },
+        {
+          "type": "Soa_array_view_type",
           "named": true
         },
         {
@@ -2652,6 +2671,10 @@
   },
   {
     "type": "Soa_array",
+    "named": false
+  },
+  {
+    "type": "Soa_array_view",
     "named": false
   },
   {

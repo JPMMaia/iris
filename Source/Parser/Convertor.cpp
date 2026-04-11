@@ -867,6 +867,30 @@ namespace h::parser
 
             return h::Type_reference{ .data = std::move(output), .source_range = source_range };
         }
+        else if (type_choice == "Soa_array_view_type")
+        {
+            h::Soa_array_view_type output = {};
+
+            std::optional<Parse_node> const value_type_node = get_child_node(tree, child, 2);
+            if (value_type_node.has_value())
+            {
+                std::optional<h::Type_reference> value_type = node_to_type_reference(
+                    module_info,
+                    tree,
+                    value_type_node.value(),
+                    output_allocator,
+                    temporaries_allocator
+                );
+
+                if (value_type.has_value())
+                {
+                    output.value_type = std::pmr::vector<h::Type_reference>{output_allocator};
+                    output.value_type.emplace_back(std::move(value_type.value()));
+                }
+            }
+
+            return h::Type_reference{ .data = std::move(output), .source_range = source_range };
+        }
         else if (type_choice == "Function_pointer_type")
         {
             std::pmr::vector<Parse_node> const input_parameter_nodes = get_child_nodes_of_parent(tree, child, "Function_pointer_type_input_parameters", "Function_parameter", temporaries_allocator);

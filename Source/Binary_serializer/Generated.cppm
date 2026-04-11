@@ -230,6 +230,18 @@ namespace h::binary_serializer
     }
 
     export template <>
+    void serialize(Serializer& serializer, Soa_array_view_type const& value)
+    {
+        serialize(serializer, value.value_type);
+    }
+
+    export template <>
+    void deserialize(Deserializer& deserializer, Soa_array_view_type& value)
+    {
+        deserialize(deserializer, value.value_type);
+    }
+
+    export template <>
     void serialize(Serializer& serializer, Custom_type_reference const& value)
     {
         serialize(serializer, value.module_reference);

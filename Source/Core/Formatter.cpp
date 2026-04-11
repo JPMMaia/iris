@@ -1769,6 +1769,13 @@ namespace h
             add_integer_text(buffer, value.size);
             add_text(buffer, ">");
         }
+        else if (std::holds_alternative<Soa_array_view_type>(type.data))
+        {
+            Soa_array_view_type const& value = std::get<Soa_array_view_type>(type.data);
+            add_text(buffer, "Soa_array_view::<");
+            add_format_type_name(buffer, value.value_type, options);
+            add_text(buffer, ">");
+        }
         else if (std::holds_alternative<Type_instance>(type.data))
         {
             Type_instance const& value = std::get<Type_instance>(type.data);

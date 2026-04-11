@@ -1,0 +1,12 @@
+module soa_array_view_type;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    var particles: Soa_array_view::<Particle> = {};
+}
