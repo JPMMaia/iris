@@ -475,6 +475,60 @@ namespace h::compiler
         return {};
     }
 
+    std::pmr::vector<h::compiler::Diagnostic> validate_soa_array_view_type(
+        h::Module const& core_module,
+        h::Type_reference const& type,
+        Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        (void)temporaries_allocator;
+
+        h::Soa_array_view_type const& soa_array_view_type = std::get<h::Soa_array_view_type>(type.data);
+        if (soa_array_view_type.value_type.empty())
+            return {};
+
+        h::Type_reference const& element_type = soa_array_view_type.value_type.front();
+
+        if (!is_custom_type_reference(element_type))
+        {
+            return
+            {
+                create_error_diagnostic_with_code(
+                    core_module.source_file_path,
+                    element_type.source_range.has_value() ? element_type.source_range : type.source_range,
+                    "Soa_array_view element type must be a struct type.",
+                    Diagnostic_code::Soa_element_type_not_a_struct,
+                    {}
+                )
+            };
+        }
+
+        std::optional<Declaration> const declaration = find_declaration(
+            declaration_database,
+            element_type
+        );
+
+        if (!declaration.has_value())
+            return {};
+
+        if (!std::holds_alternative<Struct_declaration const*>(declaration.value().data))
+        {
+            return
+            {
+                create_error_diagnostic_with_code(
+                    core_module.source_file_path,
+                    element_type.source_range.has_value() ? element_type.source_range : type.source_range,
+                    "Soa_array_view element type must be a struct type.",
+                    Diagnostic_code::Soa_element_type_not_a_struct,
+                    {}
+                )
+            };
+        }
+
+        return {};
+    }
+
     std::pmr::vector<h::compiler::Diagnostic> validate_type_reference(
         h::Module const& core_module,
         h::Type_reference const& type,
@@ -503,6 +557,15 @@ namespace h::compiler
         else if (std::holds_alternative<h::Soa_array_type>(type.data))
         {
             return validate_soa_array_type(
+                core_module,
+                type,
+                declaration_database,
+                temporaries_allocator
+            );
+        }
+        else if (std::holds_alternative<h::Soa_array_view_type>(type.data))
+        {
+            return validate_soa_array_view_type(
                 core_module,
                 type,
                 declaration_database,
@@ -1692,6 +1755,26 @@ namespace h::compiler
             else if (std::holds_alternative<h::Soa_array_type>(left_hand_side_type->data))
             {
                 if (access_expression.member_name != "data" && access_expression.member_name != "length")
+                {
+                    std::pmr::string const type_full_name = h::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format(
+                                "Member '{}' does not exist in the type '{}'.",
+                                access_expression.member_name,
+                                type_full_name
+                            )
+                        )
+                    };
+                }
+            }
+            else if (std::holds_alternative<h::Soa_array_view_type>(left_hand_side_type->data))
+            {
+                if (access_expression.member_name != "data" && access_expression.member_name != "length" && access_expression.member_name != "start_index" && access_expression.member_name != "end_index")
                 {
                     std::pmr::string const type_full_name = h::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 

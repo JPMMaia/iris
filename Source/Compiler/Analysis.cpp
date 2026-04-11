@@ -952,6 +952,27 @@ namespace h::compiler
 
                 return std::nullopt;
             }
+            else if (std::holds_alternative<h::Soa_array_view_type>(type_reference.value().data))
+            {
+                if (data.member_name == "data")
+                {
+                    return Type_info
+                    {
+                        .type = create_pointer_type_type_reference({}, type_info->is_mutable),
+                        .is_mutable = false,
+                    };
+                }
+                else if (data.member_name == "length" || data.member_name == "start_index" || data.member_name == "end_index")
+                {
+                    return Type_info
+                    {
+                        .type = h::create_integer_type_type_reference(64, false),
+                        .is_mutable = false,
+                    };
+                }
+
+                return std::nullopt;
+            }
             else if (std::holds_alternative<h::Custom_type_reference>(type_reference.value().data))
             {
                 h::Custom_type_reference const custom_type_reference = std::get<h::Custom_type_reference>(type_reference.value().data);

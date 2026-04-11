@@ -661,7 +661,7 @@ function run(view: Soa_array_view::<Particle>) -> ()
         {
             h::compiler::Diagnostic
             {
-                .range = create_source_range(11, 18, 11, 29),
+                .range = create_source_range(15, 18, 15, 29),
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
                 .message = "Member 'random' does not exist in the type 'Soa_array_view::<Particle>'.",
