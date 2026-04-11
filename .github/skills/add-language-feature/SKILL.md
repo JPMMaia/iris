@@ -45,6 +45,7 @@ Use the [compiler](../compiler/SKILL.md) to make changes if needed.
 Check if [h.compiler.clang_code_generation](../../../Source/Compiler/Clang_code_generation.cpp) needs to be updated.
 Check if we need to update [h.compiler.expressions](../../../Source/Compiler/Expressions.cpp).
 Check if we need to update any of [passes](../../../Source/Compiler/passes/).
+Check if we need to update `get_expression_type_info` in [h.compiler.analysis](../../../Source/Compiler/Analysis.cpp).
 After all this, build and test.
 Use the #askQuestions tool to validate the changes with the user.
 
