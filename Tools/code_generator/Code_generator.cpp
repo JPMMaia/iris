@@ -3000,4 +3000,25 @@ namespace h
 
         output_stream << "</AutoVisualizer>\n";
     }
+
+    void generate_soa_array_view_natvis(
+        std::istream& input_stream,
+        std::ostream& output_stream
+    )
+    {
+        (void)input_stream;
+
+        output_stream << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+        output_stream << "<AutoVisualizer xmlns=\"http://schemas.microsoft.com/vstudio/debugger/natvis/2010\">\n";
+        output_stream << "  <Type Name=\"h::Soa_array_view&lt;*&gt;\">\n";
+        output_stream << "    <DisplayString>Soa_array_view::&lt;{\"$T1\",sb}&gt; [{start_index}..{end_index}) length={length}</DisplayString>\n";
+        output_stream << "    <Expand>\n";
+        output_stream << "      <Item Name=\"start_index\">start_index</Item>\n";
+        output_stream << "      <Item Name=\"end_index\">end_index</Item>\n";
+        output_stream << "      <Item Name=\"length\">length</Item>\n";
+        output_stream << "      <Item Name=\"data\">data</Item>\n";
+        output_stream << "    </Expand>\n";
+        output_stream << "  </Type>\n";
+        output_stream << "</AutoVisualizer>\n";
+    }
 }

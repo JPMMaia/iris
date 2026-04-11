@@ -1,0 +1,12 @@
+module soa_array_view_type_debug_information;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    mutable view: Soa_array_view::<Particle> = {};
+}

@@ -2208,6 +2208,63 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Soa Array View Type Debug Information", "[LLVM_IR]")
+  {
+    char const* const input_file = "soa_array_view_type_debug_information.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+%__hl_soa_array_view = type {{ i64, i64, i64, ptr }}
+
+; Function Attrs: convergent
+define private void @soa_array_view_type_debug_information_run() #0 !dbg !3 {{
+entry:
+  %view = alloca %__hl_soa_array_view, align 8, !dbg !7
+  call void @llvm.memset.p0.i64(ptr align 8 %view, i8 0, i64 32, i1 false), !dbg !7
+  call void @llvm.dbg.declare(metadata ptr %view, metadata !8, metadata !DIExpression()), !dbg !7
+  ret void, !dbg !7
+}}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #2
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
+attributes #2 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
+
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
+
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "soa_array_view_type_debug_information.hltxt", directory: "{}")
+!3 = distinct !DISubprogram(name: "run", linkageName: "soa_array_view_type_debug_information_run", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
+!4 = !DISubroutineType(types: !5)
+!5 = !{{null}}
+!6 = !{{}}
+!7 = !DILocation(line: 11, column: 5, scope: !3)
+!8 = !DILocalVariable(name: "view", scope: !3, file: !2, line: 11, type: !9)
+!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "Soa_array_view<2,soa_array_view_type_debug_information_Particle,x,float,y,float>", scope: !10, size: 256, align: 64, elements: !11)
+!10 = !DINamespace(name: "h", scope: null)
+!11 = !{{!12, !14, !15, !16}}
+!12 = !DIDerivedType(tag: DW_TAG_member, name: "start_index", scope: !10, baseType: !13, size: 64, align: 64)
+!13 = !DIBasicType(name: "uint64_t", size: 64, encoding: DW_ATE_unsigned)
+!14 = !DIDerivedType(tag: DW_TAG_member, name: "end_index", scope: !10, baseType: !13, size: 64, align: 64, offset: 64)
+!15 = !DIDerivedType(tag: DW_TAG_member, name: "length", scope: !10, baseType: !13, size: 64, align: 64, offset: 128)
+!16 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !10, baseType: !17, size: 64, align: 64, offset: 192)
+!17 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !18, size: 64)
+!18 = !DIBasicType(name: "uint8_t", size: 8, encoding: DW_ATE_unsigned_char)
+)", g_test_source_files_path.generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
+  }
+
   TEST_CASE("Compile Debug Information C Headers", "[LLVM_IR]")
   {
     char const* const input_file = "debug_information_c_headers.hltxt";
@@ -2412,7 +2469,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !28 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !3, baseType: !6, size: 64, align: 64)
 !29 = !DIDerivedType(tag: DW_TAG_member, name: "length", scope: !3, baseType: !15, size: 64, align: 64, offset: 64)
 !30 = !DILocalVariable(name: "b", scope: !3, file: !2, line: 8, type: !31)
-!31 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<c_vector2i_Vector2i>", scope: !3, size: 128, align: 64, elements: !32)
+!31 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<Vector2i>", scope: !3, size: 128, align: 64, elements: !32)
 !32 = !{{!33, !29}}
 !33 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !3, baseType: !8, size: 64, align: 64)
 !34 = !DILocation(line: 8, column: 5, scope: !3)

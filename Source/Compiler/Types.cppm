@@ -51,6 +51,8 @@ namespace h::compiler
     {
         Debug_builtin_types builtin;
         std::pmr::unordered_map<Module_name, LLVM_debug_type_map> name_to_llvm_debug_type;
+        Declaration_database const& declaration_database;
+        llvm::DINamespace* builtin_namespace;
     };
 
     export struct Soa_member_layout
@@ -75,7 +77,8 @@ namespace h::compiler
     export Debug_type_database create_debug_type_database(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_scope,
-        llvm::DataLayout const& llvm_data_layout
+        llvm::DataLayout const& llvm_data_layout,
+        Declaration_database const& declaration_database
     );
 
     export void add_module_types(
@@ -205,6 +208,4 @@ namespace h::compiler
         Type_database const& type_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
-
-    export llvm::DINamespace* get_builtin_debug_namespace(llvm::DIBuilder& llvm_debug_builder);
 }

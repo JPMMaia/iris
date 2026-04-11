@@ -116,6 +116,19 @@ int main(int const argc, char const* const* const argv)
             output_stream
         );
     }
+    else if (operation == "natvis_soa_array_view")
+    {
+        char const* const input_filename = argv[2];
+        char const* const output_filename = argv[3];
+
+        std::ifstream input_stream{ input_filename };
+        std::ofstream output_stream{ output_filename };
+
+        h::tools::code_generator::generate_soa_array_view_natvis(
+            input_stream,
+            output_stream
+        );
+    }
 
     return 0;
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="h::Soa_array_view&lt;*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt; [{start_index}..{end_index}) length={length}</DisplayString>
+    <Expand>
+      <Item Name="start_index">start_index</Item>
+      <Item Name="end_index">end_index</Item>
+      <Item Name="length">length</Item>
+      <Item Name="data">data</Item>
+    </Expand>
+  </Type>
+</AutoVisualizer>

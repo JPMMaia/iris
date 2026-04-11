@@ -1,15 +1,14 @@
 module;
 
-#include <format>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <string_view>
-#include <variant>
+#include <assert.h>
 
 module h.compiler.debug_info_formatter;
 
+import llvm;
+import std;
+
 import h.compiler.common;
+import h.compiler.types;
 import h.core;
 import h.core.declarations;
 
@@ -141,13 +140,11 @@ namespace h::compiler
         std::pmr::string format_debug_type_name_internal(
             h::Module const& core_module,
             h::Type_reference const& type_reference,
-            h::Declaration_database const& declaration_database,
+            Debug_type_database const& debug_type_database,
             std::pmr::polymorphic_allocator<> const& output_allocator,
             std::pmr::polymorphic_allocator<> const& temporaries_allocator
         )
         {
-            (void)declaration_database;
-
             if (std::holds_alternative<Array_slice_type>(type_reference.data))
             {
                 Array_slice_type const& value = std::get<Array_slice_type>(type_reference.data);
@@ -159,7 +156,7 @@ namespace h::compiler
                     output += format_debug_type_name_internal(
                         core_module,
                         value.element_type[0],
-                        declaration_database,
+                        debug_type_database,
                         output_allocator,
                         temporaries_allocator
                     );
@@ -184,7 +181,7 @@ namespace h::compiler
                 Constant_array_type const& value = std::get<Constant_array_type>(type_reference.data);
 
                 std::pmr::string element_type_name = !value.value_type.empty() ?
-                    format_debug_type_name_internal(core_module, value.value_type[0], declaration_database, output_allocator, temporaries_allocator) :
+                    format_debug_type_name_internal(core_module, value.value_type[0], debug_type_database, output_allocator, temporaries_allocator) :
                     std::pmr::string{ "Void", output_allocator };
 
                 std::pmr::string output{ output_allocator };
@@ -198,7 +195,7 @@ namespace h::compiler
                 Custom_type_reference const& value = std::get<Custom_type_reference>(type_reference.data);
                 std::string_view const module_name = find_module_name(core_module, value.module_reference);
 
-                std::string const mangled_name = mangle_name(declaration_database, module_name, value.name);
+                std::string const mangled_name = mangle_name(debug_type_database.declaration_database, module_name, value.name);
 
                 return std::pmr::string{mangled_name, output_allocator};
             }
@@ -247,7 +244,7 @@ namespace h::compiler
                     output += format_debug_type_name_internal(
                         core_module,
                         value.element_type[0],
-                        declaration_database,
+                        debug_type_database,
                         output_allocator,
                         temporaries_allocator
                     );
@@ -267,8 +264,19 @@ namespace h::compiler
                 return create_soa_array_debug_type_name(
                     core_module,
                     value,
-                    {},
-                    declaration_database,
+                    debug_type_database,
+                    output_allocator,
+                    temporaries_allocator
+                );
+            }
+
+            if (std::holds_alternative<Soa_array_view_type>(type_reference.data))
+            {
+                Soa_array_view_type const& value = std::get<Soa_array_view_type>(type_reference.data);
+                return create_soa_array_view_debug_type_name(
+                    core_module,
+                    value,
+                    debug_type_database,
                     output_allocator,
                     temporaries_allocator
                 );
@@ -287,6 +295,70 @@ namespace h::compiler
 
             return std::pmr::string{ "Unknown", output_allocator };
         }
+    }
+
+    static std::pmr::vector<Soa_debug_member_info> get_soa_debug_member_infos(
+        h::Module const& core_module,
+        std::span<h::Type_reference const> const value_type,
+        Debug_type_database const& debug_type_database
+    )
+    {
+        if (value_type.empty())
+            return {};
+
+        if (!std::holds_alternative<Custom_type_reference>(value_type[0].data))
+            return {};
+
+        Custom_type_reference const& element_custom_type_reference = std::get<Custom_type_reference>(value_type[0].data);
+        std::string_view const element_module_name = find_module_name(core_module, element_custom_type_reference.module_reference);
+        std::pmr::string const element_module_name_key = std::pmr::string{ element_module_name };
+
+        auto const module_location = debug_type_database.name_to_llvm_debug_type.find(element_module_name_key);
+        if (module_location == debug_type_database.name_to_llvm_debug_type.end())
+            return {};
+
+        auto const type_location = module_location->second.find(element_custom_type_reference.name);
+        if (type_location == module_location->second.end())
+            return {};
+
+        llvm::DIType* const element_debug_type = type_location->second;
+        llvm::DICompositeType const* const composite_type = llvm::dyn_cast<llvm::DICompositeType>(element_debug_type);
+        if (composite_type == nullptr)
+            return {};
+
+        std::pmr::vector<Soa_debug_member_info> member_infos;
+        member_infos.reserve(composite_type->getElements().size());
+
+        for (llvm::Metadata* const element : composite_type->getElements())
+        {
+            llvm::DIDerivedType const* const member_type = llvm::dyn_cast<llvm::DIDerivedType>(element);
+            if (member_type == nullptr || member_type->getTag() != llvm::dwarf::DW_TAG_member)
+                continue;
+
+            std::string member_type_name = "Unknown";
+            llvm::DIType const* member_base_type = member_type->getBaseType();
+            while (llvm::DIDerivedType const* const derived_base_type = llvm::dyn_cast_or_null<llvm::DIDerivedType>(member_base_type))
+            {
+                member_base_type = derived_base_type->getBaseType();
+            }
+
+            if (member_base_type != nullptr)
+            {
+                std::string const candidate = member_base_type->getName().str();
+                if (!candidate.empty())
+                    member_type_name = candidate;
+            }
+
+            member_infos.push_back(
+                Soa_debug_member_info
+                {
+                    .name = std::pmr::string{ member_type->getName().str() },
+                    .type_name = std::pmr::string{ member_type_name },
+                }
+            );
+        }
+
+        return member_infos;
     }
 
     std::pmr::string format_debug_primitive_type_name(
@@ -312,7 +384,7 @@ namespace h::compiler
     std::pmr::string format_debug_type_name(
         h::Module const& core_module,
         h::Type_reference const& type_reference,
-        h::Declaration_database const& declaration_database,
+        Debug_type_database const& debug_type_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -320,39 +392,33 @@ namespace h::compiler
         return format_debug_type_name_internal(
             core_module,
             type_reference,
-            declaration_database,
+            debug_type_database,
             output_allocator,
             temporaries_allocator
         );
     }
 
-    std::pmr::string format_debug_type_name(
-        h::Module const& core_module,
-        h::Type_reference const& type_reference,
-        std::pmr::polymorphic_allocator<> const& output_allocator,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
-    )
-    {
-        h::Declaration_database const declaration_database = h::create_declaration_database();
-        return format_debug_type_name(core_module, type_reference, declaration_database, output_allocator, temporaries_allocator);
-    }
-
     std::pmr::string create_soa_array_debug_type_name(
         h::Module const& core_module,
         h::Soa_array_type const& type,
-        std::span<Soa_debug_member_info const> const member_infos,
-        h::Declaration_database const& declaration_database,
+        Debug_type_database const& debug_type_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
+        std::pmr::vector<Soa_debug_member_info> const member_infos = get_soa_debug_member_infos(
+            core_module,
+            type.value_type,
+            debug_type_database
+        );
+
         std::pmr::string element_type_name{ "Unknown", output_allocator };
         if (!type.value_type.empty())
         {
             element_type_name = format_debug_type_name_internal(
                 core_module,
                 h::Type_reference{ .data = type.value_type[0].data },
-                declaration_database,
+                debug_type_database,
                 output_allocator,
                 temporaries_allocator
             );
@@ -368,22 +434,39 @@ namespace h::compiler
         return output;
     }
 
-    std::pmr::string create_soa_array_debug_type_name(
+    std::pmr::string create_soa_array_view_debug_type_name(
         h::Module const& core_module,
-        h::Soa_array_type const& type,
-        std::span<Soa_debug_member_info const> const member_infos,
+        h::Soa_array_view_type const& type,
+        Debug_type_database const& debug_type_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Declaration_database const declaration_database = h::create_declaration_database();
-        return create_soa_array_debug_type_name(
+        std::pmr::vector<Soa_debug_member_info> const member_infos = get_soa_debug_member_infos(
             core_module,
-            type,
-            member_infos,
-            declaration_database,
-            output_allocator,
-            temporaries_allocator
+            type.value_type,
+            debug_type_database
         );
+
+       std::pmr::string element_type_name{ "Unknown", output_allocator };
+        if (!type.value_type.empty())
+        {
+            element_type_name = format_debug_type_name_internal(
+                core_module,
+                h::Type_reference{ .data = type.value_type[0].data },
+                debug_type_database,
+                output_allocator,
+                temporaries_allocator
+            );
+        }
+
+        std::pmr::string output{ std::format("Soa_array_view<{},{}", member_infos.size(), element_type_name), output_allocator };
+        for (Soa_debug_member_info const& member_info : member_infos)
+        {
+            output += std::format(",{},{}", member_info.name, member_info.type_name);
+        }
+
+        output += ">";
+        return output;
     }
 }

@@ -684,13 +684,16 @@ namespace h::compiler
     Debug_type_database create_debug_type_database(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_scope,
-        llvm::DataLayout const& llvm_data_layout
+        llvm::DataLayout const& llvm_data_layout,
+        Declaration_database const& declaration_database
     )
     {
         return
         {
             .builtin = create_debug_builtin_types(llvm_debug_builder, llvm_scope, llvm_data_layout),
-            .name_to_llvm_debug_type = {}
+            .name_to_llvm_debug_type = {},
+            .declaration_database = declaration_database,
+            .builtin_namespace = llvm_debug_builder.createNameSpace(nullptr, "h", false),
         };
     }
 
@@ -880,6 +883,7 @@ namespace h::compiler
         std::pmr::string const array_slice_name = format_debug_type_name(
             core_module,
             h::Type_reference{ .data = type },
+            debug_type_database,
             {},
             {}
         );
@@ -946,70 +950,6 @@ namespace h::compiler
         return llvm::StructType::create({ uint64_type, uint64_type, uint64_type, byte_pointer_type }, "__hl_soa_array_view");
     }
 
-    static std::pmr::vector<Soa_debug_member_info> get_soa_debug_member_infos(
-        h::Module const& core_module,
-        Soa_array_type const& type,
-        Debug_type_database const& debug_type_database
-    )
-    {
-        if (type.value_type.empty())
-            return {};
-
-        if (!std::holds_alternative<Custom_type_reference>(type.value_type[0].data))
-            return {};
-
-        Custom_type_reference const& element_custom_type_reference = std::get<Custom_type_reference>(type.value_type[0].data);
-        std::string_view const element_module_name = find_module_name(core_module, element_custom_type_reference.module_reference);
-        std::pmr::string const element_module_name_key = std::pmr::string{ element_module_name };
-
-        auto const module_location = debug_type_database.name_to_llvm_debug_type.find(element_module_name_key);
-        if (module_location == debug_type_database.name_to_llvm_debug_type.end())
-            return {};
-
-        auto const type_location = module_location->second.find(element_custom_type_reference.name);
-        if (type_location == module_location->second.end())
-            return {};
-
-        llvm::DIType* const element_debug_type = type_location->second;
-        llvm::DICompositeType const* const composite_type = llvm::dyn_cast<llvm::DICompositeType>(element_debug_type);
-        if (composite_type == nullptr)
-            return {};
-
-        std::pmr::vector<Soa_debug_member_info> member_infos;
-        member_infos.reserve(composite_type->getElements().size());
-
-        for (llvm::Metadata* const element : composite_type->getElements())
-        {
-            llvm::DIDerivedType const* const member_type = llvm::dyn_cast<llvm::DIDerivedType>(element);
-            if (member_type == nullptr || member_type->getTag() != llvm::dwarf::DW_TAG_member)
-                continue;
-
-            std::string member_type_name = "Unknown";
-            llvm::DIType const* member_base_type = member_type->getBaseType();
-            while (llvm::DIDerivedType const* const derived_base_type = llvm::dyn_cast_or_null<llvm::DIDerivedType>(member_base_type))
-            {
-                member_base_type = derived_base_type->getBaseType();
-            }
-
-            if (member_base_type != nullptr)
-            {
-                std::string const candidate = member_base_type->getName().str();
-                if (!candidate.empty())
-                    member_type_name = candidate;
-            }
-
-            member_infos.push_back(
-                Soa_debug_member_info
-                {
-                    .name = std::pmr::string{ member_type->getName().str() },
-                    .type_name = std::pmr::string{ member_type_name },
-                }
-            );
-        }
-
-        return member_infos;
-    }
-
     llvm::DIType* soa_array_type_to_llvm_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
@@ -1021,7 +961,7 @@ namespace h::compiler
     {
         (void)llvm_debug_scope;
 
-        llvm::DINamespace* const builtin_scope = get_builtin_debug_namespace(llvm_debug_builder);
+        llvm::DINamespace* const builtin_scope = debug_type_database.builtin_namespace;
 
         unsigned const pointer_size_in_bits = llvm_data_layout.getPointerSizeInBits();
         llvm::Align const pointer_alignment = llvm_data_layout.getPointerABIAlignment(0);
@@ -1045,13 +985,7 @@ namespace h::compiler
             ),
         };
 
-        std::pmr::vector<Soa_debug_member_info> const member_infos = get_soa_debug_member_infos(
-            core_module,
-            type,
-            debug_type_database
-        );
-
-        std::pmr::string const soa_array_name = create_soa_array_debug_type_name(core_module, type, member_infos, {}, {});
+        std::pmr::string const soa_array_name = create_soa_array_debug_type_name(core_module, type, debug_type_database, {}, {});
 
         return llvm_debug_builder.createStructType(
             builtin_scope,
@@ -1060,6 +994,104 @@ namespace h::compiler
             0,
             pointer_size_in_bits,
             8 * pointer_alignment.value(),
+            llvm::DINode::FlagZero,
+            nullptr,
+            llvm_debug_builder.getOrCreateArray(elements)
+        );
+    }
+
+    llvm::DIType* soa_array_view_type_to_llvm_debug_type(
+        llvm::DIBuilder& llvm_debug_builder,
+        llvm::DIScope& llvm_debug_scope,
+        llvm::DataLayout const& llvm_data_layout,
+        h::Module const& core_module,
+        Soa_array_view_type const& type,
+        Debug_type_database const& debug_type_database
+    )
+    {
+        (void)llvm_debug_scope;
+        (void)debug_type_database;
+
+        llvm::DINamespace* const builtin_scope = debug_type_database.builtin_namespace;
+
+        unsigned const pointer_size_in_bits = llvm_data_layout.getPointerSizeInBits();
+        llvm::Align const pointer_alignment = llvm_data_layout.getPointerABIAlignment(0);
+        llvm::Align const uint64_alignment = llvm_data_layout.getABIIntegerTypeAlignment(64);
+
+        std::pmr::string const uint64_type_name = format_debug_primitive_type_name(Integer_type{ .number_of_bits = 64, .is_signed = false }, {});
+        llvm::DIType* const uint64_type = llvm_debug_builder.createBasicType(uint64_type_name.data(), 64, llvm::dwarf::DW_ATE_unsigned);
+
+        std::pmr::string const byte_type_name = format_debug_primitive_type_name(Fundamental_type::Byte, {});
+        llvm::DIType* const byte_type = llvm_debug_builder.createBasicType(byte_type_name.data(), 8, llvm::dwarf::DW_ATE_unsigned_char);
+        llvm::DIType* const byte_pointer_type = llvm_debug_builder.createPointerType(byte_type, pointer_size_in_bits);
+
+        std::uint64_t const uint64_alignment_in_bits = 8 * uint64_alignment.value();
+        std::uint64_t const pointer_alignment_in_bits = 8 * pointer_alignment.value();
+
+        std::uint64_t const start_index_offset_in_bits = align_to(0, uint64_alignment_in_bits);
+        std::uint64_t const end_index_offset_in_bits = align_to(start_index_offset_in_bits + 64, uint64_alignment_in_bits);
+        std::uint64_t const length_offset_in_bits = align_to(end_index_offset_in_bits + 64, uint64_alignment_in_bits);
+        std::uint64_t const data_offset_in_bits = align_to(length_offset_in_bits + 64, pointer_alignment_in_bits);
+        std::uint64_t const struct_alignment_in_bits = std::max(uint64_alignment_in_bits, pointer_alignment_in_bits);
+        std::uint64_t const size_in_bits = align_to(data_offset_in_bits + pointer_size_in_bits, struct_alignment_in_bits);
+
+        std::array<llvm::Metadata*, 4> const elements
+        {
+            llvm_debug_builder.createMemberType(
+                builtin_scope,
+                "start_index",
+                nullptr,
+                0,
+                64,
+                uint64_alignment_in_bits,
+                start_index_offset_in_bits,
+                llvm::DINode::FlagZero,
+                uint64_type
+            ),
+            llvm_debug_builder.createMemberType(
+                builtin_scope,
+                "end_index",
+                nullptr,
+                0,
+                64,
+                uint64_alignment_in_bits,
+                end_index_offset_in_bits,
+                llvm::DINode::FlagZero,
+                uint64_type
+            ),
+            llvm_debug_builder.createMemberType(
+                builtin_scope,
+                "length",
+                nullptr,
+                0,
+                64,
+                uint64_alignment_in_bits,
+                length_offset_in_bits,
+                llvm::DINode::FlagZero,
+                uint64_type
+            ),
+            llvm_debug_builder.createMemberType(
+                builtin_scope,
+                "data",
+                nullptr,
+                0,
+                pointer_size_in_bits,
+                pointer_alignment_in_bits,
+                data_offset_in_bits,
+                llvm::DINode::FlagZero,
+                byte_pointer_type
+            ),
+        };
+
+        std::pmr::string const soa_array_view_name = create_soa_array_view_debug_type_name(core_module, type, debug_type_database, {}, {});
+
+        return llvm_debug_builder.createStructType(
+            builtin_scope,
+            soa_array_view_name.data(),
+            nullptr,
+            0,
+            size_in_bits,
+            struct_alignment_in_bits,
             llvm::DINode::FlagZero,
             nullptr,
             llvm_debug_builder.getOrCreateArray(elements)
@@ -1535,6 +1567,11 @@ namespace h::compiler
             Soa_array_type const& data = std::get<Soa_array_type>(type_reference.data);
             return soa_array_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
         }
+        else if (std::holds_alternative<Soa_array_view_type>(type_reference.data))
+        {
+            Soa_array_view_type const& data = std::get<Soa_array_view_type>(type_reference.data);
+            return soa_array_view_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
+        }
         else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
         {
             Custom_type_reference const& data = std::get<Custom_type_reference>(type_reference.data);
@@ -1742,11 +1779,5 @@ namespace h::compiler
         }();
 
         return llvm::FunctionType::get(llvm_return_type, llvm_input_parameter_types, is_var_arg);
-    }
-
-    llvm::DINamespace* get_builtin_debug_namespace(llvm::DIBuilder& llvm_debug_builder)
-    {
-        static llvm::DINamespace* const builtin_namespace = llvm_debug_builder.createNameSpace(nullptr, "h", false);
-        return builtin_namespace;
     }
 }
