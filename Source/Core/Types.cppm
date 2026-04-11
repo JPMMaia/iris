@@ -31,6 +31,8 @@ namespace h
 
     export Type_reference create_soa_array_type_reference(std::pmr::vector<Type_reference> value_type, std::uint64_t const size);
     export bool is_soa_array_type_reference(Type_reference const& type);
+    export bool is_soa_array_view_type_reference(Type_reference const& type);
+    export std::optional<Type_reference> get_soa_element_type(Type_reference const& type);
 
     export Type_reference create_custom_type_reference(std::string_view module_name, std::string_view name);
     export bool is_custom_type_reference(Type_reference const& type);
@@ -208,6 +210,17 @@ namespace h
         else if (std::holds_alternative<Soa_array_type>(type_reference.data))
         {
             Soa_array_type const& data = std::get<Soa_array_type>(type_reference.data);
+            for (Type_reference const& nested_type_reference : data.value_type)
+            {
+                if (visit_type_references_recursively(nested_type_reference, predicate))
+                    return true;
+            }
+
+            return false;
+        }
+        else if (std::holds_alternative<Soa_array_view_type>(type_reference.data))
+        {
+            Soa_array_view_type const& data = std::get<Soa_array_view_type>(type_reference.data);
             for (Type_reference const& nested_type_reference : data.value_type)
             {
                 if (visit_type_references_recursively(nested_type_reference, predicate))

@@ -119,6 +119,33 @@ namespace h
         return std::holds_alternative<Soa_array_type>(type.data);
     }
 
+    bool is_soa_array_view_type_reference(Type_reference const& type)
+    {
+        return std::holds_alternative<Soa_array_view_type>(type.data);
+    }
+
+    std::optional<Type_reference> get_soa_element_type(Type_reference const& type)
+    {
+        if (std::holds_alternative<Soa_array_type>(type.data))
+        {
+            Soa_array_type const& soa_array_type = std::get<Soa_array_type>(type.data);
+            if (soa_array_type.value_type.empty())
+                return std::nullopt;
+
+            return soa_array_type.value_type.front();
+        }
+        else if (std::holds_alternative<Soa_array_view_type>(type.data))
+        {
+            Soa_array_view_type const& soa_array_view_type = std::get<Soa_array_view_type>(type.data);
+            if (soa_array_view_type.value_type.empty())
+                return std::nullopt;
+
+            return soa_array_view_type.value_type.front();
+        }
+
+        return std::nullopt;
+    }
+
 
     Type_reference create_custom_type_reference(std::string_view const module_name, std::string_view const name)
     {
@@ -577,11 +604,11 @@ namespace h
         }
         else if (std::holds_alternative<Soa_array_type>(type.data))
         {
-            Soa_array_type const& soa_array_type = std::get<Soa_array_type>(type.data);
-            if (soa_array_type.value_type.empty())
-                return std::nullopt;
-
-            return soa_array_type.value_type.front();
+            return get_soa_element_type(type);
+        }
+        else if (std::holds_alternative<Soa_array_view_type>(type.data))
+        {
+            return get_soa_element_type(type);
         }
         else if (std::holds_alternative<Pointer_type>(type.data))
         {
