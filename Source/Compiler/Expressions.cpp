@@ -607,7 +607,21 @@ namespace h::compiler
         Soa_layout layout;
     };
 
+    struct Soa_array_view_type_info
+    {
+        Soa_array_view_type const* soa_array_view_type;
+        Type_reference const* element_type;
+        Struct_declaration const* struct_declaration;
+        std::string_view module_name;
+        Soa_layout layout;
+    };
+
     static Soa_array_type_info get_soa_array_type_info(
+        Type_reference const& type_reference,
+        Expression_parameters const& parameters
+    );
+
+    static Soa_array_view_type_info get_soa_array_view_type_info(
         Type_reference const& type_reference,
         Expression_parameters const& parameters
     );
@@ -627,7 +641,34 @@ namespace h::compiler
         Expression_parameters const& parameters
     );
 
+    static llvm::Value* create_soa_member_element_pointer(
+        llvm::Value* const data_pointer,
+        std::span<Soa_member_layout const> const member_layouts,
+        std::size_t const member_index,
+        llvm::Value* const length_value,
+        llvm::Type* const member_llvm_type,
+        llvm::Value* const index_value,
+        Expression_parameters const& parameters
+    );
+
     static llvm::Value* load_soa_data_pointer(
+        Value_and_type const& soa_value,
+        Expression_parameters const& parameters
+    );
+
+    static llvm::Value* load_soa_array_view_data_pointer(
+        Value_and_type const& soa_value,
+        Expression_parameters const& parameters
+    );
+
+    static llvm::Value* load_soa_array_view_field(
+        Value_and_type const& soa_value,
+        std::uint32_t field_index,
+        llvm::Type* field_type,
+        Expression_parameters const& parameters
+    );
+
+    static llvm::Value* load_soa_array_view_length(
         Value_and_type const& soa_value,
         Expression_parameters const& parameters
     );
@@ -794,6 +835,46 @@ namespace h::compiler
             }
         }
 
+        if (left_hand_side.type.has_value() && h::is_soa_array_view_type_reference(left_hand_side.type.value()))
+        {
+            if (expression.member_name == "start_index")
+            {
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = load_soa_array_view_field(left_hand_side, 0, llvm::Type::getInt64Ty(parameters.llvm_context), parameters),
+                    .type = create_integer_type_type_reference(64, false)
+                };
+            }
+            else if (expression.member_name == "end_index")
+            {
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = load_soa_array_view_field(left_hand_side, 1, llvm::Type::getInt64Ty(parameters.llvm_context), parameters),
+                    .type = create_integer_type_type_reference(64, false)
+                };
+            }
+            else if (expression.member_name == "length")
+            {
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = load_soa_array_view_length(left_hand_side, parameters),
+                    .type = create_integer_type_type_reference(64, false)
+                };
+            }
+            else if (expression.member_name == "data")
+            {
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = load_soa_array_view_data_pointer(left_hand_side, parameters),
+                    .type = create_pointer_type_type_reference({}, true)
+                };
+            }
+        }
+
         {
             std::optional<Custom_type_reference> custom_type_reference = get_custom_type_reference_from_access_expression(expression, left_hand_side, statement, core_module.name);
 
@@ -949,6 +1030,41 @@ namespace h::compiler
                     .type = member_type
                 };
             }
+            else if (soa_value.type.has_value() && std::holds_alternative<Soa_array_view_type>(soa_value.type->data))
+            {
+                Soa_array_view_type_info const soa_info = get_soa_array_view_type_info(soa_value.type.value(), parameters);
+
+                auto const member_location = std::find(
+                    soa_info.struct_declaration->member_names.begin(),
+                    soa_info.struct_declaration->member_names.end(),
+                    access_expression.member_name
+                );
+                if (member_location == soa_info.struct_declaration->member_names.end())
+                    throw std::runtime_error{ std::format("'{}' does not exist in struct type '{}'.", access_expression.member_name, soa_info.struct_declaration->name) };
+
+                std::size_t const member_index = static_cast<std::size_t>(std::distance(soa_info.struct_declaration->member_names.begin(), member_location));
+                Type_reference const& member_type = soa_info.struct_declaration->member_types[member_index];
+                llvm::Type* const member_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, member_type, type_database);
+
+                llvm::Value* const data_pointer = load_soa_array_view_data_pointer(soa_value, parameters);
+                llvm::Value* const length_value = load_soa_array_view_length(soa_value, parameters);
+                llvm::Value* const element_pointer = create_soa_member_element_pointer(
+                    data_pointer,
+                    soa_info.layout.members,
+                    member_index,
+                    length_value,
+                    member_llvm_type,
+                    index_llvm_value,
+                    parameters
+                );
+
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = element_pointer,
+                    .type = member_type
+                };
+            }
         }
 
         Value_and_type const left_hand_side_expression_value = create_expression_value(expression.expression.expression_index, statement, parameters);
@@ -983,6 +1099,69 @@ namespace h::compiler
                 llvm::Value* const source_pointer = create_soa_member_element_pointer(
                     data_pointer,
                     soa_info.layout.members[member_index],
+                    member_llvm_type,
+                    index_llvm_value,
+                    parameters
+                );
+                llvm::Value* const loaded_member_value = create_load_instruction(llvm_builder, llvm_data_layout, member_llvm_type, source_pointer);
+
+                generate_store_struct_member_instructions(
+                    parameters.clang_module_data,
+                    parameters.llvm_context,
+                    parameters.llvm_builder,
+                    parameters.llvm_data_layout,
+                    struct_alloca,
+                    soa_info.struct_declaration->member_names[member_index],
+                    soa_info.module_name,
+                    *soa_info.struct_declaration,
+                    Value_and_type
+                    {
+                        .name = "",
+                        .value = loaded_member_value,
+                        .type = member_type
+                    },
+                    parameters.type_database
+                );
+            }
+
+            return Value_and_type
+            {
+                .name = "",
+                .value = struct_alloca,
+                .type = *soa_info.element_type
+            };
+        }
+        else if (std::holds_alternative<Soa_array_view_type>(left_hand_side_expression_value.type->data))
+        {
+            Soa_array_view_type_info const soa_info = get_soa_array_view_type_info(left_hand_side_expression_value.type.value(), parameters);
+            llvm::Value* const data_pointer = load_soa_array_view_data_pointer(left_hand_side_expression_value, parameters);
+            llvm::Value* const length_value = load_soa_array_view_length(left_hand_side_expression_value, parameters);
+
+            llvm::Type* const element_llvm_type = type_reference_to_llvm_type(
+                llvm_context,
+                llvm_data_layout,
+                *soa_info.element_type,
+                type_database
+            );
+
+            llvm::AllocaInst* const struct_alloca = create_alloca_instruction(
+                llvm_builder,
+                llvm_data_layout,
+                *parameters.llvm_parent_function,
+                element_llvm_type,
+                "soa_element"
+            );
+
+            for (std::size_t member_index = 0; member_index < soa_info.struct_declaration->member_names.size(); ++member_index)
+            {
+                Type_reference const& member_type = soa_info.struct_declaration->member_types[member_index];
+                llvm::Type* const member_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, member_type, type_database);
+
+                llvm::Value* const source_pointer = create_soa_member_element_pointer(
+                    data_pointer,
+                    soa_info.layout.members,
+                    member_index,
+                    length_value,
                     member_llvm_type,
                     index_llvm_value,
                     parameters
@@ -1227,7 +1406,13 @@ namespace h::compiler
                 parameters.declaration_database
             );
 
-            if (array_base_expression_type.has_value() && std::holds_alternative<Soa_array_type>(array_base_expression_type->data))
+            if (
+                array_base_expression_type.has_value() &&
+                (
+                    std::holds_alternative<Soa_array_type>(array_base_expression_type->data) ||
+                    std::holds_alternative<Soa_array_view_type>(array_base_expression_type->data)
+                )
+            )
             {
                 // This is a direct indexed access like particles[index]
                 Value_and_type const array_value = create_expression_value(access_array_expression.expression.expression_index, statement, parameters);
@@ -1285,6 +1470,77 @@ namespace h::compiler
                             member_value,
                             parameters
                         );
+                    }
+
+                    return Value_and_type
+                    {
+                        .name = "",
+                        .value = nullptr,
+                        .type = std::nullopt
+                    };
+                }
+                else if (array_value.type.has_value() && std::holds_alternative<Soa_array_view_type>(array_value.type->data))
+                {
+                    Soa_array_view_type_info const soa_info = get_soa_array_view_type_info(array_value.type.value(), parameters);
+                    llvm::Value* const data_pointer = load_soa_array_view_data_pointer(array_value, parameters);
+                    llvm::Value* const length_value = load_soa_array_view_length(array_value, parameters);
+
+                    Value_and_type const index_value = create_loaded_expression_value(access_array_expression.index.expression_index, statement, parameters);
+
+                    llvm::Type* const element_llvm_type = type_reference_to_llvm_type(
+                        parameters.llvm_context,
+                        parameters.llvm_data_layout,
+                        *soa_info.element_type,
+                        parameters.type_database
+                    );
+
+                    llvm::AllocaInst* const struct_alloca = create_alloca_instruction(
+                        parameters.llvm_builder,
+                        parameters.llvm_data_layout,
+                        *parameters.llvm_parent_function,
+                        element_llvm_type,
+                        "soa_assignment_struct"
+                    );
+
+                    create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, result.value, struct_alloca);
+
+                    for (std::size_t member_index = 0; member_index < soa_info.struct_declaration->member_names.size(); ++member_index)
+                    {
+                        Value_and_type const member_value = generate_load_struct_member_instructions(
+                            parameters.clang_module_data,
+                            parameters.llvm_context,
+                            parameters.llvm_builder,
+                            parameters.llvm_data_layout,
+                            struct_alloca,
+                            soa_info.struct_declaration->member_names[member_index],
+                            soa_info.module_name,
+                            *soa_info.struct_declaration,
+                            parameters.type_database
+                        );
+
+                        Type_reference const& member_type = soa_info.struct_declaration->member_types[member_index];
+                        llvm::Type* const member_llvm_type = type_reference_to_llvm_type(
+                            parameters.llvm_context,
+                            parameters.llvm_data_layout,
+                            member_type,
+                            parameters.type_database
+                        );
+
+                        llvm::Value* const destination_pointer = create_soa_member_element_pointer(
+                            data_pointer,
+                            soa_info.layout.members,
+                            member_index,
+                            length_value,
+                            member_llvm_type,
+                            index_value.value,
+                            parameters
+                        );
+
+                        llvm::Value* value_to_store = member_value.value;
+                        if (value_to_store != nullptr && value_to_store->getType()->isPointerTy())
+                            value_to_store = create_load_instruction(parameters.llvm_builder, parameters.llvm_data_layout, member_llvm_type, value_to_store);
+
+                        create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, value_to_store, destination_pointer);
                     }
 
                     return Value_and_type
@@ -2069,6 +2325,49 @@ namespace h::compiler
         };
     }
 
+    static Soa_array_view_type_info get_soa_array_view_type_info(
+        Type_reference const& type_reference,
+        Expression_parameters const& parameters
+    )
+    {
+        if (!std::holds_alternative<Soa_array_view_type>(type_reference.data))
+            throw std::runtime_error{ "Expected Soa_array_view type." };
+
+        Soa_array_view_type const& soa_array_view_type = std::get<Soa_array_view_type>(type_reference.data);
+        if (soa_array_view_type.value_type.empty())
+            throw std::runtime_error{ "Soa_array_view value_type is not specified." };
+
+        Type_reference const& element_type = soa_array_view_type.value_type.front();
+        Custom_type_reference const* const custom_type_reference = std::get_if<Custom_type_reference>(&element_type.data);
+        if (custom_type_reference == nullptr)
+            throw std::runtime_error{ "Soa_array_view element type must be a struct type." };
+
+        std::optional<Declaration> const declaration = find_declaration(
+            parameters.declaration_database,
+            custom_type_reference->module_reference.name,
+            custom_type_reference->name
+        );
+        if (!declaration.has_value() || !std::holds_alternative<Struct_declaration const*>(declaration->data))
+            throw std::runtime_error{ "Soa_array_view element type must resolve to a struct declaration." };
+
+        Struct_declaration const& struct_declaration = *std::get<Struct_declaration const*>(declaration->data);
+
+        return Soa_array_view_type_info
+        {
+            .soa_array_view_type = &soa_array_view_type,
+            .element_type = &element_type,
+            .struct_declaration = &struct_declaration,
+            .module_name = custom_type_reference->module_reference.name,
+            .layout = calculate_soa_layout(
+                parameters.llvm_data_layout,
+                parameters.type_database,
+                custom_type_reference->module_reference.name,
+                custom_type_reference->name,
+                1
+            )
+        };
+    }
+
     static std::pair<llvm::AllocaInst*, llvm::Value*> create_soa_array_storage(
         Type_reference const& soa_type_reference,
         Soa_layout const& layout,
@@ -2153,6 +2452,78 @@ namespace h::compiler
         );
     }
 
+    static llvm::Value* create_runtime_aligned_soa_offset(
+        llvm::Value* const offset_value,
+        std::uint64_t const alignment,
+        Expression_parameters const& parameters
+    )
+    {
+        if (alignment <= 1)
+            return offset_value;
+
+        llvm::Value* const adjusted_offset = parameters.llvm_builder.CreateAdd(
+            offset_value,
+            parameters.llvm_builder.getInt64(alignment - 1),
+            "soa_offset_adjusted"
+        );
+
+        return parameters.llvm_builder.CreateAnd(
+            adjusted_offset,
+            parameters.llvm_builder.getInt64(~(alignment - 1)),
+            "soa_offset_aligned"
+        );
+    }
+
+    static llvm::Value* create_soa_member_element_pointer(
+        llvm::Value* const data_pointer,
+        std::span<Soa_member_layout const> const member_layouts,
+        std::size_t const member_index,
+        llvm::Value* const length_value,
+        llvm::Type* const member_llvm_type,
+        llvm::Value* const index_value,
+        Expression_parameters const& parameters
+    )
+    {
+        if (member_index >= member_layouts.size())
+            throw std::runtime_error{ "Soa_array_view member index out of bounds." };
+
+        llvm::Value* block_offset = parameters.llvm_builder.getInt64(0);
+        for (std::size_t previous_member_index = 0; previous_member_index < member_index; ++previous_member_index)
+        {
+            Soa_member_layout const& previous_member = member_layouts[previous_member_index];
+            block_offset = create_runtime_aligned_soa_offset(block_offset, previous_member.element_alignment, parameters);
+
+            llvm::Value* const block_size = parameters.llvm_builder.CreateMul(
+                length_value,
+                parameters.llvm_builder.getInt64(previous_member.element_size),
+                "soa_member_block_size"
+            );
+            block_offset = parameters.llvm_builder.CreateAdd(block_offset, block_size, "soa_member_block_offset");
+        }
+
+        block_offset = create_runtime_aligned_soa_offset(block_offset, member_layouts[member_index].element_alignment, parameters);
+
+        llvm::Value* const member_base_pointer = parameters.llvm_builder.CreateGEP(
+            llvm::Type::getInt8Ty(parameters.llvm_context),
+            data_pointer,
+            block_offset,
+            "soa_member_base_pointer"
+        );
+
+        llvm::Value* const typed_member_base_pointer = parameters.llvm_builder.CreateBitCast(
+            member_base_pointer,
+            member_llvm_type->getPointerTo(),
+            "soa_typed_member_base_pointer"
+        );
+
+        return parameters.llvm_builder.CreateGEP(
+            member_llvm_type,
+            typed_member_base_pointer,
+            index_value,
+            "soa_member_element_pointer"
+        );
+    }
+
     static llvm::Value* load_soa_data_pointer(
         Value_and_type const& soa_value,
         Expression_parameters const& parameters
@@ -2174,6 +2545,58 @@ namespace h::compiler
             parameters.llvm_data_layout,
             llvm::Type::getInt8Ty(parameters.llvm_context)->getPointerTo(),
             data_pointer_field
+        );
+    }
+
+    static llvm::Value* load_soa_array_view_field(
+        Value_and_type const& soa_value,
+        std::uint32_t const field_index,
+        llvm::Type* const field_type,
+        Expression_parameters const& parameters
+    )
+    {
+        if (!soa_value.type.has_value() || soa_value.value == nullptr)
+            throw std::runtime_error{ "Cannot load Soa_array_view field." };
+
+        llvm::Type* const soa_llvm_type = type_reference_to_llvm_type(
+            parameters.llvm_context,
+            parameters.llvm_data_layout,
+            soa_value.type.value(),
+            parameters.type_database
+        );
+
+        llvm::Value* const field_pointer = parameters.llvm_builder.CreateStructGEP(soa_llvm_type, soa_value.value, field_index);
+        return create_load_instruction(
+            parameters.llvm_builder,
+            parameters.llvm_data_layout,
+            field_type,
+            field_pointer
+        );
+    }
+
+    static llvm::Value* load_soa_array_view_data_pointer(
+        Value_and_type const& soa_value,
+        Expression_parameters const& parameters
+    )
+    {
+        return load_soa_array_view_field(
+            soa_value,
+            3,
+            llvm::Type::getInt8Ty(parameters.llvm_context)->getPointerTo(),
+            parameters
+        );
+    }
+
+    static llvm::Value* load_soa_array_view_length(
+        Value_and_type const& soa_value,
+        Expression_parameters const& parameters
+    )
+    {
+        return load_soa_array_view_field(
+            soa_value,
+            2,
+            llvm::Type::getInt64Ty(parameters.llvm_context),
+            parameters
         );
     }
 
@@ -3167,6 +3590,38 @@ namespace h::compiler
             {
                 .name = "",
                 .value = soa_alloca,
+                .type = parameters.expression_type.value(),
+            };
+        }
+
+        if (parameters.expression_type.has_value() && std::holds_alternative<Soa_array_view_type>(parameters.expression_type->data))
+        {
+            if (parameters.llvm_parent_function == nullptr)
+                throw std::runtime_error{ "Soa_array_view global initialization is not implemented yet." };
+
+            llvm::Type* const soa_view_llvm_type = type_reference_to_llvm_type(
+                llvm_context,
+                llvm_data_layout,
+                parameters.expression_type.value(),
+                type_database
+            );
+
+            llvm::AllocaInst* const soa_view_alloca = create_alloca_instruction(
+                llvm_builder,
+                llvm_data_layout,
+                *parameters.llvm_parent_function,
+                soa_view_llvm_type,
+                "soa_array_view"
+            );
+
+            std::uint64_t const view_size = llvm_data_layout.getTypeAllocSize(soa_view_llvm_type);
+            llvm::Align const view_alignment = llvm_data_layout.getABITypeAlign(soa_view_llvm_type);
+            create_memset_to_0_call(llvm_builder, soa_view_alloca, view_size, view_alignment);
+
+            return Value_and_type
+            {
+                .name = "",
+                .value = soa_view_alloca,
                 .type = parameters.expression_type.value(),
             };
         }
@@ -4199,6 +4654,49 @@ namespace h::compiler
             {
                 .name = "",
                 .value = soa_alloca,
+                .type = type_reference
+            };
+        }
+
+        if (std::holds_alternative<h::Soa_array_view_type>(type_reference.data))
+        {
+            if (parameters.llvm_parent_function == nullptr)
+                throw std::runtime_error{ "Soa_array_view local storage requires a parent function." };
+
+            llvm::Type* const soa_view_llvm_type = type_reference_to_llvm_type(
+                parameters.llvm_context,
+                parameters.llvm_data_layout,
+                type_reference,
+                parameters.type_database
+            );
+
+            llvm::AllocaInst* const soa_view_alloca = create_alloca_instruction(
+                parameters.llvm_builder,
+                parameters.llvm_data_layout,
+                *parameters.llvm_parent_function,
+                soa_view_llvm_type,
+                "soa_array_view"
+            );
+
+            if (expression.type == Instantiate_expression_type::Default || expression.type == Instantiate_expression_type::Zero_initialized)
+            {
+                std::uint64_t const view_size = parameters.llvm_data_layout.getTypeAllocSize(soa_view_llvm_type);
+                llvm::Align const view_alignment = parameters.llvm_data_layout.getABITypeAlign(soa_view_llvm_type);
+                create_memset_to_0_call(parameters.llvm_builder, soa_view_alloca, view_size, view_alignment);
+            }
+            else if (expression.type == Instantiate_expression_type::Explicit)
+            {
+                throw std::runtime_error{ "Explicit Soa_array_view brace initialization is not implemented." };
+            }
+            else if (expression.type != Instantiate_expression_type::Uninitialized)
+            {
+                throw std::runtime_error{ "Instantiate_expression_type not handled for Soa_array_view." };
+            }
+
+            return Value_and_type
+            {
+                .name = "",
+                .value = soa_view_alloca,
                 .type = type_reference
             };
         }

@@ -2993,6 +2993,18 @@ namespace h::compiler
             );
         }
 
+        if (std::holds_alternative<h::Soa_array_view_type>(type_to_instantiate.data))
+        {
+            h::Soa_array_view_type const& soa_array_view_type = std::get<h::Soa_array_view_type>(type_to_instantiate.data);
+            if (soa_array_view_type.value_type.empty())
+                return std::nullopt;
+
+            return find_underlying_declaration(
+                declaration_database,
+                soa_array_view_type.value_type.front()
+            );
+        }
+
         std::optional<Declaration> const declaration_optional = find_underlying_declaration(
             declaration_database,
             type_to_instantiate
@@ -3798,7 +3810,8 @@ namespace h::compiler
         if (
             std::holds_alternative<h::Instantiate_expression>(right_hand_side.data) &&
             !std::holds_alternative<h::Array_slice_type>(type.data) &&
-            !std::holds_alternative<h::Soa_array_type>(type.data)
+            !std::holds_alternative<h::Soa_array_type>(type.data) &&
+            !std::holds_alternative<h::Soa_array_view_type>(type.data)
         )
         {
             std::optional<Declaration> const declaration_optional = find_underlying_declaration(parameters.declaration_database, type);

@@ -1090,16 +1090,19 @@ namespace h::compiler
                 );
                 if (
                     soa_type_info.has_value() &&
-                    std::holds_alternative<h::Soa_array_type>(soa_type_info->type.data)
+                    (
+                        std::holds_alternative<h::Soa_array_type>(soa_type_info->type.data) ||
+                        std::holds_alternative<h::Soa_array_view_type>(soa_type_info->type.data)
+                    )
                 )
                 {
-                    h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(soa_type_info->type.data);
-                    if (soa_array_type.value_type.empty())
+                    std::optional<h::Type_reference> const element_type = h::get_element_or_pointee_type(soa_type_info->type);
+                    if (!element_type.has_value())
                         return std::nullopt;
 
                     std::optional<Declaration> const declaration = find_declaration(
                         declaration_database,
-                        soa_array_type.value_type[0]
+                        element_type.value()
                     );
                     if (!declaration.has_value())
                         return std::nullopt;
@@ -1151,6 +1154,18 @@ namespace h::compiler
             else if (std::holds_alternative<h::Soa_array_type>(lhs_type_reference->data))
             {
                 h::Soa_array_type const& array_type = std::get<h::Soa_array_type>(lhs_type_reference->data);
+                if (array_type.value_type.empty())
+                    return std::nullopt;
+
+                return Type_info
+                {
+                    .type = array_type.value_type[0],
+                    .is_mutable = lhs_type_info->is_mutable,
+                };
+            }
+            else if (std::holds_alternative<h::Soa_array_view_type>(lhs_type_reference->data))
+            {
+                h::Soa_array_view_type const& array_type = std::get<h::Soa_array_view_type>(lhs_type_reference->data);
                 if (array_type.value_type.empty())
                     return std::nullopt;
 
@@ -1547,6 +1562,15 @@ namespace h::compiler
             }
 
             if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate->data))
+            {
+                return Type_info
+                {
+                    .type = type_to_instantiate.value(),
+                    .is_mutable = false,
+                };
+            }
+
+            if (std::holds_alternative<h::Soa_array_view_type>(type_to_instantiate->data))
             {
                 return Type_info
                 {

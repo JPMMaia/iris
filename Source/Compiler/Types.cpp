@@ -934,6 +934,18 @@ namespace h::compiler
         return llvm::StructType::create({ byte_pointer_type }, "__hl_soa_array");
     }
 
+    static llvm::StructType* create_soa_array_view_llvm_type(
+        llvm::LLVMContext& llvm_context
+    )
+    {
+        if (llvm::StructType* const existing = llvm::StructType::getTypeByName(llvm_context, "__hl_soa_array_view"))
+            return existing;
+
+        llvm::Type* const uint64_type = llvm::Type::getInt64Ty(llvm_context);
+        llvm::Type* const byte_pointer_type = llvm::Type::getInt8Ty(llvm_context)->getPointerTo();
+        return llvm::StructType::create({ uint64_type, uint64_type, uint64_type, byte_pointer_type }, "__hl_soa_array_view");
+    }
+
     static std::pmr::vector<Soa_debug_member_info> get_soa_debug_member_infos(
         h::Module const& core_module,
         Soa_array_type const& type,
@@ -1308,6 +1320,10 @@ namespace h::compiler
         {
             return create_soa_array_llvm_type(llvm_context);
         }
+        else if (std::holds_alternative<Soa_array_view_type>(type_reference.data))
+        {
+            return create_soa_array_view_llvm_type(llvm_context);
+        }
         else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
         {
             Custom_type_reference const& data = std::get<Custom_type_reference>(type_reference.data);
@@ -1394,6 +1410,10 @@ namespace h::compiler
         else if (std::holds_alternative<Soa_array_type>(type_reference.data))
         {
             return create_soa_array_llvm_type(llvm_context);
+        }
+        else if (std::holds_alternative<Soa_array_view_type>(type_reference.data))
+        {
+            return create_soa_array_view_llvm_type(llvm_context);
         }
         else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
         {

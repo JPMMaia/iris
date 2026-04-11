@@ -1988,6 +1988,226 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
   }
 
+  TEST_CASE("Compile Soa Array View Type", "[LLVM_IR]")
+  {
+    char const* const input_file = "soa_array_view_type.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%__hl_soa_array_view = type { i64, i64, i64, ptr }
+%struct.soa_array_view_type_Particle = type { float, float }
+
+; Function Attrs: convergent
+define private void @soa_array_view_type_inspect(ptr noundef byval(%__hl_soa_array_view) align 8 %"arguments[0].view") #0 {
+entry:
+  %start_index = alloca i64, align 8
+  %end_index = alloca i64, align 8
+  %length = alloca i64, align 8
+  %data = alloca ptr, align 8
+  %soa_element = alloca %struct.soa_array_view_type_Particle, align 4
+  %p1 = alloca %struct.soa_array_view_type_Particle, align 4
+  %x2 = alloca float, align 4
+  %y3 = alloca float, align 4
+  %0 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
+  %1 = load i64, ptr %0, align 8
+  store i64 %1, ptr %start_index, align 8
+  %2 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 1
+  %3 = load i64, ptr %2, align 8
+  store i64 %3, ptr %end_index, align 8
+  %4 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %5 = load i64, ptr %4, align 8
+  store i64 %5, ptr %length, align 8
+  %6 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %7 = load ptr, ptr %6, align 8
+  store ptr %7, ptr %data, align 8
+  %8 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %9 = load ptr, ptr %8, align 8
+  %10 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %11 = load i64, ptr %10, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %9, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i32 1
+  %12 = load float, ptr %soa_member_element_pointer, align 4
+  %13 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 0
+  store float %12, ptr %13, align 4
+  %soa_member_block_size = mul i64 %11, 4
+  %soa_member_block_offset = add i64 0, %soa_member_block_size
+  %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
+  %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %9, i64 %soa_offset_aligned
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i32 1
+  %14 = load float, ptr %soa_member_element_pointer2, align 4
+  %15 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 1
+  store float %14, ptr %15, align 4
+  %16 = load %struct.soa_array_view_type_Particle, ptr %soa_element, align 4
+  store %struct.soa_array_view_type_Particle %16, ptr %p1, align 4
+  %17 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %18 = load ptr, ptr %17, align 8
+  %19 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %20 = load i64, ptr %19, align 8
+  %soa_member_base_pointer3 = getelementptr i8, ptr %18, i64 0
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i32 2
+  %21 = load float, ptr %soa_member_element_pointer4, align 4
+  store float %21, ptr %x2, align 4
+  %22 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %23 = load ptr, ptr %22, align 8
+  %24 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %25 = load i64, ptr %24, align 8
+  %soa_member_block_size5 = mul i64 %25, 4
+  %soa_member_block_offset6 = add i64 0, %soa_member_block_size5
+  %soa_offset_adjusted7 = add i64 %soa_member_block_offset6, 3
+  %soa_offset_aligned8 = and i64 %soa_offset_adjusted7, -4
+  %soa_member_base_pointer9 = getelementptr i8, ptr %23, i64 %soa_offset_aligned8
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i32 3
+  %26 = load float, ptr %soa_member_element_pointer10, align 4
+  store float %26, ptr %y3, align 4
+  ret void
+}
+
+; Function Attrs: convergent
+define private void @soa_array_view_type_run() #0 {
+entry:
+  %view = alloca %__hl_soa_array_view, align 8
+  %start_index = alloca i64, align 8
+  %end_index = alloca i64, align 8
+  %length = alloca i64, align 8
+  %data = alloca ptr, align 8
+  %soa_element = alloca %struct.soa_array_view_type_Particle, align 4
+  %p1 = alloca %struct.soa_array_view_type_Particle, align 4
+  %soa_element3 = alloca %struct.soa_array_view_type_Particle, align 4
+  %0 = alloca %struct.soa_array_view_type_Particle, align 4
+  %soa_assignment_struct = alloca %struct.soa_array_view_type_Particle, align 4
+  %x2 = alloca float, align 4
+  %y3 = alloca float, align 4
+  call void @llvm.memset.p0.i64(ptr align 8 %view, i8 0, i64 32, i1 false)
+  %1 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %2 = load i64, ptr %1, align 8
+  store i64 %2, ptr %start_index, align 8
+  %3 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 1
+  %4 = load i64, ptr %3, align 8
+  store i64 %4, ptr %end_index, align 8
+  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %6 = load i64, ptr %5, align 8
+  store i64 %6, ptr %length, align 8
+  %7 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %8 = load ptr, ptr %7, align 8
+  store ptr %8, ptr %data, align 8
+  %9 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %10 = load ptr, ptr %9, align 8
+  %11 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %12 = load i64, ptr %11, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %10, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i32 1
+  %13 = load float, ptr %soa_member_element_pointer, align 4
+  %14 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 0
+  store float %13, ptr %14, align 4
+  %soa_member_block_size = mul i64 %12, 4
+  %soa_member_block_offset = add i64 0, %soa_member_block_size
+  %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
+  %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %10, i64 %soa_offset_aligned
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i32 1
+  %15 = load float, ptr %soa_member_element_pointer2, align 4
+  %16 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 1
+  store float %15, ptr %16, align 4
+  %17 = load %struct.soa_array_view_type_Particle, ptr %soa_element, align 4
+  store %struct.soa_array_view_type_Particle %17, ptr %p1, align 4
+  %18 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %19 = load ptr, ptr %18, align 8
+  %20 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %21 = load i64, ptr %20, align 8
+  %soa_member_base_pointer4 = getelementptr i8, ptr %19, i64 0
+  %soa_member_element_pointer5 = getelementptr float, ptr %soa_member_base_pointer4, i32 1
+  %22 = load float, ptr %soa_member_element_pointer5, align 4
+  %23 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element3, i32 0, i32 0
+  store float %22, ptr %23, align 4
+  %soa_member_block_size6 = mul i64 %21, 4
+  %soa_member_block_offset7 = add i64 0, %soa_member_block_size6
+  %soa_offset_adjusted8 = add i64 %soa_member_block_offset7, 3
+  %soa_offset_aligned9 = and i64 %soa_offset_adjusted8, -4
+  %soa_member_base_pointer10 = getelementptr i8, ptr %19, i64 %soa_offset_aligned9
+  %soa_member_element_pointer11 = getelementptr float, ptr %soa_member_base_pointer10, i32 1
+  %24 = load float, ptr %soa_member_element_pointer11, align 4
+  %25 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element3, i32 0, i32 1
+  store float %24, ptr %25, align 4
+  %26 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 0
+  store float 3.000000e+00, ptr %26, align 4
+  %27 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 1
+  store float 4.000000e+00, ptr %27, align 4
+  %28 = load %struct.soa_array_view_type_Particle, ptr %0, align 4
+  %29 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %30 = load ptr, ptr %29, align 8
+  %31 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %32 = load i64, ptr %31, align 8
+  store %struct.soa_array_view_type_Particle %28, ptr %soa_assignment_struct, align 4
+  %33 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
+  %soa_member_base_pointer12 = getelementptr i8, ptr %30, i64 0
+  %soa_member_element_pointer13 = getelementptr float, ptr %soa_member_base_pointer12, i32 1
+  %34 = load float, ptr %33, align 4
+  store float %34, ptr %soa_member_element_pointer13, align 4
+  %35 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
+  %soa_member_block_size14 = mul i64 %32, 4
+  %soa_member_block_offset15 = add i64 0, %soa_member_block_size14
+  %soa_offset_adjusted16 = add i64 %soa_member_block_offset15, 3
+  %soa_offset_aligned17 = and i64 %soa_offset_adjusted16, -4
+  %soa_member_base_pointer18 = getelementptr i8, ptr %30, i64 %soa_offset_aligned17
+  %soa_member_element_pointer19 = getelementptr float, ptr %soa_member_base_pointer18, i32 1
+  %36 = load float, ptr %35, align 4
+  store float %36, ptr %soa_member_element_pointer19, align 4
+  %37 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %38 = load ptr, ptr %37, align 8
+  %39 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %40 = load i64, ptr %39, align 8
+  %soa_member_base_pointer20 = getelementptr i8, ptr %38, i64 0
+  %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i32 2
+  %41 = load float, ptr %soa_member_element_pointer21, align 4
+  store float %41, ptr %x2, align 4
+  %42 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %43 = load ptr, ptr %42, align 8
+  %44 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %45 = load i64, ptr %44, align 8
+  %soa_member_base_pointer22 = getelementptr i8, ptr %43, i64 0
+  %soa_member_element_pointer23 = getelementptr float, ptr %soa_member_base_pointer22, i32 2
+  store float 1.000000e+00, ptr %soa_member_element_pointer23, align 4
+  %46 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %47 = load ptr, ptr %46, align 8
+  %48 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %49 = load i64, ptr %48, align 8
+  %soa_member_block_size24 = mul i64 %49, 4
+  %soa_member_block_offset25 = add i64 0, %soa_member_block_size24
+  %soa_offset_adjusted26 = add i64 %soa_member_block_offset25, 3
+  %soa_offset_aligned27 = and i64 %soa_offset_adjusted26, -4
+  %soa_member_base_pointer28 = getelementptr i8, ptr %47, i64 %soa_offset_aligned27
+  %soa_member_element_pointer29 = getelementptr float, ptr %soa_member_base_pointer28, i32 3
+  %50 = load float, ptr %soa_member_element_pointer29, align 4
+  store float %50, ptr %y3, align 4
+  %51 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %52 = load ptr, ptr %51, align 8
+  %53 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %54 = load i64, ptr %53, align 8
+  %soa_member_block_size30 = mul i64 %54, 4
+  %soa_member_block_offset31 = add i64 0, %soa_member_block_size30
+  %soa_offset_adjusted32 = add i64 %soa_member_block_offset31, 3
+  %soa_offset_aligned33 = and i64 %soa_offset_adjusted32, -4
+  %soa_member_base_pointer34 = getelementptr i8, ptr %52, i64 %soa_offset_aligned33
+  %soa_member_element_pointer35 = getelementptr float, ptr %soa_member_base_pointer34, i32 3
+  store float 2.000000e+00, ptr %soa_member_element_pointer35, align 4
+  call void @soa_array_view_type_inspect(ptr noundef byval(%__hl_soa_array_view) align 8 %view)
+  ret void
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Debug Information C Headers", "[LLVM_IR]")
   {
     char const* const input_file = "debug_information_c_headers.hltxt";

@@ -672,6 +672,26 @@ function run(view: Soa_array_view::<Particle>) -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that Soa_array_view can initialize typed variables", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    mutable view: Soa_array_view::<Particle> = {};
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
 
     TEST_CASE("Validates that struct member names are different from each other", "[Validation][Struct]")
     {
