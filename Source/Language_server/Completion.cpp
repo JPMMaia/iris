@@ -513,6 +513,22 @@ namespace h::language_server
             };
         }
 
+        if (is_soa_array_view_type_reference(expression_type))
+        {
+            std::vector<lsp::CompletionItem> items = {};
+            items.push_back(create_completion_item("data", lsp::CompletionItemKind::Field));
+            items.push_back(create_completion_item("length", lsp::CompletionItemKind::Field));
+            items.push_back(create_completion_item("start_index", lsp::CompletionItemKind::Field));
+            items.push_back(create_completion_item("end_index", lsp::CompletionItemKind::Field));
+
+            return lsp::CompletionList
+            {
+                .isIncomplete = false,
+                .items = std::move(items),
+                .itemDefaults = std::nullopt,
+            };
+        }
+
         std::optional<Declaration> const underlying_declaration_optional = find_underlying_declaration(
             declaration_database,
             expression_type
@@ -642,6 +658,31 @@ namespace h::language_server
                                 std::optional<Declaration> const element_declaration = find_underlying_declaration(
                                     declaration_database,
                                     soa_type.value_type.front()
+                                );
+                                if (element_declaration.has_value())
+                                {
+                                    std::vector<lsp::CompletionItem> items = {};
+                                    add_declaration_member_items(items, element_declaration.value());
+
+                                    return lsp::CompletionList
+                                    {
+                                        .isIncomplete = false,
+                                        .items = std::move(items),
+                                        .itemDefaults = std::nullopt,
+                                    };
+                                }
+                            }
+                            return std::nullopt;
+                        }
+
+                        if (is_soa_array_view_type_reference(expression_type.value()))
+                        {
+                            h::Soa_array_view_type const& soa_view_type = std::get<h::Soa_array_view_type>(expression_type.value().data);
+                            if (!soa_view_type.value_type.empty())
+                            {
+                                std::optional<Declaration> const element_declaration = find_underlying_declaration(
+                                    declaration_database,
+                                    soa_view_type.value_type.front()
                                 );
                                 if (element_declaration.has_value())
                                 {

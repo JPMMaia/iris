@@ -1,0 +1,13 @@
+module completion_soa_view_0;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+    velocity: Float32 = 0.0f32;
+}
+
+export function run(value: Soa_array_view::<Particle>) -> ()
+{
+    value.
+}

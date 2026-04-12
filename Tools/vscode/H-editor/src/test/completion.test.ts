@@ -494,6 +494,59 @@ suite("Should do completion", () => {
 			]
 		}, true);
 	});
+
+	test("Completes Soa_array_view dot members", async () => {
+		const document_uri = get_document_uri('projects/other/completion_soa_view_0.hltxt');
+		await test_completion(document_uri, new vscode.Position(11, 10), {
+			items: [
+				{ label: "data", kind: vscode.CompletionItemKind.Field },
+				{ label: "length", kind: vscode.CompletionItemKind.Field },
+				{ label: "start_index", kind: vscode.CompletionItemKind.Field },
+				{ label: "end_index", kind: vscode.CompletionItemKind.Field },
+			]
+		}, true);
+	});
+
+	test("Completes Soa_array_view arrow members", async () => {
+		const document_uri = get_document_uri('projects/other/completion_soa_view_1.hltxt');
+		await test_completion(document_uri, new vscode.Position(11, 10), {
+			items: [
+				{ label: "velocity", kind: vscode.CompletionItemKind.Field },
+				{ label: "x", kind: vscode.CompletionItemKind.Field },
+				{ label: "y", kind: vscode.CompletionItemKind.Field },
+			]
+		}, true);
+	});
+
+	test("Completes Soa_array_view arrow members with comment on next line", async () => {
+		const document_uri = get_document_uri('projects/other/completion_soa_view_2.hltxt');
+		await test_completion(document_uri, new vscode.Position(11, 10), {
+			items: [
+				{ label: "velocity", kind: vscode.CompletionItemKind.Field },
+				{ label: "x", kind: vscode.CompletionItemKind.Field },
+				{ label: "y", kind: vscode.CompletionItemKind.Field },
+			]
+		}, true);
+	});
+
+	test("Completes Soa_array_view with different T", async () => {
+		const document_uri = get_document_uri('projects/other/completion_soa_view_3.hltxt');
+		await test_completion(document_uri, new vscode.Position(17, 10), {
+			items: [
+				{ label: "data", kind: vscode.CompletionItemKind.Field },
+				{ label: "length", kind: vscode.CompletionItemKind.Field },
+				{ label: "start_index", kind: vscode.CompletionItemKind.Field },
+				{ label: "end_index", kind: vscode.CompletionItemKind.Field },
+			]
+		}, true);
+
+		await test_completion(document_uri, new vscode.Position(22, 10), {
+			items: [
+				{ label: "position", kind: vscode.CompletionItemKind.Field },
+				{ label: "scale", kind: vscode.CompletionItemKind.Field },
+			]
+		}, true);
+	});
 });
 
 async function test_completion(

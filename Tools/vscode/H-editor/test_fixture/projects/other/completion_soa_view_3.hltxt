@@ -1,0 +1,24 @@
+module completion_soa_view_3;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+    velocity: Float32 = 0.0f32;
+}
+
+struct Transform
+{
+    position: Float32 = 0.0f32;
+    scale: Float32 = 1.0f32;
+}
+
+export function run_dot(value: Soa_array_view::<Transform>) -> ()
+{
+    value.
+}
+
+export function run_arrow(value: Soa_array_view::<Transform>) -> ()
+{
+    value->
+}
