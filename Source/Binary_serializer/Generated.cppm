@@ -233,12 +233,14 @@ namespace h::binary_serializer
     void serialize(Serializer& serializer, Soa_array_view_type const& value)
     {
         serialize(serializer, value.value_type);
+        serialize(serializer, value.is_mutable);
     }
 
     export template <>
     void deserialize(Deserializer& deserializer, Soa_array_view_type& value)
     {
         deserialize(deserializer, value.value_type);
+        deserialize(deserializer, value.is_mutable);
     }
 
     export template <>

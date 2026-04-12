@@ -1114,10 +1114,15 @@ namespace h::compiler
                     if (!member_type.has_value())
                         return std::nullopt;
 
+                    bool const is_member_mutable =
+                        std::holds_alternative<h::Soa_array_view_type>(soa_type_info->type.data) ?
+                        std::get<h::Soa_array_view_type>(soa_type_info->type.data).is_mutable :
+                        soa_type_info->is_mutable;
+
                     return Type_info
                     {
                         .type = member_type.value(),
-                        .is_mutable = soa_type_info->is_mutable,
+                        .is_mutable = is_member_mutable,
                     };
                 }
             }
@@ -1172,7 +1177,7 @@ namespace h::compiler
                 return Type_info
                 {
                     .type = array_type.value_type[0],
-                    .is_mutable = lhs_type_info->is_mutable,
+                    .is_mutable = array_type.is_mutable,
                 };
             }
             else if (std::holds_alternative<h::Pointer_type>(lhs_type_reference->data))

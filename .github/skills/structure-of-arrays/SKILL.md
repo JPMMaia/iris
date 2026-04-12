@@ -172,7 +172,13 @@ Non-owning view type.
 Soa_array_view::<T>
 ```
 
-Provides the same **access semantics** as `Soa_array` but **does not own memory**. `Soa_array_view` needs to store a length at runtime, whereas `Soa_array` doesn't as the length is known at compile time.
+Provides the same **access semantics** as `Soa_array` but **does not own memory**. `Soa_array_view` needs to store a length at runtime, whereas `Soa_array` doesn't as the length is known at compile time. This view is read-only.
+
+For a read-write view, mutable must be added before `T`:
+
+```
+Soa_array_view::<mutable T>
+```
 
 ## Structure
 

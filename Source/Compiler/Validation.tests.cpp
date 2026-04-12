@@ -692,6 +692,72 @@ function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that Soa_array_view mutable elements can be modified through immutable view binding", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    var view: Soa_array_view::<mutable Particle> = {};
+
+    view[1] = {
+        x: 3.0f32,
+        y: 4.0f32
+    };
+    view->x[2] = 1.0f32;
+    view->y[3] = 2.0f32;
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array_view with immutable element type cannot be assigned to Soa_array_view with mutable element type", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function inspect(view: Soa_array_view::<Particle>) -> ()
+{
+}
+
+function run(view: Soa_array_view::<Particle>, mutable_view: Soa_array_view::<mutable Particle>) -> ()
+{
+    var a: Soa_array_view::<Particle> = mutable_view;
+    var b: Soa_array_view::<mutable Particle> = view;
+
+    inspect(mutable_view);
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(15, 49, 15, 53),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Expression type 'Soa_array_view::<Particle>' does not match expected type 'Soa_array_view::<mutable Particle>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
 
     TEST_CASE("Validates that struct member names are different from each other", "[Validation][Struct]")
     {

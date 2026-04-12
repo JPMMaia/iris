@@ -20,22 +20,14 @@ function inspect(view: Soa_array_view::<Particle>) -> ()
 
 function run() -> ()
 {
-    mutable view: Soa_array_view::<Particle> = {};
-    var start_index = view.start_index;
-    var end_index = view.end_index;
-    var length = view.length;
-    var data = view.data;
+    mutable particles: Soa_array::<Particle, 4> = [];
+    var view: Soa_array_view::<mutable Particle> = {};
 
-    var p1 = view[1];
     view[1] = {
         x: 3.0f32,
         y: 4.0f32
     };
-
-    var x2 = view->x[2];
     view->x[2] = 1.0f32;
-
-    var y3 = view->y[3];
     view->y[3] = 2.0f32;
 
     inspect(view);

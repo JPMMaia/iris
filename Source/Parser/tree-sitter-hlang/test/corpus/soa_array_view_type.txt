@@ -11,6 +11,7 @@ struct Particle {
 
 function run() -> () {
   var particles: Soa_array_view::<Particle> = {};
+  var mutable_particles: Soa_array_view::<mutable Particle> = {};
 }
 
 ---
@@ -57,6 +58,20 @@ function run() -> () {
         (Function_output_parameters))
       (Function_definition
         (Block
+          (Statement
+            (Expression_variable_declaration_with_type
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Expression_variable_declaration_type
+                (Type
+                  (Soa_array_view_type
+                    (Type
+                      (Type_name
+                        (Identifier))))))
+              (Generic_expression_or_instantiate
+                (Expression_instantiate
+                  (Expression_instantiate_members)))))
           (Statement
             (Expression_variable_declaration_with_type
               (Expression_variable_mutability)

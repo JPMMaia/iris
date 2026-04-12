@@ -271,6 +271,31 @@ namespace h::compiler
             }
         }
 
+        if (std::holds_alternative<h::Soa_array_view_type>(destination_type.data))
+        {
+            h::Soa_array_view_type const& destination_soa_array_view_type = std::get<h::Soa_array_view_type>(destination_type.data);
+
+            if (!std::holds_alternative<h::Soa_array_view_type>(source_type.data))
+                return false;
+
+            h::Soa_array_view_type const& source_soa_array_view_type = std::get<h::Soa_array_view_type>(source_type.data);
+
+            if (destination_soa_array_view_type.is_mutable && !source_soa_array_view_type.is_mutable)
+                return false;
+
+            if (destination_soa_array_view_type.value_type.empty() && source_soa_array_view_type.value_type.empty())
+                return true;
+
+            if (destination_soa_array_view_type.value_type.empty() || source_soa_array_view_type.value_type.empty())
+                return false;
+
+            return can_assign_type(
+                declaration_database,
+                destination_soa_array_view_type.value_type[0],
+                source_soa_array_view_type.value_type[0]
+            );
+        }
+
         if (is_any_type(destination_type))
             return true;
 

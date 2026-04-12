@@ -283,6 +283,7 @@ namespace h
     export struct Soa_array_view_type
     {
         std::pmr::vector<Type_reference> value_type;
+        bool is_mutable;
 
 #if HACK_SPACESHIP_OPERATOR
         friend std::strong_ordering operator<=>(Soa_array_view_type const&, Soa_array_view_type const&) = default;

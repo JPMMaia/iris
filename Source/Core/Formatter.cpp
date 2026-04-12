@@ -1773,6 +1773,10 @@ namespace h
         {
             Soa_array_view_type const& value = std::get<Soa_array_view_type>(type.data);
             add_text(buffer, "Soa_array_view::<");
+
+            if (value.is_mutable)
+                add_text(buffer, "mutable ");
+
             add_format_type_name(buffer, value.value_type, options);
             add_text(buffer, ">");
         }

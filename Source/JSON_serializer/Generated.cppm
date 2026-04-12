@@ -495,6 +495,7 @@ namespace h::json
     {
         JSON data;
         data["value_type"] = to_json(value.value_type);
+        data["is_mutable"] = to_json(value.is_mutable);
         return data;
     }
 
@@ -502,6 +503,7 @@ namespace h::json
     void from_json(JSON const& data, Soa_array_view_type& value)
     {
         if (data.contains("value_type")) from_json(data.at("value_type"), value.value_type);
+        from_json(data.at("is_mutable"), value.is_mutable);
     }
 
     export template <>
