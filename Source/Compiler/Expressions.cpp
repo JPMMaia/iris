@@ -2794,6 +2794,100 @@ namespace h::compiler
     {
         h::Expression const& left_hand_side = statement.expressions[expression.expression.expression_index];
 
+        if (std::holds_alternative<h::Access_expression>(left_hand_side.data))
+        {
+            h::Access_expression const& access_expression = std::get<h::Access_expression>(left_hand_side.data);
+
+            if (access_expression.member_name == "view")
+            {
+                if (expression.arguments.size() != 0 && expression.arguments.size() != 2)
+                    throw std::runtime_error{"Soa_array.view() expects 0 or 2 arguments."};
+
+                Value_and_type const soa_value = create_expression_value(access_expression.expression.expression_index, statement, parameters);
+                if (!soa_value.type.has_value())
+                    throw std::runtime_error{"Cannot deduce Soa_array receiver type for view()."};
+
+                std::optional<Type_reference> const underlying_receiver_type = get_underlying_type(
+                    parameters.declaration_database,
+                    soa_value.type.value()
+                );
+                if (!underlying_receiver_type.has_value() || !std::holds_alternative<Soa_array_type>(underlying_receiver_type->data))
+                    throw std::runtime_error{"view() receiver must be Soa_array."};
+
+                Soa_array_type const& soa_array_type = std::get<Soa_array_type>(underlying_receiver_type->data);
+                if (soa_array_type.value_type.empty())
+                    throw std::runtime_error{"Soa_array value_type is not specified for view()."};
+
+                bool is_view_mutable = false;
+                if (parameters.expression_type.has_value() && std::holds_alternative<Soa_array_view_type>(parameters.expression_type->data))
+                    is_view_mutable = std::get<Soa_array_view_type>(parameters.expression_type->data).is_mutable;
+
+                Type_reference const soa_array_view_type_reference
+                {
+                    .data = Soa_array_view_type
+                    {
+                        .value_type = {soa_array_type.value_type[0]},
+                        .is_mutable = is_view_mutable,
+                    }
+                };
+
+                llvm::Type* const soa_view_llvm_type = type_reference_to_llvm_type(
+                    parameters.llvm_context,
+                    parameters.llvm_data_layout,
+                    soa_array_view_type_reference,
+                    parameters.type_database
+                );
+
+                if (parameters.llvm_parent_function == nullptr)
+                    throw std::runtime_error{"Soa_array.view() requires a parent function."};
+
+                llvm::AllocaInst* const soa_view_alloca = create_alloca_instruction(
+                    parameters.llvm_builder,
+                    parameters.llvm_data_layout,
+                    *parameters.llvm_parent_function,
+                    soa_view_llvm_type,
+                    "soa_array_view"
+                );
+
+                llvm::Value* const data_pointer = load_soa_data_pointer(soa_value, parameters);
+                llvm::Value* const total_length = llvm::ConstantInt::get(llvm::Type::getInt64Ty(parameters.llvm_context), soa_array_type.size);
+
+                llvm::Value* start_index_value = llvm::ConstantInt::get(llvm::Type::getInt64Ty(parameters.llvm_context), 0);
+                llvm::Value* end_index_value = total_length;
+
+                if (expression.arguments.size() == 2)
+                {
+                    Expression_parameters argument_parameters = parameters;
+                    argument_parameters.expression_type = create_integer_type_type_reference(64, false);
+
+                    Value_and_type const start_index_argument = create_loaded_expression_value(expression.arguments[0].expression_index, statement, argument_parameters);
+                    Value_and_type const end_index_argument = create_loaded_expression_value(expression.arguments[1].expression_index, statement, argument_parameters);
+
+                    start_index_value = start_index_argument.value;
+                    end_index_value = end_index_argument.value;
+                }
+
+                llvm::Value* const start_index_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 0);
+                create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, start_index_value, start_index_field);
+
+                llvm::Value* const end_index_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 1);
+                create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, end_index_value, end_index_field);
+
+                llvm::Value* const length_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 2);
+                create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, total_length, length_field);
+
+                llvm::Value* const data_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 3);
+                create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, data_pointer, data_field);
+
+                return Value_and_type
+                {
+                    .name = "",
+                    .value = soa_view_alloca,
+                    .type = soa_array_view_type_reference
+                };
+            }
+        }
+
         if (std::holds_alternative<h::Instance_call_expression>(left_hand_side.data))
         {
             h::Instance_call_expression const& instance_call_expression = std::get<h::Instance_call_expression>(left_hand_side.data);

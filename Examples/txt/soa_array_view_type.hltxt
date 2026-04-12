@@ -21,7 +21,7 @@ function inspect(view: Soa_array_view::<Particle>) -> ()
 function run() -> ()
 {
     mutable particles: Soa_array::<Particle, 4> = [];
-    var view: Soa_array_view::<mutable Particle> = {};
+    var view: Soa_array_view::<mutable Particle> = particles.view();
 
     view[1] = {
         x: 3.0f32,
@@ -31,4 +31,6 @@ function run() -> ()
     view->y[3] = 2.0f32;
 
     inspect(view);
+
+    var subview: Soa_array_view::<mutable Particle> = particles.view(1, 3);
 }

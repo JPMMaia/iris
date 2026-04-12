@@ -1779,7 +1779,7 @@ namespace h::compiler
             }
             else if (std::holds_alternative<h::Soa_array_type>(left_hand_side_type->data))
             {
-                if (access_expression.member_name != "data" && access_expression.member_name != "length")
+                if (access_expression.member_name != "data" && access_expression.member_name != "length" && access_expression.member_name != "view")
                 {
                     std::pmr::string const type_full_name = h::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
@@ -2456,6 +2456,22 @@ namespace h::compiler
                     .output_parameter_names = {"result"}
                 };
             }
+            else if (builtin_type_reference.value == "soa_array_view")
+            {
+                h::Function_type function_type
+                {
+                    .input_parameter_types = {},
+                    .output_parameter_types = {},
+                    .is_variadic = true,
+                };
+
+                return h::Function_pointer_type
+                {
+                    .type = std::move(function_type),
+                    .input_parameter_names = {},
+                    .output_parameter_names = {}
+                };
+            }
         }
 
         return std::nullopt;
@@ -2494,6 +2510,56 @@ namespace h::compiler
                                 )
                             )
                         };
+                    }
+                }
+            }
+            else if (builtin_type_reference.value == "soa_array_view")
+            {
+                if (expression.arguments.size() != 0 && expression.arguments.size() != 2)
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format(
+                                "Function expects 0 or 2 arguments, but {} were provided.",
+                                expression.arguments.size()
+                            )
+                        )
+                    };
+                }
+
+                if (expression.arguments.size() == 2)
+                {
+                    for (std::size_t argument_index = 0; argument_index < expression.arguments.size(); ++argument_index)
+                    {
+                        h::Expression const& argument_expression = parameters.statement.expressions[expression.arguments[argument_index].expression_index];
+                        std::optional<h::Type_reference> const argument_type_optional = get_expression_type_from_type_info(
+                            parameters.expression_types,
+                            expression.arguments[argument_index]
+                        );
+
+                        if (!argument_type_optional.has_value() || !h::is_integer(argument_type_optional.value()))
+                        {
+                            std::pmr::string const provided_type_name =
+                                argument_type_optional.has_value() ?
+                                h::format_type_reference(parameters.core_module, argument_type_optional.value(), parameters.temporaries_allocator, parameters.temporaries_allocator) :
+                                std::pmr::string{"?", parameters.temporaries_allocator};
+
+                            return
+                            {
+                                create_error_diagnostic(
+                                    parameters.core_module.source_file_path,
+                                    argument_expression.source_range,
+                                    std::format(
+                                        "Expression type '{}' does not match expected type '{}'.",
+                                        provided_type_name,
+                                        "Uint64"
+                                    )
+                                )
+                            };
+                        }
                     }
                 }
             }

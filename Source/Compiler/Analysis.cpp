@@ -949,6 +949,14 @@ namespace h::compiler
                         .is_mutable = false,
                     };
                 }
+                else if (data.member_name == "view")
+                {
+                    return Type_info
+                    {
+                        .type = create_builtin_type_reference("soa_array_view"),
+                        .is_mutable = false,
+                    };
+                }
 
                 return std::nullopt;
             }
@@ -1301,6 +1309,67 @@ namespace h::compiler
                     return Type_info
                     {
                         .type = {},
+                        .is_mutable = false,
+                    };
+                }
+                else if (builtin_type_reference.value == "soa_array_view")
+                {
+                    h::Expression const& callable_expression = statement.expressions[data.expression.expression_index];
+
+                    std::optional<Type_info> receiver_type_info = std::nullopt;
+                    if (std::holds_alternative<h::Access_expression>(callable_expression.data))
+                    {
+                        h::Access_expression const& access_expression = std::get<h::Access_expression>(callable_expression.data);
+                        receiver_type_info = get_expression_type_info(
+                            core_module,
+                            nullptr,
+                            scope,
+                            statement,
+                            statement.expressions[access_expression.expression.expression_index],
+                            std::nullopt,
+                            declaration_database
+                        );
+                    }
+                    else if (std::holds_alternative<h::Dereference_and_access_expression>(callable_expression.data))
+                    {
+                        h::Dereference_and_access_expression const& access_expression = std::get<h::Dereference_and_access_expression>(callable_expression.data);
+                        receiver_type_info = get_expression_type_info(
+                            core_module,
+                            nullptr,
+                            scope,
+                            statement,
+                            statement.expressions[access_expression.expression.expression_index],
+                            std::nullopt,
+                            declaration_database
+                        );
+                    }
+
+                    if (!receiver_type_info.has_value())
+                        return std::nullopt;
+
+                    std::optional<h::Type_reference> const underlying_receiver_type = get_underlying_type(
+                        declaration_database,
+                        receiver_type_info->type
+                    );
+                    if (!underlying_receiver_type.has_value() || !std::holds_alternative<h::Soa_array_type>(underlying_receiver_type->data))
+                        return std::nullopt;
+
+                    h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(underlying_receiver_type->data);
+                    if (soa_array_type.value_type.empty())
+                        return std::nullopt;
+
+                    h::Type_reference const soa_array_view_type =
+                    {
+                        .data = h::Soa_array_view_type
+                        {
+                            .value_type = {soa_array_type.value_type[0]},
+                            .is_mutable = receiver_type_info->is_mutable,
+                        }
+                    };
+
+                    return Type_info
+                    {
+                        .type = soa_array_view_type,
                         .is_mutable = false,
                     };
                 }

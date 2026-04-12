@@ -540,7 +540,7 @@ using Particle_array = Soa_array::<Particle, 4>;
         test_validate_module(input, {}, expected_diagnostics);
     }
 
-    TEST_CASE("Validates that Soa_array contains data and length", "[Validation][SoA]")
+    TEST_CASE("Validates that Soa_array contains data, length and view", "[Validation][SoA]")
     {
         std::string_view const input = R"(module Test;
 
@@ -556,6 +556,8 @@ function run() -> ()
 
     var length: Uint64 = particles.length;
     var data = particles.data;
+    var view = particles.view();
+    var subview = particles.view(1, 3);
     var random = particles.random;
 }
 )";
@@ -564,10 +566,43 @@ function run() -> ()
         {
             h::compiler::Diagnostic
             {
-                .range = create_source_range(15, 18, 15, 34),
+                .range = create_source_range(17, 18, 17, 34),
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
                 .message = "Member 'random' does not exist in the type 'Soa_array::<Particle, 4>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array view expects zero or two arguments", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    mutable particles: Soa_array::<Particle, 4> = {};
+    var a = particles.view();
+    var b = particles.view(1, 3);
+    var c = particles.view(1);
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(13, 13, 13, 30),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Function expects 0 or 2 arguments, but 1 were provided.",
                 .related_information = {},
             }
         };

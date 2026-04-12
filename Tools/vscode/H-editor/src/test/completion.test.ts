@@ -468,6 +468,7 @@ suite("Should do completion", () => {
 			items: [
 				{ label: "data", kind: vscode.CompletionItemKind.Field },
 				{ label: "length", kind: vscode.CompletionItemKind.Field },
+				{ label: "view", kind: vscode.CompletionItemKind.Method },
 			]
 		}, true);
 	});

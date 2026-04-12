@@ -503,6 +503,7 @@ namespace h::language_server
             std::vector<lsp::CompletionItem> items = {};
             items.push_back(create_completion_item("data", lsp::CompletionItemKind::Field));
             items.push_back(create_completion_item("length", lsp::CompletionItemKind::Field));
+            items.push_back(create_completion_item("view", lsp::CompletionItemKind::Method));
 
             return lsp::CompletionList
             {
