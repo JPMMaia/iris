@@ -257,6 +257,12 @@ namespace h::compiler
         return std::holds_alternative<Break_expression>(first_expression.data) || std::holds_alternative<Continue_expression>(first_expression.data) || std::holds_alternative<Return_expression>(first_expression.data);
     }
 
+    static llvm::Value* create_soa_array_view_adjusted_index(
+        Value_and_type const& soa_value,
+        llvm::Value* const index_value,
+        Expression_parameters const& parameters
+    );
+
     std::optional<Value_and_type> search_in_function_scope(
         std::string_view const variable_name,
         std::span<Value_and_type const> const function_arguments,
@@ -1048,13 +1054,14 @@ namespace h::compiler
 
                 llvm::Value* const data_pointer = load_soa_array_view_data_pointer(soa_value, parameters);
                 llvm::Value* const length_value = load_soa_array_view_length(soa_value, parameters);
+                llvm::Value* const adjusted_index = create_soa_array_view_adjusted_index(soa_value, index_llvm_value, parameters);
                 llvm::Value* const element_pointer = create_soa_member_element_pointer(
                     data_pointer,
                     soa_info.layout.members,
                     member_index,
                     length_value,
                     member_llvm_type,
-                    index_llvm_value,
+                    adjusted_index,
                     parameters
                 );
 
@@ -1136,6 +1143,7 @@ namespace h::compiler
             Soa_array_view_type_info const soa_info = get_soa_array_view_type_info(left_hand_side_expression_value.type.value(), parameters);
             llvm::Value* const data_pointer = load_soa_array_view_data_pointer(left_hand_side_expression_value, parameters);
             llvm::Value* const length_value = load_soa_array_view_length(left_hand_side_expression_value, parameters);
+            llvm::Value* const adjusted_index = create_soa_array_view_adjusted_index(left_hand_side_expression_value, index_llvm_value, parameters);
 
             llvm::Type* const element_llvm_type = type_reference_to_llvm_type(
                 llvm_context,
@@ -1163,7 +1171,7 @@ namespace h::compiler
                     member_index,
                     length_value,
                     member_llvm_type,
-                    index_llvm_value,
+                    adjusted_index,
                     parameters
                 );
                 llvm::Value* const loaded_member_value = create_load_instruction(llvm_builder, llvm_data_layout, member_llvm_type, source_pointer);
@@ -1486,6 +1494,7 @@ namespace h::compiler
                     llvm::Value* const length_value = load_soa_array_view_length(array_value, parameters);
 
                     Value_and_type const index_value = create_loaded_expression_value(access_array_expression.index.expression_index, statement, parameters);
+                    llvm::Value* const adjusted_index = create_soa_array_view_adjusted_index(array_value, index_value.value, parameters);
 
                     llvm::Type* const element_llvm_type = type_reference_to_llvm_type(
                         parameters.llvm_context,
@@ -1532,7 +1541,7 @@ namespace h::compiler
                             member_index,
                             length_value,
                             member_llvm_type,
-                            index_value.value,
+                            adjusted_index,
                             parameters
                         );
 
@@ -2598,6 +2607,36 @@ namespace h::compiler
             llvm::Type::getInt64Ty(parameters.llvm_context),
             parameters
         );
+    }
+
+    static llvm::Value* load_soa_array_view_start_index(
+        Value_and_type const& soa_value,
+        Expression_parameters const& parameters
+    )
+    {
+        return load_soa_array_view_field(
+            soa_value,
+            0,
+            llvm::Type::getInt64Ty(parameters.llvm_context),
+            parameters
+        );
+    }
+
+    static llvm::Value* create_soa_array_view_adjusted_index(
+        Value_and_type const& soa_value,
+        llvm::Value* const index_value,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::Value* const start_index = load_soa_array_view_start_index(soa_value, parameters);
+        llvm::Value* const converted_index = parameters.llvm_builder.CreateIntCast(
+            index_value,
+            llvm::Type::getInt64Ty(parameters.llvm_context),
+            false,
+            "soa_index_i64"
+        );
+
+        return parameters.llvm_builder.CreateAdd(start_index, converted_index, "soa_adjusted_index");
     }
 
     static void store_soa_member_value(
