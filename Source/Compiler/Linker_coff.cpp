@@ -49,6 +49,8 @@ namespace h::compiler
             // Natvis
             std::filesystem::path const visualizers_path = h::common::get_visualizers_file_path();
             arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "hlang_decimal.natvis").generic_string()));
+            arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "hlang_soa_array.natvis").generic_string()));
+            arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "hlang_soa_array_view.natvis").generic_string()));
         }
 
         // Provides mainCRTStartup

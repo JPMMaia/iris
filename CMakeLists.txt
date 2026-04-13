@@ -35,6 +35,8 @@ add_custom_target(
         Generate_h_core_typescript_interface
         Generate_h_core_typescript_intermediate_representation
         Generate_h_core_expressions_visitor
+        Generate_h_natvis_soa_array
+    Generate_h_natvis_soa_array_view
 )
 
 install(DIRECTORY "share/hlang" TYPE DATA CONFIGURATIONS Debug Release)

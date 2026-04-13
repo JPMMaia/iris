@@ -2920,4 +2920,166 @@ namespace h
 
         output_stream << "}\n";
     }
+
+    void generate_soa_array_natvis(
+        std::istream& input_stream,
+        std::ostream& output_stream
+    )
+    {
+        (void)input_stream;
+
+        output_stream << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+        output_stream << "<AutoVisualizer xmlns=\"http://schemas.microsoft.com/vstudio/debugger/natvis/2010\">\n";
+        output_stream << "  <Intrinsic Name=\"calculate_soa_data_pointer\" Expression=\"((char*)data) + count*stride\">\n";
+        output_stream << "    <Parameter Name=\"data\" Type=\"void*\" />\n";
+        output_stream << "    <Parameter Name=\"count\" Type=\"int\" />\n";
+        output_stream << "    <Parameter Name=\"stride\" Type=\"int\" />\n";
+        output_stream << "  </Intrinsic>\n";
+        output_stream << "\n";
+
+        for (int member_count = 0; member_count <= 18; ++member_count)
+        {
+            output_stream << std::format("  <!-- {} elements -->\n", member_count);
+
+            std::stringstream type_name;
+            type_name << "h::Soa_array&lt;" << member_count;
+            for (int index = 0; index < (2 * member_count + 2); ++index)
+            {
+                type_name << ",*";
+            }
+            type_name << "&gt;";
+
+            output_stream << std::format("  <Type Name=\"{}\">\n", type_name.str());
+            output_stream << "    <DisplayString>Soa_array::&lt;{\"$T1\",sb}, {$T2}&gt;</DisplayString>\n";
+
+            if (member_count > 0)
+            {
+                output_stream << "    <Expand>\n";
+
+                for (int member_index = 0; member_index < member_count; ++member_index)
+                {
+                    int const name_type_index = 3 + (2 * member_index);
+                    int const data_type_index = name_type_index + 1;
+
+                    std::stringstream offset_stream;
+                    if (member_index == 0)
+                    {
+                        offset_stream << "0";
+                    }
+                    else
+                    {
+                        for (int previous_member_index = 0; previous_member_index < member_index; ++previous_member_index)
+                        {
+                            if (previous_member_index != 0)
+                            {
+                                offset_stream << "+";
+                            }
+
+                            int const previous_data_type_index = 4 + (2 * previous_member_index);
+                            offset_stream << std::format("sizeof($T{})", previous_data_type_index);
+                        }
+                    }
+
+                    output_stream << std::format("      <Synthetic Name=\"{}\">\n", member_index);
+                    output_stream << std::format("        <DisplayString>{{\"$T{}: $T{}[]\",sb}}</DisplayString>\n", name_type_index, data_type_index);
+                    output_stream << "        <Expand>\n";
+                    output_stream << "          <IndexListItems>\n";
+                    output_stream << "            <Size>$T2</Size>\n";
+                    output_stream << std::format("            <ValueNode>(($T{}*)calculate_soa_data_pointer(data, $T2, {}))[$i]</ValueNode>\n", data_type_index, offset_stream.str());
+                    output_stream << "          </IndexListItems>\n";
+                    output_stream << "        </Expand>\n";
+                    output_stream << "      </Synthetic>\n";
+                    output_stream << "\n";
+                }
+
+                output_stream << "    </Expand>\n";
+            }
+
+            output_stream << "  </Type>\n";
+        }
+
+        output_stream << "</AutoVisualizer>\n";
+    }
+
+    void generate_soa_array_view_natvis(
+        std::istream& input_stream,
+        std::ostream& output_stream
+    )
+    {
+        (void)input_stream;
+
+        output_stream << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+        output_stream << "<AutoVisualizer xmlns=\"http://schemas.microsoft.com/vstudio/debugger/natvis/2010\">\n";
+        output_stream << "  <Intrinsic Name=\"calculate_soa_data_pointer\" Expression=\"((char*)data) + count*previous_stride + start_index*current_stride\">\n";
+        output_stream << "    <Parameter Name=\"data\" Type=\"void*\" />\n";
+        output_stream << "    <Parameter Name=\"count\" Type=\"int\" />\n";
+        output_stream << "    <Parameter Name=\"start_index\" Type=\"int\" />\n";
+        output_stream << "    <Parameter Name=\"current_stride\" Type=\"int\" />\n";
+        output_stream << "    <Parameter Name=\"previous_stride\" Type=\"int\" />\n";
+        output_stream << "  </Intrinsic>\n";
+        output_stream << "\n";
+
+        for (int member_count = 0; member_count <= 18; ++member_count)
+        {
+            output_stream << std::format("  <!-- {} elements -->\n", member_count);
+
+            std::stringstream type_name;
+            type_name << "h::Soa_array_view&lt;" << member_count;
+            for (int index = 0; index < (2 * member_count + 1); ++index)
+            {
+                type_name << ",*";
+            }
+            type_name << "&gt;";
+
+            output_stream << std::format("  <Type Name=\"{}\">\n", type_name.str());
+            output_stream << "    <DisplayString>Soa_array_view::&lt;{\"$T1\",sb}&gt;</DisplayString>\n";
+
+            if (member_count > 0)
+            {
+                output_stream << "    <Expand>\n";
+
+                for (int member_index = 0; member_index < member_count; ++member_index)
+                {
+                    int const member_name_type_index = 2 + (2 * member_index);
+                    int const member_data_type_index = member_name_type_index + 1;
+
+                    std::stringstream offset_stream;
+                    if (member_index == 0)
+                    {
+                        offset_stream << "0";
+                    }
+                    else
+                    {
+                        for (int previous_member_index = 0; previous_member_index < member_index; ++previous_member_index)
+                        {
+                            if (previous_member_index != 0)
+                            {
+                                offset_stream << "+";
+                            }
+
+                            int const previous_member_data_type_index = 3 + (2 * previous_member_index);
+                            offset_stream << std::format("sizeof($T{})", previous_member_data_type_index);
+                        }
+                    }
+
+                    output_stream << std::format("      <Synthetic Name=\"{}\">\n", member_index);
+                    output_stream << std::format("        <DisplayString>{{\"$T{}: $T{}[]\",sb}}</DisplayString>\n", member_name_type_index, member_data_type_index);
+                    output_stream << "        <Expand>\n";
+                    output_stream << "          <IndexListItems>\n";
+                    output_stream << "            <Size>end_index - start_index</Size>\n";
+                    output_stream << std::format("            <ValueNode>(($T{}*)calculate_soa_data_pointer(data, length, start_index, sizeof($T{}), {}))[$i]</ValueNode>\n", member_data_type_index, member_data_type_index, offset_stream.str());
+                    output_stream << "          </IndexListItems>\n";
+                    output_stream << "        </Expand>\n";
+                    output_stream << "      </Synthetic>\n";
+                    output_stream << "\n";
+                }
+
+                output_stream << "    </Expand>\n";
+            }
+
+            output_stream << "  </Type>\n";
+        }
+
+        output_stream << "</AutoVisualizer>\n";
+    }
 }

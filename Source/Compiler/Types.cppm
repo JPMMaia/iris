@@ -51,6 +51,23 @@ namespace h::compiler
     {
         Debug_builtin_types builtin;
         std::pmr::unordered_map<Module_name, LLVM_debug_type_map> name_to_llvm_debug_type;
+        Declaration_database const& declaration_database;
+        llvm::DINamespace* builtin_namespace;
+    };
+
+    export struct Soa_member_layout
+    {
+        std::uint64_t block_offset = 0;
+        std::uint64_t block_size = 0;
+        std::uint64_t element_size = 0;
+        std::uint64_t element_alignment = 0;
+    };
+
+    export struct Soa_layout
+    {
+        std::uint64_t size = 0;
+        std::uint64_t alignment = 0;
+        std::pmr::vector<Soa_member_layout> members;
     };
 
     export Type_database create_type_database(
@@ -60,7 +77,8 @@ namespace h::compiler
     export Debug_type_database create_debug_type_database(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_scope,
-        llvm::DataLayout const& llvm_data_layout
+        llvm::DataLayout const& llvm_data_layout,
+        Declaration_database const& declaration_database
     );
 
     export void add_module_types(
@@ -171,6 +189,14 @@ namespace h::compiler
         Type_database const& type_database,
         std::string_view const module_name,
         std::string_view const struct_name
+    );
+
+    export Soa_layout calculate_soa_layout(
+        llvm::DataLayout const& llvm_data_layout,
+        Type_database const& type_database,
+        std::string_view const module_name,
+        std::string_view const struct_name,
+        std::uint64_t array_length
     );
 
     export llvm::FunctionType* create_llvm_function_type(

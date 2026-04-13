@@ -13,6 +13,7 @@ module;
 export module h.compiler.common;
 
 import h.core;
+import h.core.declarations;
 
 namespace h::compiler
 {
@@ -22,6 +23,12 @@ namespace h::compiler
         std::string_view const module_name,
         std::string_view const declaration_name,
         std::optional<std::string_view> const unique_name
+    );
+
+    export std::string mangle_name(
+        h::Declaration_database const& declaration_database,
+        std::string_view const module_name,
+        std::string_view const declaration_name
     );
 
     export std::string mangle_name(

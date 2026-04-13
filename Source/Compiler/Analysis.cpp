@@ -931,6 +931,56 @@ namespace h::compiler
 
                 return std::nullopt;
             }
+            else if (std::holds_alternative<h::Soa_array_type>(type_reference.value().data))
+            {
+                if (data.member_name == "data")
+                {
+                    return Type_info
+                    {
+                        .type = create_pointer_type_type_reference({}, type_info->is_mutable),
+                        .is_mutable = false,
+                    };
+                }
+                else if (data.member_name == "length")
+                {
+                    return Type_info
+                    {
+                        .type = h::create_integer_type_type_reference(64, false),
+                        .is_mutable = false,
+                    };
+                }
+                else if (data.member_name == "view")
+                {
+                    return Type_info
+                    {
+                        .type = create_builtin_type_reference("soa_array_view"),
+                        .is_mutable = false,
+                    };
+                }
+
+                return std::nullopt;
+            }
+            else if (std::holds_alternative<h::Soa_array_view_type>(type_reference.value().data))
+            {
+                if (data.member_name == "data")
+                {
+                    return Type_info
+                    {
+                        .type = create_pointer_type_type_reference({}, type_info->is_mutable),
+                        .is_mutable = false,
+                    };
+                }
+                else if (data.member_name == "length" || data.member_name == "start_index" || data.member_name == "end_index")
+                {
+                    return Type_info
+                    {
+                        .type = h::create_integer_type_type_reference(64, false),
+                        .is_mutable = false,
+                    };
+                }
+
+                return std::nullopt;
+            }
             else if (std::holds_alternative<h::Custom_type_reference>(type_reference.value().data))
             {
                 h::Custom_type_reference const custom_type_reference = std::get<h::Custom_type_reference>(type_reference.value().data);
@@ -1032,6 +1082,59 @@ namespace h::compiler
         {
             h::Access_array_expression const& data = std::get<h::Access_array_expression>(expression.data);
 
+            h::Expression const& left_hand_side_expression = statement.expressions[data.expression.expression_index];
+            if (std::holds_alternative<h::Dereference_and_access_expression>(left_hand_side_expression.data))
+            {
+                h::Dereference_and_access_expression const& dereference_and_access_expression = std::get<h::Dereference_and_access_expression>(left_hand_side_expression.data);
+
+                std::optional<Type_info> const soa_type_info = get_expression_type_info(
+                    core_module,
+                    nullptr,
+                    scope,
+                    statement,
+                    statement.expressions[dereference_and_access_expression.expression.expression_index],
+                    std::nullopt,
+                    declaration_database
+                );
+                if (
+                    soa_type_info.has_value() &&
+                    (
+                        std::holds_alternative<h::Soa_array_type>(soa_type_info->type.data) ||
+                        std::holds_alternative<h::Soa_array_view_type>(soa_type_info->type.data)
+                    )
+                )
+                {
+                    std::optional<h::Type_reference> const element_type = h::get_element_or_pointee_type(soa_type_info->type);
+                    if (!element_type.has_value())
+                        return std::nullopt;
+
+                    std::optional<Declaration> const declaration = find_declaration(
+                        declaration_database,
+                        element_type.value()
+                    );
+                    if (!declaration.has_value())
+                        return std::nullopt;
+
+                    std::optional<h::Type_reference> const member_type = get_declaration_member_type(
+                        declaration.value(),
+                        dereference_and_access_expression.member_name
+                    );
+                    if (!member_type.has_value())
+                        return std::nullopt;
+
+                    bool const is_member_mutable =
+                        std::holds_alternative<h::Soa_array_view_type>(soa_type_info->type.data) ?
+                        std::get<h::Soa_array_view_type>(soa_type_info->type.data).is_mutable :
+                        soa_type_info->is_mutable;
+
+                    return Type_info
+                    {
+                        .type = member_type.value(),
+                        .is_mutable = is_member_mutable,
+                    };
+                }
+            }
+
             std::optional<Type_info> const lhs_type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);;
             std::optional<h::Type_reference> const lhs_type_reference = lhs_type_info.has_value() ? std::optional<h::Type_reference>{lhs_type_info->type} : std::optional<h::Type_reference>{std::nullopt};
             if (!lhs_type_reference.has_value())
@@ -1059,6 +1162,30 @@ namespace h::compiler
                 {
                     .type = array_type.value_type[0],
                     .is_mutable = lhs_type_info->is_mutable,
+                };
+            }
+            else if (std::holds_alternative<h::Soa_array_type>(lhs_type_reference->data))
+            {
+                h::Soa_array_type const& array_type = std::get<h::Soa_array_type>(lhs_type_reference->data);
+                if (array_type.value_type.empty())
+                    return std::nullopt;
+
+                return Type_info
+                {
+                    .type = array_type.value_type[0],
+                    .is_mutable = lhs_type_info->is_mutable,
+                };
+            }
+            else if (std::holds_alternative<h::Soa_array_view_type>(lhs_type_reference->data))
+            {
+                h::Soa_array_view_type const& array_type = std::get<h::Soa_array_view_type>(lhs_type_reference->data);
+                if (array_type.value_type.empty())
+                    return std::nullopt;
+
+                return Type_info
+                {
+                    .type = array_type.value_type[0],
+                    .is_mutable = array_type.is_mutable,
                 };
             }
             else if (std::holds_alternative<h::Pointer_type>(lhs_type_reference->data))
@@ -1182,6 +1309,67 @@ namespace h::compiler
                     return Type_info
                     {
                         .type = {},
+                        .is_mutable = false,
+                    };
+                }
+                else if (builtin_type_reference.value == "soa_array_view")
+                {
+                    h::Expression const& callable_expression = statement.expressions[data.expression.expression_index];
+
+                    std::optional<Type_info> receiver_type_info = std::nullopt;
+                    if (std::holds_alternative<h::Access_expression>(callable_expression.data))
+                    {
+                        h::Access_expression const& access_expression = std::get<h::Access_expression>(callable_expression.data);
+                        receiver_type_info = get_expression_type_info(
+                            core_module,
+                            nullptr,
+                            scope,
+                            statement,
+                            statement.expressions[access_expression.expression.expression_index],
+                            std::nullopt,
+                            declaration_database
+                        );
+                    }
+                    else if (std::holds_alternative<h::Dereference_and_access_expression>(callable_expression.data))
+                    {
+                        h::Dereference_and_access_expression const& access_expression = std::get<h::Dereference_and_access_expression>(callable_expression.data);
+                        receiver_type_info = get_expression_type_info(
+                            core_module,
+                            nullptr,
+                            scope,
+                            statement,
+                            statement.expressions[access_expression.expression.expression_index],
+                            std::nullopt,
+                            declaration_database
+                        );
+                    }
+
+                    if (!receiver_type_info.has_value())
+                        return std::nullopt;
+
+                    std::optional<h::Type_reference> const underlying_receiver_type = get_underlying_type(
+                        declaration_database,
+                        receiver_type_info->type
+                    );
+                    if (!underlying_receiver_type.has_value() || !std::holds_alternative<h::Soa_array_type>(underlying_receiver_type->data))
+                        return std::nullopt;
+
+                    h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(underlying_receiver_type->data);
+                    if (soa_array_type.value_type.empty())
+                        return std::nullopt;
+
+                    h::Type_reference const soa_array_view_type =
+                    {
+                        .data = h::Soa_array_view_type
+                        {
+                            .value_type = {soa_array_type.value_type[0]},
+                            .is_mutable = receiver_type_info->is_mutable,
+                        }
+                    };
+
+                    return Type_info
+                    {
+                        .type = soa_array_view_type,
                         .is_mutable = false,
                     };
                 }
@@ -1439,6 +1627,24 @@ namespace h::compiler
                 return std::nullopt;
 
             if (std::holds_alternative<h::Array_slice_type>(type_to_instantiate->data))
+            {
+                return Type_info
+                {
+                    .type = type_to_instantiate.value(),
+                    .is_mutable = false,
+                };
+            }
+
+            if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate->data))
+            {
+                return Type_info
+                {
+                    .type = type_to_instantiate.value(),
+                    .is_mutable = false,
+                };
+            }
+
+            if (std::holds_alternative<h::Soa_array_view_type>(type_to_instantiate->data))
             {
                 return Type_info
                 {
@@ -2205,7 +2411,7 @@ namespace h::compiler
                 {
                     output = scope;
                 }
-                else if (first_expression.source_range->end == source_position)
+                else if (first_expression.source_range->end.line == source_position.line)
                 {
                     output = scope;
 

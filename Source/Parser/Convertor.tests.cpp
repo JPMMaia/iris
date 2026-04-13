@@ -472,6 +472,18 @@ namespace h::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts soa_array_type.hltxt", "[Convertor]")
+    {
+        std::string_view const input_file = "soa_array_type.hltxt";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts soa_array_view_type.hltxt", "[Convertor]")
+    {
+        std::string_view const input_file = "soa_array_view_type.hltxt";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts switch_expressions.hltxt", "[Convertor]")
     {
         std::string_view const input_file = "switch_expressions.hltxt";

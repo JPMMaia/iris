@@ -56,7 +56,7 @@ suite("Should get instantiate expression add missing members code action", () =>
 
     test("Add missing instantiate members inside an explicit instantiate expression", async () => {
         const document_uri = get_document_uri("projects/other/code_action_instantiate_5.hltxt");
-        await test_code_actions(document_uri, to_range(12, 40, 12, 40), vscode.CodeActionKind.RefactorRewrite, [
+        await test_code_actions(document_uri, to_range(12, 40, 12, 40), vscode.CodeActionKind.QuickFix, [
             {
                 title: "Add missing instantiate members",
                 kind: vscode.CodeActionKind.QuickFix,
@@ -67,7 +67,7 @@ suite("Should get instantiate expression add missing members code action", () =>
 
     test("Add missing instantiate member that is imported", async () => {
         const document_uri = get_document_uri("projects/other/code_action_instantiate_6.hltxt");
-        await test_code_actions(document_uri, to_range(6, 44, 6, 44), vscode.CodeActionKind.RefactorRewrite, [
+        await test_code_actions(document_uri, to_range(6, 44, 6, 44), vscode.CodeActionKind.QuickFix, [
             {
                 title: "Add missing instantiate members",
                 kind: vscode.CodeActionKind.QuickFix,

@@ -1,0 +1,1833 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Intrinsic Name="calculate_soa_data_pointer" Expression="((char*)data) + count*previous_stride + start_index*current_stride">
+    <Parameter Name="data" Type="void*" />
+    <Parameter Name="count" Type="int" />
+    <Parameter Name="start_index" Type="int" />
+    <Parameter Name="current_stride" Type="int" />
+    <Parameter Name="previous_stride" Type="int" />
+  </Intrinsic>
+
+  <!-- 0 elements -->
+  <Type Name="h::Soa_array_view&lt;0,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+  </Type>
+  <!-- 1 elements -->
+  <Type Name="h::Soa_array_view&lt;1,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 2 elements -->
+  <Type Name="h::Soa_array_view&lt;2,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 3 elements -->
+  <Type Name="h::Soa_array_view&lt;3,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 4 elements -->
+  <Type Name="h::Soa_array_view&lt;4,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 5 elements -->
+  <Type Name="h::Soa_array_view&lt;5,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 6 elements -->
+  <Type Name="h::Soa_array_view&lt;6,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 7 elements -->
+  <Type Name="h::Soa_array_view&lt;7,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 8 elements -->
+  <Type Name="h::Soa_array_view&lt;8,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 9 elements -->
+  <Type Name="h::Soa_array_view&lt;9,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="8">
+        <DisplayString>{"$T18: $T19[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T19*)calculate_soa_data_pointer(data, length, start_index, sizeof($T19), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 10 elements -->
+  <Type Name="h::Soa_array_view&lt;10,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="8">
+        <DisplayString>{"$T18: $T19[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T19*)calculate_soa_data_pointer(data, length, start_index, sizeof($T19), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="9">
+        <DisplayString>{"$T20: $T21[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T21*)calculate_soa_data_pointer(data, length, start_index, sizeof($T21), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 11 elements -->
+  <Type Name="h::Soa_array_view&lt;11,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="8">
+        <DisplayString>{"$T18: $T19[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T19*)calculate_soa_data_pointer(data, length, start_index, sizeof($T19), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="9">
+        <DisplayString>{"$T20: $T21[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T21*)calculate_soa_data_pointer(data, length, start_index, sizeof($T21), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="10">
+        <DisplayString>{"$T22: $T23[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T23*)calculate_soa_data_pointer(data, length, start_index, sizeof($T23), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 12 elements -->
+  <Type Name="h::Soa_array_view&lt;12,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="8">
+        <DisplayString>{"$T18: $T19[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T19*)calculate_soa_data_pointer(data, length, start_index, sizeof($T19), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="9">
+        <DisplayString>{"$T20: $T21[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T21*)calculate_soa_data_pointer(data, length, start_index, sizeof($T21), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="10">
+        <DisplayString>{"$T22: $T23[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T23*)calculate_soa_data_pointer(data, length, start_index, sizeof($T23), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="11">
+        <DisplayString>{"$T24: $T25[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T25*)calculate_soa_data_pointer(data, length, start_index, sizeof($T25), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 13 elements -->
+  <Type Name="h::Soa_array_view&lt;13,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="8">
+        <DisplayString>{"$T18: $T19[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T19*)calculate_soa_data_pointer(data, length, start_index, sizeof($T19), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="9">
+        <DisplayString>{"$T20: $T21[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T21*)calculate_soa_data_pointer(data, length, start_index, sizeof($T21), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="10">
+        <DisplayString>{"$T22: $T23[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T23*)calculate_soa_data_pointer(data, length, start_index, sizeof($T23), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="11">
+        <DisplayString>{"$T24: $T25[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T25*)calculate_soa_data_pointer(data, length, start_index, sizeof($T25), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="12">
+        <DisplayString>{"$T26: $T27[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T27*)calculate_soa_data_pointer(data, length, start_index, sizeof($T27), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 14 elements -->
+  <Type Name="h::Soa_array_view&lt;14,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="8">
+        <DisplayString>{"$T18: $T19[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T19*)calculate_soa_data_pointer(data, length, start_index, sizeof($T19), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="9">
+        <DisplayString>{"$T20: $T21[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T21*)calculate_soa_data_pointer(data, length, start_index, sizeof($T21), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="10">
+        <DisplayString>{"$T22: $T23[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T23*)calculate_soa_data_pointer(data, length, start_index, sizeof($T23), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="11">
+        <DisplayString>{"$T24: $T25[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T25*)calculate_soa_data_pointer(data, length, start_index, sizeof($T25), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="12">
+        <DisplayString>{"$T26: $T27[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T27*)calculate_soa_data_pointer(data, length, start_index, sizeof($T27), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="13">
+        <DisplayString>{"$T28: $T29[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T29*)calculate_soa_data_pointer(data, length, start_index, sizeof($T29), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 15 elements -->
+  <Type Name="h::Soa_array_view&lt;15,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="8">
+        <DisplayString>{"$T18: $T19[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T19*)calculate_soa_data_pointer(data, length, start_index, sizeof($T19), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="9">
+        <DisplayString>{"$T20: $T21[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T21*)calculate_soa_data_pointer(data, length, start_index, sizeof($T21), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="10">
+        <DisplayString>{"$T22: $T23[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T23*)calculate_soa_data_pointer(data, length, start_index, sizeof($T23), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="11">
+        <DisplayString>{"$T24: $T25[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T25*)calculate_soa_data_pointer(data, length, start_index, sizeof($T25), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="12">
+        <DisplayString>{"$T26: $T27[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T27*)calculate_soa_data_pointer(data, length, start_index, sizeof($T27), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="13">
+        <DisplayString>{"$T28: $T29[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T29*)calculate_soa_data_pointer(data, length, start_index, sizeof($T29), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="14">
+        <DisplayString>{"$T30: $T31[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T31*)calculate_soa_data_pointer(data, length, start_index, sizeof($T31), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)+sizeof($T29)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 16 elements -->
+  <Type Name="h::Soa_array_view&lt;16,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="8">
+        <DisplayString>{"$T18: $T19[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T19*)calculate_soa_data_pointer(data, length, start_index, sizeof($T19), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="9">
+        <DisplayString>{"$T20: $T21[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T21*)calculate_soa_data_pointer(data, length, start_index, sizeof($T21), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="10">
+        <DisplayString>{"$T22: $T23[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T23*)calculate_soa_data_pointer(data, length, start_index, sizeof($T23), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="11">
+        <DisplayString>{"$T24: $T25[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T25*)calculate_soa_data_pointer(data, length, start_index, sizeof($T25), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="12">
+        <DisplayString>{"$T26: $T27[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T27*)calculate_soa_data_pointer(data, length, start_index, sizeof($T27), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="13">
+        <DisplayString>{"$T28: $T29[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T29*)calculate_soa_data_pointer(data, length, start_index, sizeof($T29), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="14">
+        <DisplayString>{"$T30: $T31[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T31*)calculate_soa_data_pointer(data, length, start_index, sizeof($T31), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)+sizeof($T29)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="15">
+        <DisplayString>{"$T32: $T33[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T33*)calculate_soa_data_pointer(data, length, start_index, sizeof($T33), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)+sizeof($T29)+sizeof($T31)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 17 elements -->
+  <Type Name="h::Soa_array_view&lt;17,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="8">
+        <DisplayString>{"$T18: $T19[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T19*)calculate_soa_data_pointer(data, length, start_index, sizeof($T19), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="9">
+        <DisplayString>{"$T20: $T21[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T21*)calculate_soa_data_pointer(data, length, start_index, sizeof($T21), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="10">
+        <DisplayString>{"$T22: $T23[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T23*)calculate_soa_data_pointer(data, length, start_index, sizeof($T23), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="11">
+        <DisplayString>{"$T24: $T25[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T25*)calculate_soa_data_pointer(data, length, start_index, sizeof($T25), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="12">
+        <DisplayString>{"$T26: $T27[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T27*)calculate_soa_data_pointer(data, length, start_index, sizeof($T27), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="13">
+        <DisplayString>{"$T28: $T29[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T29*)calculate_soa_data_pointer(data, length, start_index, sizeof($T29), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="14">
+        <DisplayString>{"$T30: $T31[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T31*)calculate_soa_data_pointer(data, length, start_index, sizeof($T31), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)+sizeof($T29)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="15">
+        <DisplayString>{"$T32: $T33[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T33*)calculate_soa_data_pointer(data, length, start_index, sizeof($T33), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)+sizeof($T29)+sizeof($T31)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="16">
+        <DisplayString>{"$T34: $T35[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T35*)calculate_soa_data_pointer(data, length, start_index, sizeof($T35), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)+sizeof($T29)+sizeof($T31)+sizeof($T33)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+  <!-- 18 elements -->
+  <Type Name="h::Soa_array_view&lt;18,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+    <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
+    <Expand>
+      <Synthetic Name="0">
+        <DisplayString>{"$T2: $T3[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T3*)calculate_soa_data_pointer(data, length, start_index, sizeof($T3), 0))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="1">
+        <DisplayString>{"$T4: $T5[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T5*)calculate_soa_data_pointer(data, length, start_index, sizeof($T5), sizeof($T3)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="2">
+        <DisplayString>{"$T6: $T7[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T7*)calculate_soa_data_pointer(data, length, start_index, sizeof($T7), sizeof($T3)+sizeof($T5)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="3">
+        <DisplayString>{"$T8: $T9[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T9*)calculate_soa_data_pointer(data, length, start_index, sizeof($T9), sizeof($T3)+sizeof($T5)+sizeof($T7)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="4">
+        <DisplayString>{"$T10: $T11[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T11*)calculate_soa_data_pointer(data, length, start_index, sizeof($T11), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="5">
+        <DisplayString>{"$T12: $T13[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T13*)calculate_soa_data_pointer(data, length, start_index, sizeof($T13), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="6">
+        <DisplayString>{"$T14: $T15[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T15*)calculate_soa_data_pointer(data, length, start_index, sizeof($T15), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="7">
+        <DisplayString>{"$T16: $T17[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T17*)calculate_soa_data_pointer(data, length, start_index, sizeof($T17), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="8">
+        <DisplayString>{"$T18: $T19[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T19*)calculate_soa_data_pointer(data, length, start_index, sizeof($T19), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="9">
+        <DisplayString>{"$T20: $T21[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T21*)calculate_soa_data_pointer(data, length, start_index, sizeof($T21), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="10">
+        <DisplayString>{"$T22: $T23[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T23*)calculate_soa_data_pointer(data, length, start_index, sizeof($T23), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="11">
+        <DisplayString>{"$T24: $T25[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T25*)calculate_soa_data_pointer(data, length, start_index, sizeof($T25), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="12">
+        <DisplayString>{"$T26: $T27[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T27*)calculate_soa_data_pointer(data, length, start_index, sizeof($T27), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="13">
+        <DisplayString>{"$T28: $T29[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T29*)calculate_soa_data_pointer(data, length, start_index, sizeof($T29), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="14">
+        <DisplayString>{"$T30: $T31[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T31*)calculate_soa_data_pointer(data, length, start_index, sizeof($T31), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)+sizeof($T29)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="15">
+        <DisplayString>{"$T32: $T33[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T33*)calculate_soa_data_pointer(data, length, start_index, sizeof($T33), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)+sizeof($T29)+sizeof($T31)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="16">
+        <DisplayString>{"$T34: $T35[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T35*)calculate_soa_data_pointer(data, length, start_index, sizeof($T35), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)+sizeof($T29)+sizeof($T31)+sizeof($T33)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="17">
+        <DisplayString>{"$T36: $T37[]",sb}</DisplayString>
+        <Expand>
+          <IndexListItems>
+            <Size>end_index - start_index</Size>
+            <ValueNode>(($T37*)calculate_soa_data_pointer(data, length, start_index, sizeof($T37), sizeof($T3)+sizeof($T5)+sizeof($T7)+sizeof($T9)+sizeof($T11)+sizeof($T13)+sizeof($T15)+sizeof($T17)+sizeof($T19)+sizeof($T21)+sizeof($T23)+sizeof($T25)+sizeof($T27)+sizeof($T29)+sizeof($T31)+sizeof($T33)+sizeof($T35)))[$i]</ValueNode>
+          </IndexListItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+</AutoVisualizer>

@@ -1070,6 +1070,7 @@ namespace h::compiler
         Clang_module_data const& clang_module_data,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
+        Declaration_database const& declaration_database,
         Type_database& type_database,
         Enum_value_constants const& enum_value_constants,
         Compilation_options const& compilation_options
@@ -1112,7 +1113,8 @@ namespace h::compiler
         Debug_type_database debug_type_database = create_debug_type_database(
             *llvm_debug_builder,
             *llvm_debug_compile_unit,
-            llvm_data_layout
+            llvm_data_layout,
+            declaration_database
         );
 
         Debug_type_names_per_module const requested_debug_types = create_requested_dependency_debug_types(
@@ -1272,6 +1274,7 @@ namespace h::compiler
             clang_module_data,
             core_module,
             core_module_dependencies,
+            declaration_database,
             type_database,
             enum_value_constants,
             compilation_options

@@ -404,16 +404,16 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !3 = distinct !DISubprogram(name: "take", linkageName: "Array_slices_take", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !13)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null, !6}}
-!6 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<Int32>", size: 128, align: 64, elements: !7)
+!6 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<int32_t>", size: 128, align: 64, elements: !7)
 !7 = !{{!8, !11}}
 !8 = !DIDerivedType(tag: DW_TAG_member, name: "data", baseType: !9, size: 64, align: 64)
 !9 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !10, size: 64)
-!10 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!10 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !11 = !DIDerivedType(tag: DW_TAG_member, name: "length", baseType: !12, size: 64, align: 64, offset: 64)
-!12 = !DIBasicType(name: "Uint64", size: 64, encoding: DW_ATE_unsigned)
+!12 = !DIBasicType(name: "uint64_t", size: 64, encoding: DW_ATE_unsigned)
 !13 = !{{!14}}
 !14 = !DILocalVariable(name: "integers", arg: 1, scope: !3, file: !2, line: 3, type: !15)
-!15 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<Int32>", scope: !3, size: 128, align: 64, elements: !16)
+!15 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<int32_t>", scope: !3, size: 128, align: 64, elements: !16)
 !16 = !{{!17, !18}}
 !17 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !3, baseType: !9, size: 64, align: 64)
 !18 = !DIDerivedType(tag: DW_TAG_member, name: "length", scope: !3, baseType: !12, size: 64, align: 64, offset: 64)
@@ -454,7 +454,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !53 = !DILocalVariable(name: "b", scope: !35, file: !2, line: 23, type: !10)
 !54 = !DILocalVariable(name: "c", scope: !35, file: !2, line: 24, type: !9)
 !55 = !DILocalVariable(name: "d", scope: !35, file: !2, line: 25, type: !56)
-!56 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<mutable Int32>", scope: !35, size: 128, align: 64, elements: !57)
+!56 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<int32_t>", scope: !35, size: 128, align: 64, elements: !57)
 !57 = !{{!58, !59}}
 !58 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !35, baseType: !9, size: 64, align: 64)
 !59 = !DIDerivedType(tag: DW_TAG_member, name: "length", scope: !35, baseType: !12, size: 64, align: 64, offset: 64)
@@ -530,16 +530,16 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !11 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slices_instantiate_My_struct", file: !2, line: 3, size: 128, align: 8, elements: !12)
 !12 = !{{!13}}
 !13 = !DIDerivedType(tag: DW_TAG_member, name: "slice", file: !2, line: 5, baseType: !14, size: 128, align: 64)
-!14 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<Int32>", size: 128, align: 64, elements: !15)
+!14 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<int32_t>", size: 128, align: 64, elements: !15)
 !15 = !{{!16, !19}}
 !16 = !DIDerivedType(tag: DW_TAG_member, name: "data", baseType: !17, size: 64, align: 64)
 !17 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !18, size: 64)
-!18 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!18 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !19 = !DIDerivedType(tag: DW_TAG_member, name: "length", baseType: !20, size: 64, align: 64, offset: 64)
-!20 = !DIBasicType(name: "Uint64", size: 64, encoding: DW_ATE_unsigned)
+!20 = !DIBasicType(name: "uint64_t", size: 64, encoding: DW_ATE_unsigned)
 !21 = !DILocalVariable(name: "value", scope: !3, file: !2, line: 12, type: !18)
 !22 = !DILocalVariable(name: "s0", scope: !3, file: !2, line: 13, type: !23)
-!23 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<Int32>", scope: !3, size: 128, align: 64, elements: !24)
+!23 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<int32_t>", scope: !3, size: 128, align: 64, elements: !24)
 !24 = !{{!25, !26}}
 !25 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !3, baseType: !17, size: 64, align: 64)
 !26 = !DIDerivedType(tag: DW_TAG_member, name: "length", scope: !3, baseType: !20, size: 64, align: 64, offset: 64)
@@ -1780,6 +1780,500 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Soa Array Type", "[LLVM_IR]")
+  {
+    char const* const input_file = "soa_array_type.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%__hl_soa_array = type { ptr }
+%struct.soa_array_type_Particle = type { float, float }
+
+; Function Attrs: convergent
+define private void @soa_array_type_run() #0 {
+entry:
+  %particles = alloca %__hl_soa_array, align 8
+  %soa_array_storage = alloca [32 x i8], align 4
+  %soa_element = alloca %struct.soa_array_type_Particle, align 4
+  %p1 = alloca %struct.soa_array_type_Particle, align 4
+  %soa_element19 = alloca %struct.soa_array_type_Particle, align 4
+  %0 = alloca %struct.soa_array_type_Particle, align 4
+  %soa_assignment_struct = alloca %struct.soa_array_type_Particle, align 4
+  %x2 = alloca float, align 4
+  %y3 = alloca float, align 4
+  %length = alloca i64, align 8
+  %data = alloca ptr, align 8
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
+  %1 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  store ptr %soa_array_data, ptr %1, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
+  %2 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 0
+  %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 1
+  %4 = load float, ptr %soa_member_element_pointer16, align 4
+  %5 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element, i32 0, i32 0
+  store float %4, ptr %5, align 4
+  %soa_member_base_pointer17 = getelementptr i8, ptr %3, i64 16
+  %soa_member_element_pointer18 = getelementptr float, ptr %soa_member_base_pointer17, i32 1
+  %6 = load float, ptr %soa_member_element_pointer18, align 4
+  %7 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element, i32 0, i32 1
+  store float %6, ptr %7, align 4
+  %8 = load %struct.soa_array_type_Particle, ptr %soa_element, align 4
+  store %struct.soa_array_type_Particle %8, ptr %p1, align 4
+  %9 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %10 = load ptr, ptr %9, align 8
+  %soa_member_base_pointer20 = getelementptr i8, ptr %10, i64 0
+  %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i32 1
+  %11 = load float, ptr %soa_member_element_pointer21, align 4
+  %12 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 0
+  store float %11, ptr %12, align 4
+  %soa_member_base_pointer22 = getelementptr i8, ptr %10, i64 16
+  %soa_member_element_pointer23 = getelementptr float, ptr %soa_member_base_pointer22, i32 1
+  %13 = load float, ptr %soa_member_element_pointer23, align 4
+  %14 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 1
+  store float %13, ptr %14, align 4
+  %15 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 0
+  store float 3.000000e+00, ptr %15, align 4
+  %16 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 1
+  store float 4.000000e+00, ptr %16, align 4
+  %17 = load %struct.soa_array_type_Particle, ptr %0, align 4
+  %18 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %19 = load ptr, ptr %18, align 8
+  store %struct.soa_array_type_Particle %17, ptr %soa_assignment_struct, align 4
+  %20 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
+  %soa_member_base_pointer24 = getelementptr i8, ptr %19, i64 0
+  %soa_member_element_pointer25 = getelementptr float, ptr %soa_member_base_pointer24, i32 1
+  %21 = load float, ptr %20, align 4
+  store float %21, ptr %soa_member_element_pointer25, align 4
+  %22 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
+  %soa_member_base_pointer26 = getelementptr i8, ptr %19, i64 16
+  %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i32 1
+  %23 = load float, ptr %22, align 4
+  store float %23, ptr %soa_member_element_pointer27, align 4
+  %24 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %25 = load ptr, ptr %24, align 8
+  %soa_member_base_pointer28 = getelementptr i8, ptr %25, i64 0
+  %soa_member_element_pointer29 = getelementptr float, ptr %soa_member_base_pointer28, i32 2
+  %26 = load float, ptr %soa_member_element_pointer29, align 4
+  store float %26, ptr %x2, align 4
+  %27 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %28 = load ptr, ptr %27, align 8
+  %soa_member_base_pointer30 = getelementptr i8, ptr %28, i64 0
+  %soa_member_element_pointer31 = getelementptr float, ptr %soa_member_base_pointer30, i32 2
+  store float 1.000000e+00, ptr %soa_member_element_pointer31, align 4
+  %29 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %30 = load ptr, ptr %29, align 8
+  %soa_member_base_pointer32 = getelementptr i8, ptr %30, i64 16
+  %soa_member_element_pointer33 = getelementptr float, ptr %soa_member_base_pointer32, i32 3
+  %31 = load float, ptr %soa_member_element_pointer33, align 4
+  store float %31, ptr %y3, align 4
+  %32 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %33 = load ptr, ptr %32, align 8
+  %soa_member_base_pointer34 = getelementptr i8, ptr %33, i64 16
+  %soa_member_element_pointer35 = getelementptr float, ptr %soa_member_base_pointer34, i32 3
+  store float 2.000000e+00, ptr %soa_member_element_pointer35, align 4
+  store i64 4, ptr %length, align 8
+  %34 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %35 = load ptr, ptr %34, align 8
+  store ptr %35, ptr %data, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Soa Array Type Debug Information", "[LLVM_IR]")
+  {
+    char const* const input_file = "soa_array_type_debug_information.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+%__hl_soa_array = type {{ ptr }}
+
+; Function Attrs: convergent
+define private void @soa_array_type_debug_information_run() #0 !dbg !3 {{
+entry:
+  %particles = alloca %__hl_soa_array, align 8, !dbg !7
+  %soa_array_storage = alloca [32 x i8], align 4, !dbg !7
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0, !dbg !7
+  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0, !dbg !7
+  store ptr %soa_array_data, ptr %0, align 8, !dbg !7
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0, !dbg !7
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4, !dbg !7
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16, !dbg !7
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4, !dbg !7
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0, !dbg !7
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4, !dbg !7
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16, !dbg !7
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4, !dbg !7
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0, !dbg !7
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4, !dbg !7
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16, !dbg !7
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4, !dbg !7
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0, !dbg !7
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4, !dbg !7
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16, !dbg !7
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3, !dbg !7
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4, !dbg !7
+  call void @llvm.dbg.declare(metadata ptr %particles, metadata !8, metadata !DIExpression()), !dbg !7
+  ret void, !dbg !7
+}}
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
+
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
+
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "soa_array_type_debug_information.hltxt", directory: "{}")
+!3 = distinct !DISubprogram(name: "run", linkageName: "soa_array_type_debug_information_run", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
+!4 = !DISubroutineType(types: !5)
+!5 = !{{null}}
+!6 = !{{}}
+!7 = !DILocation(line: 11, column: 5, scope: !3)
+!8 = !DILocalVariable(name: "particles", scope: !3, file: !2, line: 11, type: !9)
+!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "Soa_array<2,soa_array_type_debug_information_Particle,4,x,float,y,float>", scope: !10, size: 64, align: 64, elements: !11)
+!10 = !DINamespace(name: "h", scope: null)
+!11 = !{{!12}}
+!12 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !10, baseType: !13, size: 64, align: 64)
+!13 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !14, size: 64)
+!14 = !DIBasicType(name: "uint8_t", size: 8, encoding: DW_ATE_unsigned_char)
+)", g_test_source_files_path.generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
+  }
+
+  TEST_CASE("Compile Soa Array View Type", "[LLVM_IR]")
+  {
+    char const* const input_file = "soa_array_view_type.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%__hl_soa_array = type { ptr }
+%__hl_soa_array_view = type { i64, i64, i64, ptr }
+%struct.soa_array_view_type_Particle = type { float, float }
+
+; Function Attrs: convergent
+define private void @soa_array_view_type_run() #0 {
+entry:
+  %soa_array = alloca %__hl_soa_array, align 8
+  %soa_array_storage = alloca [32 x i8], align 4
+  %particles = alloca %__hl_soa_array, align 8
+  %soa_array_view = alloca %__hl_soa_array_view, align 8
+  %view = alloca %__hl_soa_array_view, align 8
+  %start_index = alloca i64, align 8
+  %end_index = alloca i64, align 8
+  %length = alloca i64, align 8
+  %data = alloca ptr, align 8
+  %soa_element = alloca %struct.soa_array_view_type_Particle, align 4
+  %0 = alloca %struct.soa_array_view_type_Particle, align 4
+  %soa_assignment_struct = alloca %struct.soa_array_view_type_Particle, align 4
+  %soa_element39 = alloca %struct.soa_array_view_type_Particle, align 4
+  %p_0 = alloca %struct.soa_array_view_type_Particle, align 4
+  %x0 = alloca float, align 4
+  %y1 = alloca float, align 4
+  %soa_array_view58 = alloca %__hl_soa_array_view, align 8
+  %full_view = alloca %__hl_soa_array_view, align 8
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
+  %1 = getelementptr inbounds %__hl_soa_array, ptr %soa_array, i32 0, i32 0
+  store ptr %soa_array_data, ptr %1, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
+  %2 = load %__hl_soa_array, ptr %soa_array, align 8
+  store %__hl_soa_array %2, ptr %particles, align 8
+  %3 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
+  store i32 1, ptr %5, align 4
+  %6 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
+  store i32 3, ptr %6, align 4
+  %7 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
+  store i64 4, ptr %7, align 8
+  %8 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
+  store ptr %4, ptr %8, align 8
+  %9 = load %__hl_soa_array_view, ptr %soa_array_view, align 8
+  store %__hl_soa_array_view %9, ptr %view, align 8
+  %10 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %11 = load i64, ptr %10, align 8
+  store i64 %11, ptr %start_index, align 8
+  %12 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 1
+  %13 = load i64, ptr %12, align 8
+  store i64 %13, ptr %end_index, align 8
+  %14 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %15 = load i64, ptr %14, align 8
+  store i64 %15, ptr %length, align 8
+  %16 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %17 = load ptr, ptr %16, align 8
+  store ptr %17, ptr %data, align 8
+  %18 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %19 = load ptr, ptr %18, align 8
+  %20 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %21 = load i64, ptr %20, align 8
+  %22 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %23 = load i64, ptr %22, align 8
+  %soa_adjusted_index = add i64 %23, 0
+  %soa_member_base_pointer15 = getelementptr i8, ptr %19, i64 0
+  %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i64 %soa_adjusted_index
+  %24 = load float, ptr %soa_member_element_pointer16, align 4
+  %25 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 0
+  store float %24, ptr %25, align 4
+  %soa_member_block_size = mul i64 %21, 4
+  %soa_member_block_offset = add i64 0, %soa_member_block_size
+  %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
+  %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
+  %soa_member_base_pointer17 = getelementptr i8, ptr %19, i64 %soa_offset_aligned
+  %soa_member_element_pointer18 = getelementptr float, ptr %soa_member_base_pointer17, i64 %soa_adjusted_index
+  %26 = load float, ptr %soa_member_element_pointer18, align 4
+  %27 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 1
+  store float %26, ptr %27, align 4
+  %28 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 0
+  store float 3.000000e+00, ptr %28, align 4
+  %29 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 1
+  store float 4.000000e+00, ptr %29, align 4
+  %30 = load %struct.soa_array_view_type_Particle, ptr %0, align 4
+  %31 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %32 = load ptr, ptr %31, align 8
+  %33 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %34 = load i64, ptr %33, align 8
+  %35 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %36 = load i64, ptr %35, align 8
+  %soa_adjusted_index19 = add i64 %36, 0
+  store %struct.soa_array_view_type_Particle %30, ptr %soa_assignment_struct, align 4
+  %37 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
+  %soa_member_base_pointer20 = getelementptr i8, ptr %32, i64 0
+  %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i64 %soa_adjusted_index19
+  %38 = load float, ptr %37, align 4
+  store float %38, ptr %soa_member_element_pointer21, align 4
+  %39 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
+  %soa_member_block_size22 = mul i64 %34, 4
+  %soa_member_block_offset23 = add i64 0, %soa_member_block_size22
+  %soa_offset_adjusted24 = add i64 %soa_member_block_offset23, 3
+  %soa_offset_aligned25 = and i64 %soa_offset_adjusted24, -4
+  %soa_member_base_pointer26 = getelementptr i8, ptr %32, i64 %soa_offset_aligned25
+  %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i64 %soa_adjusted_index19
+  %40 = load float, ptr %39, align 4
+  store float %40, ptr %soa_member_element_pointer27, align 4
+  %41 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %42 = load ptr, ptr %41, align 8
+  %43 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %44 = load i64, ptr %43, align 8
+  %45 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %46 = load i64, ptr %45, align 8
+  %soa_adjusted_index28 = add i64 %46, 0
+  %soa_member_base_pointer29 = getelementptr i8, ptr %42, i64 0
+  %soa_member_element_pointer30 = getelementptr float, ptr %soa_member_base_pointer29, i64 %soa_adjusted_index28
+  store float 1.000000e+00, ptr %soa_member_element_pointer30, align 4
+  %47 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %48 = load ptr, ptr %47, align 8
+  %49 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %50 = load i64, ptr %49, align 8
+  %51 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %52 = load i64, ptr %51, align 8
+  %soa_adjusted_index31 = add i64 %52, 1
+  %soa_member_block_size32 = mul i64 %50, 4
+  %soa_member_block_offset33 = add i64 0, %soa_member_block_size32
+  %soa_offset_adjusted34 = add i64 %soa_member_block_offset33, 3
+  %soa_offset_aligned35 = and i64 %soa_offset_adjusted34, -4
+  %soa_member_base_pointer36 = getelementptr i8, ptr %48, i64 %soa_offset_aligned35
+  %soa_member_element_pointer37 = getelementptr float, ptr %soa_member_base_pointer36, i64 %soa_adjusted_index31
+  store float 2.000000e+00, ptr %soa_member_element_pointer37, align 4
+  %53 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %54 = load ptr, ptr %53, align 8
+  %55 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %56 = load i64, ptr %55, align 8
+  %57 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %58 = load i64, ptr %57, align 8
+  %soa_adjusted_index38 = add i64 %58, 0
+  %soa_member_base_pointer40 = getelementptr i8, ptr %54, i64 0
+  %soa_member_element_pointer41 = getelementptr float, ptr %soa_member_base_pointer40, i64 %soa_adjusted_index38
+  %59 = load float, ptr %soa_member_element_pointer41, align 4
+  %60 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 0
+  store float %59, ptr %60, align 4
+  %soa_member_block_size42 = mul i64 %56, 4
+  %soa_member_block_offset43 = add i64 0, %soa_member_block_size42
+  %soa_offset_adjusted44 = add i64 %soa_member_block_offset43, 3
+  %soa_offset_aligned45 = and i64 %soa_offset_adjusted44, -4
+  %soa_member_base_pointer46 = getelementptr i8, ptr %54, i64 %soa_offset_aligned45
+  %soa_member_element_pointer47 = getelementptr float, ptr %soa_member_base_pointer46, i64 %soa_adjusted_index38
+  %61 = load float, ptr %soa_member_element_pointer47, align 4
+  %62 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 1
+  store float %61, ptr %62, align 4
+  %63 = load %struct.soa_array_view_type_Particle, ptr %soa_element39, align 4
+  store %struct.soa_array_view_type_Particle %63, ptr %p_0, align 4
+  %64 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %65 = load ptr, ptr %64, align 8
+  %66 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %67 = load i64, ptr %66, align 8
+  %68 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %69 = load i64, ptr %68, align 8
+  %soa_adjusted_index48 = add i64 %69, 0
+  %soa_member_base_pointer49 = getelementptr i8, ptr %65, i64 0
+  %soa_member_element_pointer50 = getelementptr float, ptr %soa_member_base_pointer49, i64 %soa_adjusted_index48
+  %70 = load float, ptr %soa_member_element_pointer50, align 4
+  store float %70, ptr %x0, align 4
+  %71 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %72 = load ptr, ptr %71, align 8
+  %73 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %74 = load i64, ptr %73, align 8
+  %75 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %76 = load i64, ptr %75, align 8
+  %soa_adjusted_index51 = add i64 %76, 1
+  %soa_member_block_size52 = mul i64 %74, 4
+  %soa_member_block_offset53 = add i64 0, %soa_member_block_size52
+  %soa_offset_adjusted54 = add i64 %soa_member_block_offset53, 3
+  %soa_offset_aligned55 = and i64 %soa_offset_adjusted54, -4
+  %soa_member_base_pointer56 = getelementptr i8, ptr %72, i64 %soa_offset_aligned55
+  %soa_member_element_pointer57 = getelementptr float, ptr %soa_member_base_pointer56, i64 %soa_adjusted_index51
+  %77 = load float, ptr %soa_member_element_pointer57, align 4
+  store float %77, ptr %y1, align 4
+  %78 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %79 = load ptr, ptr %78, align 8
+  %80 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
+  store i64 0, ptr %80, align 8
+  %81 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
+  store i64 4, ptr %81, align 8
+  %82 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
+  store i64 4, ptr %82, align 8
+  %83 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
+  store ptr %79, ptr %83, align 8
+  %84 = load %__hl_soa_array_view, ptr %soa_array_view58, align 8
+  store %__hl_soa_array_view %84, ptr %full_view, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Soa Array View Type Debug Information", "[LLVM_IR]")
+  {
+    char const* const input_file = "soa_array_view_type_debug_information.hltxt";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+%__hl_soa_array_view = type {{ i64, i64, i64, ptr }}
+
+; Function Attrs: convergent
+define private void @soa_array_view_type_debug_information_run() #0 !dbg !3 {{
+entry:
+  %view = alloca %__hl_soa_array_view, align 8, !dbg !7
+  call void @llvm.memset.p0.i64(ptr align 8 %view, i8 0, i64 32, i1 false), !dbg !7
+  call void @llvm.dbg.declare(metadata ptr %view, metadata !8, metadata !DIExpression()), !dbg !7
+  ret void, !dbg !7
+}}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #2
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
+attributes #2 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
+
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
+
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "soa_array_view_type_debug_information.hltxt", directory: "{}")
+!3 = distinct !DISubprogram(name: "run", linkageName: "soa_array_view_type_debug_information_run", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
+!4 = !DISubroutineType(types: !5)
+!5 = !{{null}}
+!6 = !{{}}
+!7 = !DILocation(line: 11, column: 5, scope: !3)
+!8 = !DILocalVariable(name: "view", scope: !3, file: !2, line: 11, type: !9)
+!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "Soa_array_view<2,soa_array_view_type_debug_information_Particle,x,float,y,float>", scope: !10, size: 256, align: 64, elements: !11)
+!10 = !DINamespace(name: "h", scope: null)
+!11 = !{{!12, !14, !15, !16}}
+!12 = !DIDerivedType(tag: DW_TAG_member, name: "start_index", scope: !10, baseType: !13, size: 64, align: 64)
+!13 = !DIBasicType(name: "uint64_t", size: 64, encoding: DW_ATE_unsigned)
+!14 = !DIDerivedType(tag: DW_TAG_member, name: "end_index", scope: !10, baseType: !13, size: 64, align: 64, offset: 64)
+!15 = !DIDerivedType(tag: DW_TAG_member, name: "length", scope: !10, baseType: !13, size: 64, align: 64, offset: 128)
+!16 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !10, baseType: !17, size: 64, align: 64, offset: 192)
+!17 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !18, size: 64)
+!18 = !DIBasicType(name: "uint8_t", size: 8, encoding: DW_ATE_unsigned_char)
+)", g_test_source_files_path.generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
+  }
+
   TEST_CASE("Compile Debug Information C Headers", "[LLVM_IR]")
   {
     char const* const input_file = "debug_information_c_headers.hltxt";
@@ -1860,7 +2354,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 5, type: !4, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
-!6 = !DIBasicType(name: "c_int", size: 32, encoding: DW_ATE_signed)
+!6 = !DIBasicType(name: "int", size: 32, encoding: DW_ATE_signed)
 !7 = !{{}}
 !8 = !DILocation(line: 7, column: 5, scope: !3)
 !9 = !DILocation(line: 8, column: 5, scope: !3)
@@ -1960,15 +2454,15 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null, !6, !8, !15}}
 !6 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !7, size: 64)
-!7 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!7 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !8 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !9, size: 64)
 !9 = !DICompositeType(tag: DW_TAG_structure_type, name: "Vector2i", file: !10, line: 2, size: 64, align: 8, elements: !11)
 !10 = !DIFile(filename: "vector2i.h", directory: "{}")
 !11 = !{{!12, !14}}
 !12 = !DIDerivedType(tag: DW_TAG_member, name: "x", file: !10, line: 4, baseType: !13, size: 32, align: 32)
-!13 = !DIBasicType(name: "c_int", size: 32, encoding: DW_ATE_signed)
+!13 = !DIBasicType(name: "int", size: 32, encoding: DW_ATE_signed)
 !14 = !DIDerivedType(tag: DW_TAG_member, name: "y", file: !10, line: 5, baseType: !13, size: 32, align: 32, offset: 32)
-!15 = !DIBasicType(name: "Uint64", size: 64, encoding: DW_ATE_unsigned)
+!15 = !DIBasicType(name: "uint64_t", size: 64, encoding: DW_ATE_unsigned)
 !16 = !{{!17, !18, !19}}
 !17 = !DILocalVariable(name: "integers", arg: 1, scope: !3, file: !2, line: 5, type: !6)
 !18 = !DILocalVariable(name: "vectors", arg: 2, scope: !3, file: !2, line: 5, type: !8)
@@ -1979,12 +2473,12 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !23 = !DILocation(line: 5, column: 39, scope: !3)
 !24 = !DILocation(line: 5, column: 68, scope: !3)
 !25 = !DILocalVariable(name: "a", scope: !3, file: !2, line: 7, type: !26)
-!26 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<Int32>", scope: !3, size: 128, align: 64, elements: !27)
+!26 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<int32_t>", scope: !3, size: 128, align: 64, elements: !27)
 !27 = !{{!28, !29}}
 !28 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !3, baseType: !6, size: 64, align: 64)
 !29 = !DIDerivedType(tag: DW_TAG_member, name: "length", scope: !3, baseType: !15, size: 64, align: 64, offset: 64)
 !30 = !DILocalVariable(name: "b", scope: !3, file: !2, line: 8, type: !31)
-!31 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<vector2i.Vector2i>", scope: !3, size: 128, align: 64, elements: !32)
+!31 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<Vector2i>", scope: !3, size: 128, align: 64, elements: !32)
 !32 = !{{!33, !29}}
 !33 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !3, baseType: !8, size: 64, align: 64)
 !34 = !DILocation(line: 8, column: 5, scope: !3)
@@ -2044,7 +2538,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !6 = !DICompositeType(tag: DW_TAG_structure_type, name: "Debug_information_My_struct", file: !2, line: 3, size: 64, align: 8, elements: !7)
 !7 = !{{!8, !10, !11}}
 !8 = !DIDerivedType(tag: DW_TAG_member, name: "a", file: !2, line: 5, baseType: !9, size: 32, align: 32)
-!9 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!9 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !10 = !DIDerivedType(tag: DW_TAG_member, name: "b", file: !2, line: 6, baseType: !9, size: 24, align: 32, offset: 32, flags: DIFlagBitField)
 !11 = !DIDerivedType(tag: DW_TAG_member, name: "c", file: !2, line: 7, baseType: !9, size: 8, align: 32, offset: 56, flags: DIFlagBitField)
 !12 = !{{}}
@@ -2114,7 +2608,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
-!6 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !7 = !{{}}
 !8 = !DILocation(line: 5, column: 5, scope: !3)
 !9 = !DILocalVariable(name: "value", scope: !3, file: !2, line: 5, type: !6)
@@ -2178,7 +2672,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 8, type: !4, scopeLine: 9, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
-!6 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !7 = !{{}}
 !8 = !DILocation(line: 10, column: 5, scope: !3)
 !9 = !DILocation(line: 10, column: 17, scope: !3)
@@ -2248,7 +2742,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6, !6}}
-!6 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !7 = !{{!8}}
 !8 = !DILocalVariable(name: "value", arg: 1, scope: !3, file: !2, line: 3, type: !6)
 !9 = !DILocation(line: 3, column: 14, scope: !3)
@@ -2308,7 +2802,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !6 = !DICompositeType(tag: DW_TAG_structure_type, name: "Debug_information_Vector2i", file: !2, line: 3, size: 64, align: 8, elements: !7)
 !7 = !{{!8, !10}}
 !8 = !DIDerivedType(tag: DW_TAG_member, name: "x", file: !2, line: 5, baseType: !9, size: 32, align: 32)
-!9 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!9 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !10 = !DIDerivedType(tag: DW_TAG_member, name: "y", file: !2, line: 6, baseType: !9, size: 32, align: 32, offset: 32)
 !11 = !{{}}
 !12 = !DILocation(line: 11, column: 5, scope: !3)
@@ -2369,7 +2863,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6, !6}}
-!6 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !7 = !{{!8}}
 !8 = !DILocalVariable(name: "value", arg: 1, scope: !3, file: !2, line: 3, type: !6)
 !9 = !DILocation(line: 3, column: 14, scope: !3)
@@ -2475,9 +2969,9 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !6 = !DICompositeType(tag: DW_TAG_union_type, name: "Debug_information_My_int", file: !2, line: 3, size: 32, align: 8, elements: !7)
 !7 = !{{!8, !10}}
 !8 = !DIDerivedType(tag: DW_TAG_member, name: "x", file: !2, line: 5, baseType: !9, size: 32, align: 8)
-!9 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!9 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !10 = !DIDerivedType(tag: DW_TAG_member, name: "y", file: !2, line: 6, baseType: !11, size: 32, align: 8)
-!11 = !DIBasicType(name: "Float32", size: 32, encoding: DW_ATE_float)
+!11 = !DIBasicType(name: "float", size: 32, encoding: DW_ATE_float)
 !12 = !{{}}
 !13 = !DILocation(line: 11, column: 5, scope: !3)
 !14 = !DILocalVariable(name: "instance", scope: !3, file: !2, line: 11, type: !6)
@@ -2522,7 +3016,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
-!6 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !7 = !{{}}
 !8 = !DILocation(line: 5, column: 5, scope: !3)
 !9 = !DILocalVariable(name: "i", scope: !3, file: !2, line: 5, type: !6)
@@ -2605,7 +3099,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
-!6 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !7 = !{{}}
 !8 = !DILocation(line: 5, column: 5, scope: !3)
 !9 = !DILocalVariable(name: "value", scope: !3, file: !2, line: 5, type: !6)
@@ -2929,24 +3423,24 @@ attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !6 = !{}
 !7 = !DILocation(line: 4, column: 1, scope: !3)
 !8 = !DILocalVariable(name: "a", scope: !3, file: !2, line: 5, type: !9)
-!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "Decimal2", scope: !10, size: 32, align: 32, elements: !11)
+!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal2", scope: !10, size: 32, align: 32, elements: !11)
 !10 = !DINamespace(name: "h", scope: null)
 !11 = !{!12}
 !12 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !13, size: 32, align: 32)
-!13 = !DIBasicType(name: "Decimal2_storage", size: 32, encoding: DW_ATE_signed)
+!13 = !DIBasicType(name: "h::Decimal2_storage", size: 32, encoding: DW_ATE_signed)
 !14 = !DILocation(line: 5, column: 5, scope: !3)
 !15 = !DILocation(line: 6, column: 5, scope: !3)
 !16 = !DILocation(line: 7, column: 5, scope: !3)
 !17 = !DILocalVariable(name: "b", scope: !3, file: !2, line: 6, type: !18)
-!18 = !DICompositeType(tag: DW_TAG_structure_type, name: "Decimal4", scope: !10, size: 32, align: 32, elements: !19)
+!18 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal4", scope: !10, size: 32, align: 32, elements: !19)
 !19 = !{!20}
 !20 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !21, size: 32, align: 32)
-!21 = !DIBasicType(name: "Decimal4_storage", size: 32, encoding: DW_ATE_signed)
+!21 = !DIBasicType(name: "h::Decimal4_storage", size: 32, encoding: DW_ATE_signed)
 !22 = !DILocalVariable(name: "c", scope: !3, file: !2, line: 7, type: !23)
-!23 = !DICompositeType(tag: DW_TAG_structure_type, name: "Decimal7", scope: !10, size: 64, align: 64, elements: !24)
+!23 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal7", scope: !10, size: 64, align: 64, elements: !24)
 !24 = !{!25}
 !25 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !26, size: 64, align: 64)
-!26 = !DIBasicType(name: "Decimal7_storage", size: 64, encoding: DW_ATE_signed)
+!26 = !DIBasicType(name: "h::Decimal7_storage", size: 64, encoding: DW_ATE_signed)
 !27 = !DILocalVariable(name: "d", scope: !3, file: !2, line: 8, type: !9)
 !28 = !DILocation(line: 8, column: 5, scope: !3)
 )";
@@ -3265,7 +3759,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !3 = distinct !DISubprogram(name: "do_defer", linkageName: "Defer_expressions_with_debug_information_do_defer", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null, !6}}
-!6 = !DIBasicType(name: "Int32", size: 32, encoding: DW_ATE_signed)
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
 !7 = !{{!8}}
 !8 = !DILocalVariable(name: "value", arg: 1, scope: !3, file: !2, line: 3, type: !6)
 !9 = !DILocation(line: 3, column: 19, scope: !3)
@@ -3273,7 +3767,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !11 = distinct !DISubprogram(name: "run", linkageName: "Defer_expressions_with_debug_information_run", scope: null, file: !2, line: 7, type: !12, scopeLine: 8, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !15)
 !12 = !DISubroutineType(types: !13)
 !13 = !{{null, !14, !6}}
-!14 = !DIBasicType(name: "Bool", size: 1, encoding: DW_ATE_boolean)
+!14 = !DIBasicType(name: "bool", size: 1, encoding: DW_ATE_boolean)
 !15 = !{{!16, !17}}
 !16 = !DILocalVariable(name: "condition", arg: 1, scope: !11, file: !2, line: 7, type: !14)
 !17 = !DILocalVariable(name: "value", arg: 2, scope: !11, file: !2, line: 7, type: !6)
@@ -7528,3 +8022,6 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
     test_c_interoperability_common("c_interoperability_function_with_small_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
 }
+
+
+

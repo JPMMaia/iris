@@ -21,6 +21,18 @@ using h::compiler::operator<<;
 
 namespace h::compiler
 {
+    void print_diagnostics(std::span<Diagnostic const> const diagnostics)
+    {
+        std::fprintf(stderr, "[\n");
+        for (std::size_t index = 0; index < diagnostics.size(); ++index)
+        {
+            std::pmr::string const diagnostic_string = diagnostic_to_string(diagnostics[index], {}, {});
+            std::fprintf(stderr, "    %s", diagnostic_string.c_str());
+            std::fprintf(stderr, index + 1 == diagnostics.size() ? ",\n" : "\n");
+        }
+        std::fprintf(stderr, "]\n");
+    }
+
     void test_validate_module(
         std::string_view const input_text,
         std::span<std::string_view const> const input_dependencies_text,
@@ -81,7 +93,19 @@ namespace h::compiler
 
         std::span<h::compiler::Diagnostic const> const actual_diagnostics = result.diagnostics;
 
+        if (actual_diagnostics.size() != expected_diagnostics.size())
+        {
+            std::fprintf(stderr, "actual_diagnostics.size() != expected_diagnostics.size()\n");
+
+            std::fprintf(stderr, "actual_diagnostics = ");
+            print_diagnostics(actual_diagnostics);
+
+            std::fprintf(stderr, "\nexpected_diagnostics = ");
+            print_diagnostics(expected_diagnostics);
+        }
+
         REQUIRE(actual_diagnostics.size() == expected_diagnostics.size());
+
         for (std::size_t index = 0; index < actual_diagnostics.size(); ++index)
         {
             h::compiler::Diagnostic const& actual_diagnostic = actual_diagnostics[index];
@@ -441,6 +465,327 @@ function run() -> ()
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
                 .message = "Cannot take address of a global macro.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+
+    TEST_CASE("Validates that Soa_array element type can only be a struct", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+var particles: Soa_array::<Int32, 4> = {};
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(8, 28, 8, 33),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Soa_element_type_not_a_struct,
+                .message = "Soa_array element type must be a struct type.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array element type must exist", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+var particles: Soa_array::<Unknown_particle, 4> = {};
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(3, 28, 3, 44),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Type 'Unknown_particle' does not exist.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array with struct element type is valid", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+using Particle_array = Soa_array::<Particle, 4>;
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array contains data, length and view", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    mutable particles: Soa_array::<Particle, 4> = {};
+
+    var length: Uint64 = particles.length;
+    var data = particles.data;
+    var view = particles.view();
+    var subview = particles.view(1, 3);
+    var random = particles.random;
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(17, 18, 17, 34),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Member 'random' does not exist in the type 'Soa_array::<Particle, 4>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array view expects zero or two arguments", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    mutable particles: Soa_array::<Particle, 4> = {};
+    var a = particles.view();
+    var b = particles.view(1, 3);
+    var c = particles.view(1);
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(13, 13, 13, 30),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Function expects 0 or 2 arguments, but 1 were provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array_view element type can only be a struct", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+using Particle_view = Soa_array_view::<Int32>;
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(3, 40, 3, 45),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Soa_element_type_not_a_struct,
+                .message = "Soa_array_view element type must be a struct type.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array_view element type must exist", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+using Particle_view = Soa_array_view::<Unknown_particle>;
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(3, 40, 3, 56),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Type 'Unknown_particle' does not exist.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array_view with struct element type is valid", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+using Particle_view = Soa_array_view::<Particle>;
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array_view rejects unknown members", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function run(view: Soa_array_view::<Particle>) -> ()
+{
+    var data = view.data;
+    var length = view.length;
+    var start_index = view.start_index;
+    var end_index = view.end_index;
+    var random = view.random;
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(15, 18, 15, 29),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Member 'random' does not exist in the type 'Soa_array_view::<Particle>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array_view can initialize typed variables", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    mutable view: Soa_array_view::<Particle> = {};
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array_view mutable elements can be modified through immutable view binding", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    var view: Soa_array_view::<mutable Particle> = {};
+
+    view[1] = {
+        x: 3.0f32,
+        y: 4.0f32
+    };
+    view->x[2] = 1.0f32;
+    view->y[3] = 2.0f32;
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that Soa_array_view with immutable element type cannot be assigned to Soa_array_view with mutable element type", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function inspect(view: Soa_array_view::<Particle>) -> ()
+{
+}
+
+function run(view: Soa_array_view::<Particle>, mutable_view: Soa_array_view::<mutable Particle>) -> ()
+{
+    var a: Soa_array_view::<Particle> = mutable_view;
+    var b: Soa_array_view::<mutable Particle> = view;
+
+    inspect(mutable_view);
+}
+)";
+
+        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        {
+            h::compiler::Diagnostic
+            {
+                .range = create_source_range(15, 49, 15, 53),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Expression type 'Soa_array_view::<Particle>' does not match expected type 'Soa_array_view::<mutable Particle>'.",
                 .related_information = {},
             }
         };

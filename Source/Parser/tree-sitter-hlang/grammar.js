@@ -40,6 +40,8 @@ module.exports = grammar({
       $.Module_type,
       $.Pointer_type,
       $.Constant_array_type,
+      $.Soa_array_type,
+      $.Soa_array_view_type,
       $.Array_slice_type,
       $.Function_pointer_type,
       $.Type_instance_type
@@ -52,6 +54,9 @@ module.exports = grammar({
     Array_slice_type: $ => seq("Array_slice", "::<", optional("mutable"), $.Type, ">"),
     Constant_array_type: $ => seq("Constant_array", "::<", $.Type, ",", $.Constant_array_length, ">"),
     Constant_array_length: $ => $.Number,
+    Soa_array_type: $ => seq("Soa_array", "::<", $.Type, ",", $.Soa_array_length, ">"),
+    Soa_array_length: $ => $.Number,
+    Soa_array_view_type: $ => seq("Soa_array_view", "::<", optional("mutable"), $.Type, ">"),
     Function_pointer_type: $ => seq("function", "<", $.Function_pointer_type_input_parameters, "->", $.Function_pointer_type_output_parameters, ">"),
     Function_pointer_type_input_parameters: $ => seq("(", optional(seq($.Function_parameter, repeat(seq(",", $.Function_parameter)))), ")"),
     Function_pointer_type_output_parameters: $ => seq("(", optional(seq($.Function_parameter, repeat(seq(",", $.Function_parameter)))), ")"),

@@ -15,6 +15,7 @@ module;
 module h.compiler.common;
 
 import h.core;
+import h.core.declarations;
 import h.core.hash;
 
 namespace h::compiler
@@ -37,6 +38,23 @@ namespace h::compiler
         std::replace(module_name_prefix.begin(), module_name_prefix.end(), '.', '_');
 
         return std::format("{}_{}", module_name_prefix, declaration_name);
+    }
+
+    std::string mangle_name(
+        h::Declaration_database const& declaration_database,
+        std::string_view const module_name,
+        std::string_view const declaration_name
+    )
+    {
+        std::optional<h::Declaration> const declaration = find_declaration(declaration_database, module_name, declaration_name);
+
+        if (declaration.has_value())
+        {
+            std::optional<std::string_view> const unique_name = get_declaration_unique_name(declaration.value());
+            return mangle_name(module_name, declaration_name, unique_name);
+        }
+
+        return mangle_name(module_name, declaration_name, std::nullopt);
     }
 
     std::string mangle_name(

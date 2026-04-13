@@ -63,6 +63,91 @@ namespace h::compiler
         return clang_ast_context.VoidPtrTy;
     }
 
+    static clang::QualType create_clang_soa_array_type(
+        clang::ASTContext& clang_ast_context
+    )
+    {
+        clang::IdentifierInfo* const struct_name = &clang_ast_context.Idents.get("__hl_soa_array");
+
+        clang::RecordDecl* const record_declaration = clang::RecordDecl::Create(
+            clang_ast_context,
+            clang::TagTypeKind::Struct,
+            clang_ast_context.getTranslationUnitDecl(),
+            clang::SourceLocation(),
+            clang::SourceLocation(),
+            struct_name
+        );
+
+        clang::QualType const byte_type = clang_ast_context.getIntTypeForBitwidth(8, 0);
+        clang::QualType const byte_pointer_type = clang_ast_context.getPointerType(byte_type);
+
+        clang::IdentifierInfo* const field_name = &clang_ast_context.Idents.get("data");
+        clang::FieldDecl* const field = clang::FieldDecl::Create(
+            clang_ast_context,
+            record_declaration,
+            clang::SourceLocation(),
+            clang::SourceLocation(),
+            field_name,
+            byte_pointer_type,
+            nullptr,
+            nullptr,
+            false,
+            clang::ICIS_NoInit
+        );
+
+        record_declaration->addDecl(field);
+        record_declaration->completeDefinition();
+
+        return clang_ast_context.getRecordType(record_declaration);
+    }
+
+    static clang::QualType create_clang_soa_array_view_type(
+        clang::ASTContext& clang_ast_context
+    )
+    {
+        clang::IdentifierInfo* const struct_name = &clang_ast_context.Idents.get("__hl_soa_array_view");
+
+        clang::RecordDecl* const record_declaration = clang::RecordDecl::Create(
+            clang_ast_context,
+            clang::TagTypeKind::Struct,
+            clang_ast_context.getTranslationUnitDecl(),
+            clang::SourceLocation(),
+            clang::SourceLocation(),
+            struct_name
+        );
+
+        clang::QualType const uint64_type = clang_ast_context.getIntTypeForBitwidth(64, 0);
+        clang::QualType const byte_type = clang_ast_context.getIntTypeForBitwidth(8, 0);
+        clang::QualType const byte_pointer_type = clang_ast_context.getPointerType(byte_type);
+
+        auto const add_field = [&](char const* const field_name, clang::QualType const field_type) {
+            clang::IdentifierInfo* const identifier = &clang_ast_context.Idents.get(field_name);
+            clang::FieldDecl* const field = clang::FieldDecl::Create(
+                clang_ast_context,
+                record_declaration,
+                clang::SourceLocation(),
+                clang::SourceLocation(),
+                identifier,
+                field_type,
+                nullptr,
+                nullptr,
+                false,
+                clang::ICIS_NoInit
+            );
+
+            record_declaration->addDecl(field);
+        };
+
+        add_field("start_index", uint64_type);
+        add_field("end_index", uint64_type);
+        add_field("length", uint64_type);
+        add_field("data", byte_pointer_type);
+
+        record_declaration->completeDefinition();
+
+        return clang_ast_context.getRecordType(record_declaration);
+    }
+
     void add_clang_alias_type_declaration(
         std::pmr::unordered_map<std::pmr::string, clang::TypedefDecl*, h::String_hash, h::String_equal>& clang_alias_type_declarations,
         clang::ASTContext& clang_ast_context,
@@ -2440,6 +2525,14 @@ namespace h::compiler
             llvm::APInt const array_size_value(64, constant_array_type.size, false);
 
             return clang_ast_context.getConstantArrayType(*element_type, array_size_value, nullptr, clang::ArraySizeModifier::Normal, 0);
+        }
+        else if (std::holds_alternative<h::Soa_array_type>(type_reference.data))
+        {
+            return create_clang_soa_array_type(clang_ast_context);
+        }
+        else if (std::holds_alternative<h::Soa_array_view_type>(type_reference.data))
+        {
+            return create_clang_soa_array_view_type(clang_ast_context);
         }
         else if (std::holds_alternative<h::Decimal_type>(type_reference.data))
         {

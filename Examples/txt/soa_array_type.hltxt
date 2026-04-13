@@ -1,0 +1,27 @@
+module soa_array_type;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    mutable particles: Soa_array::<Particle, 4> = {};
+
+    var p1 = particles[1];
+    particles[1] = {
+        x: 3.0f32,
+        y: 4.0f32
+    };
+
+    var x2 = particles->x[2];
+    particles->x[2] = 1.0f32;
+
+    var y3 = particles->y[3];
+    particles->y[3] = 2.0f32;
+
+    var length = particles.length;
+    var data = particles.data;
+}

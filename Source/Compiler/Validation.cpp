@@ -271,6 +271,31 @@ namespace h::compiler
             }
         }
 
+        if (std::holds_alternative<h::Soa_array_view_type>(destination_type.data))
+        {
+            h::Soa_array_view_type const& destination_soa_array_view_type = std::get<h::Soa_array_view_type>(destination_type.data);
+
+            if (!std::holds_alternative<h::Soa_array_view_type>(source_type.data))
+                return false;
+
+            h::Soa_array_view_type const& source_soa_array_view_type = std::get<h::Soa_array_view_type>(source_type.data);
+
+            if (destination_soa_array_view_type.is_mutable && !source_soa_array_view_type.is_mutable)
+                return false;
+
+            if (destination_soa_array_view_type.value_type.empty() && source_soa_array_view_type.value_type.empty())
+                return true;
+
+            if (destination_soa_array_view_type.value_type.empty() || source_soa_array_view_type.value_type.empty())
+                return false;
+
+            return can_assign_type(
+                declaration_database,
+                destination_soa_array_view_type.value_type[0],
+                source_soa_array_view_type.value_type[0]
+            );
+        }
+
         if (is_any_type(destination_type))
             return true;
 
@@ -421,6 +446,114 @@ namespace h::compiler
         return diagnostics;
     }
 
+    std::pmr::vector<h::compiler::Diagnostic> validate_soa_array_type(
+        h::Module const& core_module,
+        h::Type_reference const& type,
+        Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        (void)temporaries_allocator;
+
+        h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(type.data);
+        if (soa_array_type.value_type.empty())
+            return {};
+
+        h::Type_reference const& element_type = soa_array_type.value_type.front();
+
+        if (!is_custom_type_reference(element_type))
+        {
+            return
+            {
+                create_error_diagnostic_with_code(
+                    core_module.source_file_path,
+                    element_type.source_range.has_value() ? element_type.source_range : type.source_range,
+                    "Soa_array element type must be a struct type.",
+                    Diagnostic_code::Soa_element_type_not_a_struct,
+                    {}
+                )
+            };
+        }
+
+        std::optional<Declaration> const declaration = find_declaration(
+            declaration_database,
+            element_type
+        );
+
+        if (!declaration.has_value())
+            return {};
+
+        if (!std::holds_alternative<Struct_declaration const*>(declaration.value().data))
+        {
+            return
+            {
+                create_error_diagnostic_with_code(
+                    core_module.source_file_path,
+                    element_type.source_range.has_value() ? element_type.source_range : type.source_range,
+                    "Soa_array element type must be a struct type.",
+                    Diagnostic_code::Soa_element_type_not_a_struct,
+                    {}
+                )
+            };
+        }
+
+        return {};
+    }
+
+    std::pmr::vector<h::compiler::Diagnostic> validate_soa_array_view_type(
+        h::Module const& core_module,
+        h::Type_reference const& type,
+        Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        (void)temporaries_allocator;
+
+        h::Soa_array_view_type const& soa_array_view_type = std::get<h::Soa_array_view_type>(type.data);
+        if (soa_array_view_type.value_type.empty())
+            return {};
+
+        h::Type_reference const& element_type = soa_array_view_type.value_type.front();
+
+        if (!is_custom_type_reference(element_type))
+        {
+            return
+            {
+                create_error_diagnostic_with_code(
+                    core_module.source_file_path,
+                    element_type.source_range.has_value() ? element_type.source_range : type.source_range,
+                    "Soa_array_view element type must be a struct type.",
+                    Diagnostic_code::Soa_element_type_not_a_struct,
+                    {}
+                )
+            };
+        }
+
+        std::optional<Declaration> const declaration = find_declaration(
+            declaration_database,
+            element_type
+        );
+
+        if (!declaration.has_value())
+            return {};
+
+        if (!std::holds_alternative<Struct_declaration const*>(declaration.value().data))
+        {
+            return
+            {
+                create_error_diagnostic_with_code(
+                    core_module.source_file_path,
+                    element_type.source_range.has_value() ? element_type.source_range : type.source_range,
+                    "Soa_array_view element type must be a struct type.",
+                    Diagnostic_code::Soa_element_type_not_a_struct,
+                    {}
+                )
+            };
+        }
+
+        return {};
+    }
+
     std::pmr::vector<h::compiler::Diagnostic> validate_type_reference(
         h::Module const& core_module,
         h::Type_reference const& type,
@@ -440,6 +573,24 @@ namespace h::compiler
         else if (std::holds_alternative<h::Integer_type>(type.data))
         {
             return validate_integer_type(
+                core_module,
+                type,
+                declaration_database,
+                temporaries_allocator
+            );
+        }
+        else if (std::holds_alternative<h::Soa_array_type>(type.data))
+        {
+            return validate_soa_array_type(
+                core_module,
+                type,
+                declaration_database,
+                temporaries_allocator
+            );
+        }
+        else if (std::holds_alternative<h::Soa_array_view_type>(type.data))
+        {
+            return validate_soa_array_view_type(
                 core_module,
                 type,
                 declaration_database,
@@ -1626,6 +1777,46 @@ namespace h::compiler
                     };
                 }
             }
+            else if (std::holds_alternative<h::Soa_array_type>(left_hand_side_type->data))
+            {
+                if (access_expression.member_name != "data" && access_expression.member_name != "length" && access_expression.member_name != "view")
+                {
+                    std::pmr::string const type_full_name = h::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format(
+                                "Member '{}' does not exist in the type '{}'.",
+                                access_expression.member_name,
+                                type_full_name
+                            )
+                        )
+                    };
+                }
+            }
+            else if (std::holds_alternative<h::Soa_array_view_type>(left_hand_side_type->data))
+            {
+                if (access_expression.member_name != "data" && access_expression.member_name != "length" && access_expression.member_name != "start_index" && access_expression.member_name != "end_index")
+                {
+                    std::pmr::string const type_full_name = h::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format(
+                                "Member '{}' does not exist in the type '{}'.",
+                                access_expression.member_name,
+                                type_full_name
+                            )
+                        )
+                    };
+                }
+            }
         }
         else
         {
@@ -2265,6 +2456,22 @@ namespace h::compiler
                     .output_parameter_names = {"result"}
                 };
             }
+            else if (builtin_type_reference.value == "soa_array_view")
+            {
+                h::Function_type function_type
+                {
+                    .input_parameter_types = {},
+                    .output_parameter_types = {},
+                    .is_variadic = true,
+                };
+
+                return h::Function_pointer_type
+                {
+                    .type = std::move(function_type),
+                    .input_parameter_names = {},
+                    .output_parameter_names = {}
+                };
+            }
         }
 
         return std::nullopt;
@@ -2303,6 +2510,56 @@ namespace h::compiler
                                 )
                             )
                         };
+                    }
+                }
+            }
+            else if (builtin_type_reference.value == "soa_array_view")
+            {
+                if (expression.arguments.size() != 0 && expression.arguments.size() != 2)
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format(
+                                "Function expects 0 or 2 arguments, but {} were provided.",
+                                expression.arguments.size()
+                            )
+                        )
+                    };
+                }
+
+                if (expression.arguments.size() == 2)
+                {
+                    for (std::size_t argument_index = 0; argument_index < expression.arguments.size(); ++argument_index)
+                    {
+                        h::Expression const& argument_expression = parameters.statement.expressions[expression.arguments[argument_index].expression_index];
+                        std::optional<h::Type_reference> const argument_type_optional = get_expression_type_from_type_info(
+                            parameters.expression_types,
+                            expression.arguments[argument_index]
+                        );
+
+                        if (!argument_type_optional.has_value() || !h::is_integer(argument_type_optional.value()))
+                        {
+                            std::pmr::string const provided_type_name =
+                                argument_type_optional.has_value() ?
+                                h::format_type_reference(parameters.core_module, argument_type_optional.value(), parameters.temporaries_allocator, parameters.temporaries_allocator) :
+                                std::pmr::string{"?", parameters.temporaries_allocator};
+
+                            return
+                            {
+                                create_error_diagnostic(
+                                    parameters.core_module.source_file_path,
+                                    argument_expression.source_range,
+                                    std::format(
+                                        "Expression type '{}' does not match expected type '{}'.",
+                                        provided_type_name,
+                                        "Uint64"
+                                    )
+                                )
+                            };
+                        }
                     }
                 }
             }
@@ -2815,6 +3072,30 @@ namespace h::compiler
             return Declaration{ .data = &temporary_storage[0], .module_name = "H.Builtin", .is_export = true };
         }
 
+        if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate.data))
+        {
+            h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(type_to_instantiate.data);
+            if (soa_array_type.value_type.empty())
+                return std::nullopt;
+
+            return find_underlying_declaration(
+                declaration_database,
+                soa_array_type.value_type.front()
+            );
+        }
+
+        if (std::holds_alternative<h::Soa_array_view_type>(type_to_instantiate.data))
+        {
+            h::Soa_array_view_type const& soa_array_view_type = std::get<h::Soa_array_view_type>(type_to_instantiate.data);
+            if (soa_array_view_type.value_type.empty())
+                return std::nullopt;
+
+            return find_underlying_declaration(
+                declaration_database,
+                soa_array_view_type.value_type.front()
+            );
+        }
+
         std::optional<Declaration> const declaration_optional = find_underlying_declaration(
             declaration_database,
             type_to_instantiate
@@ -2869,6 +3150,18 @@ namespace h::compiler
                     parameters.core_module.source_file_path,
                     source_range,
                     "Could not deduce type to instantiate."
+                )
+            };
+        }
+
+        if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate->data) && expression.type == Instantiate_expression_type::Explicit)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    "Explicit Soa_array brace initialization is not implemented. Use [ ... ] initializer syntax."
                 )
             };
         }
@@ -3605,7 +3898,12 @@ namespace h::compiler
 
         h::Type_reference const& type = type_optional.value();
 
-        if (std::holds_alternative<h::Instantiate_expression>(right_hand_side.data) && !std::holds_alternative<h::Array_slice_type>(type.data))
+        if (
+            std::holds_alternative<h::Instantiate_expression>(right_hand_side.data) &&
+            !std::holds_alternative<h::Array_slice_type>(type.data) &&
+            !std::holds_alternative<h::Soa_array_type>(type.data) &&
+            !std::holds_alternative<h::Soa_array_view_type>(type.data)
+        )
         {
             std::optional<Declaration> const declaration_optional = find_underlying_declaration(parameters.declaration_database, type);
             if (!declaration_optional.has_value() || (!std::holds_alternative<h::Struct_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Union_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Type_constructor const*>(declaration_optional->data)))
