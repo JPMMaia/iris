@@ -25,6 +25,12 @@ The compiler tests are located in `Source/Compiler/Compiler.tests.cpp`. Each tes
 Run `cmake --build build --target H_compiler_tests` to build the tests.
 Run `build/Source/Compiler/H_compiler_tests.exe [LLVM_IR]` to run all LLVM-IR tests.
 
+To update the IR of the tests so that the expected IR is replaced by the actual IR you can run:
+
+```
+build/Tools/tests_result_replacer/H_Tools_Replace_tests_results.exe ${pwd}/build/Source/Compiler/H_compiler_tests.exe ${pwd}/Source/Compiler/Compiler.tests.cpp
+```
+
 ## Editing the compiler or expressions
 
 1. Add/edit/remove a test file in `Examples/txt`.
