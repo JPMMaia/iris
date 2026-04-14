@@ -1,12 +1,6 @@
-module;
-
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string_view>
-
 export module h.parser.convertor;
+
+import std;
 
 import h.core;
 import h.parser.parse_tree;

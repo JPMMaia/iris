@@ -1,14 +1,10 @@
 module;
 
-#include <memory_resource>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <vector>
-
 #include <tree_sitter/api.h>
 
 export module h.parser.parse_tree;
+
+import std;
 
 import h.core;
 

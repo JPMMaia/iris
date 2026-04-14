@@ -1,13 +1,6 @@
-module;
-
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <variant>
-#include <vector>
-
 export module h.compiler.analysis;
+
+import std;
 
 import h.core;
 import h.core.declarations;

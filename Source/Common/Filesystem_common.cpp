@@ -1,11 +1,6 @@
-module;
-
-#include <filesystem>
-#include <optional>
-#include <span>
-#include <string_view>
-
 module h.common.filesystem_common;
+
+import std;
 
 import h.common.filesystem;
 

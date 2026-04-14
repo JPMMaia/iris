@@ -1,13 +1,6 @@
-module;
-
-#include <cstddef>
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <vector>
-
 export module h.binary_serializer;
+
+import std;
 
 import h.binary_serializer.generated;
 import h.binary_serializer.generics;

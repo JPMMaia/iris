@@ -1,36 +1,8 @@
-module;
-
-#include <clang/AST/ASTContext.h>
-#include <clang/AST/Decl.h>
-#include <clang/AST/DeclBase.h>
-#include <clang/AST/Type.h>
-#include <clang/Basic/Builtins.h>
-#include <clang/Basic/CodeGenOptions.h>
-#include <clang/Basic/Diagnostic.h>
-#include <clang/Basic/FileManager.h>
-#include <clang/Basic/IdentifierTable.h>
-#include <clang/Basic/SourceLocation.h>
-#include <clang/Basic/SourceManager.h>
-#include <clang/CodeGen/CodeGenABITypes.h>
-#include <clang/CodeGen/CGFunctionInfo.h>
-#include <clang/CodeGen/ModuleBuilder.h>
-#include "clang/Frontend/CompilerInstance.h"
-#include <clang/Lex/HeaderSearchOptions.h>
-#include <clang/Lex/PreprocessorOptions.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/Support/VirtualFileSystem.h>
-
-#include <memory>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <variant>
-#include <vector>
-
 export module h.compiler.clang_code_generation;
+
+import std;
+import llvm;
+import clang;
 
 import h.core;
 import h.core.declarations;

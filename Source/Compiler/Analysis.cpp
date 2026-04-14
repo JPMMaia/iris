@@ -1,17 +1,10 @@
 module;
 
-#include <algorithm>
-#include <cassert>
-#include <format>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <stdexcept>
-#include <string>
-#include <variant>
-#include <vector>
+#include <assert.h>
 
 module h.compiler.analysis;
+
+import std;
 
 import h.compiler.diagnostic;
 import h.compiler.validation;

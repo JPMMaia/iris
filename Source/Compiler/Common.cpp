@@ -1,18 +1,7 @@
-module;
-
-#include <llvm/ADT/StringRef.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/Module.h>
-
-#include <filesystem>
-#include <format>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <span>
-#include <unordered_map>
-
 module h.compiler.common;
+
+import std;
+import llvm;
 
 import h.core;
 import h.core.declarations;

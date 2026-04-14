@@ -1,17 +1,6 @@
-module;
-
-#include <array>
-#include <cstddef>
-#include <filesystem>
-#include <format>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <unordered_set>
-#include <variant>
-#include <vector>
-
 module h.compiler.validation;
+
+import std;
 
 import h.compiler.analysis;
 import h.compiler.diagnostic;

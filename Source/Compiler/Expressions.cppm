@@ -1,19 +1,7 @@
-module;
-
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
 export module h.compiler.expressions;
+
+import std;
+import llvm;
 
 import h.core;
 import h.core.declarations;

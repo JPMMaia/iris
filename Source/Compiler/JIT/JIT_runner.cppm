@@ -1,20 +1,7 @@
-module;
-
-#include <llvm/ADT/DenseMap.h>
-#include <llvm/ExecutionEngine/Orc/SymbolStringPool.h>
-#include <llvm/ExecutionEngine/Orc/Shared/ExecutorSymbolDef.h>
-#include <llvm/Support/Error.h>
-
-#include <condition_variable>
-#include <filesystem>
-#include <memory>
-#include <span>
-#include <shared_mutex>
-#include <string_view>
-#include <unordered_map>
-#include <variant>
-
 export module h.compiler.jit_runner;
+
+import std;
+import llvm;
 
 import h.compiler;
 import h.compiler.artifact;

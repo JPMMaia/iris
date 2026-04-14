@@ -1,11 +1,6 @@
-module;
-
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string_view>
-
 export module h.compiler.test_framework;
+
+import std;
 
 import h.core;
 

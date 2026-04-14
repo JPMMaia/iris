@@ -2,14 +2,9 @@ module;
 
 #include <nlohmann/json.hpp>
 
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <variant>
-#include <vector>
-
 export module h.compiler.compile_commands_generator;
+
+import std;
 
 import h.common;
 import h.compiler.artifact;

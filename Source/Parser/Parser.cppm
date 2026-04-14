@@ -1,10 +1,10 @@
 module;
 
-#include <filesystem>
-
 #include <tree_sitter/api.h>
 
 export module h.parser.parser;
+
+import std;
 
 import h.core;
 import h.parser.parse_tree;

@@ -17,6 +17,9 @@
 #include <clang/Basic/SourceManager.h>
 #include <clang/Basic/TargetInfo.h>
 
+#include <clang/Driver/Compilation.h>
+#include <clang/Driver/Driver.h>
+
 #include <clang/CodeGen/CodeGenABITypes.h>
 #include <clang/CodeGen/CGFunctionInfo.h>
 #include <clang/CodeGen/ModuleBuilder.h>
@@ -30,9 +33,5 @@
 
 #include <clang/Lex/HeaderSearchOptions.h>
 #include <clang/Lex/PreprocessorOptions.h>
-
-#include <clang/CodeGen/CodeGenABITypes.h>
-#include <clang/CodeGen/CGFunctionInfo.h>
-#include <clang/CodeGen/ModuleBuilder.h>
 
 #pragma warning(pop)

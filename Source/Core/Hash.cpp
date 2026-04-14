@@ -2,15 +2,9 @@ module;
 
 #include <xxhash.h>
 
-#include <cstddef>
-#include <memory_resource>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <variant>
-
 module h.core.hash;
+
+import std;
 
 import h.common;
 import h.core;

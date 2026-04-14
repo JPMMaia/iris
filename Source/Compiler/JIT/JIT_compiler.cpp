@@ -1,34 +1,11 @@
 module;
 
-#include <llvm/ExecutionEngine/JITSymbol.h>
-#include <llvm/ExecutionEngine/SectionMemoryManager.h>
-#include <llvm/ExecutionEngine/Orc/Debugging/DebuggerSupport.h>
-#include <llvm/ExecutionEngine/Orc/Core.h>
-#include <llvm/ExecutionEngine/Orc/EPCIndirectionUtils.h>
-#include <llvm/ExecutionEngine/Orc/ExecutorProcessControl.h>
-#include <llvm/ExecutionEngine/Orc/IndirectionUtils.h>
-#include <llvm/ExecutionEngine/Orc/IRCompileLayer.h>
 #include <llvm/ExecutionEngine/Orc/LazyReexports.h>
-#include <llvm/ExecutionEngine/Orc/LLJIT.h>
-#include <llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h>
-#include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/ValueSymbolTable.h>
-#include <llvm/Support/Error.h>
-#include <llvm/TargetParser/Host.h>
-
-#include <filesystem>
-#include <future>
-#include <memory>
-#include <optional>
-#include <span>
-#include <string>
-#include <string_view>
-#include <thread>
 
 module h.compiler.jit_compiler;
+
+import std;
+import llvm;
 
 import h.common;
 import h.common.filesystem;

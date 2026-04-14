@@ -1,13 +1,10 @@
 module;
 
-#include <filesystem>
-#include <memory_resource>
-#include <string>
-#include <string_view>
-
 #include <windows.h>
 
 module h.common.filesystem;
+
+import std;
 
 import h.common;
 

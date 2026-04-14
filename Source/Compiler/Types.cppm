@@ -1,21 +1,7 @@
-module;
-
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DebugInfoMetadata.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/DIBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Type.h>
-
-#include <filesystem>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <vector>
-#include <variant>
-
 export module h.compiler.types;
+
+import std;
+import llvm;
 
 import h.compiler.clang_data;
 import h.core.hash;

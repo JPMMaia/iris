@@ -1,13 +1,6 @@
-module;
-
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string_view>
-#include <vector>
-
 export module h.common.filesystem_common;
+
+import std;
 
 namespace h::common
 {

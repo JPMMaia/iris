@@ -1,14 +1,6 @@
-module;
-
-#include <cstddef>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <variant>
-#include <vector>
-
 export module h.core.execution_engine;
+
+import std;
 
 import h.core;
 

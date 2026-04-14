@@ -1,8 +1,6 @@
-module;
+export module h.common;
 
 import std;
-
-export module h.common;
 
 namespace h::common
 {

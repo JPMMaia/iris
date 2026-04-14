@@ -3,8 +3,8 @@ add_executable(H::Builder_executable ALIAS H_builder_executable)
 
 set_target_properties(H_builder_executable PROPERTIES OUTPUT_NAME "hlang")
 
-target_compile_definitions(H_builder_executable PUBLIC "_SCL_SECURE_NO_WARNINGS")
 target_compile_features(H_builder_executable PRIVATE cxx_std_23)
+target_link_libraries(H_builder_executable PUBLIC std_module)
 
 target_link_libraries(H_builder_executable PRIVATE H::Compiler)
 

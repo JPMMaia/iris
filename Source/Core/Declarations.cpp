@@ -1,17 +1,6 @@
-module;
-
-#include <format>
-#include <functional>
-#include <memory_resource>
-#include <optional>
-#include <string>
-#include <span>
-#include <stdexcept>
-#include <unordered_map>
-#include <utility>
-#include <variant>
-
 module h.core.declarations;
+
+import std;
 
 import h.common;
 import h.core;

@@ -1,9 +1,6 @@
-module;
-
-#include <filesystem>
-#include <vector>
-
 export module h.common.filesystem;
+
+import std;
 
 export import h.common.filesystem_common;
 

@@ -2,18 +2,11 @@ module;
 
 #include <nlohmann/json.hpp>
 
-#include <algorithm>
-#include <filesystem>
 #include <memory_resource>
-#include <optional>
-#include <regex>
-#include <span>
-#include <string_view>
-#include <unordered_map>
-#include <variant>
-#include <vector>
 
 module h.compiler.artifact;
+
+import std;
 
 import h.common;
 import h.compiler.common;

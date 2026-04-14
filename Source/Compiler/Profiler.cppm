@@ -1,13 +1,6 @@
-module;
-
-#include <chrono>
-#include <iostream>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
-
 export module h.compiler.profiler;
+
+import std;
 
 namespace h::compiler
 {

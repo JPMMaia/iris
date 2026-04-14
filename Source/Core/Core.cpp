@@ -1,21 +1,10 @@
 module;
 
-#include <cstdint>
-#include <compare>
-#include <exception>
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <ostream>
-#include <span>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <utility>
-#include <variant>
-#include <vector>
+#include <charconv>
 
 module h.core;
+
+import std;
 
 import h.common;
 

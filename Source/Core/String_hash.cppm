@@ -1,11 +1,6 @@
-module;
-
-#include <cstddef>
-#include <string>
-#include <string_view>
-#include <utility>
-
 export module h.core.string_hash;
+
+import std;
 
 namespace h
 {

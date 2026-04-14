@@ -1,11 +1,6 @@
-module;
-
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string_view>
-
 export module h.parser.type_name_parser;
+
+import std;
 
 import h.core;
 

@@ -1,25 +1,13 @@
 module;
 
-#include <algorithm>
-#include <cassert>
-#include <cstdio>
-#include <filesystem>
-#include <format>
-#include <iostream>
-#include <memory_resource>
-#include <numeric>
-#include <optional>
-#include <ranges>
-#include <span>
-#include <string_view>
-#include <variant>
-#include <vector>
-
+#include <assert.h>
 #include <stdio.h>
 
 #include <clang-c/Index.h>
 
 module h.c_header_converter;
+
+import std;
 
 import h.c_header_hash;
 

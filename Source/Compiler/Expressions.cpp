@@ -1,25 +1,11 @@
 module;
 
-#include <llvm/Analysis/ConstantFolding.h>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/DIBuilder.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-
-#include <array>
-#include <format>
-#include <functional>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <variant>
-#include <vector>
+#include <assert.h>
 
 module h.compiler.expressions;
+
+import std;
+import llvm;
 
 import h.core;
 import h.core.declarations;

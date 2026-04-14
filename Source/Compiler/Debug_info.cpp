@@ -1,11 +1,11 @@
 module;
 
-#include <llvm/IR/DIBuilder.h>
-#include <llvm/IR/IRBuilder.h>
+#include <string>
 
 module h.compiler.debug_info;
 
 import std;
+import llvm;
 
 import h.compiler.types;
 import h.core;

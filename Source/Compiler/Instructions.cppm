@@ -1,8 +1,7 @@
-module;
-
-#include <llvm/IR/IRBuilder.h>
-
 export module h.compiler.instructions;
+
+import std;
+import llvm;
 
 import h.core;
 

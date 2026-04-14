@@ -1,16 +1,6 @@
-module;
-
-#include <cstdint>
-#include <memory_resource>
-#include <optional>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <span>
-#include <variant>
-#include <vector>
-
 module h.core.formatter;
+
+import std;
 
 import h.core;
 import h.core.declarations;

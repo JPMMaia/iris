@@ -1,12 +1,6 @@
-module;
-
-#include <cstdlib>
-#include <memory_resource>
-#include <optional>
-#include <string_view>
-#include <vector>
-
 module h.parser.type_name_parser;
+
+import std;
 
 import h.core;
 import h.core.types;

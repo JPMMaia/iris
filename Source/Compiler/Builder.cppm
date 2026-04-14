@@ -1,13 +1,6 @@
-module;
-
-#include <filesystem>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
 export module h.compiler.builder;
+
+import std;
 
 import h.core;
 import h.core.declarations;

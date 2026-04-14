@@ -1,18 +1,14 @@
 module;
 
-#include <format>
-#include <filesystem>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <variant>
-#include <vector>
+#include <assert.h>
+#include <stdio.h>
 
-#include <llvm/IR/Module.h>
+#include <clang/CodeGen/CodeGenABITypes.h>
 
 module h.compiler.builder;
+
+import std;
+import llvm;
 
 import h.binary_serializer;
 import h.core;
@@ -967,7 +963,7 @@ namespace h::compiler
                     {
                         std::filesystem::path const output_file_path = build_directory_path / std::format("{}.{}.{}", artifact.name, source_file_path.stem().generic_string(), "ll");
                         bool const success = compile_cpp(
-                            *llvm_data.clang_data.compiler_instance,
+                            llvm_data.clang_data,
                             llvm_data.target_triple,
                             source_file_path,
                             output_llvm_ir_file,
@@ -987,7 +983,7 @@ namespace h::compiler
                     }
 
                     bool const success = compile_cpp(
-                        *llvm_data.clang_data.compiler_instance,
+                        llvm_data.clang_data,
                         llvm_data.target_triple,
                         source_file_path,
                         output_assembly_file,
@@ -1023,7 +1019,7 @@ namespace h::compiler
                 };
 
                 bool const success = compile_cpp(
-                    *llvm_data.clang_data.compiler_instance,
+                    llvm_data.clang_data,
                     llvm_data.target_triple,
                     tests_main_file_path,
                     output_assembly_file,

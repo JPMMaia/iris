@@ -1,49 +1,15 @@
 module;
 
-#include <clang/AST/Decl.h>
-#include <llvm/Analysis/ConstantFolding.h>
-#include <llvm/Bitcode/BitcodeWriter.h>
-#include <llvm/IR/DIBuilder.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/PassManager.h>
-#include <llvm/IR/Verifier.h>
-#include <llvm/MC/TargetRegistry.h>
-#include <llvm/Passes/PassBuilder.h>
-#include <llvm/Passes/StandardInstrumentations.h>
-#include <llvm/Support/FileSystem.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Target/TargetMachine.h>
-#include <llvm/Target/TargetOptions.h>
-#include <llvm/TargetParser/Host.h>
-#include <llvm/Transforms/InstCombine/InstCombine.h>
-#include <llvm/Transforms/IPO/MergeFunctions.h>
-#include <llvm/Transforms/Scalar.h>
-#include <llvm/Transforms/Scalar/GVN.h>
-#include <llvm/Transforms/Scalar/Reassociate.h>
-#include <llvm/Transforms/Scalar/SimplifyCFG.h>
+#include <assert.h>
+#include <stdio.h>
 
-#include <bit>
-#include <cassert>
-#include <cstdlib>
-#include <format>
-#include <iostream>
-#include <filesystem>
-#include <memory>
-#include <memory_resource>
-#include <optional>
-#include <ranges>
-#include <span>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
-#include <variant>
-#include <vector>
+#include <clang/CodeGen/CodeGenABITypes.h>
 
 module h.compiler;
+
+import std;
+import llvm;
+import clang;
 
 import h.binary_serializer;
 import h.common;

@@ -1,11 +1,6 @@
-module;
-
-#include <cstdint>
-#include <format>
-#include <ostream>
-#include <vector>
-
 export module h.core.struct_layout;
+
+import std;
 
 namespace h
 {

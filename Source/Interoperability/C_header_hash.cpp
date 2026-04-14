@@ -1,13 +1,5 @@
 module;
 
-#include <cstdint>
-#include <filesystem>
-#include <memory>
-#include <optional>
-#include <span>
-#include <string>
-#include <utility>
-
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendActions.h>
 #include <clang-c/Index.h>
@@ -16,6 +8,8 @@ module;
 #include <xxhash.h>
 
 module h.c_header_hash;
+
+import std;
 
 import h.common;
 

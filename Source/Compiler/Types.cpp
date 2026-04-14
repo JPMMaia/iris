@@ -1,26 +1,11 @@
 module;
 
-#include <clang/AST/Decl.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DebugInfoMetadata.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/DIBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
-
-#include <array>
-#include <filesystem>
-#include <functional>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <variant>
-#include <vector>
+#include <assert.h>
 
 module h.compiler.types;
+
+import std;
+import llvm;
 
 import h.common;
 import h.compiler.clang_code_generation;

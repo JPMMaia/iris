@@ -1,14 +1,6 @@
-module;
-
-#include <functional>
-#include <memory_resource>
-#include <optional>
-#include <string>
-#include <span>
-#include <unordered_map>
-#include <variant>
-
 export module h.core.declarations;
+
+import std;
 
 import h.core;
 import h.core.hash;

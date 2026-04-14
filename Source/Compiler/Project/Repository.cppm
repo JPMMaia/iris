@@ -1,14 +1,6 @@
-module;
-
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
-
 export module h.compiler.repository;
+
+import std;
 
 namespace h::compiler
 {

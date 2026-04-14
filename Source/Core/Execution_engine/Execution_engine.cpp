@@ -1,14 +1,6 @@
-module;
-
-#include <algorithm>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <stdexcept>
-#include <variant>
-#include <vector>
-
 module h.core.execution_engine;
+
+import std;
 
 import h.core;
 import h.core.types;

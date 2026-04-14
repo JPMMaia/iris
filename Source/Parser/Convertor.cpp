@@ -1,16 +1,6 @@
-module;
-
-#include <cctype>
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <string_view>
-#include <variant>
-#include <vector>
-
 module h.parser.convertor;
+
+import std;
 
 import h.common;
 import h.core;

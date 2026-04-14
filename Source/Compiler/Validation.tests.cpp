@@ -1,11 +1,18 @@
-#include <memory_resource>
-#include <filesystem>
-#include <optional>
-#include <span>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
+#include <iosfwd>
 
+namespace h::compiler
+{
+    struct Diagnostic;
+    std::ostream& operator<<(
+        std::ostream& output_stream,
+        Diagnostic const& diagnostic
+    );
+}
+
+using h::compiler::operator<<;
+#include <catch2/catch_test_macros.hpp>
+
+import std;
 import h.compiler;
 import h.compiler.analysis;
 import h.compiler.diagnostic;
@@ -14,10 +21,6 @@ import h.core.declarations;
 import h.core.types;
 import h.parser.convertor;
 import h.parser.parser;
-
-using h::compiler::operator<<;
-
-#include <catch2/catch_all.hpp>
 
 namespace h::compiler
 {

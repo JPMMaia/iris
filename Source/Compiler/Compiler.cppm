@@ -1,22 +1,7 @@
-module;
-
-#include <llvm/Analysis/CGSCCPassManager.h>
-#include <llvm/Analysis/LoopAnalysisManager.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/PassInstrumentation.h>
-#include <llvm/IR/PassManager.h>
-#include <llvm/Passes/StandardInstrumentations.h>
-#include <llvm/Target/TargetMachine.h>
-
-#include <filesystem>
-#include <memory>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <unordered_map>
-
 export module h.compiler;
+
+import std;
+import llvm;
 
 import h.core;
 import h.core.declarations;

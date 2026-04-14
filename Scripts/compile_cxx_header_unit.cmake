@@ -1,4 +1,4 @@
-macro(compile_cxx_header_unit target input header_type header_path header_unit_name)
+macro(compile_cxx_header_unit target input header_type header_path header_unit_name additional_compile_options)
     
     set(ifc_path "${CMAKE_CURRENT_BINARY_DIR}/${header_unit_name}.ifc")
 
@@ -7,13 +7,18 @@ macro(compile_cxx_header_unit target input header_type header_path header_unit_n
         list(APPEND INCLUDE_COMPILER_STRING /I${dir})
     endforeach ()
 
+    set(header_compile_options "/std:c++latest" "/EHsc" "/nologo" "/D_DLL" "/D_SCL_SECURE_NO_WARNINGS")
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        list(APPEND header_compile_options "/D_DEBUG")
+    endif ()
+
+    list(APPEND header_compile_options ${additional_compile_options})
+
     add_custom_command(
         OUTPUT ${ifc_path}
         COMMAND ${CMAKE_CXX_COMPILER}
-            /std:c++latest
-            /EHsc
-            /nologo
-            /W4
+            ${header_compile_options}
             ${INCLUDE_COMPILER_STRING}
             /c
             /exportHeader

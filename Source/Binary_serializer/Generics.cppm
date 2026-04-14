@@ -1,19 +1,10 @@
 module;
 
-#include <cassert>
-#include <compare>
-#include <cstddef>
-#include <cstring>
-#include <deque>
-#include <filesystem>
-#include <optional>
-#include <span>
-#include <string>
-#include <type_traits>
-#include <variant>
-#include <vector>
+#include <assert.h>
 
 export module h.binary_serializer.generics;
+
+import std;
 
 import h.core;
 

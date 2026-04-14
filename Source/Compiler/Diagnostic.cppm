@@ -1,13 +1,6 @@
-module;
-
-#include <filesystem>
-#include <optional>
-#include <string>
-#include <unordered_map>
-#include <variant>
-#include <vector>
-
 export module h.compiler.diagnostic;
+
+import std;
 
 import h.core;
 

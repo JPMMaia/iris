@@ -1,12 +1,6 @@
-module;
-
-#include <cstdint>
-#include <filesystem>
-#include <optional>
-#include <span>
-#include <string_view>
-
 export module h.c_header_hash;
+
+import std;
 
 namespace h::c
 {

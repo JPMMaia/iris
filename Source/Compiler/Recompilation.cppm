@@ -1,11 +1,6 @@
-module;
-
-#include <filesystem>
-#include <memory_resource>
-#include <string>
-#include <unordered_map>
-
 export module h.compiler.recompilation;
+
+import std;
 
 import h.core;
 import h.core.hash;

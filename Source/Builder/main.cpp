@@ -1,6 +1,6 @@
 #include <argparse/argparse.hpp>
 
-#include <csignal>
+#include <signal.h>
 
 import std;
 import std.compat;

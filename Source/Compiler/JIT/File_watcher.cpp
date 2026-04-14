@@ -2,14 +2,11 @@ module;
 
 #include <wtr/watcher.hpp>
 
-#include <cstdio>
-#include <filesystem>
-#include <format>
 #include <memory_resource>
-#include <span>
-#include <vector>
 
 module h.compiler.file_watcher;
+
+import std;
 
 import h.compiler.artifact;
 import h.compiler.repository;

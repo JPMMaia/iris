@@ -1,19 +1,10 @@
 module;
 
 #include <compare>
-#include <deque>
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <ostream>
-#include <span>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <variant>
-#include <vector>
 
 export module h.core;
+
+import std;
 
 #if !defined(_MSC_VER)
 #define HACK_SPACESHIP_OPERATOR 1

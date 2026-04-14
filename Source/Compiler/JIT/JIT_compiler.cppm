@@ -1,23 +1,11 @@
 module;
 
-#include <llvm/ExecutionEngine/Orc/CompileOnDemandLayer.h>
-#include <llvm/ExecutionEngine/Orc/EPCIndirectionUtils.h>
-#include <llvm/ExecutionEngine/Orc/IndirectionUtils.h>
-#include <llvm/ExecutionEngine/Orc/LazyReexports.h>
-#include <llvm/ExecutionEngine/Orc/LLJIT.h>
-#include <llvm/ExecutionEngine/Orc/Shared/ExecutorSymbolDef.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/Module.h>
-
-#include <filesystem>
-#include <memory>
-#include <optional>
-#include <span>
 #include <string>
-#include <string_view>
-#include <vector>
 
 export module h.compiler.jit_compiler;
+
+import std;
+import llvm;
 
 import h.core;
 import h.compiler;

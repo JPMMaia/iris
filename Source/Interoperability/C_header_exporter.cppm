@@ -1,12 +1,6 @@
-module;
-
-#include <filesystem>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <unordered_map>
-
 export module h.c_header_exporter;
+
+import std;
 
 import h.core;
 import h.core.declarations;

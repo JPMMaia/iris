@@ -1,44 +1,14 @@
 module;
 
-#include <clang/AST/ASTContext.h>
-#include <clang/AST/Decl.h>
-#include <clang/AST/DeclBase.h>
-#include <clang/AST/DeclCXX.h>
-#include <clang/AST/Type.h>
-#include <clang/Basic/Builtins.h>
-#include <clang/Basic/CodeGenOptions.h>
-#include <clang/Basic/Diagnostic.h>
-#include <clang/Basic/FileManager.h>
-#include <clang/Basic/IdentifierTable.h>
-#include <clang/Basic/SourceLocation.h>
-#include <clang/Basic/SourceManager.h>
-#include <clang/Basic/TargetInfo.h>
-#include <clang/CodeGen/CodeGenABITypes.h>
-#include <clang/CodeGen/CGFunctionInfo.h>
-#include <clang/CodeGen/ModuleBuilder.h>
-#include <clang/Frontend/CompilerInstance.h>
-#include <clang/lib/CodeGen/CodeGenModule.h>
-#include <clang/lib/CodeGen/CodeGenTypes.h>
-#include <clang/lib/CodeGen/CGRecordLayout.h>
-#include <llvm/ADT/APSInt.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <clang/Lex/HeaderSearchOptions.h>
-#include <clang/Lex/PreprocessorOptions.h>
-#include <llvm/Support/VirtualFileSystem.h>
+#include <assert.h>
 
-#include <array>
-#include <cassert>
-#include <compare>
-#include <exception>
-#include <iterator>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <span>
-#include <variant>
+#include <clang/CodeGen/CodeGenABITypes.h>
 
 module h.compiler.clang_code_generation;
+
+import std;
+import llvm;
+import clang;
 
 import h.common;
 import h.compiler.analysis;

@@ -1,6 +1,6 @@
 add_library(clang_target STATIC)
 target_include_directories(clang_target PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-target_link_libraries(clang_target PUBLIC llvm_target)
+target_link_libraries(clang_target PRIVATE llvm_target)
 target_sources(clang_target PUBLIC FILE_SET modules TYPE CXX_MODULES
    FILES "clang.cppm"
 )
@@ -8,6 +8,8 @@ target_sources(clang_target PUBLIC FILE_SET modules TYPE CXX_MODULES
 
 find_package(Clang CONFIG REQUIRED)
 target_include_directories(clang_target PRIVATE ${CLANG_INCLUDE_DIRS})
+
+target_compile_options(clang_target PUBLIC "/D_SCL_SECURE_NO_WARNINGS")
 
 if(WIN32)
    target_link_libraries(
@@ -26,7 +28,7 @@ else()
    target_link_libraries(clang_target PRIVATE ${clang_cpp_library})
 
    find_library(llvm_library LLVM REQUIRED)
-   target_link_libraries(clang_target PUBLIC ${llvm_library})
+   target_link_libraries(clang_target PRIVATE ${llvm_library})
 
 endif()
 
@@ -55,4 +57,4 @@ else()
    )
 endif ()
 
-compile_cxx_header_unit(clang_target "clang.h" "angle" "clang/clang.h" "clang.unit")
+compile_cxx_header_unit(clang_target "clang.h" "angle" "clang/clang.h" "clang.unit" "")

@@ -3,13 +3,9 @@ module;
 #include <llvm/ExecutionEngine/Orc/Core.h>
 #include <llvm/ExecutionEngine/Orc/LazyReexports.h>
 
-#include <filesystem>
-#include <memory>
-#include <memory_resource>
-#include <string>
-#include <unordered_map>
-
 module h.compiler.recompile_module_layer;
+
+import std;
 
 import h.common;
 import h.core;

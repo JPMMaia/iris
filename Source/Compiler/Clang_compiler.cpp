@@ -1,25 +1,16 @@
 module;
 
-#include <clang/Basic/Diagnostic.h>
-#include <clang/Basic/LangOptions.h>
-#include <clang/CodeGen/CodeGenAction.h>
-#include <clang/Driver/Compilation.h>
-#include <clang/Driver/Driver.h>
-#include <clang/Frontend/CompilerInstance.h>
-#include <clang/Frontend/CompilerInvocation.h>
-#include <clang/Frontend/TextDiagnosticPrinter.h>
-#include <clang/Lex/PreprocessorOptions.h>
-#include <llvm/Support/VirtualFileSystem.h>
-
-#include <cstdio>
-#include <filesystem>
-#include <span>
-#include <string>
+#include <stdio.h>
 
 module h.compiler.clang_compiler;
 
+import std;
+import llvm;
+import clang;
+
 import h.common;
 import h.common.filesystem;
+import h.compiler.clang_data;
 
 namespace h::compiler
 {
@@ -162,7 +153,7 @@ namespace h::compiler
     }
 
     bool compile_cpp(
-        clang::CompilerInstance& clang_compiler_instance,
+        Clang_data const& clang_data,
         std::string_view const target_triple,
         std::filesystem::path const& source_file_path,
         std::filesystem::path const& output_file_path,
@@ -175,6 +166,8 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
+        clang::CompilerInstance& clang_compiler_instance = *clang_data.compiler_instance.get();
+
         llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> diagnostic_ids{new clang::DiagnosticIDs{}};
         llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> diagnostic_options{new clang::DiagnosticOptions{}};
         clang::TextDiagnosticPrinter diagnostic_printer{llvm::outs(), diagnostic_options.get()};

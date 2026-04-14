@@ -1,17 +1,11 @@
 module;
 
-#include <llvm/ExecutionEngine/Orc/Core.h>
-#include <llvm/ExecutionEngine/Orc/Layer.h>
-
-#include <cstdio>
-#include <chrono>
-#include <filesystem>
-#include <memory>
-#include <memory_resource>
-#include <string>
-#include <unordered_map>
+#include <stdio.h>
 
 module h.compiler.core_module_layer;
+
+import std;
+import llvm;
 
 import h.core;
 import h.common;

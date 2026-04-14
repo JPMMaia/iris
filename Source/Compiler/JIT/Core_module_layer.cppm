@@ -1,15 +1,7 @@
-module;
-
-#include <llvm/ExecutionEngine/Orc/Core.h>
-#include <llvm/ExecutionEngine/Orc/Layer.h>
-
-#include <filesystem>
-#include <memory>
-#include <memory_resource>
-#include <string>
-#include <unordered_map>
-
 export module h.compiler.core_module_layer;
+
+import std;
+import llvm;
 
 import h.core;
 import h.compiler;

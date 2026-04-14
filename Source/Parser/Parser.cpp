@@ -1,19 +1,12 @@
 module;
 
-#include <cassert>
-#include <cstddef>
-#include <cstdio>
-#include <cstdlib>
-#include <filesystem>
-#include <memory>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <vector>
+#include <assert.h>
 
 #include <tree_sitter/api.h>
 
 module h.parser.parser;
+
+import std;
 
 import h.common;
 import h.common.filesystem;

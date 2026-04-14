@@ -1,38 +1,7 @@
-module;
-
-#include <llvm/Analysis/CGSCCPassManager.h>
-#include <llvm/Analysis/LoopAnalysisManager.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/PassInstrumentation.h>
-#include <llvm/IR/PassManager.h>
-#include <llvm/Passes/StandardInstrumentations.h>
-#include <llvm/Target/TargetMachine.h>
-
-#include <llvm/ADT/DenseMap.h>
-#include <llvm/ExecutionEngine/Orc/Core.h>
-#include <llvm/ExecutionEngine/Orc/Mangling.h>
-#include <llvm/ExecutionEngine/Orc/Shared/ExecutorSymbolDef.h>
-#include <llvm/Support/Error.h>
-
-#include <wtr/watcher.hpp>
-
-#include <chrono>
-#include <condition_variable>
-#include <cstdio>
-#include <filesystem>
-#include <format>
-#include <functional>
-#include <memory>
-#include <memory_resource>
-#include <mutex>
-#include <optional>
-#include <shared_mutex>
-#include <string>
-#include <span>
-#include <variant>
-
 module h.compiler.jit_runner;
+
+import std;
+import llvm;
 
 import h.common;
 import h.common.filesystem;

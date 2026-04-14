@@ -1,13 +1,6 @@
-module;
-
-#include <filesystem>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
-
 export module h.c_header_converter;
+
+import std;
 
 import h.core;
 import h.core.struct_layout;

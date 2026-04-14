@@ -2,15 +2,9 @@ module;
 
 #include <nlohmann/json.hpp>
 
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
-
 module h.compiler.repository;
+
+import std;
 
 import h.common;
 import h.compiler.common;

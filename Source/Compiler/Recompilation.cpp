@@ -1,17 +1,6 @@
-module;
-
-#include <cstdio>
-#include <filesystem>
-#include <format>
-#include <functional>
-#include <memory_resource>
-#include <optional>
-#include <variant>
-#include <vector>
-#include <unordered_map>
-#include <unordered_set>
-
 module h.compiler.recompilation;
+
+import std;
 
 import h.common;
 import h.compiler;

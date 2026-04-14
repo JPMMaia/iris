@@ -1,17 +1,10 @@
 module;
 
-#include <format>
-#include <functional>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <variant>
-#include <vector>
+#include <charconv>
 
 module h.core.types;
+
+import std;
 
 import h.common;
 import h.core;

@@ -1,15 +1,12 @@
 module;
 
-#include <cassert>
-#include <optional>
-#include <memory_resource>
-#include <string>
-#include <string_view>
-#include <vector>
+#include <assert.h>
 
 #include <tree_sitter/api.h>
 
 module h.parser.parse_tree;
+
+import std;
 
 import h.core;
 

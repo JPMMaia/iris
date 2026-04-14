@@ -1,9 +1,6 @@
-module;
-
-#include <memory_resource>
-#include <string>
-
 export module h.compiler.target;
+
+import std;
 
 namespace h::compiler
 {

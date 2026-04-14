@@ -1,14 +1,10 @@
 module;
 
-#include <filesystem>
-#include <format>
-#include <memory_resource>
-#include <sstream>
-#include <string>
-
 #include <nlohmann/json.hpp>
 
 module h.compiler.diagnostic;
+
+import std;
 
 import h.core;
 import h.json_serializer;

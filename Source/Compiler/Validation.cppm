@@ -1,12 +1,6 @@
-module;
-
-#include <cstddef>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <vector>
-
 export module h.compiler.validation;
+
+import std;
 
 import h.compiler.analysis;
 import h.compiler.diagnostic;

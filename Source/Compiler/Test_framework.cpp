@@ -1,15 +1,6 @@
-module;
-
-#include <algorithm>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <vector>
-
 module h.compiler.test_framework;
+
+import std;
 
 import h.core;
 import h.core.types;
