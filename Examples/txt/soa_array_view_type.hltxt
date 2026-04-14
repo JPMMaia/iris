@@ -22,7 +22,7 @@ function run() -> ()
     };
     view->x[0] = 1.0f32;
     view->y[1] = 2.0f32;
-    
+
     var p_0 = view[0];
     var x0 = view->x[0];
     var y1 = view->y[1];
