@@ -15,6 +15,7 @@ import h.core;
 import h.core.struct_layout;
 import h.common;
 import h.common.filesystem;
+import h.common.filesystem_common;
 import h.compiler;
 import h.compiler.analysis;
 import h.compiler.artifact;
@@ -360,7 +361,7 @@ namespace h::compiler
     {
         std::pmr::vector<std::filesystem::path> source_files{temporaries_allocator};
 
-        source_files.push_back(BUILTIN_SOURCE_FILE_PATH);
+        source_files.push_back(h::common::get_builtin_module_file_path());
 
         for (Artifact const& artifact : artifacts)
         {

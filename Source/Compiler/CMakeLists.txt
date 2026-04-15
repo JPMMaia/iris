@@ -6,10 +6,6 @@ target_compile_features(H_compiler PRIVATE cxx_std_23)
 target_link_libraries(H_compiler PRIVATE H::Binary_serializer H::Core H::Common H::C_header_exporter H::C_header_importer H::JSON_serializer H::Parser)
 target_link_libraries(H_compiler PUBLIC clang_target llvm_target)
 
-# TODO find a way to not hardcode this when installing
-set(BUILTIN_SOURCE_FILE_PATH "${CMAKE_CURRENT_LIST_DIR}/Builtin/Builtin.hltxt")
-target_compile_definitions(H_compiler PRIVATE BUILTIN_SOURCE_FILE_PATH="${BUILTIN_SOURCE_FILE_PATH}")
-
 target_link_libraries(H_compiler PUBLIC "wtr.hdr_watcher")
 
 if(WIN32)

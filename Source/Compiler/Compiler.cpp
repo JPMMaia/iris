@@ -13,6 +13,7 @@ import clang;
 
 import h.binary_serializer;
 import h.common;
+import h.common.filesystem_common;
 import h.core;
 import h.core.declarations;
 import h.core.formatter;
@@ -806,7 +807,7 @@ namespace h::compiler
 
         if (core_module.name != "H.Builtin")
         {
-            std::filesystem::path const builtin_file_path = BUILTIN_SOURCE_FILE_PATH;
+            std::filesystem::path const builtin_file_path = h::common::get_builtin_module_file_path();
             std::optional<h::Module> builtin_module = parse_and_convert(builtin_file_path);
             if (!builtin_module.has_value())
                 throw std::runtime_error{"Failed to read builtin module!"};

@@ -71,6 +71,11 @@ namespace h::common
         return get_share_path("include");
     }
 
+    std::filesystem::path get_builtin_module_file_path()
+    {
+        return get_share_path("source/Builtin.hltxt");
+    }
+
     std::filesystem::path get_tests_main_file_path()
     {
         return get_share_path("source/tests_main.cpp");

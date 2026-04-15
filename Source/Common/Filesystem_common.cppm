@@ -18,6 +18,8 @@ namespace h::common
 
     export std::filesystem::path get_builtin_include_directory();
 
+    export std::filesystem::path get_builtin_module_file_path();
+
     export std::filesystem::path get_tests_main_file_path();
 
     export std::filesystem::path get_standard_repository_file_path();
