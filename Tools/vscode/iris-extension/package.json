@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JPMMaia/H"
+    "url": "https://github.com/JPMMaia/iris"
   },
   "engines": {
     "vscode": "^1.95.0"
