@@ -447,7 +447,7 @@ namespace h::compiler
         if (!header_path.has_value())
             h::common::print_message_and_exit(std::format("Could not find header {}. Please provide its location using --header-search-path.", header_filename));
 
-        std::filesystem::path const header_module_filename = std::format("{}.hlb", header_module_name);
+        std::filesystem::path const header_module_filename = std::format("{}.irisb", header_module_name);
         std::filesystem::path const output_header_module_path = build_directory_path / "artifacts" / header_module_filename;
 
         if (std::filesystem::exists(output_header_module_path))
@@ -488,7 +488,7 @@ namespace h::compiler
 
         if (output_module_json)
         {
-            std::filesystem::path const output_module_json_filename = std::format("{}.hlb.json", header_module_name);
+            std::filesystem::path const output_module_json_filename = std::format("{}.irisb.json", header_module_name);
             std::filesystem::path const output_module_json_path = get_hl_build_directory(build_directory_path) / output_module_json_filename;
             h::json::write_module_to_file(output_module_json_path, *header_module);
         }
@@ -1066,7 +1066,7 @@ namespace h::compiler
             if (!module_name.has_value())
                 h::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
 
-            std::filesystem::path const output_module_filename = std::format("{}.hlb", module_name.value());
+            std::filesystem::path const output_module_filename = std::format("{}.irisb", module_name.value());
             std::filesystem::path const output_module_path = get_hl_build_directory(builder.build_directory_path) / output_module_filename;
 
             if (std::filesystem::exists(output_module_path))
@@ -1106,7 +1106,7 @@ namespace h::compiler
 
             if (builder.output_module_json)
             {
-                std::filesystem::path const output_module_json_filename = std::format("{}.hlb.json", module_name.value());
+                std::filesystem::path const output_module_json_filename = std::format("{}.irisb.json", module_name.value());
                 std::filesystem::path const output_module_json_path = get_hl_build_directory(builder.build_directory_path) / output_module_json_filename;
                 h::json::write_module_to_file(output_module_json_path, core_module.value());
             }
@@ -1216,7 +1216,7 @@ namespace h::compiler
             {
                 std::string_view const module_name = core_module.name;
 
-                std::filesystem::path const module_filename = std::format("{}.hlb", module_name);
+                std::filesystem::path const module_filename = std::format("{}.irisb", module_name);
                 std::filesystem::path const output_module_path = get_hl_build_directory(builder.build_directory_path) / module_filename;
 
                 map.insert(std::make_pair(std::pmr::string{ module_name }, output_module_path));

@@ -61,7 +61,7 @@ namespace h
     std::lock_guard<std::mutex> lock{mutex};
 
     std::filesystem::path const input_file_path = find_c_header_path(filename);
-    std::filesystem::path const output_file_path = (g_standard_library_path / filename).replace_extension(".hlb");
+    std::filesystem::path const output_file_path = (g_standard_library_path / filename).replace_extension(".irisb");
 
     if (std::filesystem::exists(output_file_path))
       return output_file_path;
@@ -110,7 +110,7 @@ namespace h
     );
     REQUIRE(core_module.has_value());
 
-    std::filesystem::path const output_file_path = g_tests_output_directory_path / std::format("{}.hlb", core_module.value().name);
+    std::filesystem::path const output_file_path = g_tests_output_directory_path / std::format("{}.irisb", core_module.value().name);
     if (!std::filesystem::exists(output_file_path.parent_path()))
       std::filesystem::create_directories(output_file_path.parent_path());
 

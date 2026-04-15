@@ -73,7 +73,7 @@ def parse_file(directory: Path, source: Path, destination: Path) -> None:
 def generate_builtin() -> None:
     builtin_directory = root_directory.joinpath("Source/Compiler/Builtin")
     source_file = builtin_directory.joinpath("builtin.iris")
-    destination_file = builtin_directory.joinpath("builtin.hlb")
+    destination_file = builtin_directory.joinpath("builtin.irisb")
     parse_file(builtin_directory, source_file, destination_file)
 
 def install_hlang(destination_directory: Path) -> None:

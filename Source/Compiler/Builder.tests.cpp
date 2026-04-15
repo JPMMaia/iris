@@ -196,7 +196,7 @@ namespace h::compiler
         {
             std::filesystem::path{"artifacts"} / "my_app.cpp_implementation.bc",
             std::filesystem::path{"artifacts"} / "my_app.bc",
-            std::filesystem::path{"artifacts/C_interface.hlb"},
+            std::filesystem::path{"artifacts/C_interface.irisb"},
             std::filesystem::path{"bin"} / get_binary_name("my_app", target)
         };
 
@@ -281,9 +281,9 @@ namespace h::compiler
 
         std::pmr::vector<std::filesystem::path> const expected_output_paths
         {
-            std::filesystem::path{"artifacts"} / "my_library.module_a.hlb",
-            std::filesystem::path{"artifacts"} / "my_library.module_b.hlb",
-            std::filesystem::path{"artifacts"} / "my_library.module_c.hlb",
+            std::filesystem::path{"artifacts"} / "my_library.module_a.irisb",
+            std::filesystem::path{"artifacts"} / "my_library.module_b.irisb",
+            std::filesystem::path{"artifacts"} / "my_library.module_c.irisb",
             std::filesystem::path{"include"} / "my_library" / "module_a.h",
             std::filesystem::path{"include"} / "my_library" / "module_a.hpp",
         };
@@ -302,8 +302,8 @@ namespace h::compiler
 
         std::pmr::vector<std::filesystem::path> const expected_output_paths
         {
-            std::filesystem::path{"artifacts"} / "my_library.hlb",
-            std::filesystem::path{"artifacts"} / "my_app.hlb",
+            std::filesystem::path{"artifacts"} / "my_library.irisb",
+            std::filesystem::path{"artifacts"} / "my_app.irisb",
             std::filesystem::path{"bin"} / get_binary_name("my_app", target)
         };
 

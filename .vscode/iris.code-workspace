@@ -182,7 +182,7 @@
 				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"print-struct-layout",
-					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/no_artifact/code_lens_0.generated.hlb",
+					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/no_artifact/code_lens_0.generated.irisb",
 					"My_struct"
 				],
 				"cwd": "${workspaceFolder}/build",
