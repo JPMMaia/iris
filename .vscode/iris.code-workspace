@@ -58,7 +58,7 @@
 				"args": [
 					"typescript_interface",
 					"${workspaceFolder}/Source/Core/Core.cppm",
-					"${workspaceFolder}/Tools/vscode/H-editor/src/core/Core_interface.ts"
+					"${workspaceFolder}/Tools/vscode/iris-extension/src/core/Core_interface.ts"
 				],
 				"cwd": "${workspaceFolder}",
 			},
@@ -70,7 +70,7 @@
 				"args": [
 					"typescript_intermediate_representation",
 					"${workspaceFolder}/Source/Core/Core.cppm",
-					"${workspaceFolder}/Tools/vscode/H-editor/src/core/Core_intermediate_representation.ts"
+					"${workspaceFolder}/Tools/vscode/iris-extension/src/core/Core_intermediate_representation.ts"
 				],
 				"cwd": "${workspaceFolder}",
 			},
@@ -114,7 +114,7 @@
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
 					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
-					"--repository=${workspaceFolder}/../HLang_Local_Repository/hlang_repository.json",
+					"--repository=${workspaceFolder}/../iris_local_repository/hlang_repository.json",
 					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
 				],
 				"cwd": "${workspaceFolder}/build",
@@ -131,7 +131,7 @@
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
 					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
-					"--repository=${workspaceFolder}/../HLang_Local_Repository/hlang_repository.json",
+					"--repository=${workspaceFolder}/../iris_local_repository/hlang_repository.json",
 					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
 				],
 				"cwd": "${workspaceFolder}/build",
@@ -157,7 +157,7 @@
 					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/hlang_artifact.json",
 					"--build-directory=${workspaceFolder}/build/tmp",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/Libraries/hlang_repository.json"
+					"--repository=${workspaceFolder}/share/libraries/hlang_repository.json"
 				],
 				"cwd": "${workspaceFolder}/build/tmp",
 			},
@@ -171,8 +171,8 @@
 					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/hlang_artifact.json",
 					"--build-directory=${workspaceFolder}/../MythologyEngine/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/../H/Libraries/hlang_repository.json",
-					"--repository=${workspaceFolder}/../HLang Local Repository/hlang_repository.json"
+					"--repository=${workspaceFolder}/share/libraries/hlang_repository.json",
+					"--repository=${workspaceFolder}/../iris_local_repository/hlang_repository.json"
 				],
 				"cwd": "${workspaceFolder}/../MythologyEngine",
 			},
@@ -184,8 +184,8 @@
 				"args": [
 					"import-c-header",
 					"c.complex",
-					"${workspaceFolder}/../H/Tools/vscode/H-editor/packages/client/test_fixture/projects/complex/complex.h",
-					"${workspaceFolder}/../H/Tools/vscode/H-editor/packages/client/test_fixture/build/Complex/c.complex.h",
+					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/projects/complex/complex.h",
+					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/Complex/c.complex.h",
 					/*"SDL3.SDL",
 					"${workspaceFolder}/../SDL/include/SDL3/SDL.h",
 					"${workspaceFolder}/SDL3.hl",
@@ -200,7 +200,7 @@
 				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"print-struct-layout",
-					"${workspaceFolder}/Tools/vscode/H-editor/packages/client/test_fixture/build/no_artifact/code_lens_0.generated.hl",
+					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/no_artifact/code_lens_0.generated.hl",
 					"My_struct"
 				],
 				"cwd": "${workspaceFolder}/build",
@@ -217,7 +217,7 @@
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
 					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
-					"--repository=${workspaceFolder}/../HLang_Local_Repository/hlang_repository.json",
+					"--repository=${workspaceFolder}/../iris_local_repository/hlang_repository.json",
 					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
 				],
 				"cwd": "${workspaceFolder}/../rts-game",
@@ -242,14 +242,14 @@
 				"request": "launch",
 				"runtimeExecutable": "${execPath}",
 				"args": [
-					"--extensionDevelopmentPath=${workspaceRoot}/Tools/vscode/H-editor",
+					"--extensionDevelopmentPath=${workspaceRoot}/Tools/vscode/iris-extension",
 					"--trace-warnings",
 					"--disable-extensions"
 				],
 				"sourceMaps": true,
 				"autoAttachChildProcesses": true,
 				"outFiles": [
-					"${workspaceRoot}/Tools/vscode/H-editor/out/**/*.js"
+					"${workspaceRoot}/Tools/vscode/iris-extension/out/**/*.js"
 				],
 				"env": {
 					"mode": "debug",
@@ -261,7 +261,7 @@
 				"type": "extensionHost",
 				"request": "launch",
 				"runtimeExecutable": "${execPath}",
-				"testConfiguration": "${workspaceFolder}/Tools/vscode/H-editor/.vscode-test.mjs",
+				"testConfiguration": "${workspaceFolder}/Tools/vscode/iris-extension/.vscode-test.mjs",
 				"args": [],
 				"autoAttachChildProcesses": true,
 				"preLaunchTask": "Build Language Client and Server",
@@ -305,11 +305,11 @@
 				"type": "extensionHost",
 				"request": "launch",
 				"runtimeExecutable": "${execPath}",
-				"testConfiguration": "${workspaceFolder}/Tools/vscode/H-editor/.vscode-test.mjs",
+				"testConfiguration": "${workspaceFolder}/Tools/vscode/iris-extension/.vscode-test.mjs",
 				"args": [
 				],
 				"outFiles": [
-					"${workspaceRoot}/Tools/vscode/H-editor/out/**/*.js"
+					"${workspaceRoot}/Tools/vscode/iris-extension/out/**/*.js"
 				],
 				"preLaunchTask": "Build Language Client",
 				"env": {
@@ -367,7 +367,7 @@
 				},
 				"group": "none",
 				"options": {
-					"cwd": "${workspaceFolder}/Tools/vscode/H-editor"
+					"cwd": "${workspaceFolder}/Tools/vscode/iris-extension"
 				},
 				"problemMatcher": []
 			},
@@ -398,7 +398,7 @@
 				},
 				"group": "none",
 				"options": {
-					"cwd": "${workspaceFolder}/Tools/vscode/H-editor"
+					"cwd": "${workspaceFolder}/Tools/vscode/iris-extension"
 				},
 				"problemMatcher": []
 			},
@@ -645,13 +645,9 @@
 		"cmake.configureOnEdit": false,
 		"cmake.enableAutomaticKitScan": false,
 		"chat.tools.terminal.autoApprove": {
-			"/^powershell -Command \"\\. \\$PROFILE ; Enter-VsDevEnv ; cd 'C:\\\\Users\\\\JPMMa\\\\Desktop\\\\source\\\\H' ; cmake --build build --target H_compiler\"$/": {
-				"approve": true,
-				"matchCommandLine": true
-			},
 			"Enter-VsDevEnv": true,
-			".\\build\\Source\\Compiler\\H_compiler_tests.exe": true,
-			"cmake": true
+			"cmake": true,
+			"./build/Source/Compiler/H_compiler_tests.exe": true
 		}
 	}
 }

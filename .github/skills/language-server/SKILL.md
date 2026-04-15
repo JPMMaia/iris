@@ -24,27 +24,27 @@ The Language Server is built using CMake. The CMake target is `H_language_server
 
 ## Language Client
 
-The Language Client code is located in `Tools/vscode/H-editor`. This is a VSCode extension built using Node.js and Typescript.
+The Language Client code is located in `Tools/vscode/iris-extension`. This is a VSCode extension built using Node.js and Typescript.
 
-The main file is `Tools/vscode/H-editor/src/extension.ts` which simply tries to connect to a Language Server (or spawn one).
+The main file is `Tools/vscode/iris-extension/src/extension.ts` which simply tries to connect to a Language Server (or spawn one).
 
 ### Build the Language Client
 
 ```
-cd Tools/vscode/H-editor
+cd Tools/vscode/iris-extension
 npm run compile
 ```
 
 ## Tests
 
-The Language Server is mainly tested through the Language Client tests. The test files are located in `Tools/vscode/H-editor/src/test`. The test fixture is located in `Tools/vscode/H-editor/test_fixture`.
+The Language Server is mainly tested through the Language Client tests. The test files are located in `Tools/vscode/iris-extension/src/test`. The test fixture is located in `Tools/vscode/iris-extension/test_fixture`.
 
 Run the tests using PowerShell from the workspace root:
 
 ```powershell
 Enter-VsDevEnv
 cmake --build build --target H_language_server_app
-cd Tools/vscode/H-editor
+cd Tools/vscode/iris-extension
 npm run compile
 $env:hlang_language_server = "${pwd}/../../../build/Source/Language_server/hlang_language_server.exe"
 npm run test
@@ -54,8 +54,8 @@ Note: do **not** set `mode=debug` when running tests. That mode makes the extens
 
 ## Making changes to the Language Server
 
-1. Create a new file for testing in `Tools/vscode/H-editor/test_fixture/projects/other` if needed
-2. Add a new test to one of the files in `Tools/vscode/H-editor/src/test`.
+1. Create a new file for testing in `Tools/vscode/iris-extension/test_fixture/projects/other` if needed
+2. Add a new test to one of the files in `Tools/vscode/iris-extension/src/test`.
 3. Run the tests to confirm that the new test is failing.
 4. Make the required changes to the Language Server.
 5. Run the tests again and confirm that the the new test is passing. If not, go to step 4.

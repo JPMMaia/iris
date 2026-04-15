@@ -47,28 +47,28 @@ target_sources(H_Tools_Generate_JSON PRIVATE
 set(H_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}/../../")
 
 add_custom_command(
-    OUTPUT "${H_ROOT_DIR}/Tools/vscode/H-editor/packages/core/src/Core_interface.ts"
+    OUTPUT "${H_ROOT_DIR}/Tools/vscode/iris-extension/packages/core/src/Core_interface.ts"
     COMMAND H_Tools_Generate_JSON
                 ARGS
                 "typescript_interface"
                 "${H_ROOT_DIR}/Source/Core/Core.cppm"
-                "${H_ROOT_DIR}/Tools/vscode/H-editor/packages/core/src/Core_interface.ts"
+                "${H_ROOT_DIR}/Tools/vscode/iris-extension/packages/core/src/Core_interface.ts"
     DEPENDS H_Tools_Generate_JSON "${H_ROOT_DIR}/Source/Core/Core.cppm"
     VERBATIM
 )
-add_custom_target(Generate_h_core_typescript_interface DEPENDS "${H_ROOT_DIR}/Tools/vscode/H-editor/packages/core/src/Core_interface.ts")
+add_custom_target(Generate_h_core_typescript_interface DEPENDS "${H_ROOT_DIR}/Tools/vscode/iris-extension/packages/core/src/Core_interface.ts")
 
 add_custom_command(
-    OUTPUT "${H_ROOT_DIR}/Tools/vscode/H-editor/packages/core/src/Core_intermediate_representation.ts"
+    OUTPUT "${H_ROOT_DIR}/Tools/vscode/iris-extension/packages/core/src/Core_intermediate_representation.ts"
     COMMAND H_Tools_Generate_JSON
                 ARGS
                 "typescript_intermediate_representation"
                 "${H_ROOT_DIR}/Source/Core/Core.cppm"
-                "${H_ROOT_DIR}/Tools/vscode/H-editor/packages/core/src/Core_intermediate_representation.ts"
+                "${H_ROOT_DIR}/Tools/vscode/iris-extension/packages/core/src/Core_intermediate_representation.ts"
     DEPENDS H_Tools_Generate_JSON "${H_ROOT_DIR}/Source/Core/Core.cppm"
     VERBATIM
 )
-add_custom_target(Generate_h_core_typescript_intermediate_representation DEPENDS "${H_ROOT_DIR}/Tools/vscode/H-editor/packages/core/src/Core_intermediate_representation.ts")
+add_custom_target(Generate_h_core_typescript_intermediate_representation DEPENDS "${H_ROOT_DIR}/Tools/vscode/iris-extension/packages/core/src/Core_intermediate_representation.ts")
 
 add_custom_command(
     OUTPUT "${H_ROOT_DIR}/Source/Binary_serializer/Generated.cppm"

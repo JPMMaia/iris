@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(H LANGUAGES C CXX)
+project(Iris LANGUAGES C CXX)
 
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 set(CMAKE_CXX_STANDARD 23)

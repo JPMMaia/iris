@@ -3386,9 +3386,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     {
     };
 
-    char const* const expected_llvm_ir = R"(
+    std::string const expected_llvm_ir = std::format(R"(
 ; Function Attrs: convergent
-define void @Debug_information_decimal_expressions_decimal_constants() #0 !dbg !3 {
+define void @Debug_information_decimal_expressions_decimal_constants() #0 !dbg !3 {{
 entry:
   %a = alloca i32, align 4, !dbg !7
   call void @llvm.dbg.declare(metadata ptr %a, metadata !8, metadata !DIExpression()), !dbg !14
@@ -3403,29 +3403,29 @@ entry:
   call void @llvm.dbg.declare(metadata ptr %d, metadata !27, metadata !DIExpression()), !dbg !28
   store i32 10000, ptr %d, align 4, !dbg !28
   ret void, !dbg !28
-}
+}}
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
 declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
 
-attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
-attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
-!llvm.module.flags = !{!0}
-!llvm.dbg.cu = !{!1}
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
 
-!0 = !{i32 2, !"Debug Info Version", i32 3}
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_decimal_expressions.hltxt", directory: "C:/Users/JPMMa/Desktop/source/H/Examples/txt")
+!2 = !DIFile(filename: "debug_information_decimal_expressions.hltxt", directory: "{{}}")
 !3 = distinct !DISubprogram(name: "decimal_constants", linkageName: "Debug_information_decimal_expressions_decimal_constants", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
-!5 = !{null}
-!6 = !{}
+!5 = !{{null}}
+!6 = !{{}}
 !7 = !DILocation(line: 4, column: 1, scope: !3)
 !8 = !DILocalVariable(name: "a", scope: !3, file: !2, line: 5, type: !9)
 !9 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal2", scope: !10, size: 32, align: 32, elements: !11)
 !10 = !DINamespace(name: "h", scope: null)
-!11 = !{!12}
+!11 = !{{!12}}
 !12 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !13, size: 32, align: 32)
 !13 = !DIBasicType(name: "h::Decimal2_storage", size: 32, encoding: DW_ATE_signed)
 !14 = !DILocation(line: 5, column: 5, scope: !3)
@@ -3433,17 +3433,17 @@ attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !16 = !DILocation(line: 7, column: 5, scope: !3)
 !17 = !DILocalVariable(name: "b", scope: !3, file: !2, line: 6, type: !18)
 !18 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal4", scope: !10, size: 32, align: 32, elements: !19)
-!19 = !{!20}
+!19 = !{{!20}}
 !20 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !21, size: 32, align: 32)
 !21 = !DIBasicType(name: "h::Decimal4_storage", size: 32, encoding: DW_ATE_signed)
 !22 = !DILocalVariable(name: "c", scope: !3, file: !2, line: 7, type: !23)
 !23 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal7", scope: !10, size: 64, align: 64, elements: !24)
-!24 = !{!25}
+!24 = !{{!25}}
 !25 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !26, size: 64, align: 64)
 !26 = !DIBasicType(name: "h::Decimal7_storage", size: 64, encoding: DW_ATE_signed)
 !27 = !DILocalVariable(name: "d", scope: !3, file: !2, line: 8, type: !9)
 !28 = !DILocation(line: 8, column: 5, scope: !3)
-)";
+)", g_test_source_files_path.generic_string());
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
   }

@@ -174,17 +174,17 @@ ctest -j 8
 
 ### VS Code Extension Development
 
-The VS Code extension is located in `Tools/vscode/H-editor/`:
+The VS Code extension is located in `Tools/vscode/iris-extension/`:
 
 #### Build Language Client
 ```bash
-cd Tools/vscode/H-editor
+cd Tools/vscode/iris-extension
 npm run compile
 ```
 
 #### Package Extension
 ```bash
-cd Tools/vscode/H-editor
+cd Tools/vscode/iris-extension
 npm run package
 ```
 

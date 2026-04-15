@@ -39,7 +39,7 @@ def copy_file(source: str, destination: str) -> None:
 
 root_directory = Path(__file__).resolve().parent.parent
 examples_directory = root_directory.joinpath("Examples")
-extension_directory = root_directory.joinpath("Tools/vscode/H-editor")
+extension_directory = root_directory.joinpath("Tools/vscode/iris-extension")
 parser_directory = root_directory.joinpath("Source/Parser/tree-sitter-hlang")
 
 def build_and_test() -> bool:
