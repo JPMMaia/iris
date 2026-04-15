@@ -41,4 +41,4 @@ add_custom_target(
     Generate_h_natvis_soa_array_view
 )
 
-install(DIRECTORY "share/hlang" TYPE DATA CONFIGURATIONS Debug Release)
+install(DIRECTORY "share/iris" TYPE DATA CONFIGURATIONS Debug Release)

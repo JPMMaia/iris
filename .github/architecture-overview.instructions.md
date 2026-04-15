@@ -33,7 +33,7 @@ It also contains a Builder component that orchestrates the entire build pipeline
   - `Compiler.cpp` - LLVM code generation and lowering.
   - `Expressions.cpp` - Expression lowering to LLVM IR.
   - `Clang_code_generation.cpp` - Clang-based code generation for C and platform ABI compatibility. It's possible that this might be changed to use the new LLVM's ABI Lowering Library.
-  - `Test_framework.cpp` - Can be used to create `.hltxt` source files that implement specific functions that return information about the tests. For example it will return an array of function pointers to all the functions marked with the `@test` attribute. These functions are then called by the test runner which is implemented in `share/hlang/source/tests_main.cpp`.
+  - `Test_framework.cpp` - Can be used to create `.hltxt` source files that implement specific functions that return information about the tests. For example it will return an array of function pointers to all the functions marked with the `@test` attribute. These functions are then called by the test runner which is implemented in `share/iris/source/tests_main.cpp`.
   - `Validation.cppm` - Type checking and semantic validation.
   - `Linker.cppm` - Linking logic
   - `JIT/` - Just-In-Time execution support. Not fully implemented yet and it's not being used at the moment.

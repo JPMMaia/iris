@@ -51,7 +51,7 @@ Use the #askQuestions tool to validate the changes with the user.
 
 7. Debug Info
 
-If debug info changes are needed check [h.compiler.types](../../../Source/Compiler/Types.cpp) and the [natvis visualizers](../../../share/hlang/visualizers).
+If debug info changes are needed check [h.compiler.types](../../../Source/Compiler/Types.cpp) and the [natvis visualizers](../../../share/iris/visualizers).
 If natvis is added, add the natvis linker flag in [Linker_coff.cpp](../../../Source/Compiler/Linker_coff.cpp).
 After all this, build and test.
 Use the #askQuestions tool to validate the changes with the user.

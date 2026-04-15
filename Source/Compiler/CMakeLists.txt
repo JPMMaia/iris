@@ -115,7 +115,7 @@ if(BUILD_TESTING)
          TEST_SOURCE_FILES_PATH="${CMAKE_SOURCE_DIR}/Examples/txt"
          TESTS_OUTPUT_DIRECTORY_PATH="${CMAKE_BINARY_DIR}/Temp/Tests/Compiler"
          C_STANDARD_LIBRARY_PATH="${CMAKE_BINARY_DIR}/C_standard_library"
-         STANDARD_REPOSITORY_FILE_PATH="${CMAKE_SOURCE_DIR}/share/hlang/libraries/iris_repository.json"
+         STANDARD_REPOSITORY_FILE_PATH="${CMAKE_SOURCE_DIR}/share/iris/libraries/iris_repository.json"
    )
 
    target_sources(H_compiler_tests PRIVATE
