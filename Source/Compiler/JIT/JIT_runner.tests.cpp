@@ -94,19 +94,19 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = {"./**/*.hltxt"}
+                    .include = {"./**/*.iris"}
                 }
             },
             .info = h::compiler::Executable_info
             {
-                .source = "main.hltxt",
+                .source = "main.iris",
                 .entry_point = "main",    
             }
         };
 
         h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
-        std::filesystem::path const main_file_path = root_directory / "main.hltxt";
+        std::filesystem::path const main_file_path = root_directory / "main.iris";
 
         // TODO change module name to test.main
         std::string_view const initial_code = R"(    
@@ -188,19 +188,19 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = {"./**/*.hltxt"}
+                    .include = {"./**/*.iris"}
                 }
             },
             .info = h::compiler::Executable_info
             {
-                .source = "m0.hltxt",
+                .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
         h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
-        std::filesystem::path const m0_file_path = root_directory / "m0.hltxt";
+        std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(    
             module m0;
 
@@ -213,7 +213,7 @@ namespace h
         )";
         h::common::write_to_file(m0_file_path, m0_code);
 
-        std::filesystem::path const m1_file_path = root_directory / "m1.hltxt";
+        std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(    
             module m1;
 
@@ -275,19 +275,19 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = {"./**/*.hltxt"}
+                    .include = {"./**/*.iris"}
                 }
             },
             .info = h::compiler::Executable_info
             {
-                .source = "m0.hltxt",
+                .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
         h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
-        std::filesystem::path const m0_file_path = root_directory / "m0.hltxt";
+        std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(    
             module m0;
 
@@ -355,19 +355,19 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = {"./**/*.hltxt"}
+                    .include = {"./**/*.iris"}
                 }
             },
             .info = h::compiler::Executable_info
             {
-                .source = "m0.hltxt",
+                .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
         h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
-        std::filesystem::path const m0_file_path = root_directory / "m0.hltxt";
+        std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code_with_errors = R"(
             module m0;
 
@@ -472,19 +472,19 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = {"./**/*.hltxt"}
+                    .include = {"./**/*.iris"}
                 }
             },
             .info = h::compiler::Executable_info
             {
-                .source = "m0.hltxt",
+                .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
         h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
-        std::filesystem::path const m0_file_path = root_directory / "m0.hltxt";
+        std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(
             module m0;
 
@@ -498,7 +498,7 @@ namespace h
         )";
         h::common::write_to_file(m0_file_path, m0_code);
 
-        std::filesystem::path const m1_file_path = root_directory / "m1.hltxt";
+        std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(
             module m1;
 
@@ -557,19 +557,19 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = {"./**/*.hltxt"}
+                    .include = {"./**/*.iris"}
                 }
             },
             .info = h::compiler::Executable_info
             {
-                .source = "m0.hltxt",
+                .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
         h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
-        std::filesystem::path const m0_file_path = root_directory / "m0.hltxt";
+        std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(
             module m0;
 
@@ -583,7 +583,7 @@ namespace h
         )";
         h::common::write_to_file(m0_file_path, m0_code);
 
-        std::filesystem::path const m1_file_path = root_directory / "m1.hltxt";
+        std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(
             module m1;
 
@@ -660,19 +660,19 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = {"./**/*.hltxt"}
+                    .include = {"./**/*.iris"}
                 }
             },
             .info = h::compiler::Executable_info
             {
-                .source = "m0.hltxt",
+                .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
         h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
-        std::filesystem::path const m0_file_path = root_directory / "m0.hltxt";
+        std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(
             module m0;
 
@@ -700,7 +700,7 @@ namespace h
             CHECK(function_pointer == nullptr);
         }
 
-        std::filesystem::path const m1_file_path = root_directory / "m1.hltxt";
+        std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(
             module m1;
 
@@ -755,19 +755,19 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = {"./**/*.hltxt"}
+                    .include = {"./**/*.iris"}
                 }
             },
             .info = h::compiler::Executable_info
             {
-                .source = "m0.hltxt",
+                .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
         h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
-        std::filesystem::path const m0_file_path = root_directory / "m0.hltxt";
+        std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(
             module m0;
 
@@ -780,7 +780,7 @@ namespace h
         )";
         h::common::write_to_file(m0_file_path, m0_code);
 
-        std::filesystem::path const m1_file_path = root_directory / "m1.hltxt";
+        std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(
             module m1;
 
@@ -867,19 +867,19 @@ namespace h
                 h::compiler::Source_group
                 {
                     .data = h::compiler::Hlang_source_group{},
-                    .include = {"./**/*.hltxt"}
+                    .include = {"./**/*.iris"}
                 }
             },
             .info = h::compiler::Executable_info
             {
-                .source = "m0.hltxt",
+                .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
         h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
-        std::filesystem::path const m0_file_path = root_directory / "m0.hltxt";
+        std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(
             module m0;
 
@@ -892,7 +892,7 @@ namespace h
         )";
         h::common::write_to_file(m0_file_path, m0_code);
 
-        std::filesystem::path const m1_file_path = root_directory / "m1.hltxt";
+        std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(
             module m1;
 
@@ -920,7 +920,7 @@ namespace h
             CHECK(result == 3);
         }
 
-        std::filesystem::path const m1_new_file_path = root_directory / "m1_renamed.hltxt";
+        std::filesystem::path const m1_new_file_path = root_directory / "m1_renamed.iris";
         rename_file_and_wait(*jit_runner, m1_file_path, m1_new_file_path);
 
         {

@@ -232,7 +232,7 @@ namespace h::compiler
 
         std::filesystem::path const parsed_file_path = unprotected_data.build_directory_path / module_source_file_path->filename().replace_extension("hl");
 
-        if (module_source_file_path->extension() == ".hltxt")
+        if (module_source_file_path->extension() == ".iris")
         {
             std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(
                 *module_source_file_path,
@@ -739,7 +739,7 @@ namespace h::compiler
         // Any time there is a watched file is modified, add to the recompile module layer:
         if (event.effect_type == wtr::event::effect_type::create || event.effect_type == wtr::event::effect_type::modify)
         {
-            if (source_file_path.extension() == ".hltxt")
+            if (source_file_path.extension() == ".iris")
             {
                 using namespace std::chrono_literals;
 

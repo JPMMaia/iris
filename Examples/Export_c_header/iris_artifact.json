@@ -7,13 +7,13 @@
         {
             "type": "hlang",
             "include": [
-                "./**/*.hltxt"
+                "./**/*.iris"
             ]
         },
         {
             "type": "export_c_header",
             "include": [
-                "./module_a.hltxt"
+                "./module_a.iris"
             ]
         }
     ]

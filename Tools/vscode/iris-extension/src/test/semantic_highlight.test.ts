@@ -13,8 +13,8 @@ interface Decoded_semantic_token {
 
 suite("Should add semantic highlights", () => {
 
-	test.skip("Provides tokens for semantic_highlight_alias.hltxt", async () => {
-		const document_uri = get_document_uri("semantic_highlight_alias.hltxt");
+	test.skip("Provides tokens for semantic_highlight_alias.iris", async () => {
+		const document_uri = get_document_uri("semantic_highlight_alias.iris");
 		await test_semantic_highlight(
 			document_uri,
 			[
@@ -26,8 +26,8 @@ suite("Should add semantic highlights", () => {
 		);
 	});
 
-	test.skip("Provides tokens for semantic_highlight_enum.hltxt", async () => {
-		const document_uri = get_document_uri("semantic_highlight_enum.hltxt");
+	test.skip("Provides tokens for semantic_highlight_enum.iris", async () => {
+		const document_uri = get_document_uri("semantic_highlight_enum.iris");
 		await test_semantic_highlight(
 			document_uri,
 			[
@@ -43,8 +43,8 @@ suite("Should add semantic highlights", () => {
 		);
 	});
 
-	test.skip("Provides tokens for semantic_highlight_function.hltxt", async () => {
-		const document_uri = get_document_uri("semantic_highlight_function.hltxt");
+	test.skip("Provides tokens for semantic_highlight_function.iris", async () => {
+		const document_uri = get_document_uri("semantic_highlight_function.iris");
 		await test_semantic_highlight(
 			document_uri,
 			[
@@ -67,8 +67,8 @@ suite("Should add semantic highlights", () => {
 		);
 	});
 
-	test.skip("Provides tokens for semantic_highlight_module_declaration.hltxt", async () => {
-		const document_uri = get_document_uri("semantic_highlight_module_declaration.hltxt");
+	test.skip("Provides tokens for semantic_highlight_module_declaration.iris", async () => {
+		const document_uri = get_document_uri("semantic_highlight_module_declaration.iris");
 		await test_semantic_highlight(
 			document_uri,
 			[
@@ -78,8 +78,8 @@ suite("Should add semantic highlights", () => {
 		);
 	});
 
-	test.skip("Provides tokens for semantic_highlight_global_variable.hltxt", async () => {
-		const document_uri = get_document_uri("semantic_highlight_global_variable.hltxt");
+	test.skip("Provides tokens for semantic_highlight_global_variable.iris", async () => {
+		const document_uri = get_document_uri("semantic_highlight_global_variable.iris");
 		await test_semantic_highlight(
 			document_uri,
 			[
@@ -94,8 +94,8 @@ suite("Should add semantic highlights", () => {
 		);
 	});
 
-	test.skip("Provides tokens for semantic_highlight_struct.hltxt", async () => {
-		const document_uri = get_document_uri("semantic_highlight_struct.hltxt");
+	test.skip("Provides tokens for semantic_highlight_struct.iris", async () => {
+		const document_uri = get_document_uri("semantic_highlight_struct.iris");
 		await test_semantic_highlight(
 			document_uri,
 			[
@@ -110,8 +110,8 @@ suite("Should add semantic highlights", () => {
 		);
 	});
 
-	test.skip("Provides tokens for semantic_highlight_union.hltxt", async () => {
-		const document_uri = get_document_uri("semantic_highlight_union.hltxt");
+	test.skip("Provides tokens for semantic_highlight_union.iris", async () => {
+		const document_uri = get_document_uri("semantic_highlight_union.iris");
 		await test_semantic_highlight(
 			document_uri,
 			[

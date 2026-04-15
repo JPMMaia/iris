@@ -6,7 +6,7 @@ import { get_document_uri, activate } from './helper.js';
 suite("Should get instantiate expression add missing members code action", () => {
 
     test("Add missing instantiate members 0", async () => {
-        const document_uri = get_document_uri("projects/other/code_action_instantiate_0.hltxt");
+        const document_uri = get_document_uri("projects/other/code_action_instantiate_0.iris");
         await test_code_actions(document_uri, to_range(12, 31, 12, 31), vscode.CodeActionKind.RefactorRewrite, [
             {
                 title: "Add missing instantiate members",
@@ -17,7 +17,7 @@ suite("Should get instantiate expression add missing members code action", () =>
     });
 
     test("Add missing instantiate members, without modifying existing member values", async () => {
-        const document_uri = get_document_uri("projects/other/code_action_instantiate_1.hltxt");
+        const document_uri = get_document_uri("projects/other/code_action_instantiate_1.iris");
         await test_code_actions(document_uri, to_range(12, 31, 12, 31), vscode.CodeActionKind.RefactorRewrite, [
             {
                 title: "Add missing instantiate members",
@@ -28,12 +28,12 @@ suite("Should get instantiate expression add missing members code action", () =>
     });
 
     test("Do not get any code action if all instantiate members are present", async () => {
-        const document_uri = get_document_uri("projects/other/code_action_instantiate_2.hltxt");
+        const document_uri = get_document_uri("projects/other/code_action_instantiate_2.iris");
         await test_code_actions(document_uri, to_range(12, 31, 12, 31), vscode.CodeActionKind.RefactorRewrite, []);
     });
 
     test("Add missing instantiate members which are also structs", async () => {
-        const document_uri = get_document_uri("projects/other/code_action_instantiate_3.hltxt");
+        const document_uri = get_document_uri("projects/other/code_action_instantiate_3.iris");
         await test_code_actions(document_uri, to_range(23, 29, 23, 29), vscode.CodeActionKind.RefactorRewrite, [
             {
                 title: "Add missing instantiate members",
@@ -44,7 +44,7 @@ suite("Should get instantiate expression add missing members code action", () =>
     });
 
     test("Add missing instantiate members inside a instantiate expression", async () => {
-        const document_uri = get_document_uri("projects/other/code_action_instantiate_4.hltxt");
+        const document_uri = get_document_uri("projects/other/code_action_instantiate_4.iris");
         await test_code_actions(document_uri, to_range(24, 12, 24, 12), vscode.CodeActionKind.RefactorRewrite, [
             {
                 title: "Add missing instantiate members",
@@ -55,7 +55,7 @@ suite("Should get instantiate expression add missing members code action", () =>
     });
 
     test("Add missing instantiate members inside an explicit instantiate expression", async () => {
-        const document_uri = get_document_uri("projects/other/code_action_instantiate_5.hltxt");
+        const document_uri = get_document_uri("projects/other/code_action_instantiate_5.iris");
         await test_code_actions(document_uri, to_range(12, 40, 12, 40), vscode.CodeActionKind.QuickFix, [
             {
                 title: "Add missing instantiate members",
@@ -66,7 +66,7 @@ suite("Should get instantiate expression add missing members code action", () =>
     });
 
     test("Add missing instantiate member that is imported", async () => {
-        const document_uri = get_document_uri("projects/other/code_action_instantiate_6.hltxt");
+        const document_uri = get_document_uri("projects/other/code_action_instantiate_6.iris");
         await test_code_actions(document_uri, to_range(6, 44, 6, 44), vscode.CodeActionKind.QuickFix, [
             {
                 title: "Add missing instantiate members",
@@ -80,7 +80,7 @@ suite("Should get instantiate expression add missing members code action", () =>
 suite("Code action should fix type mismatch using cast", () => {
 
     test("Fix mismatch using cast 0", async () => {
-        const document_uri = get_document_uri("projects/other/code_action_fix_type_mismatch_using_cast_0.hltxt");
+        const document_uri = get_document_uri("projects/other/code_action_fix_type_mismatch_using_cast_0.iris");
         await test_code_actions(document_uri, to_range(6, 21, 6, 21), vscode.CodeActionKind.QuickFix, [
             {
                 title: "Add cast from 'Int32' to 'My_int' ('Int32' to 'Int32')",
@@ -91,7 +91,7 @@ suite("Code action should fix type mismatch using cast", () => {
     });
 
     test("Fix mismatch using cast 1", async () => {
-        const document_uri = get_document_uri("projects/other/code_action_fix_type_mismatch_using_cast_0.hltxt");
+        const document_uri = get_document_uri("projects/other/code_action_fix_type_mismatch_using_cast_0.iris");
         await test_code_actions(document_uri, to_range(7, 21, 7, 21), vscode.CodeActionKind.QuickFix, [
             {
                 title: "Add cast from 'Uint32' to 'My_int' ('Uint32' to 'Int32')",
@@ -102,7 +102,7 @@ suite("Code action should fix type mismatch using cast", () => {
     });
 
     test("Fix mismatch using cast 2", async () => {
-        const document_uri = get_document_uri("projects/other/code_action_fix_type_mismatch_using_cast_0.hltxt");
+        const document_uri = get_document_uri("projects/other/code_action_fix_type_mismatch_using_cast_0.iris");
         await test_code_actions(document_uri, to_range(8, 22, 8, 22), vscode.CodeActionKind.QuickFix, [
             {
                 title: "Add cast from 'Uint32' to 'Float32' ('Uint32' to 'Float32')",

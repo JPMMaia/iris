@@ -11,12 +11,12 @@
         {
             "type": "hlang",
             "include": [
-                "./**/*.hltxt"
+                "./**/*.iris"
             ]
         }
     ],
     "executable": {
-        "source": "main.hltxt",
+        "source": "main.iris",
         "entry_point": "with_prefix_use_main_main"
     }
 }

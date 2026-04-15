@@ -11,11 +11,11 @@
         {
             "type": "hlang",
             "include": [
-                "./**/*.hltxt"
+                "./**/*.iris"
             ]
         }
     ],
     "executable": {
-        "source": "hello_world.hltxt"
+        "source": "hello_world.iris"
     }
 }

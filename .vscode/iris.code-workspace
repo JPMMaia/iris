@@ -276,7 +276,7 @@
 				"request": "launch",
 				"program": "${workspaceFolder}/build/Source/Parser/hlang_parser.exe",
 				"args": [
-					"${workspaceFolder}/Examples/txt/hello_world.hltxt",
+					"${workspaceFolder}/Examples/txt/hello_world.iris",
 					"${workspaceFolder}/build/tmp/hello_world.hl",
 				],
 				"cwd": "${workspaceFolder}/build/tmp",

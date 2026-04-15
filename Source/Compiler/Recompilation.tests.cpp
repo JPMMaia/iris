@@ -79,7 +79,7 @@ namespace h
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
         h::parser::Parser const parser = h::parser::create_parser();
 
-        std::filesystem::path const module_a_code_file_path = root_directory / "A.hltxt";
+        std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(    
             module A;
 
@@ -94,7 +94,7 @@ namespace h
         h::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
-        std::filesystem::path const module_b_code_file_path = root_directory / "B.hltxt";
+        std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
         std::string_view const module_b_code = R"(    
             module B;
 
@@ -161,7 +161,7 @@ namespace h
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
         h::parser::Parser const parser = h::parser::create_parser();
 
-        std::filesystem::path const module_a_code_file_path = root_directory / "A.hltxt";
+        std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
             module A;
 
@@ -176,7 +176,7 @@ namespace h
         h::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
-        std::filesystem::path const module_b_code_file_path = root_directory / "B.hltxt";
+        std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
         std::string_view const module_b_code = R"(
             module B;
 
@@ -248,7 +248,7 @@ namespace h
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
         h::parser::Parser const parser = h::parser::create_parser();
 
-        std::filesystem::path const module_a_code_file_path = root_directory / "A.hltxt";
+        std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
             module A;
 
@@ -263,7 +263,7 @@ namespace h
         h::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
-        std::filesystem::path const module_b_code_file_path = root_directory / "B.hltxt";
+        std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
         std::string_view const module_b_code = R"(
             module B;
 
@@ -340,7 +340,7 @@ namespace h
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
         h::parser::Parser const parser = h::parser::create_parser();
 
-        std::filesystem::path const module_a_code_file_path = root_directory / "A.hltxt";
+        std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
             module A;
 
@@ -355,7 +355,7 @@ namespace h
         h::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
-        std::filesystem::path const module_b_code_file_path = root_directory / "B.hltxt";
+        std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
         std::string_view const module_b_code = R"(
             module B;
 
@@ -370,7 +370,7 @@ namespace h
         h::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        std::filesystem::path const module_c_code_file_path = root_directory / "C.hltxt";
+        std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
         std::string_view const module_c_code = R"(
             module C;
 
@@ -450,7 +450,7 @@ namespace h
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
         h::parser::Parser const parser = h::parser::create_parser();
 
-        std::filesystem::path const module_a_code_file_path = root_directory / "A.hltxt";
+        std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
             module A;
 
@@ -465,7 +465,7 @@ namespace h
         h::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
-        std::filesystem::path const module_b_code_file_path = root_directory / "B.hltxt";
+        std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
         std::string_view const module_b_code = R"(
             module B;
 
@@ -484,7 +484,7 @@ namespace h
         h::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        std::filesystem::path const module_c_code_file_path = root_directory / "C.hltxt";
+        std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
         std::string_view const module_c_code = R"(
             module C;
 
@@ -553,7 +553,7 @@ namespace h
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
         h::parser::Parser const parser = h::parser::create_parser();
 
-        std::filesystem::path const module_a_code_file_path = root_directory / "A.hltxt";
+        std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
             module A;
 
@@ -570,7 +570,7 @@ namespace h
         h::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
-        std::filesystem::path const module_b_code_file_path = root_directory / "B.hltxt";
+        std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
         std::string_view const module_b_code = R"(
             module B;
 
@@ -585,7 +585,7 @@ namespace h
         h::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        std::filesystem::path const module_c_code_file_path = root_directory / "C.hltxt";
+        std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
         std::string_view const module_c_code = R"(
             module C;
 
@@ -657,7 +657,7 @@ namespace h
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
         h::parser::Parser const parser = h::parser::create_parser();
 
-        std::filesystem::path const module_a_code_file_path = root_directory / "A.hltxt";
+        std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
             module A;
 
@@ -672,7 +672,7 @@ namespace h
         h::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
-        std::filesystem::path const module_b_code_file_path = root_directory / "B.hltxt";
+        std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
         std::string_view const module_b_code = R"(
             module B;
 
@@ -683,7 +683,7 @@ namespace h
         h::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        std::filesystem::path const module_c_code_file_path = root_directory / "C.hltxt";
+        std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
         std::string_view const module_c_code = R"(
             module C;
 
@@ -747,7 +747,7 @@ namespace h
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
         h::parser::Parser const parser = h::parser::create_parser();
 
-        std::filesystem::path const module_a_code_file_path = root_directory / "A.hltxt";
+        std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
             module A;
 
@@ -762,7 +762,7 @@ namespace h
         h::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
-        std::filesystem::path const module_b_code_file_path = root_directory / "B.hltxt";
+        std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
         std::string_view const module_b_code = R"(
             module B;
 
@@ -773,7 +773,7 @@ namespace h
         h::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        std::filesystem::path const module_c_code_file_path = root_directory / "C.hltxt";
+        std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
         std::string_view const module_c_code = R"(
             module C;
 
@@ -845,7 +845,7 @@ namespace h
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
         h::parser::Parser const parser = h::parser::create_parser();
 
-        std::filesystem::path const module_a_code_file_path = root_directory / "A.hltxt";
+        std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
             module A;
 
@@ -860,7 +860,7 @@ namespace h
         h::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
-        std::filesystem::path const module_b_code_file_path = root_directory / "B.hltxt";
+        std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
         std::string_view const module_b_code = R"(
             module B;
 
@@ -874,7 +874,7 @@ namespace h
         h::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        std::filesystem::path const module_c_code_file_path = root_directory / "C.hltxt";
+        std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
         std::string_view const module_c_code = R"(
             module C;
 
@@ -941,7 +941,7 @@ namespace h
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
         h::parser::Parser const parser = h::parser::create_parser();
 
-        std::filesystem::path const module_a_code_file_path = root_directory / "A.hltxt";
+        std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
             module A;
 
@@ -956,7 +956,7 @@ namespace h
         h::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
-        std::filesystem::path const module_b_code_file_path = root_directory / "B.hltxt";
+        std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
         std::string_view const module_b_code = R"(
             module B;
 
@@ -970,7 +970,7 @@ namespace h
         h::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        std::filesystem::path const module_c_code_file_path = root_directory / "C.hltxt";
+        std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
         std::string_view const module_c_code = R"(
             module C;
 

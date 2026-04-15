@@ -6,21 +6,21 @@ import { get_document_uri, activate } from './helper.js';
 suite("Should get diagnostics", () => {
 
 	test("Diagnoses parsing error", async () => {
-		const document_uri = get_document_uri("projects/other/diagnostics_parser_error.hltxt");
+		const document_uri = get_document_uri("projects/other/diagnostics_parser_error.iris");
 		await test_diagnostics(document_uri, [
 			{ message: "Unexpected token.", range: to_range(2, 0, 5, 1), severity: vscode.DiagnosticSeverity.Error, source: "Parser" },
 		]);
 	});
 
 	test.skip("Diagnoses incorrect float suffix", async () => {
-		const document_uri = get_document_uri("projects/other/diagnostics_float_suffix.hltxt");
+		const document_uri = get_document_uri("projects/other/diagnostics_float_suffix.iris");
 		await test_diagnostics(document_uri, [
 			{ message: "Did not expect 'f' as number suffix. Did you mean 'f16', 'f32' or 'f64'?", range: to_range(4, 12, 4, 16), severity: vscode.DiagnosticSeverity.Error, source: "Compiler" },
 		]);
 	});
 
 	test("Diagnoses missing members in an explicit instantiate expression", async () => {
-		const document_uri = get_document_uri("projects/other/diagnostics_missing_explicit_instantiate_members.hltxt");
+		const document_uri = get_document_uri("projects/other/diagnostics_missing_explicit_instantiate_members.iris");
 		await test_diagnostics(document_uri, [
 			{ message: "'My_struct.a' is not set. Explicit instantiate expression requires all members to be set.", range: to_range(10, 30, 10, 41), severity: vscode.DiagnosticSeverity.Error, source: "Compiler" },
 			{ message: "'My_struct.b' is not set. Explicit instantiate expression requires all members to be set.", range: to_range(10, 30, 10, 41), severity: vscode.DiagnosticSeverity.Error, source: "Compiler" },

@@ -9,7 +9,7 @@ description: 'Overview of the H language repository structure and components'
 
 This is the **H language compiler** repository. H is a systems programming language that uses LLVM for code generation and tree-sitter for parsing.
 
-The compiler accepts `.hltxt` source files, parses them using tree-sitter, and then compiles to bitcode using LLVM.
+The compiler accepts `.iris` source files, parses them using tree-sitter, and then compiles to bitcode using LLVM.
 
 For interoperability with C, it can generate C headers from H source files, and it can also import C headers as H modules that can then be used directly in H code.
 
@@ -33,7 +33,7 @@ It also contains a Builder component that orchestrates the entire build pipeline
   - `Compiler.cpp` - LLVM code generation and lowering.
   - `Expressions.cpp` - Expression lowering to LLVM IR.
   - `Clang_code_generation.cpp` - Clang-based code generation for C and platform ABI compatibility. It's possible that this might be changed to use the new LLVM's ABI Lowering Library.
-  - `Test_framework.cpp` - Can be used to create `.hltxt` source files that implement specific functions that return information about the tests. For example it will return an array of function pointers to all the functions marked with the `@test` attribute. These functions are then called by the test runner which is implemented in `share/iris/source/tests_main.cpp`.
+  - `Test_framework.cpp` - Can be used to create `.iris` source files that implement specific functions that return information about the tests. For example it will return an array of function pointers to all the functions marked with the `@test` attribute. These functions are then called by the test runner which is implemented in `share/iris/source/tests_main.cpp`.
   - `Validation.cppm` - Type checking and semantic validation.
   - `Linker.cppm` - Linking logic
   - `JIT/` - Just-In-Time execution support. Not fully implemented yet and it's not being used at the moment.
@@ -44,7 +44,7 @@ It also contains a Builder component that orchestrates the entire build pipeline
   - For now this is only contains a `main.cpp` file which is used to create the `hlang` executable. This might be moved into `Compiler/` in the future, as most of the work is done in the `Compiler/Builder.cpp` file.
 
 - **`Parser/`** - tree-sitter parsing and CST conversion
-  - `Parser.cppm` - Uses tree-sitter to parse `.hltxt` source files into the tree-sitter Concrete Syntax Tree (CST).
+  - `Parser.cppm` - Uses tree-sitter to parse `.iris` source files into the tree-sitter Concrete Syntax Tree (CST).
   - `Convertor.cpp` - tree-sitter CST to Core Module conversion
   - `tree-sitter-iris/` - Grammar definition
 
@@ -70,7 +70,7 @@ It also contains a Builder component that orchestrates the entire build pipeline
 - **`Tools/tests_result_replacer/`** - Runs the compiler tests that contain the `[LLVM]` tag and then edits `Source/Compiler/Compiler.tests.cpp` and replaces the expected results with the actual results.
 
 ### Examples Directory (`Examples/`)
-- Contains example `.hltxt` source files and projects. This is used by the tests.
+- Contains example `.iris` source files and projects. This is used by the tests.
 
 - **`Hello_world/`** - Basic H program example
 - **`Export_and_import_c_header/`** - Project that exports a C header and imports another C header.
@@ -213,7 +213,7 @@ Lists external dependencies managed by vcpkg.
 
 | Extension | Purpose | Description |
 |-----------|---------|-------------|
-| `.hltxt` | H Language Source | H language code that contains user code that is input to this compiler |
+| `.iris` | H Language Source | H language code that contains user code that is input to this compiler |
 | `.h` | C Header | C header files |
 | `.cppm` | C++ Modules | C++ module interface files |
 | `.cpp` | C++ Implementation | C++ implementation files |

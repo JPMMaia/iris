@@ -61,13 +61,10 @@
         "language": "hlang",
         "scopeName": "source.hlang",
         "path": "./syntaxes/hlang.tmGrammar.json"
-      }
-    ],
-    "languages": [
-      {
-        "id": "hlang",
+
+,
         "extensions": [
-          ".hltxt"
+          ".iris"
         ],
         "configuration": "./language_configuration.json"
       }

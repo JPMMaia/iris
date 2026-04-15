@@ -189,7 +189,7 @@ namespace h
 
   TEST_CASE("Compile Address Of", "[LLVM_IR]")
   {
-    char const* const input_file = "address_of.hltxt";
+    char const* const input_file = "address_of.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -224,7 +224,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Array Slices", "[LLVM_IR]")
   {
-    char const* const input_file = "array_slices.hltxt";
+    char const* const input_file = "array_slices.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -400,7 +400,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "array_slices.hltxt", directory: "{}")
+!2 = !DIFile(filename: "array_slices.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "take", linkageName: "Array_slices_take", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !13)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null, !6}}
@@ -472,7 +472,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Array Slices Instantiate", "[LLVM_IR]")
   {
-    char const* const input_file = "array_slices_instantiate.hltxt";
+    char const* const input_file = "array_slices_instantiate.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -518,7 +518,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "array_slices_instantiate.hltxt", directory: "{}")
+!2 = !DIFile(filename: "array_slices_instantiate.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Array_slices_instantiate_run", scope: null, file: !2, line: 8, type: !4, scopeLine: 9, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null}}
@@ -550,7 +550,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Asserts", "[LLVM_IR]")
   {
-    char const* const input_file = "assert_expressions.hltxt";
+    char const* const input_file = "assert_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -600,7 +600,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Assignments", "[LLVM_IR]")
   {
-    char const* const input_file = "assignment_expressions.hltxt";
+    char const* const input_file = "assignment_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -714,7 +714,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Binary Expressions Precedence", "[LLVM_IR]")
   {
-    char const* const input_file = "binary_expressions_precedence.hltxt";
+    char const* const input_file = "binary_expressions_precedence.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -848,7 +848,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Binary Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "binary_expressions.hltxt";
+    char const* const input_file = "binary_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1089,7 +1089,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Binary Expressions Types", "[LLVM_IR]")
   {
-    char const* const input_file = "binary_expressions_types.hltxt";
+    char const* const input_file = "binary_expressions_types.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1117,7 +1117,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Bit Fields", "[LLVM_IR]")
   {
-    char const* const input_file = "bit_fields.hltxt";
+    char const* const input_file = "bit_fields.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1281,7 +1281,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Block Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "block_expressions.hltxt";
+    char const* const input_file = "block_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1310,7 +1310,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Booleans", "[LLVM_IR]")
   {
-    char const* const input_file = "booleans.hltxt";
+    char const* const input_file = "booleans.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1335,7 +1335,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Break Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "break_expressions.hltxt";
+    char const* const input_file = "break_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1502,7 +1502,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Cast Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "cast_expressions.hltxt";
+    char const* const input_file = "cast_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1545,7 +1545,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Comment Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "comment_expressions.hltxt";
+    char const* const input_file = "comment_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1600,7 +1600,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Compile Time For", "[LLVM_IR]")
   {
-    char const* const input_file = "compile_time_for.hltxt";
+    char const* const input_file = "compile_time_for.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1632,7 +1632,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Compile Time If", "[LLVM_IR]")
   {
-    char const* const input_file = "compile_time_if.hltxt";
+    char const* const input_file = "compile_time_if.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1661,7 +1661,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Constant Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "constant_expressions.hltxt";
+    char const* const input_file = "constant_expressions.iris";
     
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "constant_expressions";
     std::filesystem::create_directories(root_directory_path);
@@ -1675,7 +1675,7 @@ My_flags g_global_2 = 0x000000002ULL;
 My_flags g_global_unused = 0x000000003ULL;
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.iris", "my_module", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1710,7 +1710,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Constant Arrays", "[LLVM_IR]")
   {
-    char const* const input_file = "constant_array_expressions.hltxt";
+    char const* const input_file = "constant_array_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1782,7 +1782,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 
   TEST_CASE("Compile Soa Array Type", "[LLVM_IR]")
   {
-    char const* const input_file = "soa_array_type.hltxt";
+    char const* const input_file = "soa_array_type.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1914,7 +1914,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Soa Array Type Debug Information", "[LLVM_IR]")
   {
-    char const* const input_file = "soa_array_type_debug_information.hltxt";
+    char const* const input_file = "soa_array_type_debug_information.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1970,7 +1970,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "soa_array_type_debug_information.hltxt", directory: "{}")
+!2 = !DIFile(filename: "soa_array_type_debug_information.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "soa_array_type_debug_information_run", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null}}
@@ -1990,7 +1990,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Soa Array View Type", "[LLVM_IR]")
   {
-    char const* const input_file = "soa_array_view_type.hltxt";
+    char const* const input_file = "soa_array_view_type.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2219,7 +2219,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Soa Array View Type Debug Information", "[LLVM_IR]")
   {
-    char const* const input_file = "soa_array_view_type_debug_information.hltxt";
+    char const* const input_file = "soa_array_view_type_debug_information.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2252,7 +2252,7 @@ attributes #2 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "soa_array_view_type_debug_information.hltxt", directory: "{}")
+!2 = !DIFile(filename: "soa_array_view_type_debug_information.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "soa_array_view_type_debug_information_run", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null}}
@@ -2276,7 +2276,7 @@ attributes #2 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information C Headers", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_c_headers.hltxt";
+    char const* const input_file = "debug_information_c_headers.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "debug_information_c_headers";
     std::filesystem::create_directories(root_directory_path);
@@ -2291,7 +2291,7 @@ struct Vector2i
 Vector2i add(Vector2i lhs, Vector2i rhs);
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "vector2i.h", "vector2i.hltxt", "c.vector2i", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "vector2i.h", "vector2i.iris", "c.vector2i", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2350,7 +2350,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_c_headers.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_c_headers.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 5, type: !4, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2376,7 +2376,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Array Slices", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_array_slices.hltxt";
+    char const* const input_file = "debug_information_array_slices.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "debug_information_c_headers";
     std::filesystem::create_directories(root_directory_path);
@@ -2391,7 +2391,7 @@ struct Vector2i
 Vector2i add(Vector2i lhs, Vector2i rhs);
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "vector2i.h", "vector2i.hltxt", "c.vector2i", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "vector2i.h", "vector2i.iris", "c.vector2i", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2449,7 +2449,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_array_slices.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_array_slices.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 5, type: !4, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !16)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null, !6, !8, !15}}
@@ -2489,7 +2489,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Bit Fields", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_bit_fields.hltxt";
+    char const* const input_file = "debug_information_bit_fields.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2531,7 +2531,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_bit_fields.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_bit_fields.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "instantiate", linkageName: "Debug_information_instantiate", scope: null, file: !2, line: 10, type: !4, scopeLine: 11, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !12)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2552,7 +2552,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information For Loop", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_for_loop.hltxt";
+    char const* const input_file = "debug_information_for_loop.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2604,7 +2604,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_for_loop.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_for_loop.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2624,7 +2624,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Function Call", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_function_call.hltxt";
+    char const* const input_file = "debug_information_function_call.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2668,7 +2668,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_function_call.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_function_call.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 8, type: !4, scopeLine: 9, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2695,7 +2695,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information If", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_if.hltxt";
+    char const* const input_file = "debug_information_if.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2738,7 +2738,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_if.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_if.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6, !6}}
@@ -2761,7 +2761,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Struct", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_structs.hltxt";
+    char const* const input_file = "debug_information_structs.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2795,7 +2795,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_structs.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_structs.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "instantiate", linkageName: "Debug_information_instantiate", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !11)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2815,7 +2815,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Switch", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_switch.hltxt";
+    char const* const input_file = "debug_information_switch.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2859,7 +2859,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_switch.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_switch.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6, !6}}
@@ -2879,7 +2879,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Temporary Replacement", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_temporary_replacement.hltxt";
+    char const* const input_file = "debug_information_temporary_replacement.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2911,7 +2911,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_temporary_replacement.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_temporary_replacement.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_temporary_replacement_run", scope: null, file: !2, line: 10, type: !4, scopeLine: 11, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null}}
@@ -2931,7 +2931,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Union", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_unions.hltxt";
+    char const* const input_file = "debug_information_unions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2962,7 +2962,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_unions.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_unions.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "instantiate", linkageName: "Debug_information_instantiate", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !12)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2983,7 +2983,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Variables", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_variables.hltxt";
+    char const* const input_file = "debug_information_variables.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3012,7 +3012,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_variables.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_variables.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -3029,7 +3029,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information While Loop", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_while_loop.hltxt";
+    char const* const input_file = "debug_information_while_loop.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3095,7 +3095,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_while_loop.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_while_loop.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -3124,7 +3124,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Decimal Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "decimal_expressions.hltxt";
+    char const* const input_file = "decimal_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3380,7 +3380,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Debug Information Decimal Types", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_decimal_expressions.hltxt";
+    char const* const input_file = "debug_information_decimal_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3416,7 +3416,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_decimal_expressions.hltxt", directory: "{}")
+!2 = !DIFile(filename: "debug_information_decimal_expressions.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "decimal_constants", linkageName: "Debug_information_decimal_expressions_decimal_constants", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null}}
@@ -3450,7 +3450,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Defer Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "defer_expressions.hltxt";
+    char const* const input_file = "defer_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3677,7 +3677,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Dereference and Access Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "dereference_and_access_expressions.hltxt";
+    char const* const input_file = "dereference_and_access_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3710,7 +3710,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Defer Expressions with Debug Information", "[LLVM_IR]")
   {
-    char const* const input_file = "defer_expressions_with_debug_information.hltxt";
+    char const* const input_file = "defer_expressions_with_debug_information.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3755,7 +3755,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "defer_expressions_with_debug_information.hltxt", directory: "{}")
+!2 = !DIFile(filename: "defer_expressions_with_debug_information.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "do_defer", linkageName: "Defer_expressions_with_debug_information_do_defer", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null, !6}}
@@ -3785,7 +3785,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Dynamic Array", "[LLVM_IR]")
   {
-    char const* const input_file = "dynamic_array.hltxt";
+    char const* const input_file = "dynamic_array.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3798,11 +3798,11 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Dynamic Array Usage", "[LLVM_IR]")
   {
-    char const* const input_file = "dynamic_array_usage.hltxt";
+    char const* const input_file = "dynamic_array_usage.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-      { "dynamic_array", parse_and_get_file_path(g_test_source_files_path / "dynamic_array.hltxt") },
+      { "dynamic_array", parse_and_get_file_path(g_test_source_files_path / "dynamic_array.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -4028,7 +4028,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
 
   TEST_CASE("Compile Empty Return Expression", "[LLVM_IR]")
   {
-    char const* const input_file = "empty_return_expression.hltxt";
+    char const* const input_file = "empty_return_expression.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4049,7 +4049,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile For Loop Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "for_loop_expressions.hltxt";
+    char const* const input_file = "for_loop_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4170,7 +4170,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Function Pointers", "[LLVM_IR]")
   {
-    char const* const input_file = "function_pointers.hltxt";
+    char const* const input_file = "function_pointers.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4222,7 +4222,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile hello world!", "[LLVM_IR]")
   {
-    char const* const input_file = "hello_world.hltxt";
+    char const* const input_file = "hello_world.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4250,7 +4250,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile If Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "if_expressions.hltxt";
+    char const* const input_file = "if_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4382,7 +4382,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile If Return Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "if_return_expressions.hltxt";
+    char const* const input_file = "if_return_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4413,7 +4413,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Implicit Arguments", "[LLVM_IR]")
   {
-    char const* const input_file = "implicit_arguments.hltxt";
+    char const* const input_file = "implicit_arguments.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4461,11 +4461,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Implicit Arguments External", "[LLVM_IR]")
   {
-    char const* const input_file = "implicit_arguments_external.hltxt";
+    char const* const input_file = "implicit_arguments_external.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-      { "Implicit_arguments", parse_and_get_file_path(g_test_source_files_path / "implicit_arguments.hltxt") },
+      { "Implicit_arguments", parse_and_get_file_path(g_test_source_files_path / "implicit_arguments.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -4502,11 +4502,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Instantiate Struct with Enum from Module", "[LLVM_IR]")
   {
-    char const* const input_file = "instantiate_struct_with_enum_from_module.hltxt";
+    char const* const input_file = "instantiate_struct_with_enum_from_module.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-      { "Instantiate_struct_with_enum", parse_and_get_file_path(g_test_source_files_path / "instantiate_struct_with_enum.hltxt") },
+      { "Instantiate_struct_with_enum", parse_and_get_file_path(g_test_source_files_path / "instantiate_struct_with_enum.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -4529,7 +4529,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
    TEST_CASE("Compile Instantiate Uninitialized", "[LLVM_IR]")
   {
-    char const* const input_file = "instantiate_uninitialized.hltxt";
+    char const* const input_file = "instantiate_uninitialized.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4553,7 +4553,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Instantiate Zero Initialized", "[LLVM_IR]")
   {
-    char const* const input_file = "instantiate_zero_initialized.hltxt";
+    char const* const input_file = "instantiate_zero_initialized.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4583,7 +4583,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 
   TEST_CASE("Compile Load Pointers", "[LLVM_IR]")
   {
-    char const* const input_file = "load_pointers.hltxt";
+    char const* const input_file = "load_pointers.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4628,7 +4628,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Merge Functions", "[LLVM_IR]")
   {
-    char const* const input_file = "merge_functions.hltxt";
+    char const* const input_file = "merge_functions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4669,7 +4669,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Module with Dots", "[LLVM_IR]")
   {
-    char const* const input_file = "module_with_dots.hltxt";
+    char const* const input_file = "module_with_dots.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4702,12 +4702,12 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Multiple Modules", "[LLVM_IR]")
   {
-    char const* const input_file = "multiple_modules_a.hltxt";
+    char const* const input_file = "multiple_modules_a.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-      { "MB", parse_and_get_file_path(g_test_source_files_path / "multiple_modules_b.hltxt") },
-      { "MC", parse_and_get_file_path(g_test_source_files_path / "multiple_modules_c.hltxt") },
+      { "MB", parse_and_get_file_path(g_test_source_files_path / "multiple_modules_b.iris") },
+      { "MC", parse_and_get_file_path(g_test_source_files_path / "multiple_modules_c.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -4744,7 +4744,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Null Pointers", "[LLVM_IR]")
   {
-    char const* const input_file = "null_pointers.hltxt";
+    char const* const input_file = "null_pointers.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4783,7 +4783,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Numbers", "[LLVM_IR]")
   {
-    char const* const input_file = "numbers.hltxt";
+    char const* const input_file = "numbers.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4846,7 +4846,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Numeric_casts", "[LLVM_IR]")
   {
-    char const* const input_file = "numeric_casts.hltxt";
+    char const* const input_file = "numeric_casts.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4945,7 +4945,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Offset Pointer", "[LLVM_IR]")
   {
-    char const* const input_file = "offset_pointer.hltxt";
+    char const* const input_file = "offset_pointer.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4993,7 +4993,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Passing Pointers to Functions", "[LLVM_IR]")
   {
-    char const* const input_file = "passing_pointers_to_functions.hltxt";
+    char const* const input_file = "passing_pointers_to_functions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5047,7 +5047,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Pointers", "[LLVM_IR]")
   {
-    char const* const input_file = "pointers.hltxt";
+    char const* const input_file = "pointers.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5084,7 +5084,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Reinterpret_as", "[LLVM_IR]")
   {
-    char const* const input_file = "reinterpret_as.hltxt";
+    char const* const input_file = "reinterpret_as.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5110,7 +5110,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Size_of", "[LLVM_IR]")
   {
-    char const* const input_file = "size_of.hltxt";
+    char const* const input_file = "size_of.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5135,7 +5135,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Stack Array Entry", "[LLVM_IR]")
   {
-    char const* const input_file = "stack_array_entry.hltxt";
+    char const* const input_file = "stack_array_entry.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5189,7 +5189,7 @@ attributes #1 = { nocallback nofree nosync nounwind willreturn }
 
   TEST_CASE("Compile Stack Array Loop", "[LLVM_IR]")
   {
-    char const* const input_file = "stack_array_loop.hltxt";
+    char const* const input_file = "stack_array_loop.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5271,7 +5271,7 @@ attributes #1 = { nocallback nofree nosync nounwind willreturn }
 
   TEST_CASE("Compile Switch Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "switch_expressions.hltxt";
+    char const* const input_file = "switch_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5346,7 +5346,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Ternary Condition Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "ternary_condition_expressions.hltxt";
+    char const* const input_file = "ternary_condition_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5504,7 +5504,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Test Framework Non Test Mode", "[LLVM_IR]")
   {
-    char const* const input_file = "test_framework.hltxt";
+    char const* const input_file = "test_framework.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5532,7 +5532,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Test Framework Test Mode", "[LLVM_IR]")
   {
-    char const* const input_file = "test_framework.hltxt";
+    char const* const input_file = "test_framework.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5579,7 +5579,7 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
 
   TEST_CASE("Compile Unary Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "unary_expressions.hltxt";
+    char const* const input_file = "unary_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5645,7 +5645,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Use Printf", "[LLVM_IR]")
   {
-    char const* const input_file = "use_printf.hltxt";
+    char const* const input_file = "use_printf.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5676,7 +5676,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Unique Name", "[LLVM_IR]")
   {
-    char const* const input_file = "unique_name.hltxt";
+    char const* const input_file = "unique_name.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5699,11 +5699,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Alias From Modules", "[LLVM_IR]")
   {
-    char const* const input_file = "using_alias_from_modules.hltxt";
+    char const* const input_file = "using_alias_from_modules.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-        { "Alias", parse_and_get_file_path(g_test_source_files_path / "using_alias.hltxt") },
+        { "Alias", parse_and_get_file_path(g_test_source_files_path / "using_alias.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -5725,7 +5725,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Alias", "[LLVM_IR]")
   {
-    char const* const input_file = "using_alias.hltxt";
+    char const* const input_file = "using_alias.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5752,7 +5752,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Enum Flags", "[LLVM_IR]")
   {
-    char const* const input_file = "using_enum_flags.hltxt";
+    char const* const input_file = "using_enum_flags.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5830,7 +5830,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Enum Default Values", "[LLVM_IR]")
   {
-    char const* const input_file = "using_enums_default_values.hltxt";
+    char const* const input_file = "using_enums_default_values.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5857,11 +5857,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Enums Duplicate", "[LLVM_IR]")
   {
-    char const* const input_file = "using_enums_duplicate.hltxt";
+    char const* const input_file = "using_enums_duplicate.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-        { "Enums", parse_and_get_file_path(g_test_source_files_path / "using_enums.hltxt") },
+        { "Enums", parse_and_get_file_path(g_test_source_files_path / "using_enums.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -5883,11 +5883,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Enums From Modules", "[LLVM_IR]")
   {
-    char const* const input_file = "using_enums_from_modules.hltxt";
+    char const* const input_file = "using_enums_from_modules.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-        { "Enums", parse_and_get_file_path(g_test_source_files_path / "using_enums.hltxt") },
+        { "Enums", parse_and_get_file_path(g_test_source_files_path / "using_enums.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -5907,7 +5907,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Enums", "[LLVM_IR]")
   {
-    char const* const input_file = "using_enums.hltxt";
+    char const* const input_file = "using_enums.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5961,7 +5961,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Function Constructors", "[LLVM_IR]")
   {
-    char const* const input_file = "using_function_constructors.hltxt";
+    char const* const input_file = "using_function_constructors.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6017,7 +6017,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Global Variables", "[LLVM_IR]")
   {
-    char const* const input_file = "using_global_variables.hltxt";
+    char const* const input_file = "using_global_variables.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "using_global_variables";
     std::filesystem::create_directories(root_directory_path);
@@ -6027,7 +6027,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 float my_global = 0.0f;
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.iris", "my_module", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6078,7 +6078,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Global Variables 2", "[LLVM_IR]")
   {
-    char const* const input_file = "using_global_variables_2.hltxt";
+    char const* const input_file = "using_global_variables_2.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "using_global_variables";
     std::filesystem::create_directories(root_directory_path);
@@ -6087,7 +6087,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 void foo();
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.iris", "my_module", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6109,7 +6109,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Structs", "[LLVM_IR]")
   {
-    char const* const input_file = "using_structs.hltxt";
+    char const* const input_file = "using_structs.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6275,7 +6275,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Type Constructors", "[LLVM_IR]")
   {
-    char const* const input_file = "using_type_constructors.hltxt";
+    char const* const input_file = "using_type_constructors.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6326,7 +6326,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Unions", "[LLVM_IR]")
   {
-    char const* const input_file = "using_unions.hltxt";
+    char const* const input_file = "using_unions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6462,7 +6462,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 
   TEST_CASE("Compile Variables", "[LLVM_IR]")
   {
-    char const* const input_file = "variables.hltxt";
+    char const* const input_file = "variables.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6488,7 +6488,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile While Loop Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "while_loop_expressions.hltxt";
+    char const* const input_file = "while_loop_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6596,7 +6596,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Function Contracts", "[LLVM_IR]")
   {
-    char const* const input_file = "function_contracts.hltxt";
+    char const* const input_file = "function_contracts.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6695,7 +6695,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
     TEST_CASE("Compile Function Contracts with disable contracts", "[LLVM_IR]")
   {
-    char const* const input_file = "function_contracts.hltxt";
+    char const* const input_file = "function_contracts.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6746,7 +6746,7 @@ struct My_struct
 };
 )";
 
-std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_struct.h", "my_struct.hltxt", "my_module", root_directory_path);
+std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_struct.h", "my_struct.iris", "my_module", root_directory_path);
 
     std::filesystem::path const header_file_path = root_directory_path / "my_struct.h";
     std::optional<h::Struct_layout> const expected_struct_layout = h::c::calculate_struct_layout(header_file_path, "My_struct", {});
@@ -6782,7 +6782,7 @@ std::filesystem::path const header_module_file_path = create_and_import_c_header
     std::string_view const expected_llvm_ir
   )
   {
-    char const* const input_file = "c_interoperability_call_function_with_struct.hltxt";
+    char const* const input_file = "c_interoperability_call_function_with_struct.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_interoperability_call_function_with_struct";
     std::filesystem::create_directories(root_directory_path);
@@ -6799,7 +6799,7 @@ typedef struct My_struct
 void foo(My_struct argument);
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.iris", "my_module", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6889,7 +6889,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
     std::string_view const expected_llvm_ir
   )
   {
-    char const* const input_file = "c_interoperability_define_function_with_struct.hltxt";
+    char const* const input_file = "c_interoperability_define_function_with_struct.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_interoperability_define_function_with_struct";
     std::filesystem::create_directories(root_directory_path);
@@ -7064,7 +7064,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_call_function_that_returns_bool.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_call_function_that_returns_bool.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - Call function that returns c bool x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7104,7 +7104,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_call_function_that_returns_bool.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_call_function_that_returns_bool.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_big_struct_and_return x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7145,7 +7145,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_big_struct_and_return.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_big_struct_and_return.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_big_struct_and_return x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7188,7 +7188,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_big_struct_and_return.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_big_struct_and_return.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_return_big_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7232,7 +7232,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_big_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_big_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_return_big_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7276,7 +7276,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_big_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_big_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_bool x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7327,7 +7327,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_bool.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_bool.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_bool x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7378,7 +7378,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_bool.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_bool.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_return_empty_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7403,7 +7403,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_empty_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_empty_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_return_empty_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7436,7 +7436,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_empty_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_empty_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_return_int x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7460,7 +7460,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_int.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_int.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_return_int x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7484,7 +7484,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_int.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_int.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_return_pointer x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7508,7 +7508,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_pointer.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_pointer.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_return_pointer x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7532,7 +7532,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_pointer.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_pointer.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_return_small_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7576,7 +7576,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_small_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_small_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_return_small_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7618,7 +7618,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_small_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_small_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_array_slice x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7665,7 +7665,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_array_slice.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_array_slice.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_array_slice x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7709,7 +7709,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_array_slice.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_array_slice.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_with_big_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7744,7 +7744,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_big_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_big_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_big_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7785,7 +7785,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_big_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_big_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_with_empty_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7810,7 +7810,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_empty_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_empty_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_empty_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7840,7 +7840,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_empty_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_empty_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_with_int_arguments x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7866,7 +7866,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_int_arguments.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_int_arguments.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_int_arguments x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7892,7 +7892,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_int_arguments.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_int_arguments.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_with_pointer x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7916,7 +7916,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_pointer.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_pointer.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_pointer x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7940,7 +7940,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_pointer.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_pointer.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_with_small_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7982,7 +7982,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_small_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_small_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_small_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -8021,7 +8021,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_small_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_small_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
 }
 

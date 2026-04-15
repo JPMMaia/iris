@@ -73,13 +73,13 @@ def parse_file(directory: Path, source: Path, destination: Path) -> None:
 
 def generate_builtin() -> None:
     builtin_directory = root_directory.joinpath("Source/Compiler/Builtin")
-    source_file = builtin_directory.joinpath("builtin.hltxt")
+    source_file = builtin_directory.joinpath("builtin.iris")
     destination_file = builtin_directory.joinpath("builtin.hl")
     parse_file(builtin_directory, source_file, destination_file)
 
 def generate_examples() -> None:
     text_directory = examples_directory.joinpath("txt")
-    source_files = list(text_directory.glob(f"*.hltxt"))
+    source_files = list(text_directory.glob(f"*.iris"))
 
     for source_file in source_files:
         destination_file = examples_directory.joinpath("hl").joinpath(source_file.stem + ".hl")

@@ -6,7 +6,7 @@
         {
             "type": "hlang",
             "include": [
-                "./**/*.hltxt"
+                "./**/*.iris"
             ]
         }
     ]

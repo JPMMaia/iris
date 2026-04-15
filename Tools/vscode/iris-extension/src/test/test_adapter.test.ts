@@ -105,8 +105,8 @@ suite("Test Adapter", () => {
 				{
 					name: "suite_name",
 					tests: [
-						{ name: "module.name.do_something", file: "C:/path/to/file.hltxt", line: 551 },
-						{ name: "module.name.another_thing", file: "C:/path/to/file.hltxt", line: 800 }
+						{ name: "module.name.do_something", file: "C:/path/to/file.iris", line: 551 },
+						{ name: "module.name.another_thing", file: "C:/path/to/file.iris", line: 800 }
 					]
 				}
 			]
@@ -119,13 +119,13 @@ suite("Test Adapter", () => {
 					{
 						module_name: "module.name",
 						test_name: "do_something",
-						file_path: "C:/path/to/file.hltxt",
+						file_path: "C:/path/to/file.iris",
 						line: 551
 					},
 					{
 						module_name: "module.name",
 						test_name: "another_thing",
-						file_path: "C:/path/to/file.hltxt",
+						file_path: "C:/path/to/file.iris",
 						line: 800
 					}
 				]
@@ -145,7 +145,7 @@ suite("Test Adapter", () => {
 				{
 					name: "suite_name",
 					tests: [
-						{ name: "module.name.do_something", file: "C:/path/to/file.hltxt", line: 551 }
+						{ name: "module.name.do_something", file: "C:/path/to/file.iris", line: 551 }
 					]
 				}
 			]
@@ -178,7 +178,7 @@ suite("Test Adapter", () => {
 		const test_case = suite.test_cases[0];
 		assert.equal(test_case.module_name, "module.name");
 		assert.equal(test_case.test_name, "do_something");
-		assert.equal(test_case.file_path, "C:/path/to/file.hltxt");
+		assert.equal(test_case.file_path, "C:/path/to/file.iris");
 		assert.equal(test_case.line, 551);
 	});
 

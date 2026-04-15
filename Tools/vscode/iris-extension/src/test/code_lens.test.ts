@@ -4,7 +4,7 @@ import { get_document_uri, activate } from './helper.js';
 
 suite("Should add code lens describing the layout of structs", () => {
 	test.skip("Add code lens 0", async () => {
-		const document_uri = get_document_uri('code_lens_0.hltxt');
+		const document_uri = get_document_uri('code_lens_0.iris');
 		await test_code_lens(document_uri, [
 			new vscode.CodeLens(to_range(2, 7, 2, 16), { title: "Size: 24 bytes | Alignment: 8 bytes", command: "", arguments: undefined }),
 			new vscode.CodeLens(to_range(4, 4, 4, 6), { title: "Offset: 0 bytes | Size: 1 bytes | Alignment: 1 bytes", command: "", arguments: undefined }),

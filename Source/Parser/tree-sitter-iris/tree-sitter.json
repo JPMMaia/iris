@@ -7,7 +7,7 @@
       "title": "Iris",
       "scope": "source.iris",
       "file-types": [
-        "hltxt"
+        "iris"
       ],
       "injection-regex": "^iris$",
       "class-name": "TreeSitterIris"

@@ -29,11 +29,11 @@
         {
             "type": "hlang",
             "include": [
-                "./**/*.hltxt"
+                "./**/*.iris"
             ]
         }
     ],
     "executable": {
-        "source": "my_app.hltxt"
+        "source": "my_app.iris"
     }
 }
