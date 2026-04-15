@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
+cmake_policy(SET CMP0207 NEW)
+
 project(Iris LANGUAGES C CXX)
 
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)

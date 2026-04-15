@@ -44,7 +44,8 @@ if (WIN32)
    add_custom_command(
       TARGET clang_target
       POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG_CL} ${CMAKE_CURRENT_BINARY_DIR}/clang-cl.exe
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG_CL} ${CMAKE_BINARY_DIR}/Source/Compiler/clang-cl.exe
+      COMMAND ${CMAKE_COMMAND} -DPROGRAM="${PROGRAM_CLANG_CL}" -DDESTINATION="${CMAKE_BINARY_DIR}/Source/Compiler" -P "${CMAKE_SOURCE_DIR}/Scripts/copy_runtime_dependencies.cmake"
    )
 else()
    find_program(PROGRAM_CLANG "clang++.exe" REQUIRED)
@@ -53,7 +54,7 @@ else()
    add_custom_command(
       TARGET clang_target
       POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG} ${CMAKE_CURRENT_BINARY_DIR}/clang++
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG} ${CMAKE_BINARY_DIR}/Source/Compiler/clang++
    )
 endif ()
 
