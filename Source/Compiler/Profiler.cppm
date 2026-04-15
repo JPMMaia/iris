@@ -1,8 +1,8 @@
-export module h.compiler.profiler;
+export module iris.compiler.profiler;
 
 import std;
 
-namespace h::compiler
+namespace iris::compiler
 {
     using Clock = std::chrono::high_resolution_clock;
     using Time_point = Clock::time_point;

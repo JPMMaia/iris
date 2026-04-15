@@ -7,13 +7,13 @@ module;
 
 #include <nlohmann/json.hpp>
 
-export module h.json_serializer.operators;
+export module iris.json_serializer.operators;
 
-import h.json_serializer.generated;
-//import h.json_serializer.generics;
-import h.core;
+import iris.json_serializer.generated;
+//import iris.json_serializer.generics;
+import iris.core;
 
-namespace h::json::operators
+namespace iris::json::operators
 {
 
         export std::istream& operator>>(std::istream& input_stream, Fundamental_type& value)

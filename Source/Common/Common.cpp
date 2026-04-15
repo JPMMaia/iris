@@ -9,12 +9,12 @@ module;
 #include <crtdbg.h>
 #endif
 
-module h.common;
+module iris.common;
 
 import std;
 import std.compat;
 
-namespace h::common
+namespace iris::common
 {
     void print_message_and_exit(std::string const& message)
     {

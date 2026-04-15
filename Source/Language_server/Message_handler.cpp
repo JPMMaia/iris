@@ -14,11 +14,11 @@ module;
 
 #include <nlohmann/json.hpp>
 
-module h.language_server.message_handler;
+module iris.language_server.message_handler;
 
-import h.language_server.server;
+import iris.language_server.server;
 
-namespace h::language_server
+namespace iris::language_server
 {
     Message_handler create_message_handler()
     {

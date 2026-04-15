@@ -80,7 +80,7 @@ export function find_tests(test_executable_file_path: string): Test_suite[]
     // create temporary json output file
     const tmpDir = os.tmpdir();
     const randomSuffix = crypto.randomBytes(8).toString('hex');
-    const outFile = path.join(tmpDir, `hlang-tests-${randomSuffix}.json`);
+    const outFile = path.join(tmpDir, `iris-tests-${randomSuffix}.json`);
 
     try {
         child_process.execFileSync(test_executable_file_path, ['--list-tests', `--output-format=json:${outFile}`], { timeout: 30000, stdio: 'pipe' });
@@ -206,7 +206,7 @@ async function find_test_executables(glob_pattern: string): Promise<vscode.Uri[]
 export function create_test_controller(id: string): vscode.TestController {
     const test_controller = vscode.tests.createTestController(
         id,
-        "Hlang Tests"
+        "Iris Tests"
     );
 
     const run_handler = async (request: vscode.TestRunRequest, token: vscode.CancellationToken) => {
@@ -244,8 +244,8 @@ export function create_test_controller(id: string): vscode.TestController {
     );
 
     test_controller.refreshHandler = async () => {
-        const tests_configuration = vscode.workspace.getConfiguration("hlang");
-        const glob_pattern = tests_configuration.get<string>("test_executable_glob", "build/bin/*.hlang.test*");
+        const tests_configuration = vscode.workspace.getConfiguration("iris");
+        const glob_pattern = tests_configuration.get<string>("test_executable_glob", "build/bin/*.iris.test*");
         const uris = await find_test_executables(glob_pattern);
         for (const uri of uris) {
             const suites = find_tests(uri.fsPath);

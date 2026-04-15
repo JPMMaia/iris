@@ -3,16 +3,16 @@ module;
 #include <llvm/ExecutionEngine/Orc/Core.h>
 #include <llvm/ExecutionEngine/Orc/LazyReexports.h>
 
-module h.compiler.recompile_module_layer;
+module iris.compiler.recompile_module_layer;
 
 import std;
 
-import h.common;
-import h.core;
-import h.compiler;
-import h.compiler.common;
+import iris.common;
+import iris.core;
+import iris.compiler;
+import iris.compiler.common;
 
-namespace h::compiler
+namespace iris::compiler
 {
     static bool symbol_exists(
         llvm::orc::IndirectStubsManager& indirect_stubs_manager,
@@ -39,7 +39,7 @@ namespace h::compiler
         );
 
         if (!symbol_flags_map)
-            h::common::print_message_and_exit(std::format("Failed to lookup flags: {}", llvm::toString(symbol_flags_map.takeError())));
+            iris::common::print_message_and_exit(std::format("Failed to lookup flags: {}", llvm::toString(symbol_flags_map.takeError())));
 
         return symbol_flags_map->contains(symbol);
     }
@@ -51,7 +51,7 @@ namespace h::compiler
     };
 
     static Recompile_data modify_function_names_and_create_recompile_data(
-        h::Module& core_module,
+        iris::Module& core_module,
         llvm::orc::ExecutionSession& execution_session,
         llvm::orc::JITDylib& source_library,
         llvm::orc::IndirectStubsManager& indirect_stubs_manager,
@@ -62,10 +62,10 @@ namespace h::compiler
 
         Recompile_data recompile_data;
 
-        std::pmr::vector<h::Function_declaration> new_function_declarations;
+        std::pmr::vector<iris::Function_declaration> new_function_declarations;
         new_function_declarations.reserve(core_module.export_declarations.function_declarations.size() + core_module.internal_declarations.function_declarations.size());
 
-        auto const process_function_declaration = [&](h::Function_declaration& declaration)
+        auto const process_function_declaration = [&](iris::Function_declaration& declaration)
         {
             std::string const stub_name = mangle_function_name(core_module, declaration.name);
             llvm::orc::SymbolStringPtr const stub_symbol = mangle(stub_name.c_str());
@@ -74,12 +74,12 @@ namespace h::compiler
             std::string const mangled_body_name = mangle_name(core_module, body_name, std::nullopt);
             llvm::orc::SymbolStringPtr const body_symbol = mangle(mangled_body_name.c_str());
 
-            declaration.linkage = h::Linkage::External;
+            declaration.linkage = iris::Linkage::External;
 
             {
-                h::Function_declaration body_declaration = declaration;
+                iris::Function_declaration body_declaration = declaration;
                 body_declaration.name = body_name;
-                body_declaration.linkage = h::Linkage::External;
+                body_declaration.linkage = iris::Linkage::External;
                 new_function_declarations.push_back(std::move(body_declaration));
             }
 
@@ -100,17 +100,17 @@ namespace h::compiler
             }
         };
 
-        for (h::Function_declaration& declaration : core_module.export_declarations.function_declarations)
+        for (iris::Function_declaration& declaration : core_module.export_declarations.function_declarations)
         {
             process_function_declaration(declaration);
         }
 
-        for (h::Function_declaration& declaration : core_module.internal_declarations.function_declarations)
+        for (iris::Function_declaration& declaration : core_module.internal_declarations.function_declarations)
         {
             process_function_declaration(declaration);
         }
 
-        for (h::Function_definition& definition : core_module.definitions.function_definitions)
+        for (iris::Function_definition& definition : core_module.definitions.function_definitions)
         {
             std::string const body_name = std::format("{}_{}_$body", definition.name, id);
 
@@ -132,7 +132,7 @@ namespace h::compiler
         llvm::orc::IndirectStubsManager& indirect_stubs_manager,
         llvm::orc::JITDylib& source_library,
         llvm::orc::MangleAndInterner& mangle,
-        h::compiler::Core_module_layer& next_layer
+        iris::compiler::Core_module_layer& next_layer
     )
     {
         Recompile_data recompile_data = modify_function_names_and_create_recompile_data(
@@ -212,7 +212,7 @@ namespace h::compiler
 
     Recompile_module_layer::Recompile_module_layer(
         llvm::orc::ExecutionSession& execution_session,
-        h::compiler::Core_module_layer& base_layer,
+        iris::compiler::Core_module_layer& base_layer,
         llvm::orc::LazyCallThroughManager& lazy_call_through_manager,
         llvm::orc::IndirectStubsManager& indirect_stubs_manager,
         llvm::orc::MangleAndInterner& mangle
@@ -262,6 +262,6 @@ namespace h::compiler
             m_base_layer
         );
         if (error)
-            h::common::print_message_and_exit(std::format("Failed to recompile module: {}", llvm::toString(std::move(error))));
+            iris::common::print_message_and_exit(std::format("Failed to recompile module: {}", llvm::toString(std::move(error))));
     }
 }

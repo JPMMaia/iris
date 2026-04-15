@@ -1,23 +1,23 @@
-module h.compiler.validation;
+module iris.compiler.validation;
 
 import std;
 
-import h.compiler.analysis;
-import h.compiler.diagnostic;
-import h.core;
-import h.core.declarations;
-import h.core.formatter;
-import h.core.types;
+import iris.compiler.analysis;
+import iris.compiler.diagnostic;
+import iris.core;
+import iris.core.declarations;
+import iris.core.formatter;
+import iris.core.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
-    h::compiler::Diagnostic create_error_diagnostic(
+    iris::compiler::Diagnostic create_error_diagnostic(
         std::optional<std::filesystem::path> const source_file_path,
         std::optional<Source_range> const range,
         std::string_view const message
     )
     {
-        return h::compiler::Diagnostic
+        return iris::compiler::Diagnostic
         {
             .file_path = source_file_path,
             .range = range.has_value() ? range.value() : Source_range{},
@@ -28,7 +28,7 @@ namespace h::compiler
         };
     }
 
-    h::compiler::Diagnostic create_error_diagnostic_with_code(
+    iris::compiler::Diagnostic create_error_diagnostic_with_code(
         std::optional<std::filesystem::path> const source_file_path,
         std::optional<Source_range> const range,
         std::string_view const message,
@@ -36,7 +36,7 @@ namespace h::compiler
         Diagnostic_data data
     )
     {
-        return h::compiler::Diagnostic
+        return iris::compiler::Diagnostic
         {
             .file_path = source_file_path,
             .range = range.has_value() ? range.value() : Source_range{},
@@ -49,13 +49,13 @@ namespace h::compiler
         };
     }
 
-    h::compiler::Diagnostic create_warning_diagnostic(
+    iris::compiler::Diagnostic create_warning_diagnostic(
         std::optional<std::filesystem::path> const source_file_path,
         std::optional<Source_range> const range,
         std::string_view const message
     )
     {
-        return h::compiler::Diagnostic
+        return iris::compiler::Diagnostic
         {
             .file_path = source_file_path,
             .range = range.has_value() ? range.value() : Source_range{},
@@ -68,10 +68,10 @@ namespace h::compiler
 
     std::optional<std::string_view> find_type_unique_name(
         Declaration_database const& declaration_database,
-        h::Type_reference const& type
+        iris::Type_reference const& type
     )
     {
-        if (std::holds_alternative<h::Custom_type_reference>(type.data))
+        if (std::holds_alternative<iris::Custom_type_reference>(type.data))
         {
             std::optional<Declaration> const declaration_optional = find_declaration(declaration_database, type);
             if (declaration_optional.has_value())
@@ -121,18 +121,18 @@ namespace h::compiler
 
     bool are_compatible_types(
         Declaration_database const& declaration_database,
-        std::optional<h::Type_reference> const& first,
-        std::optional<h::Type_reference> const& second
+        std::optional<iris::Type_reference> const& first,
+        std::optional<iris::Type_reference> const& second
     )
     {
         if (!first.has_value() || !second.has_value())
             return false;
 
-        std::optional<h::Type_reference> const first_underlying_type = get_underlying_type(declaration_database, first.value());
+        std::optional<iris::Type_reference> const first_underlying_type = get_underlying_type(declaration_database, first.value());
         if (!first_underlying_type.has_value())
             return false;
 
-        std::optional<h::Type_reference> const second_underlying_type = get_underlying_type(declaration_database, second.value());
+        std::optional<iris::Type_reference> const second_underlying_type = get_underlying_type(declaration_database, second.value());
         if (!second_underlying_type.has_value())
             return false;
 
@@ -162,8 +162,8 @@ namespace h::compiler
 
         if (is_function_pointer(first_underlying_type.value()) && is_function_pointer(second_underlying_type.value()))
         {
-            h::Function_pointer_type const& first_pointer_type = std::get<h::Function_pointer_type>(first_underlying_type->data);
-            h::Function_pointer_type const& second_pointer_type = std::get<h::Function_pointer_type>(second_underlying_type->data);
+            iris::Function_pointer_type const& first_pointer_type = std::get<iris::Function_pointer_type>(first_underlying_type->data);
+            iris::Function_pointer_type const& second_pointer_type = std::get<iris::Function_pointer_type>(second_underlying_type->data);
             return first_pointer_type.type == second_pointer_type.type;
         }
 
@@ -172,22 +172,22 @@ namespace h::compiler
 
     bool can_assign_type(
         Declaration_database const& declaration_database,
-        std::optional<h::Type_reference> const& destination,
-        std::optional<h::Type_reference> const& source
+        std::optional<iris::Type_reference> const& destination,
+        std::optional<iris::Type_reference> const& source
     )
     {
         if (!destination.has_value() || !source.has_value())
             return false;
 
-        std::optional<h::Type_reference> const destination_underlying_type = get_underlying_type(declaration_database, destination.value());
+        std::optional<iris::Type_reference> const destination_underlying_type = get_underlying_type(declaration_database, destination.value());
         if (!destination_underlying_type.has_value())
             return false;
-        h::Type_reference const& destination_type = destination_underlying_type.value();
+        iris::Type_reference const& destination_type = destination_underlying_type.value();
 
-        std::optional<h::Type_reference> const source_underlying_type = get_underlying_type(declaration_database, source.value());
+        std::optional<iris::Type_reference> const source_underlying_type = get_underlying_type(declaration_database, source.value());
         if (!source_underlying_type.has_value())
             return false;
-        h::Type_reference const& source_type = source_underlying_type.value();
+        iris::Type_reference const& source_type = source_underlying_type.value();
 
         {
             std::optional<std::string_view> const destination_unique_name = find_type_unique_name(declaration_database, destination_type);
@@ -209,8 +209,8 @@ namespace h::compiler
             if (!is_pointer(source_type))
                 return false;
 
-            h::Pointer_type const& destination_pointer_type = std::get<h::Pointer_type>(destination_type.data);
-            h::Pointer_type const& source_pointer_type = std::get<h::Pointer_type>(source_type.data);
+            iris::Pointer_type const& destination_pointer_type = std::get<iris::Pointer_type>(destination_type.data);
+            iris::Pointer_type const& source_pointer_type = std::get<iris::Pointer_type>(source_type.data);
 
             if (destination_pointer_type.is_mutable && !source_pointer_type.is_mutable)
                 return false;
@@ -227,13 +227,13 @@ namespace h::compiler
         if (is_function_pointer(destination_type) && is_null_pointer_type(source_type))
             return true;
 
-        if (std::holds_alternative<h::Array_slice_type>(destination_type.data))
+        if (std::holds_alternative<iris::Array_slice_type>(destination_type.data))
         {
-            h::Array_slice_type const& destination_array_slice_type = std::get<h::Array_slice_type>(destination_type.data);
+            iris::Array_slice_type const& destination_array_slice_type = std::get<iris::Array_slice_type>(destination_type.data);
 
-            if (std::holds_alternative<h::Array_slice_type>(source_type.data))
+            if (std::holds_alternative<iris::Array_slice_type>(source_type.data))
             {
-                h::Array_slice_type const& source_array_slice_type = std::get<h::Array_slice_type>(source_type.data);
+                iris::Array_slice_type const& source_array_slice_type = std::get<iris::Array_slice_type>(source_type.data);
 
                 if (destination_array_slice_type.is_mutable && !source_array_slice_type.is_mutable)
                     return false;
@@ -246,9 +246,9 @@ namespace h::compiler
 
                 return can_assign_type(declaration_database, destination_array_slice_type.element_type[0], source_array_slice_type.element_type[0]);
             }
-            else if (std::holds_alternative<h::Constant_array_type>(source_type.data))
+            else if (std::holds_alternative<iris::Constant_array_type>(source_type.data))
             {
-                h::Constant_array_type const& constant_array_type = std::get<h::Constant_array_type>(source_type.data);
+                iris::Constant_array_type const& constant_array_type = std::get<iris::Constant_array_type>(source_type.data);
 
                 if (destination_array_slice_type.element_type.empty() && constant_array_type.value_type.empty())
                     return true;
@@ -260,14 +260,14 @@ namespace h::compiler
             }
         }
 
-        if (std::holds_alternative<h::Soa_array_view_type>(destination_type.data))
+        if (std::holds_alternative<iris::Soa_array_view_type>(destination_type.data))
         {
-            h::Soa_array_view_type const& destination_soa_array_view_type = std::get<h::Soa_array_view_type>(destination_type.data);
+            iris::Soa_array_view_type const& destination_soa_array_view_type = std::get<iris::Soa_array_view_type>(destination_type.data);
 
-            if (!std::holds_alternative<h::Soa_array_view_type>(source_type.data))
+            if (!std::holds_alternative<iris::Soa_array_view_type>(source_type.data))
                 return false;
 
-            h::Soa_array_view_type const& source_soa_array_view_type = std::get<h::Soa_array_view_type>(source_type.data);
+            iris::Soa_array_view_type const& source_soa_array_view_type = std::get<iris::Soa_array_view_type>(source_type.data);
 
             if (destination_soa_array_view_type.is_mutable && !source_soa_array_view_type.is_mutable)
                 return false;
@@ -312,8 +312,8 @@ namespace h::compiler
         };
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_module(
-        h::Module const& core_module,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_module(
+        iris::Module const& core_module,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -321,7 +321,7 @@ namespace h::compiler
         // TODO validate module name
 
         {
-            std::pmr::vector<h::compiler::Diagnostic> const diagnostics = validate_imports(
+            std::pmr::vector<iris::compiler::Diagnostic> const diagnostics = validate_imports(
                 core_module,
                 declaration_database,
                 temporaries_allocator
@@ -331,7 +331,7 @@ namespace h::compiler
         }
 
         {
-            std::pmr::vector<h::compiler::Diagnostic> const diagnostics = validate_type_references(
+            std::pmr::vector<iris::compiler::Diagnostic> const diagnostics = validate_type_references(
                 core_module,
                 declaration_database,
                 temporaries_allocator
@@ -341,7 +341,7 @@ namespace h::compiler
         }
 
         {
-            std::pmr::vector<h::compiler::Diagnostic> const diagnostics = validate_declarations(
+            std::pmr::vector<iris::compiler::Diagnostic> const diagnostics = validate_declarations(
                 core_module,
                 declaration_database,
                 temporaries_allocator
@@ -353,13 +353,13 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_imports(
-        h::Module const& core_module,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_imports(
+        iris::Module const& core_module,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
 
         std::pmr::unordered_set<std::string_view> all_names{temporaries_allocator};
 
@@ -404,20 +404,20 @@ namespace h::compiler
         return diagnostics;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_type_references(
-        h::Module const& core_module,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_type_references(
+        iris::Module const& core_module,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
 
         auto const process_type_reference = [&](
             std::string_view const declaration_name,
-            h::Type_reference const& type
+            iris::Type_reference const& type
         ) -> bool
         {
-            std::pmr::vector<h::compiler::Diagnostic> const current_diagnostics = validate_type_reference(
+            std::pmr::vector<iris::compiler::Diagnostic> const current_diagnostics = validate_type_reference(
                 core_module,
                 type,
                 declaration_database,
@@ -435,20 +435,20 @@ namespace h::compiler
         return diagnostics;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_soa_array_type(
-        h::Module const& core_module,
-        h::Type_reference const& type,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_soa_array_type(
+        iris::Module const& core_module,
+        iris::Type_reference const& type,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         (void)temporaries_allocator;
 
-        h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(type.data);
+        iris::Soa_array_type const& soa_array_type = std::get<iris::Soa_array_type>(type.data);
         if (soa_array_type.value_type.empty())
             return {};
 
-        h::Type_reference const& element_type = soa_array_type.value_type.front();
+        iris::Type_reference const& element_type = soa_array_type.value_type.front();
 
         if (!is_custom_type_reference(element_type))
         {
@@ -489,20 +489,20 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_soa_array_view_type(
-        h::Module const& core_module,
-        h::Type_reference const& type,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_soa_array_view_type(
+        iris::Module const& core_module,
+        iris::Type_reference const& type,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         (void)temporaries_allocator;
 
-        h::Soa_array_view_type const& soa_array_view_type = std::get<h::Soa_array_view_type>(type.data);
+        iris::Soa_array_view_type const& soa_array_view_type = std::get<iris::Soa_array_view_type>(type.data);
         if (soa_array_view_type.value_type.empty())
             return {};
 
-        h::Type_reference const& element_type = soa_array_view_type.value_type.front();
+        iris::Type_reference const& element_type = soa_array_view_type.value_type.front();
 
         if (!is_custom_type_reference(element_type))
         {
@@ -543,9 +543,9 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_type_reference(
-        h::Module const& core_module,
-        h::Type_reference const& type,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_type_reference(
+        iris::Module const& core_module,
+        iris::Type_reference const& type,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -559,7 +559,7 @@ namespace h::compiler
                 temporaries_allocator
             );
         }
-        else if (std::holds_alternative<h::Integer_type>(type.data))
+        else if (std::holds_alternative<iris::Integer_type>(type.data))
         {
             return validate_integer_type(
                 core_module,
@@ -568,7 +568,7 @@ namespace h::compiler
                 temporaries_allocator
             );
         }
-        else if (std::holds_alternative<h::Soa_array_type>(type.data))
+        else if (std::holds_alternative<iris::Soa_array_type>(type.data))
         {
             return validate_soa_array_type(
                 core_module,
@@ -577,7 +577,7 @@ namespace h::compiler
                 temporaries_allocator
             );
         }
-        else if (std::holds_alternative<h::Soa_array_view_type>(type.data))
+        else if (std::holds_alternative<iris::Soa_array_view_type>(type.data))
         {
             return validate_soa_array_view_type(
                 core_module,
@@ -590,9 +590,9 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_custom_type_reference(
-        h::Module const& core_module,
-        h::Type_reference const& type,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_custom_type_reference(
+        iris::Module const& core_module,
+        iris::Type_reference const& type,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -604,7 +604,7 @@ namespace h::compiler
 
         if (!declaration.has_value())
         {
-            std::pmr::string const type_name = h::format_type_reference(core_module, type, temporaries_allocator, temporaries_allocator);
+            std::pmr::string const type_name = iris::format_type_reference(core_module, type, temporaries_allocator, temporaries_allocator);
 
             return
             {
@@ -619,18 +619,18 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_integer_type(
-        h::Module const& core_module,
-        h::Type_reference const& type,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_integer_type(
+        iris::Module const& core_module,
+        iris::Type_reference const& type,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Integer_type const& integer_type = std::get<h::Integer_type>(type.data);
+        iris::Integer_type const& integer_type = std::get<iris::Integer_type>(type.data);
 
         if (integer_type.number_of_bits != 8 && integer_type.number_of_bits != 16 && integer_type.number_of_bits != 32 && integer_type.number_of_bits != 64)
         {
-            std::pmr::string const type_name = h::format_type_reference(core_module, type, temporaries_allocator, temporaries_allocator);
+            std::pmr::string const type_name = iris::format_type_reference(core_module, type, temporaries_allocator, temporaries_allocator);
 
             return
             {
@@ -645,13 +645,13 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_declarations(
-        h::Module const& core_module,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_declarations(
+        iris::Module const& core_module,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
 
         std::pmr::unordered_set<std::string_view> all_names{temporaries_allocator};
 
@@ -704,7 +704,7 @@ namespace h::compiler
         {
             process_declaration_name(declaration.name, declaration.source_location);
 
-            std::pmr::vector<h::compiler::Diagnostic> declaration_diagnostics = validate_enum_declaration(
+            std::pmr::vector<iris::compiler::Diagnostic> declaration_diagnostics = validate_enum_declaration(
                 core_module,
                 declaration,
                 declaration_database,
@@ -719,7 +719,7 @@ namespace h::compiler
         {
             process_declaration_name(declaration.name, declaration.source_location);
 
-            std::pmr::vector<h::compiler::Diagnostic> const declaration_diagnostics = validate_enum_declaration(
+            std::pmr::vector<iris::compiler::Diagnostic> const declaration_diagnostics = validate_enum_declaration(
                 core_module,
                 declaration,
                 declaration_database,
@@ -734,7 +734,7 @@ namespace h::compiler
         {
             process_declaration_name(declaration.name, declaration.source_location);
 
-            std::pmr::vector<h::compiler::Diagnostic> const declaration_diagnostics = validate_global_variable_declaration(
+            std::pmr::vector<iris::compiler::Diagnostic> const declaration_diagnostics = validate_global_variable_declaration(
                 core_module,
                 declaration,
                 declaration_database,
@@ -749,7 +749,7 @@ namespace h::compiler
         {
             process_declaration_name(declaration.name, declaration.source_location);
 
-            std::pmr::vector<h::compiler::Diagnostic> const declaration_diagnostics = validate_global_variable_declaration(
+            std::pmr::vector<iris::compiler::Diagnostic> const declaration_diagnostics = validate_global_variable_declaration(
                 core_module,
                 declaration,
                 declaration_database,
@@ -764,7 +764,7 @@ namespace h::compiler
         {
             process_declaration_name(declaration.name, declaration.source_location);
 
-            std::pmr::vector<h::compiler::Diagnostic> const declaration_diagnostics = validate_struct_declaration(
+            std::pmr::vector<iris::compiler::Diagnostic> const declaration_diagnostics = validate_struct_declaration(
                 core_module,
                 declaration,
                 declaration_database,
@@ -779,7 +779,7 @@ namespace h::compiler
         {
             process_declaration_name(declaration.name, declaration.source_location);
 
-            std::pmr::vector<h::compiler::Diagnostic> const declaration_diagnostics = validate_struct_declaration(
+            std::pmr::vector<iris::compiler::Diagnostic> const declaration_diagnostics = validate_struct_declaration(
                 core_module,
                 declaration,
                 declaration_database,
@@ -794,7 +794,7 @@ namespace h::compiler
         {
             process_declaration_name(declaration.name, declaration.source_location);
 
-            std::pmr::vector<h::compiler::Diagnostic> const declaration_diagnostics = validate_union_declaration(
+            std::pmr::vector<iris::compiler::Diagnostic> const declaration_diagnostics = validate_union_declaration(
                 core_module,
                 declaration,
                 declaration_database,
@@ -809,7 +809,7 @@ namespace h::compiler
         {
             process_declaration_name(declaration.name, declaration.source_location);
 
-            std::pmr::vector<h::compiler::Diagnostic> const declaration_diagnostics = validate_union_declaration(
+            std::pmr::vector<iris::compiler::Diagnostic> const declaration_diagnostics = validate_union_declaration(
                 core_module,
                 declaration,
                 declaration_database,
@@ -826,7 +826,7 @@ namespace h::compiler
 
             std::optional<Function_definition const*> const definition = find_function_definition(core_module, declaration.name);
 
-            std::pmr::vector<h::compiler::Diagnostic> const function_diagnostics = validate_function(
+            std::pmr::vector<iris::compiler::Diagnostic> const function_diagnostics = validate_function(
                 core_module,
                 declaration,
                 definition.has_value() ? definition.value() : nullptr,
@@ -844,7 +844,7 @@ namespace h::compiler
 
             std::optional<Function_definition const*> const definition = find_function_definition(core_module, declaration.name);
 
-            std::pmr::vector<h::compiler::Diagnostic> const function_diagnostics = validate_function(
+            std::pmr::vector<iris::compiler::Diagnostic> const function_diagnostics = validate_function(
                 core_module,
                 declaration,
                 definition.has_value() ? definition.value() : nullptr,
@@ -880,14 +880,14 @@ namespace h::compiler
         return diagnostics;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_enum_declaration(
-        h::Module const& core_module,
-        h::Enum_declaration const& declaration,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_enum_declaration(
+        iris::Module const& core_module,
+        iris::Enum_declaration const& declaration,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
 
         std::pmr::unordered_set<std::string_view> all_names{temporaries_allocator};
 
@@ -914,7 +914,7 @@ namespace h::compiler
 
             if (value.value.has_value())
             {
-                h::Statement const& statement = value.value.value();
+                iris::Statement const& statement = value.value.value();
 
                 std::pmr::vector<std::optional<Type_info>> const expression_types = calculate_expression_type_infos_of_statement(
                     core_module,
@@ -968,16 +968,16 @@ namespace h::compiler
             }
 
             scope.variables.push_back(
-                create_variable(value.name, int32_type, false, true, value.source_location.has_value() ? std::optional<h::Source_position>{h::Source_position{value.source_location->line, value.source_location->column}} : std::optional<h::Source_position>{std::nullopt})
+                create_variable(value.name, int32_type, false, true, value.source_location.has_value() ? std::optional<iris::Source_position>{iris::Source_position{value.source_location->line, value.source_location->column}} : std::optional<iris::Source_position>{std::nullopt})
             );
         }
 
         return diagnostics;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_global_variable_declaration(
-        h::Module const& core_module,
-        h::Global_variable_declaration const& declaration,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_global_variable_declaration(
+        iris::Module const& core_module,
+        iris::Global_variable_declaration const& declaration,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -1014,12 +1014,12 @@ namespace h::compiler
 
         if (declaration.type.has_value())
         {
-            std::optional<h::Type_reference> const& type_reference = get_expression_type_from_type_info(expression_types, 0);
+            std::optional<iris::Type_reference> const& type_reference = get_expression_type_from_type_info(expression_types, 0);
 
             if (!are_compatible_types(declaration_database, declaration.type, type_reference))
             {
-                std::pmr::string const provided_type_name = h::format_type_reference(core_module, type_reference, temporaries_allocator, temporaries_allocator);
-                std::pmr::string const expected_type_name = h::format_type_reference(core_module, declaration.type, temporaries_allocator, temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(core_module, type_reference, temporaries_allocator, temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(core_module, declaration.type, temporaries_allocator, temporaries_allocator);
 
                 return
                 {
@@ -1037,14 +1037,14 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_struct_declaration(
-        h::Module const& core_module,
-        h::Struct_declaration const& declaration,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_struct_declaration(
+        iris::Module const& core_module,
+        iris::Struct_declaration const& declaration,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
 
         std::pmr::unordered_set<std::string_view> all_names{temporaries_allocator};
 
@@ -1072,8 +1072,8 @@ namespace h::compiler
                 all_names.insert(member_name);
             }
 
-            h::Type_reference const& member_type = declaration.member_types[member_index];
-            h::Statement const& member_default_value = declaration.member_default_values[member_index];
+            iris::Type_reference const& member_type = declaration.member_types[member_index];
+            iris::Statement const& member_default_value = declaration.member_default_values[member_index];
 
             std::pmr::vector<std::optional<Type_info>> const expression_types = calculate_expression_type_infos_of_statement(
                 core_module,
@@ -1109,8 +1109,8 @@ namespace h::compiler
 
             if (!are_compatible_types(declaration_database, default_value_type, member_type))
             {
-                std::pmr::string const provided_type_name = h::format_type_reference(core_module, default_value_type, temporaries_allocator, temporaries_allocator);
-                std::pmr::string const expected_type_name = h::format_type_reference(core_module, member_type, temporaries_allocator, temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(core_module, default_value_type, temporaries_allocator, temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(core_module, member_type, temporaries_allocator, temporaries_allocator);
 
                 diagnostics.push_back(
                     create_error_diagnostic_with_code(
@@ -1131,14 +1131,14 @@ namespace h::compiler
         return diagnostics;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_union_declaration(
-        h::Module const& core_module,
-        h::Union_declaration const& declaration,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_union_declaration(
+        iris::Module const& core_module,
+        iris::Union_declaration const& declaration,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
 
         std::pmr::unordered_set<std::string_view> all_names{temporaries_allocator};
 
@@ -1170,8 +1170,8 @@ namespace h::compiler
         return diagnostics;
     }
 
-    static std::pmr::vector<h::compiler::Diagnostic> create_function_missing_return_diagnostic(
-        h::Module const& core_module,
+    static std::pmr::vector<iris::compiler::Diagnostic> create_function_missing_return_diagnostic(
+        iris::Module const& core_module,
         std::string_view const function_name,
         std::optional<Source_range> const& source_range
     )
@@ -1186,43 +1186,43 @@ namespace h::compiler
         };
     }
 
-    static std::pmr::vector<h::compiler::Diagnostic> validate_function_return_expressions_with_statements(
-        h::Module const& core_module,
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_function_return_expressions_with_statements(
+        iris::Module const& core_module,
         std::string_view const function_name,
-        std::span<h::Statement const> const statements,
+        std::span<iris::Statement const> const statements,
         std::optional<Source_range> const source_range
     );
 
-    static std::pmr::vector<h::compiler::Diagnostic> validate_function_return_expressions_with_statement_expression(
-        h::Module const& core_module,
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_function_return_expressions_with_statement_expression(
+        iris::Module const& core_module,
         std::string_view const function_name,
-        h::Statement const& last_statement,
-        h::Expression const& last_statement_expression,
+        iris::Statement const& last_statement,
+        iris::Expression const& last_statement_expression,
         std::optional<Source_range> const source_range
     )
     {
-        if (std::holds_alternative<h::Return_expression>(last_statement_expression.data))
+        if (std::holds_alternative<iris::Return_expression>(last_statement_expression.data))
         {
             return {};
         }
-        else if (std::holds_alternative<h::Block_expression>(last_statement_expression.data))
+        else if (std::holds_alternative<iris::Block_expression>(last_statement_expression.data))
         {
-            h::Block_expression const& block_expression = std::get<h::Block_expression>(last_statement_expression.data);
+            iris::Block_expression const& block_expression = std::get<iris::Block_expression>(last_statement_expression.data);
             return validate_function_return_expressions_with_statements(core_module, function_name, block_expression.statements, source_range);
         }
-        else if (std::holds_alternative<h::Compile_time_expression>(last_statement_expression.data))
+        else if (std::holds_alternative<iris::Compile_time_expression>(last_statement_expression.data))
         {
-            h::Compile_time_expression const& compile_time_expression = std::get<h::Compile_time_expression>(last_statement_expression.data);
-            h::Expression const& right_side_expression = last_statement.expressions[compile_time_expression.expression.expression_index];
+            iris::Compile_time_expression const& compile_time_expression = std::get<iris::Compile_time_expression>(last_statement_expression.data);
+            iris::Expression const& right_side_expression = last_statement.expressions[compile_time_expression.expression.expression_index];
             return validate_function_return_expressions_with_statement_expression(core_module, function_name, last_statement, right_side_expression, source_range);
         }
-        else if (std::holds_alternative<h::If_expression>(last_statement_expression.data))
+        else if (std::holds_alternative<iris::If_expression>(last_statement_expression.data))
         {
-            h::If_expression const& if_expression = std::get<h::If_expression>(last_statement_expression.data);
+            iris::If_expression const& if_expression = std::get<iris::If_expression>(last_statement_expression.data);
 
-            for (h::Condition_statement_pair const& serie : if_expression.series)
+            for (iris::Condition_statement_pair const& serie : if_expression.series)
             {
-                std::pmr::vector<h::compiler::Diagnostic> const serie_diagnostics = validate_function_return_expressions_with_statements(core_module, function_name, serie.then_statements, source_range);
+                std::pmr::vector<iris::compiler::Diagnostic> const serie_diagnostics = validate_function_return_expressions_with_statements(core_module, function_name, serie.then_statements, source_range);
                 if (!serie_diagnostics.empty())
                     return serie_diagnostics;
             }
@@ -1233,13 +1233,13 @@ namespace h::compiler
 
             return {};
         }
-        else if (std::holds_alternative<h::Switch_expression>(last_statement_expression.data))
+        else if (std::holds_alternative<iris::Switch_expression>(last_statement_expression.data))
         {
-            h::Switch_expression const& switch_expression = std::get<h::Switch_expression>(last_statement_expression.data);
+            iris::Switch_expression const& switch_expression = std::get<iris::Switch_expression>(last_statement_expression.data);
 
-            for (h::Switch_case_expression_pair const& switch_case : switch_expression.cases)
+            for (iris::Switch_case_expression_pair const& switch_case : switch_expression.cases)
             {
-                std::pmr::vector<h::compiler::Diagnostic> const switch_case_diagnostics = validate_function_return_expressions_with_statements(core_module, function_name, switch_case.statements, source_range);
+                std::pmr::vector<iris::compiler::Diagnostic> const switch_case_diagnostics = validate_function_return_expressions_with_statements(core_module, function_name, switch_case.statements, source_range);
                 if (!switch_case_diagnostics.empty())
                     return switch_case_diagnostics;
             }
@@ -1252,46 +1252,46 @@ namespace h::compiler
         }
     }
 
-    static std::pmr::vector<h::compiler::Diagnostic> validate_function_return_expressions_with_statements(
-        h::Module const& core_module,
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_function_return_expressions_with_statements(
+        iris::Module const& core_module,
         std::string_view const function_name,
-        std::span<h::Statement const> const statements,
+        std::span<iris::Statement const> const statements,
         std::optional<Source_range> const source_range
     )
     {
         if (statements.empty())
             return create_function_missing_return_diagnostic(core_module, function_name, source_range);
 
-        h::Statement const& last_statement = statements[statements.size() - 1];
+        iris::Statement const& last_statement = statements[statements.size() - 1];
         if (last_statement.expressions.empty())
             return create_function_missing_return_diagnostic(core_module, function_name, source_range);
 
-        h::Expression const& last_statement_expression = last_statement.expressions[0];
+        iris::Expression const& last_statement_expression = last_statement.expressions[0];
         return validate_function_return_expressions_with_statement_expression(core_module, function_name, last_statement, last_statement_expression, source_range);
     }
 
-    static std::pmr::vector<h::compiler::Diagnostic> validate_function_return_expressions(
-        h::Module const& core_module,
-        h::Function_declaration const& declaration,
-        h::Function_definition const& definition
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_function_return_expressions(
+        iris::Module const& core_module,
+        iris::Function_declaration const& declaration,
+        iris::Function_definition const& definition
     )
     {
         if (declaration.type.output_parameter_types.empty())
             return {};
 
-        std::optional<h::Source_range> const source_range = declaration.source_location.has_value() ? declaration.source_location->range : std::optional<h::Source_range>{std::nullopt};
+        std::optional<iris::Source_range> const source_range = declaration.source_location.has_value() ? declaration.source_location->range : std::optional<iris::Source_range>{std::nullopt};
         return validate_function_return_expressions_with_statements(core_module, declaration.name, definition.statements, source_range);
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_function(
-        h::Module const& core_module,
-        h::Function_declaration const& declaration,
-        h::Function_definition const* const definition,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_function(
+        iris::Module const& core_module,
+        iris::Function_declaration const& declaration,
+        iris::Function_definition const* const definition,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
 
         // TODO validate parameters
 
@@ -1308,7 +1308,7 @@ namespace h::compiler
                 declaration.input_parameter_source_positions
             );
 
-            std::pmr::vector<h::compiler::Diagnostic> pre_condition_diagnostics = validate_function_contracts(
+            std::pmr::vector<iris::compiler::Diagnostic> pre_condition_diagnostics = validate_function_contracts(
                 core_module,
                 declaration,
                 scope,
@@ -1326,7 +1326,7 @@ namespace h::compiler
                 declaration.output_parameter_source_positions
             );
 
-            std::pmr::vector<h::compiler::Diagnostic> post_condition_diagnostics = validate_function_contracts(
+            std::pmr::vector<iris::compiler::Diagnostic> post_condition_diagnostics = validate_function_contracts(
                 core_module,
                 declaration,
                 scope,
@@ -1352,7 +1352,7 @@ namespace h::compiler
                 declaration.input_parameter_source_positions
             );
 
-            std::pmr::vector<h::compiler::Diagnostic> const definition_diagnostics = validate_statements(
+            std::pmr::vector<iris::compiler::Diagnostic> const definition_diagnostics = validate_statements(
                 core_module,
                 &declaration,
                 scope,
@@ -1363,7 +1363,7 @@ namespace h::compiler
             if (!definition_diagnostics.empty())
                 diagnostics.insert(diagnostics.end(), definition_diagnostics.begin(), definition_diagnostics.end());
 
-            std::pmr::vector<h::compiler::Diagnostic> function_missing_return_diagnostics = validate_function_return_expressions(
+            std::pmr::vector<iris::compiler::Diagnostic> function_missing_return_diagnostics = validate_function_return_expressions(
                 core_module,
                 declaration,
                 *definition
@@ -1375,20 +1375,20 @@ namespace h::compiler
         return diagnostics;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_function_contracts(
-        h::Module const& core_module,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_function_contracts(
+        iris::Module const& core_module,
         Function_declaration const& function_declaration,
-        h::compiler::Scope const& scope,
-        std::span<h::Function_condition const> const function_conditions,
+        iris::compiler::Scope const& scope,
+        std::span<iris::Function_condition const> const function_conditions,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
 
-        for (h::Function_condition const& function_condition : function_conditions)
+        for (iris::Function_condition const& function_condition : function_conditions)
         {
-            std::pmr::vector<h::compiler::Diagnostic> statement_diagnostics = validate_statement(
+            std::pmr::vector<iris::compiler::Diagnostic> statement_diagnostics = validate_statement(
                 core_module,
                 &function_declaration,
                 scope,
@@ -1403,7 +1403,7 @@ namespace h::compiler
                 continue;
             }
 
-            std::optional<h::Type_reference> const condition_type_optional = get_expression_type(
+            std::optional<iris::Type_reference> const condition_type_optional = get_expression_type(
                 core_module,
                 &function_declaration,
                 scope,
@@ -1414,7 +1414,7 @@ namespace h::compiler
 
             if (!condition_type_optional.has_value() || (!is_bool(condition_type_optional.value()) && !is_c_bool(condition_type_optional.value())))
             {
-                std::pmr::string const provided_type_name = h::format_type_reference(core_module, condition_type_optional, temporaries_allocator, temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(core_module, condition_type_optional, temporaries_allocator, temporaries_allocator);
 
                 diagnostics.push_back(
                     create_error_diagnostic(
@@ -1425,7 +1425,7 @@ namespace h::compiler
                 );
             }
 
-            auto const process_expression = [&](h::Expression const& expression, h::Statement const& statement) -> bool
+            auto const process_expression = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
             {
                 bool const is_mutable_global_constant = is_mutable_global_variable(
                     core_module.name,
@@ -1455,24 +1455,24 @@ namespace h::compiler
         return diagnostics;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_statements(
-        h::Module const& core_module,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_statements(
+        iris::Module const& core_module,
         Function_declaration const* const function_declaration,
         Scope const& scope,
-        std::span<h::Statement const> const statements,
+        std::span<iris::Statement const> const statements,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
 
         Scope new_scope = scope;
 
         for (std::size_t statement_index = 0; statement_index < statements.size(); ++statement_index)
         {
-            h::Statement const& statement = statements[statement_index];
+            iris::Statement const& statement = statements[statement_index];
 
-            std::pmr::vector<h::compiler::Diagnostic> const statement_diagnostics = validate_statement(
+            std::pmr::vector<iris::compiler::Diagnostic> const statement_diagnostics = validate_statement(
                 core_module,
                 function_declaration,
                 new_scope,
@@ -1486,13 +1486,13 @@ namespace h::compiler
 
             if (!statement.expressions.empty())
             {
-                h::Expression const& expression = statement.expressions[0];
+                iris::Expression const& expression = statement.expressions[0];
                 
-                if (std::holds_alternative<h::Variable_declaration_expression>(expression.data))
+                if (std::holds_alternative<iris::Variable_declaration_expression>(expression.data))
                 {
-                    h::Variable_declaration_expression const& variable_declaration = std::get<h::Variable_declaration_expression>(expression.data);
+                    iris::Variable_declaration_expression const& variable_declaration = std::get<iris::Variable_declaration_expression>(expression.data);
 
-                    std::optional<h::Type_reference> variable_type = get_expression_type(
+                    std::optional<iris::Type_reference> variable_type = get_expression_type(
                         core_module,
                         function_declaration,
                         new_scope,
@@ -1509,11 +1509,11 @@ namespace h::compiler
                         );
                     }
                 }
-                else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(expression.data))
+                else if (std::holds_alternative<iris::Variable_declaration_with_type_expression>(expression.data))
                 {
-                    h::Variable_declaration_with_type_expression const& variable_declaration_with_type = std::get<h::Variable_declaration_with_type_expression>(expression.data);
+                    iris::Variable_declaration_with_type_expression const& variable_declaration_with_type = std::get<iris::Variable_declaration_with_type_expression>(expression.data);
 
-                    std::optional<h::Type_reference> const variable_type = h::get_variable_declaration_with_type_expression_type(statement, variable_declaration_with_type);
+                    std::optional<iris::Type_reference> const variable_type = iris::get_variable_declaration_with_type_expression_type(statement, variable_declaration_with_type);
                     if (variable_type.has_value())
                     {
                         new_scope.variables.push_back(
@@ -1527,12 +1527,12 @@ namespace h::compiler
         return diagnostics;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_statement(
-        h::Module const& core_module,
+    std::pmr::vector<iris::compiler::Diagnostic> validate_statement(
+        iris::Module const& core_module,
         Function_declaration const* const function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        std::optional<h::Type_reference> const& expected_statement_type,
+        iris::Statement const& statement,
+        std::optional<iris::Type_reference> const& expected_statement_type,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -1565,7 +1565,7 @@ namespace h::compiler
             std::size_t const expression_index = statement.expressions.size() - 1 - index;
             parameters.expression_index = expression_index;
 
-            std::pmr::vector<h::compiler::Diagnostic> diagnostics = validate_expression(
+            std::pmr::vector<iris::compiler::Diagnostic> diagnostics = validate_expression(
                 parameters
             );
 
@@ -1576,132 +1576,132 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_expression(
         Validate_expression_parameters const& parameters
     )
     {
-        h::Expression const& expression = parameters.statement.expressions[parameters.expression_index];
+        iris::Expression const& expression = parameters.statement.expressions[parameters.expression_index];
 
-        if (std::holds_alternative<h::Access_expression>(expression.data))
+        if (std::holds_alternative<iris::Access_expression>(expression.data))
         {
-            h::Access_expression const& value = std::get<h::Access_expression>(expression.data);
+            iris::Access_expression const& value = std::get<iris::Access_expression>(expression.data);
             return validate_access_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Assert_expression>(expression.data))
+        else if (std::holds_alternative<iris::Assert_expression>(expression.data))
         {
-            h::Assert_expression const& value = std::get<h::Assert_expression>(expression.data);
+            iris::Assert_expression const& value = std::get<iris::Assert_expression>(expression.data);
             return validate_assert_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Assignment_expression>(expression.data))
+        else if (std::holds_alternative<iris::Assignment_expression>(expression.data))
         {
-            h::Assignment_expression const& value = std::get<h::Assignment_expression>(expression.data);
+            iris::Assignment_expression const& value = std::get<iris::Assignment_expression>(expression.data);
             return validate_assignment_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Binary_expression>(expression.data))
+        else if (std::holds_alternative<iris::Binary_expression>(expression.data))
         {
-            h::Binary_expression const& value = std::get<h::Binary_expression>(expression.data);
+            iris::Binary_expression const& value = std::get<iris::Binary_expression>(expression.data);
             return validate_binary_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Block_expression>(expression.data))
+        else if (std::holds_alternative<iris::Block_expression>(expression.data))
         {
-            h::Block_expression const& value = std::get<h::Block_expression>(expression.data);
+            iris::Block_expression const& value = std::get<iris::Block_expression>(expression.data);
             return validate_block_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Break_expression>(expression.data))
+        else if (std::holds_alternative<iris::Break_expression>(expression.data))
         {
-            h::Break_expression const& value = std::get<h::Break_expression>(expression.data);
+            iris::Break_expression const& value = std::get<iris::Break_expression>(expression.data);
             return validate_break_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Call_expression>(expression.data))
+        else if (std::holds_alternative<iris::Call_expression>(expression.data))
         {
-            h::Call_expression const& value = std::get<h::Call_expression>(expression.data);
+            iris::Call_expression const& value = std::get<iris::Call_expression>(expression.data);
             return validate_call_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Cast_expression>(expression.data))
+        else if (std::holds_alternative<iris::Cast_expression>(expression.data))
         {
-            h::Cast_expression const& value = std::get<h::Cast_expression>(expression.data);
+            iris::Cast_expression const& value = std::get<iris::Cast_expression>(expression.data);
             return validate_cast_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Continue_expression>(expression.data))
+        else if (std::holds_alternative<iris::Continue_expression>(expression.data))
         {
-            h::Continue_expression const& value = std::get<h::Continue_expression>(expression.data);
+            iris::Continue_expression const& value = std::get<iris::Continue_expression>(expression.data);
             return validate_continue_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::For_loop_expression>(expression.data))
+        else if (std::holds_alternative<iris::For_loop_expression>(expression.data))
         {
-            h::For_loop_expression const& value = std::get<h::For_loop_expression>(expression.data);
+            iris::For_loop_expression const& value = std::get<iris::For_loop_expression>(expression.data);
             return validate_for_loop_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::If_expression>(expression.data))
+        else if (std::holds_alternative<iris::If_expression>(expression.data))
         {
-            h::If_expression const& value = std::get<h::If_expression>(expression.data);
+            iris::If_expression const& value = std::get<iris::If_expression>(expression.data);
             return validate_if_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Instantiate_expression>(expression.data))
+        else if (std::holds_alternative<iris::Instantiate_expression>(expression.data))
         {
-            h::Instantiate_expression const& value = std::get<h::Instantiate_expression>(expression.data);
+            iris::Instantiate_expression const& value = std::get<iris::Instantiate_expression>(expression.data);
             return validate_instantiate_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Reflection_expression>(expression.data))
+        else if (std::holds_alternative<iris::Reflection_expression>(expression.data))
         {
-            h::Reflection_expression const& value = std::get<h::Reflection_expression>(expression.data);
+            iris::Reflection_expression const& value = std::get<iris::Reflection_expression>(expression.data);
             return validate_reflection_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Return_expression>(expression.data))
+        else if (std::holds_alternative<iris::Return_expression>(expression.data))
         {
-            h::Return_expression const& value = std::get<h::Return_expression>(expression.data);
+            iris::Return_expression const& value = std::get<iris::Return_expression>(expression.data);
             return validate_return_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Switch_expression>(expression.data))
+        else if (std::holds_alternative<iris::Switch_expression>(expression.data))
         {
-            h::Switch_expression const& value = std::get<h::Switch_expression>(expression.data);
+            iris::Switch_expression const& value = std::get<iris::Switch_expression>(expression.data);
             return validate_switch_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Ternary_condition_expression>(expression.data))
+        else if (std::holds_alternative<iris::Ternary_condition_expression>(expression.data))
         {
-            h::Ternary_condition_expression const& value = std::get<h::Ternary_condition_expression>(expression.data);
+            iris::Ternary_condition_expression const& value = std::get<iris::Ternary_condition_expression>(expression.data);
             return validate_ternary_condition_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Unary_expression>(expression.data))
+        else if (std::holds_alternative<iris::Unary_expression>(expression.data))
         {
-            h::Unary_expression const& value = std::get<h::Unary_expression>(expression.data);
+            iris::Unary_expression const& value = std::get<iris::Unary_expression>(expression.data);
             return validate_unary_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Variable_declaration_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_declaration_expression>(expression.data))
         {
-            h::Variable_declaration_expression const& value = std::get<h::Variable_declaration_expression>(expression.data);
+            iris::Variable_declaration_expression const& value = std::get<iris::Variable_declaration_expression>(expression.data);
             return validate_variable_declaration_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_declaration_with_type_expression>(expression.data))
         {
-            h::Variable_declaration_with_type_expression const& value = std::get<h::Variable_declaration_with_type_expression>(expression.data);
+            iris::Variable_declaration_with_type_expression const& value = std::get<iris::Variable_declaration_with_type_expression>(expression.data);
             return validate_variable_declaration_with_type_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::Variable_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
-            h::Variable_expression const& value = std::get<h::Variable_expression>(expression.data);
+            iris::Variable_expression const& value = std::get<iris::Variable_expression>(expression.data);
             return validate_variable_expression(parameters, value, expression.source_range);
         }
-        else if (std::holds_alternative<h::While_loop_expression>(expression.data))
+        else if (std::holds_alternative<iris::While_loop_expression>(expression.data))
         {
-            h::While_loop_expression const& value = std::get<h::While_loop_expression>(expression.data);
+            iris::While_loop_expression const& value = std::get<iris::While_loop_expression>(expression.data);
             return validate_while_loop_expression(parameters, value, expression.source_range);
         }
 
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_access_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_access_expression(
         Validate_expression_parameters const& parameters,
-        h::Access_expression const& access_expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Access_expression const& access_expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<h::Type_reference> const& left_hand_side_type = get_expression_type_from_type_info(parameters.expression_types, access_expression.expression);
+        std::optional<iris::Type_reference> const& left_hand_side_type = get_expression_type_from_type_info(parameters.expression_types, access_expression.expression);
 
         if (left_hand_side_type.has_value())
         {
-            std::optional<Declaration> const declaration_optional = h::find_underlying_declaration(
+            std::optional<Declaration> const declaration_optional = iris::find_underlying_declaration(
                 parameters.declaration_database,
                 left_hand_side_type.value()
             );
@@ -1726,9 +1726,9 @@ namespace h::compiler
                         declaration.module_name,
                         access_expression.member_name
                     );
-                    if (!function_declaration.has_value() || (!std::holds_alternative<h::Function_declaration const*>(function_declaration->data) && !std::holds_alternative<h::Function_constructor const*>(function_declaration->data)))
+                    if (!function_declaration.has_value() || (!std::holds_alternative<iris::Function_declaration const*>(function_declaration->data) && !std::holds_alternative<iris::Function_constructor const*>(function_declaration->data)))
                     {
-                        std::pmr::string const type_full_name = h::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+                        std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                         return
                         {
@@ -1746,11 +1746,11 @@ namespace h::compiler
                 }
             }
 
-            if (std::holds_alternative<h::Array_slice_type>(left_hand_side_type->data))
+            if (std::holds_alternative<iris::Array_slice_type>(left_hand_side_type->data))
             {
                 if (access_expression.member_name != "data" && access_expression.member_name != "length")
                 {
-                    std::pmr::string const type_full_name = h::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                     return
                     {
@@ -1766,11 +1766,11 @@ namespace h::compiler
                     };
                 }
             }
-            else if (std::holds_alternative<h::Soa_array_type>(left_hand_side_type->data))
+            else if (std::holds_alternative<iris::Soa_array_type>(left_hand_side_type->data))
             {
                 if (access_expression.member_name != "data" && access_expression.member_name != "length" && access_expression.member_name != "view")
                 {
-                    std::pmr::string const type_full_name = h::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                     return
                     {
@@ -1786,11 +1786,11 @@ namespace h::compiler
                     };
                 }
             }
-            else if (std::holds_alternative<h::Soa_array_view_type>(left_hand_side_type->data))
+            else if (std::holds_alternative<iris::Soa_array_view_type>(left_hand_side_type->data))
             {
                 if (access_expression.member_name != "data" && access_expression.member_name != "length" && access_expression.member_name != "start_index" && access_expression.member_name != "end_index")
                 {
-                    std::pmr::string const type_full_name = h::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                     return
                     {
@@ -1809,11 +1809,11 @@ namespace h::compiler
         }
         else
         {
-            h::Expression const& left_hand_side_expression = parameters.statement.expressions[access_expression.expression.expression_index];
+            iris::Expression const& left_hand_side_expression = parameters.statement.expressions[access_expression.expression.expression_index];
 
-            if (std::holds_alternative<h::Variable_expression>(left_hand_side_expression.data))
+            if (std::holds_alternative<iris::Variable_expression>(left_hand_side_expression.data))
             {
-                h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_hand_side_expression.data);
+                iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_hand_side_expression.data);
 
                 // Try enum:
                 {
@@ -1824,14 +1824,14 @@ namespace h::compiler
                     );
                     if (declaration_optional.has_value())
                     {
-                        if (std::holds_alternative<h::Enum_declaration const*>(declaration_optional->data))
+                        if (std::holds_alternative<iris::Enum_declaration const*>(declaration_optional->data))
                         {
-                            h::Enum_declaration const& enum_declaration = *std::get<h::Enum_declaration const*>(declaration_optional->data);
+                            iris::Enum_declaration const& enum_declaration = *std::get<iris::Enum_declaration const*>(declaration_optional->data);
 
                             auto const location = std::find_if(
                                 enum_declaration.values.begin(),
                                 enum_declaration.values.end(),
-                                [&](h::Enum_value const& enum_value) -> bool { return enum_value.name == access_expression.member_name; }
+                                [&](iris::Enum_value const& enum_value) -> bool { return enum_value.name == access_expression.member_name; }
                             );
                             if (location == enum_declaration.values.end())
                             {
@@ -1907,13 +1907,13 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_assert_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_assert_expression(
         Validate_expression_parameters const& parameters,
-        h::Assert_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Assert_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<h::Type_reference> const condition_type_optional = get_expression_type(
+        std::optional<iris::Type_reference> const condition_type_optional = get_expression_type(
             parameters.core_module,
             parameters.function_declaration,
             parameters.scope,
@@ -1924,7 +1924,7 @@ namespace h::compiler
 
         if (!condition_type_optional.has_value() || (!is_bool(condition_type_optional.value()) && !is_c_bool(condition_type_optional.value())))
         {
-            std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return 
             {
@@ -1942,25 +1942,25 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_binary_operation(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_binary_operation(
         Validate_expression_parameters const& parameters,
-        h::Expression_index const left_hand_side,
-        h::Expression_index const right_hand_side,
-        h::Binary_operation const operation,
-        std::optional<h::Source_range> const& source_range
+        iris::Expression_index const left_hand_side,
+        iris::Expression_index const right_hand_side,
+        iris::Binary_operation const operation,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<h::Type_reference> const& left_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, left_hand_side);
-        std::optional<h::Type_reference> const& right_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, right_hand_side);
+        std::optional<iris::Type_reference> const& left_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, left_hand_side);
+        std::optional<iris::Type_reference> const& right_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, right_hand_side);
 
         if (!left_hand_side_type_optional.has_value() || !right_hand_side_type_optional.has_value())
             return {};
 
-        std::optional<h::Type_reference> const type_optional = get_underlying_type(parameters.declaration_database, left_hand_side_type_optional.value());
+        std::optional<iris::Type_reference> const type_optional = get_underlying_type(parameters.declaration_database, left_hand_side_type_optional.value());
         if (!type_optional.has_value())
             return {};
         
-        h::Type_reference const& type = type_optional.value();
+        iris::Type_reference const& type = type_optional.value();
 
         if (is_bit_shift_binary_operation(operation))
         {
@@ -1973,7 +1973,7 @@ namespace h::compiler
                         source_range,
                         std::format(
                             "Binary operation '{}' can only be applied to integers or bytes.",
-                            h::binary_operation_symbol_to_string(operation)
+                            iris::binary_operation_symbol_to_string(operation)
                         )
                     )
                 };
@@ -1990,7 +1990,7 @@ namespace h::compiler
                         source_range,
                         std::format(
                             "Binary operation '{}' can only be applied to integers, bytes or enums.",
-                            h::binary_operation_symbol_to_string(operation)
+                            iris::binary_operation_symbol_to_string(operation)
                         )
                     )
                 };
@@ -2000,7 +2000,7 @@ namespace h::compiler
         {
             if (is_pointer(type) || is_null_pointer_type(type))
             {
-                h::Type_reference const& right_hand_side_type = right_hand_side_type_optional.value();
+                iris::Type_reference const& right_hand_side_type = right_hand_side_type_optional.value();
 
                 if (!is_pointer(right_hand_side_type) && !is_null_pointer_type(right_hand_side_type))
                 {
@@ -2011,7 +2011,7 @@ namespace h::compiler
                             source_range,
                             std::format(
                                 "Binary operation '{}' can only be applied to numbers, bytes or booleans.",
-                                h::binary_operation_symbol_to_string(operation)
+                                iris::binary_operation_symbol_to_string(operation)
                             )
                         )
                     };
@@ -2026,7 +2026,7 @@ namespace h::compiler
                         source_range,
                         std::format(
                             "Binary operation '{}' can only be applied to numbers, bytes, booleans or enums.",
-                            h::binary_operation_symbol_to_string(operation)
+                            iris::binary_operation_symbol_to_string(operation)
                         )
                     )
                 };
@@ -2043,7 +2043,7 @@ namespace h::compiler
                         source_range,
                         std::format(
                             "Binary operation '{}' can only be applied to numeric types.",
-                            h::binary_operation_symbol_to_string(operation)
+                            iris::binary_operation_symbol_to_string(operation)
                         )
                     )
                 };
@@ -2060,7 +2060,7 @@ namespace h::compiler
                         source_range,
                         std::format(
                             "Binary operation '{}' can only be applied to a boolean value.",
-                            h::binary_operation_symbol_to_string(operation)
+                            iris::binary_operation_symbol_to_string(operation)
                         )
                     )
                 };
@@ -2077,13 +2077,13 @@ namespace h::compiler
                         source_range,
                         std::format(
                             "Binary operation '{}' can only be applied to numeric types.",
-                            h::binary_operation_symbol_to_string(operation)
+                            iris::binary_operation_symbol_to_string(operation)
                         )
                     )
                 };
             }
         }
-        else if (operation == h::Binary_operation::Has)
+        else if (operation == iris::Binary_operation::Has)
         {
             if (!is_enum_type(parameters.declaration_database, type))
             {
@@ -2094,7 +2094,7 @@ namespace h::compiler
                         source_range,
                         std::format(
                             "Binary operation 'has' can only be applied to enum values.",
-                            h::binary_operation_symbol_to_string(operation)
+                            iris::binary_operation_symbol_to_string(operation)
                         )
                     )
                 };
@@ -2104,20 +2104,20 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_assignment_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_assignment_expression(
         Validate_expression_parameters const& parameters,
-        h::Assignment_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Assignment_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<h::Type_reference> const& left_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.left_hand_side);
-        std::optional<h::Type_reference> const& right_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.right_hand_side);
+        std::optional<iris::Type_reference> const& left_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.left_hand_side);
+        std::optional<iris::Type_reference> const& right_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.right_hand_side);
         
         if (!can_assign_type(parameters.declaration_database, left_hand_side_type_optional, right_hand_side_type_optional))
         {
-            h::Expression const& right_hand_side_expression = parameters.statement.expressions[expression.right_hand_side.expression_index];
-            std::pmr::string const left_hand_side_type_name = h::format_type_reference(parameters.core_module, left_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-            std::pmr::string const right_hand_side_type_name = h::format_type_reference(parameters.core_module, right_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            iris::Expression const& right_hand_side_expression = parameters.statement.expressions[expression.right_hand_side.expression_index];
+            std::pmr::string const left_hand_side_type_name = iris::format_type_reference(parameters.core_module, left_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const right_hand_side_type_name = iris::format_type_reference(parameters.core_module, right_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -2148,7 +2148,7 @@ namespace h::compiler
 
         if (expression.additional_operation.has_value())
         {
-            std::pmr::vector<h::compiler::Diagnostic> diagnostics = validate_binary_operation(
+            std::pmr::vector<iris::compiler::Diagnostic> diagnostics = validate_binary_operation(
                 parameters,
                 expression.left_hand_side,
                 expression.right_hand_side,
@@ -2163,19 +2163,19 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_binary_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_binary_expression(
         Validate_expression_parameters const& parameters,
-        h::Binary_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Binary_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<h::Type_reference> const& left_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.left_hand_side);
-        std::optional<h::Type_reference> const& right_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.right_hand_side);
+        std::optional<iris::Type_reference> const& left_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.left_hand_side);
+        std::optional<iris::Type_reference> const& right_hand_side_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.right_hand_side);
         
         if (!are_compatible_types(parameters.declaration_database, left_hand_side_type_optional, right_hand_side_type_optional))
         {
-            std::pmr::string const left_hand_side_type_name = h::format_type_reference(parameters.core_module, left_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-            std::pmr::string const right_hand_side_type_name = h::format_type_reference(parameters.core_module, right_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const left_hand_side_type_name = iris::format_type_reference(parameters.core_module, left_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const right_hand_side_type_name = iris::format_type_reference(parameters.core_module, right_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -2202,10 +2202,10 @@ namespace h::compiler
         );
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_block_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_block_expression(
         Validate_expression_parameters const& parameters,
-        h::Block_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Block_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         return validate_statements(
@@ -2218,10 +2218,10 @@ namespace h::compiler
         );
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_break_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_break_expression(
         Validate_expression_parameters const& parameters,
-        h::Break_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Break_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         std::size_t const block_count = parameters.scope.blocks.size();
@@ -2256,30 +2256,30 @@ namespace h::compiler
         return {};
     }
 
-    std::optional<std::pair<std::string_view, h::Instance_call_expression>> find_builtin_instance_call_expression(
-        h::Statement const& statement,
-        h::Call_expression const& expression
+    std::optional<std::pair<std::string_view, iris::Instance_call_expression>> find_builtin_instance_call_expression(
+        iris::Statement const& statement,
+        iris::Call_expression const& expression
     )
     {
-        h::Expression const& left_side_expression = statement.expressions[expression.expression.expression_index];
+        iris::Expression const& left_side_expression = statement.expressions[expression.expression.expression_index];
 
-        if (std::holds_alternative<h::Instance_call_expression>(left_side_expression.data))
+        if (std::holds_alternative<iris::Instance_call_expression>(left_side_expression.data))
         {
-            h::Instance_call_expression const& instance_call_expression = std::get<h::Instance_call_expression>(left_side_expression.data);
+            iris::Instance_call_expression const& instance_call_expression = std::get<iris::Instance_call_expression>(left_side_expression.data);
 
-            h::Expression const& instance_call_left_expression = statement.expressions[instance_call_expression.left_hand_side.expression_index];
+            iris::Expression const& instance_call_left_expression = statement.expressions[instance_call_expression.left_hand_side.expression_index];
 
-            if (std::holds_alternative<h::Variable_expression>(instance_call_left_expression.data))
+            if (std::holds_alternative<iris::Variable_expression>(instance_call_left_expression.data))
             {
-                h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(instance_call_left_expression.data);
+                iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(instance_call_left_expression.data);
 
                 if (variable_expression.name == "create_stack_array_uninitialized")
                 {
-                    return std::pair<std::string_view, h::Instance_call_expression>{"create_stack_array_uninitialized", instance_call_expression};
+                    return std::pair<std::string_view, iris::Instance_call_expression>{"create_stack_array_uninitialized", instance_call_expression};
                 }
                 else if (variable_expression.name == "reinterpret_as")
                 {
-                    return std::pair<std::string_view, h::Instance_call_expression>{"reinterpret_as", instance_call_expression};
+                    return std::pair<std::string_view, iris::Instance_call_expression>{"reinterpret_as", instance_call_expression};
                 }
             }
         }
@@ -2287,25 +2287,25 @@ namespace h::compiler
         return std::nullopt;
     }
 
-    h::Function_constructor const* find_function_constructor_using_call_expression(
+    iris::Function_constructor const* find_function_constructor_using_call_expression(
         std::string_view const current_module_name,
         Declaration_database const& declaration_database,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Call_expression const& expression
+        iris::Statement const& statement,
+        iris::Call_expression const& expression
     )
     {
-        h::Expression const& left_side_expression = statement.expressions[expression.expression.expression_index];
+        iris::Expression const& left_side_expression = statement.expressions[expression.expression.expression_index];
 
-        if (std::holds_alternative<h::Access_expression>(left_side_expression.data))
+        if (std::holds_alternative<iris::Access_expression>(left_side_expression.data))
         {
-            h::Access_expression const& access_expression = std::get<h::Access_expression>(left_side_expression.data);
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(left_side_expression.data);
 
-            h::Expression const& access_left_side_expression = statement.expressions[access_expression.expression.expression_index];
+            iris::Expression const& access_left_side_expression = statement.expressions[access_expression.expression.expression_index];
 
-            if (std::holds_alternative<h::Variable_expression>(access_left_side_expression.data))
+            if (std::holds_alternative<iris::Variable_expression>(access_left_side_expression.data))
             {
-                h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(access_left_side_expression.data);
+                iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(access_left_side_expression.data);
                 // Left side can be a module alias or a variable name
 
                 Variable const* const variable = find_variable_from_scope(
@@ -2324,8 +2324,8 @@ namespace h::compiler
                         );
                         if (declaration.has_value())
                         {
-                            if (std::holds_alternative<h::Function_constructor const*>(declaration->data))
-                                return std::get<h::Function_constructor const*>(declaration->data);
+                            if (std::holds_alternative<iris::Function_constructor const*>(declaration->data))
+                                return std::get<iris::Function_constructor const*>(declaration->data);
                         }
                     }
 
@@ -2335,46 +2335,46 @@ namespace h::compiler
                 // TODO import alias
             }
         }
-        else if (std::holds_alternative<h::Variable_expression>(left_side_expression.data))
+        else if (std::holds_alternative<iris::Variable_expression>(left_side_expression.data))
         {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_side_expression.data);
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_side_expression.data);
 
             std::optional<Declaration> const declaration = find_underlying_declaration(declaration_database, current_module_name, variable_expression.name);
             if (declaration.has_value())
             {
-                if (std::holds_alternative<h::Function_constructor const*>(declaration->data))
-                    return std::get<h::Function_constructor const*>(declaration->data);
+                if (std::holds_alternative<iris::Function_constructor const*>(declaration->data))
+                    return std::get<iris::Function_constructor const*>(declaration->data);
             }
         }
 
         return nullptr;
     }
 
-    std::optional<h::Function_pointer_type> get_function_pointer_type_from_callable(
+    std::optional<iris::Function_pointer_type> get_function_pointer_type_from_callable(
         Validate_expression_parameters const& parameters,
-        h::Call_expression const& expression,
-        std::optional<h::Type_reference> const& callable_type
+        iris::Call_expression const& expression,
+        std::optional<iris::Type_reference> const& callable_type
     )
     {
         if (!callable_type.has_value())
             return std::nullopt;
 
         if (is_function_pointer(callable_type.value()))
-            return std::get<h::Function_pointer_type>(callable_type->data);
+            return std::get<iris::Function_pointer_type>(callable_type->data);
 
         if (is_builtin_type_reference(callable_type.value()))
         {
-            h::Builtin_type_reference const& builtin_type_reference = std::get<h::Builtin_type_reference>(callable_type->data);
+            iris::Builtin_type_reference const& builtin_type_reference = std::get<iris::Builtin_type_reference>(callable_type->data);
             if (builtin_type_reference.value == "check")
             {
-                h::Function_type function_type
+                iris::Function_type function_type
                 {
-                    .input_parameter_types = { h::create_bool_type_reference() },
+                    .input_parameter_types = { iris::create_bool_type_reference() },
                     .output_parameter_types = {},
                     .is_variadic = false,
                 };
 
-                return h::Function_pointer_type
+                return iris::Function_pointer_type
                 {
                     .type = std::move(function_type),
                     .input_parameter_names = { "condition" },
@@ -2383,12 +2383,12 @@ namespace h::compiler
             }
             else if (builtin_type_reference.value == "create_array_slice_from_pointer")
             {
-                std::pmr::vector<h::Type_reference> element_type;
+                std::pmr::vector<iris::Type_reference> element_type;
 
                 if (expression.arguments.size() > 0)
                 {
                     std::optional<Type_info> const first_argument_type_info = get_expression_type_info(parameters.core_module, nullptr, parameters.scope, parameters.statement, parameters.statement.expressions[expression.arguments[0].expression_index], std::nullopt, parameters.declaration_database);
-                    if (first_argument_type_info.has_value() && std::holds_alternative<h::Pointer_type>(first_argument_type_info->type.data))
+                    if (first_argument_type_info.has_value() && std::holds_alternative<iris::Pointer_type>(first_argument_type_info->type.data))
                     {
                         std::optional<Type_reference> value_type = remove_pointer(first_argument_type_info->type);
                         if (value_type.has_value())
@@ -2396,7 +2396,7 @@ namespace h::compiler
                     }
                 }
 
-                h::Function_type function_type
+                iris::Function_type function_type
                 {
                     .input_parameter_types = {
                         create_pointer_type_type_reference(element_type, false),
@@ -2408,7 +2408,7 @@ namespace h::compiler
                     .is_variadic = false,
                 };
 
-                return h::Function_pointer_type
+                return iris::Function_pointer_type
                 {
                     .type = std::move(function_type),
                     .input_parameter_names = {"data", "length"},
@@ -2417,16 +2417,16 @@ namespace h::compiler
             }
             else if (builtin_type_reference.value == "offset_pointer")
             {
-                h::Type_reference pointer_type;
+                iris::Type_reference pointer_type;
 
                 if (expression.arguments.size() > 0)
                 {
                     std::optional<Type_info> first_argument_type_info = get_expression_type_info(parameters.core_module, nullptr, parameters.scope, parameters.statement, parameters.statement.expressions[expression.arguments[0].expression_index], std::nullopt, parameters.declaration_database);
-                    if (first_argument_type_info.has_value() && std::holds_alternative<h::Pointer_type>(first_argument_type_info->type.data))
+                    if (first_argument_type_info.has_value() && std::holds_alternative<iris::Pointer_type>(first_argument_type_info->type.data))
                         pointer_type = std::move(first_argument_type_info->type);
                 }
 
-                h::Function_type function_type
+                iris::Function_type function_type
                 {
                     .input_parameter_types = {
                         pointer_type,
@@ -2438,7 +2438,7 @@ namespace h::compiler
                     .is_variadic = false,
                 };
 
-                return h::Function_pointer_type
+                return iris::Function_pointer_type
                 {
                     .type = std::move(function_type),
                     .input_parameter_names = {"pointer", "offset"},
@@ -2447,14 +2447,14 @@ namespace h::compiler
             }
             else if (builtin_type_reference.value == "soa_array_view")
             {
-                h::Function_type function_type
+                iris::Function_type function_type
                 {
                     .input_parameter_types = {},
                     .output_parameter_types = {},
                     .is_variadic = true,
                 };
 
-                return h::Function_pointer_type
+                return iris::Function_pointer_type
                 {
                     .type = std::move(function_type),
                     .input_parameter_names = {},
@@ -2466,27 +2466,27 @@ namespace h::compiler
         return std::nullopt;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_call_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_call_expression(
         Validate_expression_parameters const& parameters,
-        h::Call_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Call_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<h::Type_reference> const& callable_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.expression);
+        std::optional<iris::Type_reference> const& callable_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.expression);
 
         if (callable_type_optional.has_value() && is_builtin_type_reference(callable_type_optional.value()))
         {
-            h::Builtin_type_reference const& builtin_type_reference = std::get<h::Builtin_type_reference>(callable_type_optional->data);
+            iris::Builtin_type_reference const& builtin_type_reference = std::get<iris::Builtin_type_reference>(callable_type_optional->data);
             if (builtin_type_reference.value == "create_array_slice_from_pointer")
             {
                 if (expression.arguments.size() > 1)
                 {
-                    std::optional<h::Type_reference> const& first_argument_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.arguments[0]);
+                    std::optional<iris::Type_reference> const& first_argument_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.arguments[0]);
 
                     if (!first_argument_type_optional.has_value() || is_null_pointer_type(first_argument_type_optional.value()))
                     {
-                        h::Expression const& first_argument_expression = parameters.statement.expressions[expression.arguments[0].expression_index];
-                        std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, first_argument_type_optional.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+                        iris::Expression const& first_argument_expression = parameters.statement.expressions[expression.arguments[0].expression_index];
+                        std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, first_argument_type_optional.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                         return
                         {
@@ -2523,17 +2523,17 @@ namespace h::compiler
                 {
                     for (std::size_t argument_index = 0; argument_index < expression.arguments.size(); ++argument_index)
                     {
-                        h::Expression const& argument_expression = parameters.statement.expressions[expression.arguments[argument_index].expression_index];
-                        std::optional<h::Type_reference> const argument_type_optional = get_expression_type_from_type_info(
+                        iris::Expression const& argument_expression = parameters.statement.expressions[expression.arguments[argument_index].expression_index];
+                        std::optional<iris::Type_reference> const argument_type_optional = get_expression_type_from_type_info(
                             parameters.expression_types,
                             expression.arguments[argument_index]
                         );
 
-                        if (!argument_type_optional.has_value() || !h::is_integer(argument_type_optional.value()))
+                        if (!argument_type_optional.has_value() || !iris::is_integer(argument_type_optional.value()))
                         {
                             std::pmr::string const provided_type_name =
                                 argument_type_optional.has_value() ?
-                                h::format_type_reference(parameters.core_module, argument_type_optional.value(), parameters.temporaries_allocator, parameters.temporaries_allocator) :
+                                iris::format_type_reference(parameters.core_module, argument_type_optional.value(), parameters.temporaries_allocator, parameters.temporaries_allocator) :
                                 std::pmr::string{"?", parameters.temporaries_allocator};
 
                             return
@@ -2570,7 +2570,7 @@ namespace h::compiler
         }
         
         {
-            std::optional<std::pair<std::string_view, h::Instance_call_expression>> const builtin_instance_call = find_builtin_instance_call_expression(
+            std::optional<std::pair<std::string_view, iris::Instance_call_expression>> const builtin_instance_call = find_builtin_instance_call_expression(
                 parameters.statement,
                 expression
             );
@@ -2579,7 +2579,7 @@ namespace h::compiler
             {
                 if (builtin_instance_call->first == "create_stack_array_uninitialized")
                 {
-                    h::Instance_call_expression const& instance_call_expression = builtin_instance_call->second;
+                    iris::Instance_call_expression const& instance_call_expression = builtin_instance_call->second;
 
                     if (instance_call_expression.arguments.size() != 1)
                     {
@@ -2599,7 +2599,7 @@ namespace h::compiler
                 }
                 else if (builtin_instance_call->first == "reinterpret_as")
                 {
-                    h::Instance_call_expression const& instance_call_expression = builtin_instance_call->second;
+                    iris::Instance_call_expression const& instance_call_expression = builtin_instance_call->second;
 
                     if (instance_call_expression.arguments.size() != 1)
                     {
@@ -2657,7 +2657,7 @@ namespace h::compiler
             return {};
         }
 
-        const std::optional<h::Function_pointer_type> function_pointer_type_optional = get_function_pointer_type_from_callable(
+        const std::optional<iris::Function_pointer_type> function_pointer_type_optional = get_function_pointer_type_from_callable(
             parameters,
             expression,
             callable_type_optional
@@ -2675,7 +2675,7 @@ namespace h::compiler
             };
         }
 
-        h::Function_pointer_type const& function_pointer_type = function_pointer_type_optional.value();
+        iris::Function_pointer_type const& function_pointer_type = function_pointer_type_optional.value();
 
         std::optional<Implicit_argument> const implicit_first_argument = get_implicit_first_call_argument(
             parameters.statement,
@@ -2730,15 +2730,15 @@ namespace h::compiler
         {
             std::uint64_t const expression_index = call_arguments[argument_index].expression_index;
             bool const take_address_of = argument_index == 0 && implicit_first_argument.has_value() && implicit_first_argument->take_address_of;
-            std::optional<h::Type_reference> const& argument_type_optional = get_expression_type_from_type_info_from_call_arguments(parameters.expression_types, expression_index, take_address_of);
+            std::optional<iris::Type_reference> const& argument_type_optional = get_expression_type_from_type_info_from_call_arguments(parameters.expression_types, expression_index, take_address_of);
             
-            h::Type_reference const& parameter_type = function_pointer_type.type.input_parameter_types[argument_index];
+            iris::Type_reference const& parameter_type = function_pointer_type.type.input_parameter_types[argument_index];
 
             if (!can_assign_type(parameters.declaration_database, parameter_type, argument_type_optional))
             {
                 std::optional<Source_range> const argument_source_range = parameters.statement.expressions[expression_index].source_range;
-                std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, argument_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const expected_type_name = h::format_type_reference(parameters.core_module, parameter_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, argument_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, parameter_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 diagnostics.push_back(
                     {
@@ -2760,13 +2760,13 @@ namespace h::compiler
         return diagnostics;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_cast_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_cast_expression(
         Validate_expression_parameters const& parameters,
-        h::Cast_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Cast_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<h::Type_reference> const& source_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.source);
+        std::optional<iris::Type_reference> const& source_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.source);
         std::optional<Type_reference> const& underlying_destination_type = get_underlying_type(parameters.declaration_database, expression.destination_type);
 
         if (!source_type_optional.has_value() || !underlying_destination_type.has_value())
@@ -2778,8 +2778,8 @@ namespace h::compiler
                     source_range,
                     std::format(
                         "Cannot apply numeric cast from '{}' to '{}'.",
-                        h::format_type_reference(parameters.core_module, source_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator),
-                        h::format_type_reference(parameters.core_module, underlying_destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
+                        iris::format_type_reference(parameters.core_module, source_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                        iris::format_type_reference(parameters.core_module, underlying_destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
                     )
                 )
             };
@@ -2804,8 +2804,8 @@ namespace h::compiler
                     source_range,
                     std::format(
                         "Cannot apply numeric cast from '{}' to '{}'.",
-                        h::format_type_reference(parameters.core_module, underlying_source_type, parameters.temporaries_allocator, parameters.temporaries_allocator),
-                        h::format_type_reference(parameters.core_module, underlying_destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
+                        iris::format_type_reference(parameters.core_module, underlying_source_type, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                        iris::format_type_reference(parameters.core_module, underlying_destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
                     )
                 )
             };
@@ -2820,8 +2820,8 @@ namespace h::compiler
                     source_range,
                     std::format(
                         "Numeric cast from '{}' to '{}'.",
-                        h::format_type_reference(parameters.core_module, source_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator),
-                        h::format_type_reference(parameters.core_module, expression.destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
+                        iris::format_type_reference(parameters.core_module, source_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                        iris::format_type_reference(parameters.core_module, expression.destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
                     )
                 )
             };
@@ -2830,15 +2830,15 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_continue_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_continue_expression(
         Validate_expression_parameters const& parameters,
-        h::Continue_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Continue_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         auto const is_loop_block = [](Block_expression_variant const& block) -> bool {
-            return std::holds_alternative<h::For_loop_expression const*>(block) ||
-                   std::holds_alternative<h::While_loop_expression const*>(block);
+            return std::holds_alternative<iris::For_loop_expression const*>(block) ||
+                   std::holds_alternative<iris::While_loop_expression const*>(block);
         };
 
         auto const location = std::find_if(
@@ -2861,18 +2861,18 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_for_loop_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_for_loop_expression(
         Validate_expression_parameters const& parameters,
-        h::For_loop_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::For_loop_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<h::Type_reference> const& range_begin_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.range_begin);
+        std::optional<iris::Type_reference> const& range_begin_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.range_begin);
 
         if (!range_begin_type_optional.has_value() || (!is_integer(range_begin_type_optional.value()) && !is_floating_point(range_begin_type_optional.value())))
         {
-            h::Expression const& range_begin_expression = parameters.statement.expressions[expression.range_begin.expression_index];
-            std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            iris::Expression const& range_begin_expression = parameters.statement.expressions[expression.range_begin.expression_index];
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -2894,7 +2894,7 @@ namespace h::compiler
         new_scope.blocks.push_back(&expression);
 
         {
-            std::pmr::vector<h::compiler::Diagnostic> const range_end_statement_diagnostics = validate_statement(
+            std::pmr::vector<iris::compiler::Diagnostic> const range_end_statement_diagnostics = validate_statement(
                 parameters.core_module,
                 parameters.function_declaration,
                 new_scope,
@@ -2907,7 +2907,7 @@ namespace h::compiler
                 return range_end_statement_diagnostics;
         }
 
-        std::optional<h::Type_reference> const range_end_type_optional = get_expression_type(
+        std::optional<iris::Type_reference> const range_end_type_optional = get_expression_type(
             parameters.core_module,
             parameters.function_declaration,
             new_scope,
@@ -2918,8 +2918,8 @@ namespace h::compiler
 
         if (!are_compatible_types(parameters.declaration_database, range_begin_type_optional, range_end_type_optional))
         {
-            std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, range_end_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-            std::pmr::string const expected_type_name = h::format_type_reference(parameters.core_module, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, range_end_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -2939,13 +2939,13 @@ namespace h::compiler
 
         if (expression.step_by.has_value())
         {
-            std::optional<h::Type_reference> const& step_by_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.step_by.value());
+            std::optional<iris::Type_reference> const& step_by_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.step_by.value());
 
             if (!are_compatible_types(parameters.declaration_database, range_begin_type_optional, step_by_type_optional))
             {
-                h::Expression const& step_by_expression = parameters.statement.expressions[expression.step_by->expression_index];
-                std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, step_by_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const expected_type_name = h::format_type_reference(parameters.core_module, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                iris::Expression const& step_by_expression = parameters.statement.expressions[expression.step_by->expression_index];
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, step_by_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 return
                 {
@@ -2965,7 +2965,7 @@ namespace h::compiler
         }
 
         {
-            std::pmr::vector<h::compiler::Diagnostic> const statements_diagnostics = validate_statements(
+            std::pmr::vector<iris::compiler::Diagnostic> const statements_diagnostics = validate_statements(
                 parameters.core_module,
                 parameters.function_declaration,
                 new_scope,
@@ -2980,19 +2980,19 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_if_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_if_expression(
         Validate_expression_parameters const& parameters,
-        h::If_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::If_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{parameters.temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{parameters.temporaries_allocator};
 
         for (Condition_statement_pair const& pair : expression.series)
         {
             if (pair.condition.has_value())
             {
-                std::pmr::vector<h::compiler::Diagnostic> const condition_diagnostics = validate_statement(
+                std::pmr::vector<iris::compiler::Diagnostic> const condition_diagnostics = validate_statement(
                     parameters.core_module,
                     parameters.function_declaration,
                     parameters.scope,
@@ -3006,7 +3006,7 @@ namespace h::compiler
 
                 if (condition_diagnostics.empty())
                 {
-                    std::optional<h::Type_reference> const condition_type_optional = get_expression_type(
+                    std::optional<iris::Type_reference> const condition_type_optional = get_expression_type(
                         parameters.core_module,
                         parameters.function_declaration,
                         parameters.scope,
@@ -3017,7 +3017,7 @@ namespace h::compiler
 
                     if (!condition_type_optional.has_value() || (!is_bool(condition_type_optional.value()) && !is_c_bool(condition_type_optional.value())))
                     {
-                        std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                        std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                         diagnostics.push_back(
                             create_error_diagnostic(
@@ -3032,7 +3032,7 @@ namespace h::compiler
                     }
                 }
 
-                std::pmr::vector<h::compiler::Diagnostic> const then_diagnostics = validate_statements(
+                std::pmr::vector<iris::compiler::Diagnostic> const then_diagnostics = validate_statements(
                     parameters.core_module,
                     parameters.function_declaration,
                     parameters.scope,
@@ -3050,20 +3050,20 @@ namespace h::compiler
 
     std::optional<Declaration> find_declaration_to_instantiate(
         Declaration_database const& declaration_database,
-        h::Type_reference const& type_to_instantiate,
-        std::pmr::vector<h::Struct_declaration>& temporary_storage
+        iris::Type_reference const& type_to_instantiate,
+        std::pmr::vector<iris::Struct_declaration>& temporary_storage
     )
     {
-        if (std::holds_alternative<h::Array_slice_type>(type_to_instantiate.data))
+        if (std::holds_alternative<iris::Array_slice_type>(type_to_instantiate.data))
         {
-            h::Array_slice_type const& array_slice = std::get<h::Array_slice_type>(type_to_instantiate.data);
+            iris::Array_slice_type const& array_slice = std::get<iris::Array_slice_type>(type_to_instantiate.data);
             temporary_storage.push_back(create_array_slice_type_struct_declaration(array_slice.element_type));
             return Declaration{ .data = &temporary_storage[0], .module_name = "iris.builtin", .is_export = true };
         }
 
-        if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate.data))
+        if (std::holds_alternative<iris::Soa_array_type>(type_to_instantiate.data))
         {
-            h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(type_to_instantiate.data);
+            iris::Soa_array_type const& soa_array_type = std::get<iris::Soa_array_type>(type_to_instantiate.data);
             if (soa_array_type.value_type.empty())
                 return std::nullopt;
 
@@ -3073,9 +3073,9 @@ namespace h::compiler
             );
         }
 
-        if (std::holds_alternative<h::Soa_array_view_type>(type_to_instantiate.data))
+        if (std::holds_alternative<iris::Soa_array_view_type>(type_to_instantiate.data))
         {
-            h::Soa_array_view_type const& soa_array_view_type = std::get<h::Soa_array_view_type>(type_to_instantiate.data);
+            iris::Soa_array_view_type const& soa_array_view_type = std::get<iris::Soa_array_view_type>(type_to_instantiate.data);
             if (soa_array_view_type.value_type.empty())
                 return std::nullopt;
 
@@ -3095,20 +3095,20 @@ namespace h::compiler
         return std::nullopt;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_instantiate_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_instantiate_expression(
         Validate_expression_parameters const& parameters,
-        h::Instantiate_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Instantiate_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         for (std::size_t member_index = 1; member_index < expression.members.size(); ++member_index)
         {
-            h::Instantiate_member_value_pair const& pair = expression.members[member_index];
+            iris::Instantiate_member_value_pair const& pair = expression.members[member_index];
 
             auto const duplicate_location = std::find_if(
                 expression.members.begin(),
                 expression.members.begin() + member_index,
-                [&](h::Instantiate_member_value_pair const& other_pair) -> bool
+                [&](iris::Instantiate_member_value_pair const& other_pair) -> bool
                 {
                     return pair.member_name == other_pair.member_name;
                 }
@@ -3130,7 +3130,7 @@ namespace h::compiler
             }
         }
 
-        std::optional<h::Type_reference> const type_to_instantiate = get_expression_type_from_type_info(parameters.expression_types, parameters.expression_index);
+        std::optional<iris::Type_reference> const type_to_instantiate = get_expression_type_from_type_info(parameters.expression_types, parameters.expression_index);
         if (!type_to_instantiate.has_value())
         {
             return
@@ -3143,7 +3143,7 @@ namespace h::compiler
             };
         }
 
-        if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate->data) && expression.type == Instantiate_expression_type::Explicit)
+        if (std::holds_alternative<iris::Soa_array_type>(type_to_instantiate->data) && expression.type == Instantiate_expression_type::Explicit)
         {
             return
             {
@@ -3155,7 +3155,7 @@ namespace h::compiler
             };
         }
 
-        std::pmr::vector<h::Struct_declaration> temporary_storage{parameters.temporaries_allocator};
+        std::pmr::vector<iris::Struct_declaration> temporary_storage{parameters.temporaries_allocator};
         std::optional<Declaration> const declaration_optional = find_declaration_to_instantiate(
             parameters.declaration_database,
             type_to_instantiate.value(),
@@ -3181,7 +3181,7 @@ namespace h::compiler
 
         for (std::size_t member_index = 0; member_index < expression.members.size(); ++member_index)
         {
-            h::Instantiate_member_value_pair const& pair = expression.members[member_index];
+            iris::Instantiate_member_value_pair const& pair = expression.members[member_index];
 
             auto const location = std::find_if(
                 member_infos.begin(),
@@ -3201,17 +3201,17 @@ namespace h::compiler
                         create_sub_source_range(pair.source_range, 0, pair.member_name.size()),
                         std::format(
                             "'{}.{}' does not exist.",
-                            h::format_type_reference(parameters.core_module, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                            iris::format_type_reference(parameters.core_module, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
                             pair.member_name
                         )
                     )
                 };
             }
 
-            h::Type_reference const& member_type = location->member_type;
+            iris::Type_reference const& member_type = location->member_type;
 
-            h::Expression const& member_value_expression = parameters.statement.expressions[pair.value.expression_index];
-            std::optional<h::Type_reference> const assigned_value_type = get_expression_type(
+            iris::Expression const& member_value_expression = parameters.statement.expressions[pair.value.expression_index];
+            std::optional<iris::Type_reference> const assigned_value_type = get_expression_type(
                 parameters.core_module,
                 parameters.function_declaration,
                 parameters.scope,
@@ -3223,8 +3223,8 @@ namespace h::compiler
 
             if (!can_assign_type(parameters.declaration_database, member_type, assigned_value_type))
             {
-                std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, assigned_value_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const expected_type_name = h::format_type_reference(parameters.core_module, member_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, assigned_value_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, member_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 return
                 {
@@ -3234,7 +3234,7 @@ namespace h::compiler
                         std::format(
                             "Cannot assign value of type '{}' to member '{}.{}' of type '{}'.",
                             provided_type_name,
-                            h::format_type_reference(parameters.core_module, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                            iris::format_type_reference(parameters.core_module, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
                             pair.member_name,
                             expected_type_name
                         ),
@@ -3266,7 +3266,7 @@ namespace h::compiler
         {
             if (expression.members.size() != member_infos.size())
             {
-                std::pmr::vector<h::compiler::Diagnostic> diagnostics{parameters.temporaries_allocator};
+                std::pmr::vector<iris::compiler::Diagnostic> diagnostics{parameters.temporaries_allocator};
 
                 for (std::size_t member_index = 0; member_index < member_infos.size(); ++member_index)
                 {
@@ -3275,7 +3275,7 @@ namespace h::compiler
                     auto const location = std::find_if(
                         expression.members.begin(),
                         expression.members.end(),
-                        [&](h::Instantiate_member_value_pair const& pair) -> bool
+                        [&](iris::Instantiate_member_value_pair const& pair) -> bool
                         {
                             return pair.member_name == member_info.member_name;
                         }
@@ -3289,7 +3289,7 @@ namespace h::compiler
                                 source_range,
                                 std::format(
                                     "'{}.{}' is not set. Explicit instantiate expression requires all members to be set.",
-                                    h::format_type_reference(parameters.core_module, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                                    iris::format_type_reference(parameters.core_module, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
                                     member_info.member_name
                                 )
                             )
@@ -3304,10 +3304,10 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_reflection_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_reflection_expression(
         Validate_expression_parameters const& parameters,
-        h::Reflection_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Reflection_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         if (expression.name == "size_of" || expression.name == "alignment_of")
@@ -3340,29 +3340,29 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_return_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_return_expression(
         Validate_expression_parameters const& parameters,
-        h::Return_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Return_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         if (parameters.function_declaration == nullptr)
             return {};
 
-        std::optional<h::Type_reference> const expected_type = 
+        std::optional<iris::Type_reference> const expected_type = 
             !parameters.function_declaration->type.output_parameter_types.empty() ?
             get_underlying_type(parameters.declaration_database, parameters.function_declaration->type.output_parameter_types[0]) :
-            std::optional<h::Type_reference>{std::nullopt};
+            std::optional<iris::Type_reference>{std::nullopt};
 
         if (expression.expression.has_value())
         {
-            std::optional<h::Type_reference> const& provided_type = get_expression_type_from_type_info(parameters.expression_types, expression.expression.value());
-            std::optional<h::Type_reference> const underlying_provided_type = provided_type.has_value() ? get_underlying_type(parameters.declaration_database, provided_type.value()) : std::optional<h::Type_reference>{};
+            std::optional<iris::Type_reference> const& provided_type = get_expression_type_from_type_info(parameters.expression_types, expression.expression.value());
+            std::optional<iris::Type_reference> const underlying_provided_type = provided_type.has_value() ? get_underlying_type(parameters.declaration_database, provided_type.value()) : std::optional<iris::Type_reference>{};
 
             if (!are_compatible_types(parameters.declaration_database, underlying_provided_type, expected_type))
             {
-                std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, underlying_provided_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const expected_type_name = h::format_type_reference(parameters.core_module, expected_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, underlying_provided_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, expected_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 return
                 {
@@ -3387,7 +3387,7 @@ namespace h::compiler
             {
                 if (!parameters.function_declaration->type.output_parameter_types.empty())
                 {
-                    std::pmr::string const expected_type_name = h::format_type_reference(parameters.core_module, expected_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                    std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, expected_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                     return {
                         create_error_diagnostic(
@@ -3407,18 +3407,18 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_switch_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_switch_expression(
         Validate_expression_parameters const& parameters,
-        h::Switch_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Switch_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         std::optional<Type_reference> const type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.value);
 
         if (!type_optional.has_value() || (!is_enum_type(parameters.declaration_database, type_optional.value()) && !is_integer(type_optional.value())))
         {
-            h::Expression const& value_expression = parameters.statement.expressions[expression.value.expression_index];
-            std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            iris::Expression const& value_expression = parameters.statement.expressions[expression.value.expression_index];
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -3433,7 +3433,7 @@ namespace h::compiler
             };
         }
 
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics{parameters.temporaries_allocator};
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{parameters.temporaries_allocator};
 
         std::size_t default_case_count = 0;
 
@@ -3461,13 +3461,13 @@ namespace h::compiler
                 continue;
             }
 
-            h::Expression const& case_value_expression = parameters.statement.expressions[pair.case_value->expression_index];
-            std::optional<h::Type_reference> const case_value_type_optional = get_expression_type_from_type_info(parameters.expression_types, pair.case_value.value());
+            iris::Expression const& case_value_expression = parameters.statement.expressions[pair.case_value->expression_index];
+            std::optional<iris::Type_reference> const case_value_type_optional = get_expression_type_from_type_info(parameters.expression_types, pair.case_value.value());
 
             if (!are_compatible_types(parameters.declaration_database, type_optional, case_value_type_optional))
             {
-                std::pmr::string const expected_type_name = h::format_type_reference(parameters.core_module, type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, case_value_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, case_value_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 diagnostics.push_back(
                     create_error_diagnostic_with_code(
@@ -3495,7 +3495,7 @@ namespace h::compiler
             }
 
             {
-                std::pmr::vector<h::compiler::Diagnostic> const statements_diagnostics = validate_statements(
+                std::pmr::vector<iris::compiler::Diagnostic> const statements_diagnostics = validate_statements(
                     parameters.core_module,
                     parameters.function_declaration,
                     new_scope,
@@ -3511,18 +3511,18 @@ namespace h::compiler
         return diagnostics;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_ternary_condition_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_ternary_condition_expression(
         Validate_expression_parameters const& parameters,
-        h::Ternary_condition_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Ternary_condition_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<h::Type_reference> const& condition_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.condition);
+        std::optional<iris::Type_reference> const& condition_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.condition);
 
         if (!condition_type_optional.has_value() || (!is_bool(condition_type_optional.value()) && !is_c_bool(condition_type_optional.value())))
         {
-            h::Expression const& condition_expression = parameters.statement.expressions[expression.condition.expression_index];
-            std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            iris::Expression const& condition_expression = parameters.statement.expressions[expression.condition.expression_index];
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -3538,9 +3538,9 @@ namespace h::compiler
         }
 
         {
-            std::pmr::vector<h::compiler::Diagnostic> diagnostics{parameters.temporaries_allocator};
+            std::pmr::vector<iris::compiler::Diagnostic> diagnostics{parameters.temporaries_allocator};
 
-            std::pmr::vector<h::compiler::Diagnostic> const then_statement_diagnostics = validate_statement(
+            std::pmr::vector<iris::compiler::Diagnostic> const then_statement_diagnostics = validate_statement(
                 parameters.core_module,
                 parameters.function_declaration,
                 parameters.scope,
@@ -3552,7 +3552,7 @@ namespace h::compiler
             if (!then_statement_diagnostics.empty())
                 diagnostics.insert(diagnostics.end(), then_statement_diagnostics.begin(), then_statement_diagnostics.end());
 
-            std::pmr::vector<h::compiler::Diagnostic> const else_statement_diagnostics = validate_statement(
+            std::pmr::vector<iris::compiler::Diagnostic> const else_statement_diagnostics = validate_statement(
                 parameters.core_module,
                 parameters.function_declaration,
                 parameters.scope,
@@ -3568,7 +3568,7 @@ namespace h::compiler
                 return diagnostics;
         }
 
-        std::optional<h::Type_reference> const then_type_optional = get_expression_type(
+        std::optional<iris::Type_reference> const then_type_optional = get_expression_type(
             parameters.core_module,
             parameters.function_declaration,
             parameters.scope,
@@ -3577,7 +3577,7 @@ namespace h::compiler
             parameters.declaration_database
         );
 
-        std::optional<h::Type_reference> const else_type_optional = get_expression_type(
+        std::optional<iris::Type_reference> const else_type_optional = get_expression_type(
             parameters.core_module,
             parameters.function_declaration,
             parameters.scope,
@@ -3588,8 +3588,8 @@ namespace h::compiler
 
         if (!are_compatible_types(parameters.declaration_database, then_type_optional, else_type_optional))
         {
-            std::pmr::string const then_type_name = h::format_type_reference(parameters.core_module, then_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-            std::pmr::string const else_type_name = h::format_type_reference(parameters.core_module, else_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const then_type_name = iris::format_type_reference(parameters.core_module, then_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const else_type_name = iris::format_type_reference(parameters.core_module, else_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -3609,29 +3609,29 @@ namespace h::compiler
     }
 
     static bool can_take_address_of_expression(
-        h::Statement const& statement,
-        h::Expression const& expression
+        iris::Statement const& statement,
+        iris::Expression const& expression
     )
     {
-        if (std::holds_alternative<h::Access_expression>(expression.data))
+        if (std::holds_alternative<iris::Access_expression>(expression.data))
         {
-            h::Access_expression const& access_expression = std::get<h::Access_expression>(expression.data);
-            h::Expression const& left_expression = statement.expressions[access_expression.expression.expression_index];
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
+            iris::Expression const& left_expression = statement.expressions[access_expression.expression.expression_index];
             return can_take_address_of_expression(statement, left_expression);
         }
-        else if (std::holds_alternative<h::Access_array_expression>(expression.data))
+        else if (std::holds_alternative<iris::Access_array_expression>(expression.data))
         {
-            h::Access_array_expression const& access_expression = std::get<h::Access_array_expression>(expression.data);
-            h::Expression const& left_expression = statement.expressions[access_expression.expression.expression_index];
+            iris::Access_array_expression const& access_expression = std::get<iris::Access_array_expression>(expression.data);
+            iris::Expression const& left_expression = statement.expressions[access_expression.expression.expression_index];
             return can_take_address_of_expression(statement, left_expression);
         }
-        else if (std::holds_alternative<h::Dereference_and_access_expression>(expression.data))
+        else if (std::holds_alternative<iris::Dereference_and_access_expression>(expression.data))
         {
-            h::Dereference_and_access_expression const& access_expression = std::get<h::Dereference_and_access_expression>(expression.data);
-            h::Expression const& left_expression = statement.expressions[access_expression.expression.expression_index];
+            iris::Dereference_and_access_expression const& access_expression = std::get<iris::Dereference_and_access_expression>(expression.data);
+            iris::Expression const& left_expression = statement.expressions[access_expression.expression.expression_index];
             return can_take_address_of_expression(statement, left_expression);
         }
-        else if (std::holds_alternative<h::Variable_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
             return true;
         }
@@ -3639,33 +3639,33 @@ namespace h::compiler
         return false;
     }
 
-    static bool is_constant_1(h::Expression const& expression)
+    static bool is_constant_1(iris::Expression const& expression)
     {
-        if (std::holds_alternative<h::Constant_expression>(expression.data))
+        if (std::holds_alternative<iris::Constant_expression>(expression.data))
         {
-            h::Constant_expression const& constant_expression = std::get<h::Constant_expression>(expression.data);
+            iris::Constant_expression const& constant_expression = std::get<iris::Constant_expression>(expression.data);
             return constant_expression.data == "1";
         }
 
         return false;
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_unary_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_unary_expression(
         Validate_expression_parameters const& parameters,
-        h::Unary_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Unary_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<h::Type_reference> const& operand_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.expression);
+        std::optional<iris::Type_reference> const& operand_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.expression);
 
         if (!operand_type_optional.has_value())
             return {}; // TODO error
 
-        std::optional<h::Type_reference> const type_optional = get_underlying_type(parameters.declaration_database, operand_type_optional.value());
+        std::optional<iris::Type_reference> const type_optional = get_underlying_type(parameters.declaration_database, operand_type_optional.value());
         if (!type_optional.has_value())
             return {}; // TODO error
         
-        h::Type_reference const& type = type_optional.value();
+        iris::Type_reference const& type = type_optional.value();
 
         switch (expression.operation)
         {
@@ -3680,7 +3680,7 @@ namespace h::compiler
                             create_sub_source_range(source_range, 0, 1),
                             std::format(
                                 "Cannot apply unary operation '{}' to expression.",
-                                h::unary_operation_symbol_to_string(expression.operation)
+                                iris::unary_operation_symbol_to_string(expression.operation)
                             )
                         )
                     };
@@ -3698,7 +3698,7 @@ namespace h::compiler
                             create_sub_source_range(source_range, 0, 1),
                             std::format(
                                 "Cannot apply unary operation '{}' to expression.",
-                                h::unary_operation_symbol_to_string(expression.operation)
+                                iris::unary_operation_symbol_to_string(expression.operation)
                             )
                         )
                     };
@@ -3716,14 +3716,14 @@ namespace h::compiler
                             create_sub_source_range(source_range, 0, 1),
                             std::format(
                                 "Cannot apply unary operation '{}' to expression.",
-                                h::unary_operation_symbol_to_string(expression.operation)
+                                iris::unary_operation_symbol_to_string(expression.operation)
                             )
                         )
                     };
                 }
                 else if (is_unsigned_integer(type))
                 {
-                    h::Expression const& operand_expression = parameters.statement.expressions[expression.expression.expression_index];
+                    iris::Expression const& operand_expression = parameters.statement.expressions[expression.expression.expression_index];
                     if (!is_constant_1(operand_expression))
                     {
                         return
@@ -3733,7 +3733,7 @@ namespace h::compiler
                                 create_sub_source_range(source_range, 0, 1),
                                 std::format(
                                     "Cannot apply unary operation '-' to unsigned integer.",
-                                    h::unary_operation_symbol_to_string(expression.operation)
+                                    iris::unary_operation_symbol_to_string(expression.operation)
                                 )
                             )
                         };
@@ -3752,7 +3752,7 @@ namespace h::compiler
                             create_sub_source_range(source_range, 0, 1),
                             std::format(
                                 "Cannot apply unary operation '{}' to expression.",
-                                h::unary_operation_symbol_to_string(expression.operation)
+                                iris::unary_operation_symbol_to_string(expression.operation)
                             )
                         )
                     };
@@ -3772,7 +3772,7 @@ namespace h::compiler
                             create_sub_source_range(source_range, 0, 1),
                             std::format(
                                 "Cannot apply unary operation '{}' to expression.",
-                                h::unary_operation_symbol_to_string(expression.operation)
+                                iris::unary_operation_symbol_to_string(expression.operation)
                             )
                         )
                     };
@@ -3797,10 +3797,10 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_variable_declaration_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_variable_declaration_expression(
         Validate_expression_parameters const& parameters,
-        h::Variable_declaration_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Variable_declaration_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         Variable const* const variable = find_variable_from_scope(
@@ -3809,7 +3809,7 @@ namespace h::compiler
         );
         if (variable != nullptr)
         {
-            std::optional<h::Source_range> const& name_source_range = create_sub_source_range(
+            std::optional<iris::Source_range> const& name_source_range = create_sub_source_range(
                 source_range,
                 expression.is_mutable ? 8 : 4,
                 expression.name.size()
@@ -3825,10 +3825,10 @@ namespace h::compiler
             };
         }
 
-        std::optional<h::Type_reference> const& type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.right_hand_side);
+        std::optional<iris::Type_reference> const& type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.right_hand_side);
         if (!type_optional.has_value())
         {
-            h::Expression const& right_hand_side = parameters.statement.expressions[expression.right_hand_side.expression_index];
+            iris::Expression const& right_hand_side = parameters.statement.expressions[expression.right_hand_side.expression_index];
 
             return
             {
@@ -3843,10 +3843,10 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_variable_declaration_with_type_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_variable_declaration_with_type_expression(
         Validate_expression_parameters const& parameters,
-        h::Variable_declaration_with_type_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Variable_declaration_with_type_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         Variable const* const variable = find_variable_from_scope(
@@ -3855,7 +3855,7 @@ namespace h::compiler
         );
         if (variable != nullptr)
         {
-            std::optional<h::Source_range> const& name_source_range = create_sub_source_range(
+            std::optional<iris::Source_range> const& name_source_range = create_sub_source_range(
                 source_range,
                 expression.is_mutable ? 8 : 4,
                 expression.name.size()
@@ -3871,8 +3871,8 @@ namespace h::compiler
             };
         }
         
-        h::Expression const& right_hand_side = parameters.statement.expressions[expression.right_hand_side.expression_index];
-        std::optional<h::Type_reference> const type_optional = h::get_variable_declaration_with_type_expression_type(parameters.statement, expression);
+        iris::Expression const& right_hand_side = parameters.statement.expressions[expression.right_hand_side.expression_index];
+        std::optional<iris::Type_reference> const type_optional = iris::get_variable_declaration_with_type_expression_type(parameters.statement, expression);
         if (!type_optional.has_value())
         {
             return
@@ -3885,17 +3885,17 @@ namespace h::compiler
             };
         }
 
-        h::Type_reference const& type = type_optional.value();
+        iris::Type_reference const& type = type_optional.value();
 
         if (
-            std::holds_alternative<h::Instantiate_expression>(right_hand_side.data) &&
-            !std::holds_alternative<h::Array_slice_type>(type.data) &&
-            !std::holds_alternative<h::Soa_array_type>(type.data) &&
-            !std::holds_alternative<h::Soa_array_view_type>(type.data)
+            std::holds_alternative<iris::Instantiate_expression>(right_hand_side.data) &&
+            !std::holds_alternative<iris::Array_slice_type>(type.data) &&
+            !std::holds_alternative<iris::Soa_array_type>(type.data) &&
+            !std::holds_alternative<iris::Soa_array_view_type>(type.data)
         )
         {
             std::optional<Declaration> const declaration_optional = find_underlying_declaration(parameters.declaration_database, type);
-            if (!declaration_optional.has_value() || (!std::holds_alternative<h::Struct_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Union_declaration const*>(declaration_optional->data) && !std::holds_alternative<h::Type_constructor const*>(declaration_optional->data)))
+            if (!declaration_optional.has_value() || (!std::holds_alternative<iris::Struct_declaration const*>(declaration_optional->data) && !std::holds_alternative<iris::Union_declaration const*>(declaration_optional->data) && !std::holds_alternative<iris::Type_constructor const*>(declaration_optional->data)))
             {
                 return
                 {
@@ -3904,7 +3904,7 @@ namespace h::compiler
                         right_hand_side.source_range,
                         std::format(
                             "Cannot assign expression of type '{}' to variable '{}'. Expected struct or union type.",
-                            h::format_type_reference(parameters.core_module, type, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                            iris::format_type_reference(parameters.core_module, type, parameters.temporaries_allocator, parameters.temporaries_allocator),
                             expression.name
                         )
                     )
@@ -3913,7 +3913,7 @@ namespace h::compiler
         }
         else
         {
-            std::optional<h::Type_reference> const& right_hand_side_type = get_expression_type(
+            std::optional<iris::Type_reference> const& right_hand_side_type = get_expression_type(
                 parameters.core_module,
                 parameters.function_declaration,
                 parameters.scope,
@@ -3925,8 +3925,8 @@ namespace h::compiler
 
             if (!can_assign_type(parameters.declaration_database, type, right_hand_side_type))
             {
-                std::pmr::string const expected_type_name = h::format_type_reference(parameters.core_module, type, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, right_hand_side_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, right_hand_side_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 return
                 {
@@ -3948,10 +3948,10 @@ namespace h::compiler
         return {};
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_variable_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_variable_expression(
         Validate_expression_parameters const& parameters,
-        h::Variable_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::Variable_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         Variable const* const variable = find_variable_from_scope(
@@ -3989,14 +3989,14 @@ namespace h::compiler
         };
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> validate_while_loop_expression(
+    std::pmr::vector<iris::compiler::Diagnostic> validate_while_loop_expression(
         Validate_expression_parameters const& parameters,
-        h::While_loop_expression const& expression,
-        std::optional<h::Source_range> const& source_range
+        iris::While_loop_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
     )
     {
         {
-            std::pmr::vector<h::compiler::Diagnostic> const condition_statement_diagnostics = validate_statement(
+            std::pmr::vector<iris::compiler::Diagnostic> const condition_statement_diagnostics = validate_statement(
                 parameters.core_module,
                 parameters.function_declaration,
                 parameters.scope,
@@ -4009,7 +4009,7 @@ namespace h::compiler
                 return condition_statement_diagnostics;
         }
 
-        std::optional<h::Type_reference> const condition_type_optional = get_expression_type(
+        std::optional<iris::Type_reference> const condition_type_optional = get_expression_type(
             parameters.core_module,
             parameters.function_declaration,
             parameters.scope,
@@ -4020,7 +4020,7 @@ namespace h::compiler
 
         if (!condition_type_optional.has_value() || (!is_bool(condition_type_optional.value()) && !is_c_bool(condition_type_optional.value())))
         {
-            std::pmr::string const provided_type_name = h::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return 
             {
@@ -4039,7 +4039,7 @@ namespace h::compiler
             Scope new_scope = parameters.scope;
             new_scope.blocks.push_back(&expression);
 
-            std::pmr::vector<h::compiler::Diagnostic> const statements_diagnostics = validate_statements(
+            std::pmr::vector<iris::compiler::Diagnostic> const statements_diagnostics = validate_statements(
                 parameters.core_module,
                 parameters.function_declaration,
                 new_scope,
@@ -4054,9 +4054,9 @@ namespace h::compiler
         return {};
     }
 
-    static std::optional<h::Type_reference> get_expected_expression_type(
-        h::Statement const& statement,
-        std::optional<h::Type_reference> const expected_statement_type,
+    static std::optional<iris::Type_reference> get_expected_expression_type(
+        iris::Statement const& statement,
+        std::optional<iris::Type_reference> const expected_statement_type,
         std::size_t const expression_index
     )
     {
@@ -4068,11 +4068,11 @@ namespace h::compiler
 
         if (expression_index == 1)
         {
-            h::Expression const& expression = statement.expressions[0];
-            if (std::holds_alternative<h::Variable_declaration_with_type_expression>(expression.data))
+            iris::Expression const& expression = statement.expressions[0];
+            if (std::holds_alternative<iris::Variable_declaration_with_type_expression>(expression.data))
             {
-                h::Variable_declaration_with_type_expression const& data = std::get<h::Variable_declaration_with_type_expression>(expression.data);
-                return h::get_variable_declaration_with_type_expression_type(statement, data);
+                iris::Variable_declaration_with_type_expression const& data = std::get<iris::Variable_declaration_with_type_expression>(expression.data);
+                return iris::get_variable_declaration_with_type_expression_type(statement, data);
             }
         }
 
@@ -4080,11 +4080,11 @@ namespace h::compiler
     }
 
     std::pmr::vector<std::optional<Type_info>> calculate_expression_type_infos_of_statement(
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const* const function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        std::optional<h::Type_reference> const expected_statement_type,
+        iris::Statement const& statement,
+        std::optional<iris::Type_reference> const expected_statement_type,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -4094,8 +4094,8 @@ namespace h::compiler
 
         for (std::size_t expression_index = 0; expression_index < statement.expressions.size(); ++expression_index)
         {
-            h::Expression const& expression = statement.expressions[expression_index];
-            std::optional<h::Type_reference> const expected_expression_type = get_expected_expression_type(statement, expected_statement_type, expression_index);
+            iris::Expression const& expression = statement.expressions[expression_index];
+            std::optional<iris::Type_reference> const expected_expression_type = get_expected_expression_type(statement, expected_statement_type, expression_index);
             
             expression_types[expression_index] = get_expression_type_info(
                 core_module,
@@ -4111,22 +4111,22 @@ namespace h::compiler
         return expression_types;
     }
 
-    std::pmr::vector<std::optional<h::Type_reference>> calculate_expression_types_of_statement(
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
+    std::pmr::vector<std::optional<iris::Type_reference>> calculate_expression_types_of_statement(
+        iris::Module const& core_module,
+        iris::Function_declaration const* const function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        std::optional<h::Type_reference> const expected_statement_type,
+        iris::Statement const& statement,
+        std::optional<iris::Type_reference> const expected_statement_type,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<std::optional<h::Type_reference>> expression_types{temporaries_allocator};
+        std::pmr::vector<std::optional<iris::Type_reference>> expression_types{temporaries_allocator};
         expression_types.resize(statement.expressions.size(), std::nullopt);
 
         for (std::size_t expression_index = 0; expression_index < statement.expressions.size(); ++expression_index)
         {
-            h::Expression const& expression = statement.expressions[expression_index];
+            iris::Expression const& expression = statement.expressions[expression_index];
             
             expression_types[expression_index] = get_expression_type(
                 core_module,
@@ -4142,7 +4142,7 @@ namespace h::compiler
         return expression_types;
     }
 
-    std::optional<h::Type_reference> get_expression_type_from_type_info(
+    std::optional<iris::Type_reference> get_expression_type_from_type_info(
         std::span<std::optional<Type_info> const> const type_infos,
         std::uint64_t const expression_index
     )
@@ -4157,15 +4157,15 @@ namespace h::compiler
         return type_info->type;
     }
 
-    std::optional<h::Type_reference> get_expression_type_from_type_info(
+    std::optional<iris::Type_reference> get_expression_type_from_type_info(
         std::span<std::optional<Type_info> const> const type_infos,
-        h::Expression_index const expression_index
+        iris::Expression_index const expression_index
     )
     {
         return get_expression_type_from_type_info(type_infos, expression_index.expression_index);
     }
 
-    std::optional<h::Type_reference> get_expression_type_from_type_info_from_call_arguments(
+    std::optional<iris::Type_reference> get_expression_type_from_type_info_from_call_arguments(
         std::span<std::optional<Type_info> const> const type_infos,
         std::uint64_t const expression_index,
         bool const take_address_of
@@ -4186,8 +4186,8 @@ namespace h::compiler
 
 
     bool is_computable_at_compile_time(
-        h::Expression const& expression,
-        std::optional<h::Type_reference> const& expression_type,
+        iris::Expression const& expression,
+        std::optional<iris::Type_reference> const& expression_type,
         Validate_expression_parameters const& parameters
     )
     {
@@ -4203,9 +4203,9 @@ namespace h::compiler
     }
 
     bool is_computable_at_compile_time(
-        h::Module const& core_module,
-        h::compiler::Scope const& scope,
-        h::Statement const& statement,
+        iris::Module const& core_module,
+        iris::compiler::Scope const& scope,
+        iris::Statement const& statement,
         std::span<std::optional<Type_info> const> const expression_types,
         Declaration_database const& declaration_database
     )
@@ -4213,7 +4213,7 @@ namespace h::compiler
         if (statement.expressions.empty())
             return true;
 
-        h::Expression const& expression = statement.expressions[0];
+        iris::Expression const& expression = statement.expressions[0];
         std::optional<Type_info> const& expression_type = expression_types[0];
 
         return is_computable_at_compile_time(
@@ -4221,22 +4221,22 @@ namespace h::compiler
             scope,
             statement,
             expression,
-            expression_type.has_value() ? std::optional<h::Type_reference>{expression_type->type} : std::optional<h::Type_reference>{std::nullopt},
+            expression_type.has_value() ? std::optional<iris::Type_reference>{expression_type->type} : std::optional<iris::Type_reference>{std::nullopt},
             expression_types,
             declaration_database
         );
     }
 
     bool is_computable_at_compile_time(
-        h::Module const& core_module,
-        h::compiler::Scope const& scope,
-        h::Statement const& statement,
-        h::Expression_index const& expression_index,
+        iris::Module const& core_module,
+        iris::compiler::Scope const& scope,
+        iris::Statement const& statement,
+        iris::Expression_index const& expression_index,
         std::span<std::optional<Type_info> const> const expression_types,
         Declaration_database const& declaration_database
     )
     {
-        h::Expression const& expression = statement.expressions[expression_index.expression_index];
+        iris::Expression const& expression = statement.expressions[expression_index.expression_index];
         std::optional<Type_info> const& expression_type = expression_types[expression_index.expression_index];
 
         return is_computable_at_compile_time(
@@ -4244,7 +4244,7 @@ namespace h::compiler
             scope,
             statement,
             expression,
-            expression_type.has_value() ? std::optional<h::Type_reference>{expression_type->type} : std::optional<h::Type_reference>{std::nullopt},
+            expression_type.has_value() ? std::optional<iris::Type_reference>{expression_type->type} : std::optional<iris::Type_reference>{std::nullopt},
             expression_types,
             declaration_database
         );
@@ -4252,16 +4252,16 @@ namespace h::compiler
 
     static bool is_declaration_value_computable_at_compile_time(Declaration const& declaration)
     {
-        if (std::holds_alternative<h::Enum_declaration const*>(declaration.data))
+        if (std::holds_alternative<iris::Enum_declaration const*>(declaration.data))
         {
             return true;
         }
-        else if (std::holds_alternative<h::Global_variable_declaration const*>(declaration.data))
+        else if (std::holds_alternative<iris::Global_variable_declaration const*>(declaration.data))
         {
-            h::Global_variable_declaration const& global_variable_declaration = *std::get<h::Global_variable_declaration const*>(declaration.data);
+            iris::Global_variable_declaration const& global_variable_declaration = *std::get<iris::Global_variable_declaration const*>(declaration.data);
             return global_variable_declaration.global_type != Global_variable_type::Mutable;
         }
-        else if (std::holds_alternative<h::Function_declaration const*>(declaration.data))
+        else if (std::holds_alternative<iris::Function_declaration const*>(declaration.data))
         {
             return true;
         }
@@ -4270,29 +4270,29 @@ namespace h::compiler
     }
 
     bool is_computable_at_compile_time(
-        h::Module const& core_module,
-        h::compiler::Scope const& scope,
-        h::Statement const& statement,
-        h::Expression const& expression,
-        std::optional<h::Type_reference> const& expression_type,
+        iris::Module const& core_module,
+        iris::compiler::Scope const& scope,
+        iris::Statement const& statement,
+        iris::Expression const& expression,
+        std::optional<iris::Type_reference> const& expression_type,
         std::span<std::optional<Type_info> const> const expression_types,
         Declaration_database const& declaration_database
     )
     {
-        if (std::holds_alternative<h::Access_expression>(expression.data))
+        if (std::holds_alternative<iris::Access_expression>(expression.data))
         {
-            h::Access_expression const& access_expression = std::get<h::Access_expression>(expression.data);
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
 
             if (expression_type.has_value())
             {
                 if (is_enum_type(declaration_database, expression_type.value()))
                     return true;
 
-                h::Expression const& left_hand_side = statement.expressions[access_expression.expression.expression_index];
+                iris::Expression const& left_hand_side = statement.expressions[access_expression.expression.expression_index];
 
-                if (std::holds_alternative<h::Variable_expression>(left_hand_side.data))
+                if (std::holds_alternative<iris::Variable_expression>(left_hand_side.data))
                 {
-                    h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_hand_side.data);
+                    iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_hand_side.data);
 
                     std::optional<Declaration> const declaration = find_declaration_using_import_alias(
                         declaration_database,
@@ -4305,9 +4305,9 @@ namespace h::compiler
                 }
             }
         }
-        else if (std::holds_alternative<h::Binary_expression>(expression.data))
+        else if (std::holds_alternative<iris::Binary_expression>(expression.data))
         {
-            h::Binary_expression const& binary_expression = std::get<h::Binary_expression>(expression.data);
+            iris::Binary_expression const& binary_expression = std::get<iris::Binary_expression>(expression.data);
 
             bool const is_lhs_compile_time = is_computable_at_compile_time(
                 core_module,
@@ -4333,19 +4333,19 @@ namespace h::compiler
 
             return true;
         }
-        else if (std::holds_alternative<h::Cast_expression>(expression.data))
+        else if (std::holds_alternative<iris::Cast_expression>(expression.data))
         {
             return true;
         }
-        else if (std::holds_alternative<h::Constant_expression>(expression.data))
+        else if (std::holds_alternative<iris::Constant_expression>(expression.data))
         {
             return true;
         }
-        else if (std::holds_alternative<h::Constant_array_expression>(expression.data))
+        else if (std::holds_alternative<iris::Constant_array_expression>(expression.data))
         {
-            h::Constant_array_expression const& constant_array_expression = std::get<h::Constant_array_expression>(expression.data);
+            iris::Constant_array_expression const& constant_array_expression = std::get<iris::Constant_array_expression>(expression.data);
 
-            for (h::Statement const& element : constant_array_expression.array_data)
+            for (iris::Statement const& element : constant_array_expression.array_data)
             {
                 bool const is_compile_time = is_computable_at_compile_time(
                     core_module,
@@ -4360,15 +4360,15 @@ namespace h::compiler
 
             return true;
         }
-        else if (std::holds_alternative<h::Null_pointer_expression>(expression.data))
+        else if (std::holds_alternative<iris::Null_pointer_expression>(expression.data))
         {
             return true;
         }
-        else if (std::holds_alternative<h::Instantiate_expression>(expression.data))
+        else if (std::holds_alternative<iris::Instantiate_expression>(expression.data))
         {
-            h::Instantiate_expression const& instantiate_expression = std::get<h::Instantiate_expression>(expression.data);
+            iris::Instantiate_expression const& instantiate_expression = std::get<iris::Instantiate_expression>(expression.data);
 
-            for (h::Instantiate_member_value_pair const& pair : instantiate_expression.members)
+            for (iris::Instantiate_member_value_pair const& pair : instantiate_expression.members)
             {
                 bool const is_compile_time = is_computable_at_compile_time(
                     core_module,
@@ -4385,18 +4385,18 @@ namespace h::compiler
 
             return true;
         }
-        else if (std::holds_alternative<h::Unary_expression>(expression.data))
+        else if (std::holds_alternative<iris::Unary_expression>(expression.data))
         {
-            h::Unary_expression const& unary_expression = std::get<h::Unary_expression>(expression.data);
+            iris::Unary_expression const& unary_expression = std::get<iris::Unary_expression>(expression.data);
 
             switch (unary_expression.operation)
             {
-                case h::Unary_operation::Pre_increment:
-                case h::Unary_operation::Post_increment:
-                case h::Unary_operation::Pre_decrement:
-                case h::Unary_operation::Post_decrement:
-                case h::Unary_operation::Indirection:
-                case h::Unary_operation::Address_of:
+                case iris::Unary_operation::Pre_increment:
+                case iris::Unary_operation::Post_increment:
+                case iris::Unary_operation::Pre_decrement:
+                case iris::Unary_operation::Post_decrement:
+                case iris::Unary_operation::Indirection:
+                case iris::Unary_operation::Address_of:
                     return false;
                 default:
                     break;
@@ -4412,9 +4412,9 @@ namespace h::compiler
                 declaration_database
             );
         }
-        else if (std::holds_alternative<h::Variable_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
             Variable const* const variable = find_variable_from_scope(scope, variable_expression.name);
             if (variable != nullptr)
                 return variable->is_compile_time;
@@ -4436,15 +4436,15 @@ namespace h::compiler
 
     Global_variable_declaration const* get_global_variable(
         std::string_view const current_module_name,
-        h::Expression const& expression,
+        iris::Expression const& expression,
         Declaration_database const& declaration_database
     )
     {
         // TODO can also be access expression
 
-        if (std::holds_alternative<h::Variable_expression>(expression.data))
+        if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
 
             std::optional<Declaration> const declaration = find_underlying_declaration(
                 declaration_database,
@@ -4465,7 +4465,7 @@ namespace h::compiler
 
     bool is_constant_global_variable(
         std::string_view const current_module_name,
-        h::Expression const& expression,
+        iris::Expression const& expression,
         Declaration_database const& declaration_database
     )
     {
@@ -4477,12 +4477,12 @@ namespace h::compiler
         if (global_variable == nullptr)
             return false;
 
-        return global_variable->global_type == h::Global_variable_type::Constant;
+        return global_variable->global_type == iris::Global_variable_type::Constant;
     }
 
     bool is_mutable_global_variable(
         std::string_view const current_module_name,
-        h::Expression const& expression,
+        iris::Expression const& expression,
         Declaration_database const& declaration_database
     )
     {
@@ -4494,12 +4494,12 @@ namespace h::compiler
         if (global_variable == nullptr)
             return false;
 
-        return global_variable->global_type == h::Global_variable_type::Mutable;
+        return global_variable->global_type == iris::Global_variable_type::Mutable;
     }
 
     bool is_macro_global_variable(
         std::string_view const current_module_name,
-        h::Expression const& expression,
+        iris::Expression const& expression,
         Declaration_database const& declaration_database
     )
     {
@@ -4511,29 +4511,29 @@ namespace h::compiler
         if (global_variable == nullptr)
             return false;
 
-        return global_variable->global_type == h::Global_variable_type::Macro;
+        return global_variable->global_type == iris::Global_variable_type::Macro;
     }
 
-    std::optional<h::Source_range> get_statement_source_range(
-        h::Statement const& statement
+    std::optional<iris::Source_range> get_statement_source_range(
+        iris::Statement const& statement
     )
     {
         if (statement.expressions.empty())
             return std::nullopt;
 
-        h::Expression const& first_expression = statement.expressions.front();
+        iris::Expression const& first_expression = statement.expressions.front();
         return first_expression.source_range;
     }
 
-    std::optional<h::Source_range> create_source_range_from_source_location(
-        std::optional<h::Source_location> const& source_location,
+    std::optional<iris::Source_range> create_source_range_from_source_location(
+        std::optional<iris::Source_location> const& source_location,
         std::uint32_t const count
     )
     {
         if (!source_location.has_value())
             return std::nullopt;
 
-        return h::Source_range
+        return iris::Source_range
         {
             .start =
             {
@@ -4548,15 +4548,15 @@ namespace h::compiler
         };
     }
 
-    std::optional<h::Source_range> create_source_range_from_source_location(
-        std::optional<h::Source_range_location> const& source_location,
+    std::optional<iris::Source_range> create_source_range_from_source_location(
+        std::optional<iris::Source_range_location> const& source_location,
         std::uint32_t const count
     )
     {
         if (!source_location.has_value())
             return std::nullopt;
 
-        return h::Source_range
+        return iris::Source_range
         {
             .start =
             {
@@ -4571,15 +4571,15 @@ namespace h::compiler
         };
     }
 
-    std::optional<h::Source_range> create_source_range_from_source_position(
-        std::optional<h::Source_position> const& source_position,
+    std::optional<iris::Source_range> create_source_range_from_source_position(
+        std::optional<iris::Source_position> const& source_position,
         std::uint32_t const count
     )
     {
         if (!source_position.has_value())
             return std::nullopt;
 
-        return h::Source_range
+        return iris::Source_range
         {
             .start =
             {
@@ -4595,17 +4595,17 @@ namespace h::compiler
     }
 
     std::optional<Expression_index> get_implicit_first_call_argument_auxiliary(
-        h::Expression_index const& left_side_access_expression_index,
-        h::Expression const& left_side_access_expression,
+        iris::Expression_index const& left_side_access_expression_index,
+        iris::Expression const& left_side_access_expression,
         std::string_view const access_expression_member_name,
         bool const dereference,
         Scope const& scope,
         Declaration_database const& declaration_database
     )
     {
-        if (std::holds_alternative<h::Variable_expression>(left_side_access_expression.data))
+        if (std::holds_alternative<iris::Variable_expression>(left_side_access_expression.data))
         {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_side_access_expression.data);
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_side_access_expression.data);
 
             Variable const* const variable = find_variable_from_scope(
                 scope,
@@ -4650,18 +4650,18 @@ namespace h::compiler
     }
 
     std::optional<Implicit_argument> get_implicit_first_call_argument(
-        h::Statement const& statement,
-        h::Call_expression const& expression,
+        iris::Statement const& statement,
+        iris::Call_expression const& expression,
         Scope const& scope,
         Declaration_database const& declaration_database
     )
     {
-        h::Expression const& left_side_expression = statement.expressions[expression.expression.expression_index];
+        iris::Expression const& left_side_expression = statement.expressions[expression.expression.expression_index];
 
-        if (std::holds_alternative<h::Access_expression>(left_side_expression.data))
+        if (std::holds_alternative<iris::Access_expression>(left_side_expression.data))
         {
-            h::Access_expression const& access_expression = std::get<h::Access_expression>(left_side_expression.data);
-            h::Expression const& left_side_access_expression = statement.expressions[access_expression.expression.expression_index];
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(left_side_expression.data);
+            iris::Expression const& left_side_access_expression = statement.expressions[access_expression.expression.expression_index];
 
             std::optional<Expression_index> expression_index = get_implicit_first_call_argument_auxiliary(
                 access_expression.expression,
@@ -4680,10 +4680,10 @@ namespace h::compiler
                 };
             }
         }
-        else if (std::holds_alternative<h::Dereference_and_access_expression>(left_side_expression.data))
+        else if (std::holds_alternative<iris::Dereference_and_access_expression>(left_side_expression.data))
         {
-            h::Dereference_and_access_expression const& access_expression = std::get<h::Dereference_and_access_expression>(left_side_expression.data);
-            h::Expression const& left_side_access_expression = statement.expressions[access_expression.expression.expression_index];
+            iris::Dereference_and_access_expression const& access_expression = std::get<iris::Dereference_and_access_expression>(left_side_expression.data);
+            iris::Expression const& left_side_access_expression = statement.expressions[access_expression.expression.expression_index];
 
             std::optional<Expression_index> expression_index = get_implicit_first_call_argument_auxiliary(
                 access_expression.expression,
@@ -4707,7 +4707,7 @@ namespace h::compiler
     }
 
     std::pmr::vector<Expression_index> get_call_aguments(
-        h::Call_expression const& expression,
+        iris::Call_expression const& expression,
         std::optional<Implicit_argument> const& implicit_first_argument,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )

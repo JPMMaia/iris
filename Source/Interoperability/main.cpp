@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-import h.c_header_converter;
-import h.core;
+import iris.c_header_converter;
+import iris.core;
 
 std::pmr::vector<std::filesystem::path> convert_to_path(std::span<std::string const> const values)
 {
@@ -25,10 +25,10 @@ std::pmr::vector<std::filesystem::path> convert_to_path(std::span<std::string co
 
 int main(int const argc, char const* const argv[])
 {
-    argparse::ArgumentParser program("hlang_c_header_importer");
+    argparse::ArgumentParser program("iris_c_header_importer");
 
     program.add_argument("header_name")
-        .help("Header name of the converted output hlang module")
+        .help("Header name of the converted output iris module")
         .required();
     program.add_argument("header_path")
         .help("Source file path.")
@@ -57,12 +57,12 @@ int main(int const argc, char const* const argv[])
     std::filesystem::path const output_path = program.get<std::string>("output_path");
     std::pmr::vector<std::filesystem::path> const include_directories = convert_to_path(program.get<std::vector<std::string>>("--include-directory"));
     
-    h::c::Options const options =
+    iris::c::Options const options =
     {
         .include_directories = include_directories
     };
 
-    std::optional<h::Module> const header_module = h::c::import_header_and_write_to_file(header_name, header_path, output_path, options);
+    std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(header_name, header_path, output_path, options);
     if (!header_module.has_value())
         return -1;
 

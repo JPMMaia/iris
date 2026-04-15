@@ -8,11 +8,11 @@ module;
 #include <lsp/messagehandler.h>
 #include <lsp/types.h>
 
-export module h.language_server.message_handler;
+export module iris.language_server.message_handler;
 
-import h.language_server.server;
+import iris.language_server.server;
 
-namespace h::language_server
+namespace iris::language_server
 {
     export struct Message_handler
     {
@@ -39,7 +39,7 @@ namespace h::language_server
 
     struct Workspace_initialized
     {
-        static constexpr auto Method = std::string_view("hlang/workspaceInitialized");
+        static constexpr auto Method = std::string_view("iris/workspaceInitialized");
         static constexpr auto Direction = lsp::MessageDirection::ServerToClient;
         static constexpr auto Type = lsp::Message::Notification;
     };

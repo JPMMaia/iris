@@ -2,24 +2,24 @@ module;
 
 #include <stdio.h>
 
-module h.compiler.clang_compiler;
+module iris.compiler.clang_compiler;
 
 import std;
 import llvm;
 import clang;
 
-import h.common;
-import h.common.filesystem;
-import h.compiler.clang_data;
+import iris.common;
+import iris.common.filesystem;
+import iris.compiler.clang_data;
 
-namespace h::compiler
+namespace iris::compiler
 {
     std::filesystem::path find_clang(bool const use_clang_cl)
     {
         std::filesystem::path const local_path{use_clang_cl ? "clang-cl.exe" : "clang++"};
-        std::filesystem::path const absolute_path = h::common::get_executable_directory() / local_path;
+        std::filesystem::path const absolute_path = iris::common::get_executable_directory() / local_path;
         if (!std::filesystem::exists(absolute_path))
-            h::common::print_message_and_exit(std::format("Could not find clang in '{}'", absolute_path.generic_string()));
+            iris::common::print_message_and_exit(std::format("Could not find clang in '{}'", absolute_path.generic_string()));
 
         return absolute_path;
     }
@@ -97,7 +97,7 @@ namespace h::compiler
 
         arguments.push_back(std::pmr::string{clang_path.generic_string()});
 
-        std::filesystem::path const builtin_include_directory = h::common::get_builtin_include_directory();
+        std::filesystem::path const builtin_include_directory = iris::common::get_builtin_include_directory();
         add_include_directory_argument(arguments, builtin_include_directory.generic_string(), use_clang_cl);
 
         std::filesystem::path const build_directory = build_artifacts_directory.parent_path();

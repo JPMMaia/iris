@@ -9,29 +9,29 @@ module;
 
 #include <lsp/types.h>
 
-module h.language_server.server;
+module iris.language_server.server;
 
-import h.common;
-import h.common.filesystem;
-import h.common.filesystem_common;
-import h.compiler;
-import h.compiler.artifact;
-import h.compiler.builder;
-import h.compiler.diagnostic;
-import h.compiler.target;
-import h.core;
-import h.core.declarations;
-import h.language_server.code_action;
-import h.language_server.completion;
-import h.language_server.core;
-import h.language_server.diagnostics;
-import h.language_server.go_to_location;
-import h.language_server.inlay_hints;
-import h.parser.convertor;
-import h.parser.parse_tree;
-import h.parser.parser;
+import iris.common;
+import iris.common.filesystem;
+import iris.common.filesystem_common;
+import iris.compiler;
+import iris.compiler.artifact;
+import iris.compiler.builder;
+import iris.compiler.diagnostic;
+import iris.compiler.target;
+import iris.core;
+import iris.core.declarations;
+import iris.language_server.code_action;
+import iris.language_server.completion;
+import iris.language_server.core;
+import iris.language_server.diagnostics;
+import iris.language_server.go_to_location;
+import iris.language_server.inlay_hints;
+import iris.parser.convertor;
+import iris.parser.parse_tree;
+import iris.parser.parser;
 
-namespace h::language_server
+namespace iris::language_server
 {
     static constexpr bool g_debug = true;
 
@@ -39,7 +39,7 @@ namespace h::language_server
         Server_logger logger
     )
     {
-        h::parser::Parser parser = h::parser::create_parser();
+        iris::parser::Parser parser = iris::parser::create_parser();
 
         return
         {
@@ -55,7 +55,7 @@ namespace h::language_server
     )
     {
         destroy_workspaces_data(server);
-        h::parser::destroy_parser(std::move(server.parser));
+        iris::parser::destroy_parser(std::move(server.parser));
     }
 
     lsp::InitializeResult initialize(
@@ -147,7 +147,7 @@ namespace h::language_server
             },
             .serverInfo = lsp::InitializeResultServerInfo
             {
-                .name = "Hlang Language Server",
+                .name = "Iris Language Server",
                 .version = "0.1.0"
             }
         };
@@ -197,7 +197,7 @@ namespace h::language_server
         {
             for (std::size_t index = 0; index < workspace_data.core_module_parse_trees.size(); ++index)
             {
-                h::parser::destroy_tree(std::move(workspace_data.core_module_parse_trees[index]));
+                iris::parser::destroy_tree(std::move(workspace_data.core_module_parse_trees[index]));
             }
         }
 
@@ -274,7 +274,7 @@ namespace h::language_server
         lsp::json::Any const& configuration
     )
     {
-        std::pmr::vector<std::filesystem::path> header_search_paths = h::common::get_default_header_search_directories();
+        std::pmr::vector<std::filesystem::path> header_search_paths = iris::common::get_default_header_search_directories();
 
         return header_search_paths;
     }
@@ -287,7 +287,7 @@ namespace h::language_server
         if (!configuration.isObject())
             return {};
 
-        lsp::json::Any const& extension_settings = configuration.object().get("hlang");
+        lsp::json::Any const& extension_settings = configuration.object().get("iris");
         if (!extension_settings.isObject())
             return {};
 
@@ -349,26 +349,26 @@ namespace h::language_server
         return true;
     }
 
-    static std::pmr::vector<h::parser::Parse_tree> parse_source_files(
-        h::parser::Parser const& parser,
+    static std::pmr::vector<iris::parser::Parse_tree> parse_source_files(
+        iris::parser::Parser const& parser,
         std::span<std::filesystem::path const> const source_files_paths,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::parser::Parse_tree> trees{output_allocator};
+        std::pmr::vector<iris::parser::Parse_tree> trees{output_allocator};
         trees.resize(source_files_paths.size());
 
         for (std::size_t index = 0; index < source_files_paths.size(); ++index)
         {
             std::filesystem::path const& source_file_path = source_files_paths[index];
 
-            std::optional<std::pmr::string> const source_content = h::common::get_file_contents(source_file_path);
+            std::optional<std::pmr::string> const source_content = iris::common::get_file_contents(source_file_path);
             if (!source_content.has_value())
                 continue;
 
             std::pmr::u8string const utf_8_source_content{reinterpret_cast<char8_t const*>(source_content->data()), source_content->size(), output_allocator};
-            h::parser::Parse_tree parse_tree = h::parser::parse(parser, std::move(utf_8_source_content));
+            iris::parser::Parse_tree parse_tree = iris::parser::parse(parser, std::move(utf_8_source_content));
 
             trees[index] = std::move(parse_tree);
         }
@@ -376,16 +376,16 @@ namespace h::language_server
         return trees;
     }
 
-    static std::optional<h::Module> convert_to_core_module(
+    static std::optional<iris::Module> convert_to_core_module(
         std::filesystem::path const& source_file_path,
-        h::parser::Parse_tree const& parse_tree,
+        iris::parser::Parse_tree const& parse_tree,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::parser::Parse_node const& root_node = h::parser::get_root_node(parse_tree);
+        iris::parser::Parse_node const& root_node = iris::parser::get_root_node(parse_tree);
 
-        std::optional<h::Module> core_module = h::parser::parse_node_to_module(
+        std::optional<iris::Module> core_module = iris::parser::parse_node_to_module(
             parse_tree,
             root_node,
             source_file_path,
@@ -396,22 +396,22 @@ namespace h::language_server
         return core_module;
     }
 
-    static std::pmr::vector<h::Module> convert_to_core_modules(
+    static std::pmr::vector<iris::Module> convert_to_core_modules(
         std::span<std::filesystem::path const> const source_file_paths,
-        std::span<h::parser::Parse_tree const> const parse_trees,
+        std::span<iris::parser::Parse_tree const> const parse_trees,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::Module> core_modules{output_allocator};
-        core_modules.resize(parse_trees.size(), h::Module{});
+        std::pmr::vector<iris::Module> core_modules{output_allocator};
+        core_modules.resize(parse_trees.size(), iris::Module{});
 
         for (std::size_t index = 0; index < parse_trees.size(); ++index)
         {
             std::filesystem::path const& source_file_path = source_file_paths[index];
-            h::parser::Parse_tree const& parse_tree = parse_trees[index];
+            iris::parser::Parse_tree const& parse_tree = parse_trees[index];
 
-            std::optional<h::Module> core_module = convert_to_core_module(
+            std::optional<iris::Module> core_module = convert_to_core_module(
                 source_file_path,
                 parse_tree,
                 output_allocator,
@@ -435,7 +435,7 @@ namespace h::language_server
 
         destroy_workspaces_data(server);
 
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::polymorphic_allocator<> output_allocator;
         std::pmr::polymorphic_allocator<> temporaries_allocator;
@@ -461,19 +461,19 @@ namespace h::language_server
             if (!validate_paths(server, repository_paths))
                 return;
 
-            h::compiler::Compilation_options const compilation_options
+            iris::compiler::Compilation_options const compilation_options
             {
                 .target_triple = std::nullopt,
                 .is_optimized = false,
                 .debug = true,
-                .contract_options = h::compiler::Contract_options::Log_error_and_abort,
+                .contract_options = iris::compiler::Contract_options::Log_error_and_abort,
             };
 
-            h::compiler::Builder_options const builder_options
+            iris::compiler::Builder_options const builder_options
             {
             };
 
-            h::compiler::Builder builder = h::compiler::create_builder(
+            iris::compiler::Builder builder = iris::compiler::create_builder(
                 target,
                 build_directory_path,
                 header_search_paths,
@@ -483,14 +483,14 @@ namespace h::language_server
                 output_allocator
             );
 
-            std::pmr::vector<std::filesystem::path> const artifact_file_paths = h::common::search_files(
+            std::pmr::vector<std::filesystem::path> const artifact_file_paths = iris::common::search_files(
                 workspace_folder_path,
                 "iris_artifact.json",
                 temporaries_allocator,
                 temporaries_allocator
             );
 
-            std::pmr::vector<h::compiler::Artifact> artifacts = h::compiler::get_sorted_artifacts(
+            std::pmr::vector<iris::compiler::Artifact> artifacts = iris::compiler::get_sorted_artifacts(
                 artifact_file_paths,
                 builder.repositories,
                 false,
@@ -507,7 +507,7 @@ namespace h::language_server
             std::pmr::vector<std::optional<int>> core_module_versions{output_allocator};
             core_module_versions.resize(core_module_source_file_paths.size(), std::nullopt);
 
-            std::pmr::vector<std::pmr::vector<h::compiler::Diagnostic>> core_module_diagnostics{output_allocator};
+            std::pmr::vector<std::pmr::vector<iris::compiler::Diagnostic>> core_module_diagnostics{output_allocator};
             core_module_diagnostics.resize(core_module_source_file_paths.size());
 
             std::pmr::vector<std::pmr::string> core_module_diagnostic_result_ids{output_allocator};
@@ -516,21 +516,21 @@ namespace h::language_server
             std::pmr::vector<bool> core_module_diagnostic_dirty_flags{output_allocator};
             core_module_diagnostic_dirty_flags.resize(core_module_source_file_paths.size(), true);
 
-            std::pmr::vector<h::parser::Parse_tree> core_module_parse_trees = parse_source_files(
+            std::pmr::vector<iris::parser::Parse_tree> core_module_parse_trees = parse_source_files(
                 server.parser,
                 core_module_source_file_paths,
                 output_allocator,
                 temporaries_allocator
             );
 
-            std::pmr::vector<h::Module> core_modules = convert_to_core_modules(
+            std::pmr::vector<iris::Module> core_modules = convert_to_core_modules(
                 core_module_source_file_paths,
                 core_module_parse_trees,
                 output_allocator,
                 temporaries_allocator
             );
 
-            h::compiler::Modules_and_declaration_database modules_and_declaration_database = import_and_export_c_headers(
+            iris::compiler::Modules_and_declaration_database modules_and_declaration_database = import_and_export_c_headers(
                 builder,
                 artifacts,
                 core_modules,
@@ -640,19 +640,19 @@ namespace h::language_server
                 lsp::TextDocumentContentChangeEvent_Text const& full_content_event = std::get<lsp::TextDocumentContentChangeEvent_Text>(event);
 
                 std::pmr::u8string text = convert_to_utf_8_string(full_content_event.text, {});
-                h::parser::Parse_tree parse_tree = h::parser::parse(server.parser, std::move(text));
+                iris::parser::Parse_tree parse_tree = iris::parser::parse(server.parser, std::move(text));
 
-                h::parser::destroy_tree(std::move(workspace_data.core_module_parse_trees[core_module_index]));
+                iris::parser::destroy_tree(std::move(workspace_data.core_module_parse_trees[core_module_index]));
                 workspace_data.core_module_parse_trees[core_module_index] = std::move(parse_tree);
             }
             else if (std::holds_alternative<lsp::TextDocumentContentChangeEvent_Range_Text>(event))
             {
                 lsp::TextDocumentContentChangeEvent_Range_Text const& range_content_event = std::get<lsp::TextDocumentContentChangeEvent_Range_Text>(event);
 
-                h::Source_range const range = utf_16_lsp_range_to_utf_8_source_range(range_content_event.range);
+                iris::Source_range const range = utf_16_lsp_range_to_utf_8_source_range(range_content_event.range);
                 std::pmr::u8string const new_text = convert_to_utf_8_string(range_content_event.text, {});
 
-                h::parser::Parse_tree new_parse_tree = h::parser::edit_tree(
+                iris::parser::Parse_tree new_parse_tree = iris::parser::edit_tree(
                     server.parser,
                     std::move(workspace_data.core_module_parse_trees[core_module_index]),
                     range,
@@ -662,7 +662,7 @@ namespace h::language_server
                 workspace_data.core_module_parse_trees[core_module_index] = std::move(new_parse_tree);
             }
 
-            std::optional<h::Module> core_module = convert_to_core_module(
+            std::optional<iris::Module> core_module = convert_to_core_module(
                 workspace_data.core_module_source_file_paths[core_module_index],
                 workspace_data.core_module_parse_trees[core_module_index],
                 output_allocator,
@@ -672,13 +672,13 @@ namespace h::language_server
             {
                 workspace_data.core_modules[core_module_index] = core_module.value();
 
-                std::pmr::vector<h::Module const*> const sorted_core_modules = h::compiler::sort_core_modules(
+                std::pmr::vector<iris::Module const*> const sorted_core_modules = iris::compiler::sort_core_modules(
                     workspace_data.core_modules,
                     temporaries_allocator,
                     temporaries_allocator
                 );
 
-                workspace_data.declaration_database = h::compiler::create_declaration_database_and_add_modules(
+                workspace_data.declaration_database = iris::compiler::create_declaration_database_and_add_modules(
                     workspace_data.header_modules,
                     sorted_core_modules
                 );
@@ -848,13 +848,13 @@ namespace h::language_server
         std::size_t const core_module_index = workspace_core_module_pair->second;
 
         Declaration_database const& declaration_database = workspace_data.declaration_database;
-        h::Module const& core_module = workspace_data.core_modules[core_module_index];
+        iris::Module const& core_module = workspace_data.core_modules[core_module_index];
         if (core_module.name.empty())
             return nullptr;
 
         std::vector<lsp::InlayHint> inlay_hints;
 
-        auto const process_function = [&](h::Function_declaration const& function_declaration) -> void {
+        auto const process_function = [&](iris::Function_declaration const& function_declaration) -> void {
             std::optional<Function_definition const*> const function_definition = find_function_definition(core_module, function_declaration.name);
             if (function_definition.has_value())
             {
@@ -872,16 +872,16 @@ namespace h::language_server
             }
         };
 
-        for (h::Function_declaration const& function_declaration : core_module.export_declarations.function_declarations)
+        for (iris::Function_declaration const& function_declaration : core_module.export_declarations.function_declarations)
             process_function(function_declaration);
-        for (h::Function_declaration const& function_declaration : core_module.internal_declarations.function_declarations)
+        for (iris::Function_declaration const& function_declaration : core_module.internal_declarations.function_declarations)
             process_function(function_declaration);
 
         return inlay_hints;
     }
 
     std::filesystem::path to_filesystem_path(
-        h::compiler::Target const& target,
+        iris::compiler::Target const& target,
         lsp::Uri const& uri
     )
     {
@@ -893,7 +893,7 @@ namespace h::language_server
         return file_path;
     }
 
-    h::Source_range utf_16_lsp_range_to_utf_8_source_range(
+    iris::Source_range utf_16_lsp_range_to_utf_8_source_range(
         lsp::Range const& utf_16_range
     )
     {

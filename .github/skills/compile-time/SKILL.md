@@ -24,7 +24,7 @@ else
 }
 ```
 
-- Represented as a `h::If_expression` inside a `h::Compile_time_expression`.
+- Represented as a `iris::If_expression` inside a `iris::Compile_time_expression`.
 - The Compile Time pass must evaluate the conditions and replace this compile time expression by the statements of the taken branch.
 
 ### Compile Time For Loop
@@ -36,8 +36,8 @@ compile_time for index in 0u64 to 4u64
 }
 ```
 
-- Represented as a `h::For_loop_expression` inside a `h::Compile_time_expression`.
-- The Compile Time pass must evaluate the loop range and then unroll the loop. For each iteration, the index `h::Variable_expression` must be replaced by a `h::Constant_expression`.
+- Represented as a `iris::For_loop_expression` inside a `iris::Compile_time_expression`.
+- The Compile Time pass must evaluate the loop range and then unroll the loop. For each iteration, the index `iris::Variable_expression` must be replaced by a `iris::Constant_expression`.
 
 ## Reflection expressions
 :
@@ -47,7 +47,7 @@ compile_time for index in 0u64 to 4u64
 
 - Computes the size of the type T
 - Returns a Uint64 value
-- `@size_of::<Int32>` is represented as `h::Reflection_expression` and must be replaced by a `h::Constant_expression` that contains 4 as Uint64
+- `@size_of::<Int32>` is represented as `iris::Reflection_expression` and must be replaced by a `iris::Constant_expression` that contains 4 as Uint64
 
 ### `alignment_of`
 
@@ -62,27 +62,27 @@ compile_time for index in 0u64 to 4u64
 
 - Returns a C string with the name of the type
 - Uses the formatter
-- The compile time pass should replace this by a `h::Constant_expression` with the value of the formatted type
+- The compile time pass should replace this by a `iris::Constant_expression` with the value of the formatted type
 
 ### `member_count`
 
 `@member_count::<T>()`
 
-- The compile time pass should replace this by a `h::Constant_expression` with the member count value 
+- The compile time pass should replace this by a `iris::Constant_expression` with the member count value 
 - Validation should check that T is a struct/union type
 
 ### `member_type`
 
 `@member_type::<T>(index)`
 
-- The compile time pass should replace this by a `h::Type_expression` that contains the member of T at `index`
+- The compile time pass should replace this by a `iris::Type_expression` that contains the member of T at `index`
 - Validation should check that T is a struct/union type and that index is less than the member count
 
 ### `member_offset`
 
 `@member_offset::<T>(index)`
 
- - The compile time pass should replace this by a `h::Constant_expression` with the value of the member offset.
+ - The compile time pass should replace this by a `iris::Constant_expression` with the value of the member offset.
 - Validation should check that T is a struct/union type and that index is less than the member count
 
 
@@ -90,17 +90,17 @@ compile_time for index in 0u64 to 4u64
 
 `@member_name::<T>(index)`
 
-- The compile time pass should replace this by a `h::Constant_expression` with the C-string value of the member name.
+- The compile time pass should replace this by a `iris::Constant_expression` with the C-string value of the member name.
 - Validation should check that T is a struct/union type and that index is less than the member count
 
 ### `get_type_kind`
 
 `@get_type_kind::<T>()`
 
-- The compile time pass should replace this by a `h::Constant_expression` with the an enum value that represents the type of the type T.
+- The compile time pass should replace this by a `iris::Constant_expression` with the an enum value that represents the type of the type T.
 - This enum is named `Type_kind` and should be part of the Bultin module. Some enum values it should contain are `Int`, `Uint`, `Float`, `Struct`, `Union`, `Enum`, `Pointer`, `Array_slice`, `Constant_array`, etc.
 
 ## Tests
 
-Build the H_compiler_tests CMake target. Then run the tests using the `[Compile_time_pass]` Catch2 tag.
+Build the Iris_compiler_tests CMake target. Then run the tests using the `[Compile_time_pass]` Catch2 tag.
 The tests are located in [Compile_time_pass.tests.cpp](../../../Source/Compiler/passes/Compile_time_pass.tests.cpp).

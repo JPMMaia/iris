@@ -1,8 +1,8 @@
-export module h.compiler.target;
+export module iris.compiler.target;
 
 import std;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Target
     {

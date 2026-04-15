@@ -1,31 +1,31 @@
-export module h.compiler.clang_code_generation;
+export module iris.compiler.clang_code_generation;
 
 import std;
 import llvm;
 import clang;
 
-import h.core;
-import h.core.declarations;
-import h.compiler.clang_data;
-import h.compiler.debug_info;
-import h.compiler.instructions;
-import h.compiler.types;
+import iris.core;
+import iris.core.declarations;
+import iris.compiler.clang_data;
+import iris.compiler.debug_info;
+import iris.compiler.instructions;
+import iris.compiler.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export void add_clang_struct_declaration(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
-        h::Module const& core_module,
-        h::Struct_declaration const& struct_declaration,
+        iris::Module const& core_module,
+        iris::Struct_declaration const& struct_declaration,
         Declaration_database const& declaration_database
     );
 
     export void add_clang_union_declaration(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
-        h::Module const& core_module,
-        h::Union_declaration const& union_declaration,
+        iris::Module const& core_module,
+        iris::Union_declaration const& union_declaration,
         Declaration_database const& declaration_database
     );
 
@@ -33,14 +33,14 @@ namespace h::compiler
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
         std::string_view const module_name,
-        h::Function_declaration const& function_declaration,
+        iris::Function_declaration const& function_declaration,
         Declaration_database const& declaration_database
     );
 
     export void add_clang_function_declarations(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Declaration_database const& declaration_database
     );
 
@@ -53,14 +53,14 @@ namespace h::compiler
     export llvm::FunctionType* convert_to_llvm_function_type(
         Clang_module_data const& clang_module_data,
         Declaration_database const& declaration_database,
-        h::Function_type const& function_type
+        iris::Function_type const& function_type
     );
 
     export void set_llvm_function_argument_names(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         Clang_module_data const& clang_module_data,
-        h::Function_declaration const& function_declaration,
+        iris::Function_declaration const& function_declaration,
         llvm::Function& llvm_function,
         Declaration_database const& declaration_database,
         Type_database const& type_database
@@ -81,8 +81,8 @@ namespace h::compiler
         Clang_module_data const& clang_module_data,
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
-        h::Module const& core_module,
-        h::Function_type const& function_type,
+        iris::Module const& core_module,
+        iris::Function_type const& function_type,
         std::span<llvm::Value* const> const original_arguments,
         Declaration_database const& declaration_database,
         Type_database const& type_database
@@ -93,8 +93,8 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Function& llvm_parent_function,
-        h::Module const& core_module,
-        h::Function_type const& function_type,
+        iris::Module const& core_module,
+        iris::Function_type const& function_type,
         clang::CodeGen::CGFunctionInfo const& function_info,
         Type_database const& type_database,
         llvm::Value* const call_instruction
@@ -108,8 +108,8 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_parent_function,
         Clang_module_data const& clang_module_data,
-        h::Module const& core_module,
-        h::Function_type const& function_type,
+        iris::Module const& core_module,
+        iris::Function_type const& function_type,
         llvm::FunctionType& llvm_function_type,
         llvm::Value& llvm_function_callee,
         std::span<llvm::Value* const> const llvm_arguments,
@@ -122,8 +122,8 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         Clang_module_data const& clang_module_data,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         llvm::Function& llvm_function,
         llvm::BasicBlock& llvm_block,
         Declaration_database const& declaration_database,
@@ -137,8 +137,8 @@ namespace h::compiler
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
         Clang_module_data const& clang_module_data,
-        h::Module const& core_module,
-        h::Function_type const& function_type,
+        iris::Module const& core_module,
+        iris::Function_type const& function_type,
         llvm::Function& llvm_function,
         Declaration_database const& declaration_database,
         Type_database const& type_database,
@@ -221,7 +221,7 @@ namespace h::compiler
 
     std::optional<clang::QualType> create_type(
         clang::ASTContext& clang_ast_context,
-        std::span<h::Type_reference const> const type_reference,
+        std::span<iris::Type_reference const> const type_reference,
         bool const alloca_type,
         Declaration_database const& declaration_database,
         Clang_declaration_database const& clang_declaration_database
@@ -229,7 +229,7 @@ namespace h::compiler
 
     std::optional<clang::QualType> create_type(
         clang::ASTContext& clang_ast_context,
-        h::Type_reference const& type_reference,
+        iris::Type_reference const& type_reference,
         bool const alloca_type,
         Declaration_database const& declaration_database,
         Clang_declaration_database const& clang_declaration_database
@@ -270,13 +270,13 @@ namespace h::compiler
     export Clang_declaration_database create_clang_declaration_database(
         llvm::LLVMContext& llvm_context,
         Clang_data const& clang_data,
-        std::span<h::Module const* const> const core_modules,
+        std::span<iris::Module const* const> const core_modules,
         Declaration_database const& declaration_database
     );
 
     export Clang_module_data create_clang_module_data(
         Clang_context&& clang_context,
-        std::span<h::Module const* const> const sorted_modules,
+        std::span<iris::Module const* const> const sorted_modules,
         Declaration_database const& declaration_database
     );
 
@@ -284,7 +284,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         Clang_data const& clang_data,
         std::string_view const module_name,
-        std::span<h::Module const* const> const sorted_modules,
+        std::span<iris::Module const* const> const sorted_modules,
         Declaration_database const& declaration_database
     );
 }

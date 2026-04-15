@@ -2,16 +2,16 @@ module;
 
 #include <string>
 
-module h.compiler.debug_info;
+module iris.compiler.debug_info;
 
 import std;
 import llvm;
 
-import h.compiler.types;
-import h.core;
-import h.core.types;
+import iris.compiler.types;
+import iris.core;
+import iris.core.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
     llvm::DIScope* get_debug_scope(
         Debug_info& debug_info
@@ -83,12 +83,12 @@ namespace h::compiler
     void set_debug_location_at_statement(
         llvm::IRBuilder<>& llvm_builder,
         Debug_info& debug_info,
-        h::Statement const& statement
+        iris::Statement const& statement
     )
     {
         if (!statement.expressions.empty())
         {
-            std::optional<h::Source_range> const& source_range = statement.expressions[0].source_range;
+            std::optional<iris::Source_range> const& source_range = statement.expressions[0].source_range;
             set_debug_location_at_range(llvm_builder, debug_info, source_range);
         }
     }
@@ -96,7 +96,7 @@ namespace h::compiler
     void set_debug_location_at_range(
         llvm::IRBuilder<>& llvm_builder,
         Debug_info& debug_info,
-        std::optional<h::Source_range> const& source_range
+        std::optional<iris::Source_range> const& source_range
     )
     {
         if (source_range.has_value())

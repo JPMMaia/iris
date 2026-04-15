@@ -69,7 +69,7 @@ suite("Should get hover of structs", () => {
 function create_complex_struct_markdown_string(): vscode.MarkdownString {
     return new vscode.MarkdownString(
         [
-            '```hlang',
+            '```iris',
             'module hover_struct_0',
             'struct Complex',
             '```',
@@ -81,7 +81,7 @@ function create_complex_struct_markdown_string(): vscode.MarkdownString {
 function create_complex_struct_real_markdown_string(): vscode.MarkdownString {
     return new vscode.MarkdownString(
         [
-            '```hlang',
+            '```iris',
             'Complex.real: Float32 = 0.0f32',
             '```',
             'The real part.'
@@ -92,7 +92,7 @@ function create_complex_struct_real_markdown_string(): vscode.MarkdownString {
 function create_complex_struct_imaginary_markdown_string(): vscode.MarkdownString {
     return new vscode.MarkdownString(
         [
-            '```hlang',
+            '```iris',
             'Complex.imaginary: Float32 = 0.0f32',
             '```',
             'The imaginary part.'
@@ -127,7 +127,7 @@ suite("Should get hover of functions", () => {
 function create_add_function_markdown_string(): vscode.MarkdownString {
     return new vscode.MarkdownString(
         [
-            '```hlang',
+            '```iris',
             'module hover_function_0',
             'function add(lhs: Int32, rhs: Int32) -> (result: Int32)',
             '```',
@@ -142,7 +142,7 @@ function create_add_function_markdown_string(): vscode.MarkdownString {
 function create_complex_add_function_markdown_string(): vscode.MarkdownString {
     return new vscode.MarkdownString(
         [
-            '```hlang',
+            '```iris',
             'module c.complex',
             'function add(lhs: Complex, rhs: Complex) -> (result: Complex)',
             '```',
@@ -192,7 +192,7 @@ suite("Should get hover of global variables", () => {
 function create_global_constant_markdown_string(): vscode.MarkdownString {
     return new vscode.MarkdownString(
         [
-            '```hlang',
+            '```iris',
             'module hover_global_variable_0',
             'var my_global_constant = 0',
             '```',
@@ -205,7 +205,7 @@ function create_global_constant_markdown_string(): vscode.MarkdownString {
 function create_global_variable_markdown_string(): vscode.MarkdownString {
     return new vscode.MarkdownString(
         [
-            '```hlang',
+            '```iris',
             'module hover_global_variable_0',
             'mutable my_global_variable',
             '```',

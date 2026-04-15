@@ -1,7 +1,7 @@
 {
-  "name": "hlang",
-  "displayName": "Hlang Extension",
-  "description": "Provides support for the Hlang programming language",
+  "name": "iris",
+  "displayName": "Iris Extension",
+  "description": "Provides support for the Iris programming language",
   "version": "0.0.1",
   "publisher": "JPMMaia",
   "license": "MIT",
@@ -18,32 +18,32 @@
   "contributes": {
     "breakpoints": [
       {
-        "language": "hlang"
+        "language": "iris"
       }
     ],
     "configuration": {
       "type": "object",
       "title": "Configuration",
       "properties": {
-        "hlang.hlang_executable": {
+        "iris.iris_executable": {
           "scope": "resource",
           "type": "string",
-          "default": "hlang",
-          "description": "Specify the file path to the hlang executable."
+          "default": "iris",
+          "description": "Specify the file path to the iris executable."
         },
-        "hlang.hlang_language_server_executable": {
+        "iris.iris_language_server_executable": {
           "scope": "resource",
           "type": "string",
-          "default": "hlang_language_server",
-          "description": "Specify the file path to the hlang language server executable."
+          "default": "iris_language_server",
+          "description": "Specify the file path to the iris language server executable."
         },
-        "hlang.repositories": {
+        "iris.repositories": {
           "scope": "resource",
           "type": "array",
           "default": [],
           "description": "Specify repositories that specify additional projects that can be added as dependencies to your project."
         },
-        "hlang.trace.server": {
+        "iris.trace.server": {
           "scope": "window",
           "type": "string",
           "enum": [
@@ -58,9 +58,9 @@
     },
     "grammars": [
       {
-        "language": "hlang",
-        "scopeName": "source.hlang",
-        "path": "./syntaxes/hlang.tmGrammar.json"
+        "language": "iris",
+        "scopeName": "source.iris",
+        "path": "./syntaxes/iris.tmGrammar.json"
 
 ,
         "extensions": [

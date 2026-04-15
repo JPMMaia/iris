@@ -2,12 +2,12 @@ module;
 
 #include <compare>
 
-export module h.binary_serializer.generated;
+export module iris.binary_serializer.generated;
 
-import h.binary_serializer.generics;
-import h.core;
+import iris.binary_serializer.generics;
+import iris.core;
 
-namespace h::binary_serializer
+namespace iris::binary_serializer
 {
     export template <typename T>
     void serialize(

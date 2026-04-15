@@ -4,13 +4,13 @@ module;
 
 #include <tree_sitter/api.h>
 
-module h.parser.parse_tree;
+module iris.parser.parse_tree;
 
 import std;
 
-import h.core;
+import iris.core;
 
-namespace h::parser
+namespace iris::parser
 {
     std::string_view get_node_value(
         Parse_tree const& tree,
@@ -370,7 +370,7 @@ namespace h::parser
 
     Parse_node get_smallest_node_that_contains_position(
         Parse_node const& node,
-        h::Source_position const& position
+        iris::Source_position const& position
     )
     {
         TSPoint const start_point
@@ -431,7 +431,7 @@ namespace h::parser
     std::uint32_t calculate_byte(
         Parse_tree const& tree,
         Parse_node const& hint_node,
-        h::Source_position const& source_position
+        iris::Source_position const& source_position
     )
     {
         TSPoint const hint_start_point = ts_node_start_point(hint_node.ts_node);
@@ -447,7 +447,7 @@ namespace h::parser
     std::optional<Parse_node> find_node_before_source_position(
         Parse_tree const& tree,
         Parse_node const& hint_node,
-        h::Source_position const& source_position
+        iris::Source_position const& source_position
     )
     {
         Parse_node const root_node = get_root_node(tree);

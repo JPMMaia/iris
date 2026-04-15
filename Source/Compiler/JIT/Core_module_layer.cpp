@@ -2,26 +2,26 @@ module;
 
 #include <stdio.h>
 
-module h.compiler.core_module_layer;
+module iris.compiler.core_module_layer;
 
 import std;
 import llvm;
 
-import h.core;
-import h.common;
-import h.compiler;
-import h.compiler.common;
+import iris.core;
+import iris.common;
+import iris.compiler;
+import iris.compiler.common;
 
-namespace h::compiler
+namespace iris::compiler
 {
     static llvm::orc::MaterializationUnit::Interface get_interface(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         llvm::orc::MangleAndInterner& mangle
     )
     {
         llvm::orc::SymbolFlagsMap symbols;
 
-        for (h::Function_definition const& function_definition : core_module.definitions.function_definitions)
+        for (iris::Function_definition const& function_definition : core_module.definitions.function_definitions)
         {
             if (function_definition.name.ends_with("$body"))
             {
@@ -58,7 +58,7 @@ namespace h::compiler
 
         llvm::orc::SymbolNameSet const requested_symbols = materialization_responsibility->getRequestedSymbols();
 
-        auto const is_requested_symbol = [&](h::Function_definition const& definition) -> bool
+        auto const is_requested_symbol = [&](iris::Function_definition const& definition) -> bool
         {
             std::string const mangled_name = mangle_name(m_core_module_compilation_data.core_module, definition.name, std::nullopt);
             return requested_symbols.contains(mangle(mangled_name.c_str()));
@@ -66,7 +66,7 @@ namespace h::compiler
 
         std::pmr::vector<std::string_view> functions_to_compile;
 
-        for (h::Function_definition const& definition : m_core_module_compilation_data.core_module.definitions.function_definitions)
+        for (iris::Function_definition const& definition : m_core_module_compilation_data.core_module.definitions.function_definitions)
         {
             if (is_requested_symbol(definition))
                 functions_to_compile.push_back(definition.name);
@@ -75,7 +75,7 @@ namespace h::compiler
         // TODO refactor code so that exceptions are not used
         try
         {
-            std::unique_ptr<llvm::Module> llvm_module = h::compiler::create_llvm_module(
+            std::unique_ptr<llvm::Module> llvm_module = iris::compiler::create_llvm_module(
                 m_core_module_compilation_data.llvm_data,
                 m_core_module_compilation_data.core_module,
                 m_core_module_compilation_data.core_module_dependencies,
@@ -84,7 +84,7 @@ namespace h::compiler
             );
 
             {
-                std::pmr::deque<h::Function_definition>& function_definitions = m_core_module_compilation_data.core_module.definitions.function_definitions;
+                std::pmr::deque<iris::Function_definition>& function_definitions = m_core_module_compilation_data.core_module.definitions.function_definitions;
                 function_definitions.erase(
                     std::remove_if(function_definitions.begin(), function_definitions.end(), is_requested_symbol),
                     function_definitions.end()
@@ -100,7 +100,7 @@ namespace h::compiler
 
                     llvm::Error error = materialization_responsibility->replace(std::move(new_materialization_unit));
                     if (error)
-                        h::common::print_message_and_exit(std::format("Error while creating a new materialization unit to replace unrequested symbols to target library: {}", llvm::toString(std::move(error))));
+                        iris::common::print_message_and_exit(std::format("Error while creating a new materialization unit to replace unrequested symbols to target library: {}", llvm::toString(std::move(error))));
                 }
             }
 

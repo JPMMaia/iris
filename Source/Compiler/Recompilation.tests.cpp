@@ -6,23 +6,23 @@
 
 #include <catch2/catch_all.hpp>
 
-import h.binary_serializer;
-import h.common;
-import h.compiler;
-import h.core.hash;
-import h.compiler.recompilation;
-import h.core;
-import h.json_serializer;
-import h.parser.convertor;
-import h.parser.parser;
+import iris.binary_serializer;
+import iris.common;
+import iris.compiler;
+import iris.core.hash;
+import iris.compiler.recompilation;
+import iris.core;
+import iris.json_serializer;
+import iris.parser.convertor;
+import iris.parser.parser;
 
-namespace h
+namespace iris
 {
     std::filesystem::path setup_root_directory(
         std::string_view const directory_name
     )
     {
-        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "hlang_test" / directory_name;
+        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "iris_test" / directory_name;
 
         if (std::filesystem::exists(root_directory))
             std::filesystem::remove_all(root_directory);
@@ -42,30 +42,30 @@ namespace h
     }
 
     std::filesystem::path parse_core_module(
-        h::parser::Parser const& parser,
+        iris::parser::Parser const& parser,
         std::filesystem::path const& build_directory,
         std::filesystem::path const& file_path
     )
     {
         std::filesystem::path const parsed_file_path = build_directory / file_path.filename().replace_extension("hlb");
 
-        std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(
+        std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(
             file_path,
             {},
             {}
         );
         REQUIRE(core_module.has_value());
         
-        h::binary_serializer::write_module_to_file(parsed_file_path, core_module.value(), {});
+        iris::binary_serializer::write_module_to_file(parsed_file_path, core_module.value(), {});
 
         return parsed_file_path;
     }
 
-    h::Module read_core_module(
+    iris::Module read_core_module(
         std::filesystem::path const& file_path
     )
     {
-        std::optional<h::Module> core_module = h::compiler::read_core_module(file_path);
+        std::optional<iris::Module> core_module = iris::compiler::read_core_module(file_path);
         REQUIRE(core_module.has_value());
 
         return *core_module;
@@ -77,7 +77,7 @@ namespace h
 
         std::filesystem::path const root_directory = setup_root_directory("recompilation_0");
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
-        h::parser::Parser const parser = h::parser::create_parser();
+        iris::parser::Parser const parser = iris::parser::create_parser();
 
         std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(    
@@ -91,7 +91,7 @@ namespace h
                 return foo.a;
             }
         )";
-        h::common::write_to_file(module_a_code_file_path, module_a_code);
+        iris::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
         std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
@@ -103,11 +103,11 @@ namespace h
                 a: Int32 = 0;
             }
         )";
-        h::common::write_to_file(module_b_code_file_path, module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        h::Module const previous_module_b = read_core_module(module_b_file_path);
-        h::Symbol_name_to_hash const previous_symbol_name_to_hash = h::hash_module_declarations(previous_module_b, {});
+        iris::Module const previous_module_b = read_core_module(module_b_file_path);
+        iris::Symbol_name_to_hash const previous_symbol_name_to_hash = iris::hash_module_declarations(previous_module_b, {});
 
         std::string_view const new_module_b_code = R"(    
             module B;
@@ -117,11 +117,11 @@ namespace h
                 a: Int32 = 1;
             }
         )";
-        h::common::write_to_file(module_b_code_file_path, new_module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, new_module_b_code);
         parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        h::Module const new_module_b = read_core_module(module_b_file_path);
-        h::Symbol_name_to_hash const new_symbol_name_to_hash = h::hash_module_declarations(new_module_b, {});
+        iris::Module const new_module_b = read_core_module(module_b_file_path);
+        iris::Symbol_name_to_hash const new_symbol_name_to_hash = iris::hash_module_declarations(new_module_b, {});
 
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path
@@ -135,7 +135,7 @@ namespace h
             std::make_pair("B", "A"),
         };
 
-        std::pmr::vector<std::pmr::string> const modules_to_recompile = h::compiler::find_modules_to_recompile(
+        std::pmr::vector<std::pmr::string> const modules_to_recompile = iris::compiler::find_modules_to_recompile(
             new_module_b,
             previous_symbol_name_to_hash,
             new_symbol_name_to_hash,
@@ -159,7 +159,7 @@ namespace h
 
         std::filesystem::path const root_directory = setup_root_directory("recompilation_1");
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
-        h::parser::Parser const parser = h::parser::create_parser();
+        iris::parser::Parser const parser = iris::parser::create_parser();
 
         std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
@@ -173,7 +173,7 @@ namespace h
                 return foo.a;
             }
         )";
-        h::common::write_to_file(module_a_code_file_path, module_a_code);
+        iris::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
         std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
@@ -190,11 +190,11 @@ namespace h
                 a: Int32 = 0;
             }
         )";
-        h::common::write_to_file(module_b_code_file_path, module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        h::Module const previous_module_b = read_core_module(module_b_file_path);
-        h::Symbol_name_to_hash const previous_symbol_name_to_hash = h::hash_module_declarations(previous_module_b, {});
+        iris::Module const previous_module_b = read_core_module(module_b_file_path);
+        iris::Symbol_name_to_hash const previous_symbol_name_to_hash = iris::hash_module_declarations(previous_module_b, {});
 
         std::string_view const new_module_b_code = R"(
             module B;
@@ -209,11 +209,11 @@ namespace h
                 a: Int32 = 1;
             }
         )";
-        h::common::write_to_file(module_b_file_path, new_module_b_code);
+        iris::common::write_to_file(module_b_file_path, new_module_b_code);
         parse_core_module(parser, build_directory_path, module_b_file_path);
 
-        h::Module const new_module_b = read_core_module(module_b_file_path);
-        h::Symbol_name_to_hash const new_symbol_name_to_hash = h::hash_module_declarations(new_module_b, {});
+        iris::Module const new_module_b = read_core_module(module_b_file_path);
+        iris::Symbol_name_to_hash const new_symbol_name_to_hash = iris::hash_module_declarations(new_module_b, {});
 
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path
@@ -227,7 +227,7 @@ namespace h
             std::make_pair("B", "A"),
         };
 
-        std::pmr::vector<std::pmr::string> const modules_to_recompile = h::compiler::find_modules_to_recompile(
+        std::pmr::vector<std::pmr::string> const modules_to_recompile = iris::compiler::find_modules_to_recompile(
             new_module_b,
             previous_symbol_name_to_hash,
             new_symbol_name_to_hash,
@@ -246,7 +246,7 @@ namespace h
 
         std::filesystem::path const root_directory = setup_root_directory("recompilation_2");
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
-        h::parser::Parser const parser = h::parser::create_parser();
+        iris::parser::Parser const parser = iris::parser::create_parser();
 
         std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
@@ -260,7 +260,7 @@ namespace h
                 return foo.bar.a;
             }
         )";
-        h::common::write_to_file(module_a_code_file_path, module_a_code);
+        iris::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
         std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
@@ -277,11 +277,11 @@ namespace h
                 a: Int32 = 0;
             }
         )";
-        h::common::write_to_file(module_b_code_file_path, module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        h::Module const previous_module_b = read_core_module(module_b_file_path);
-        h::Symbol_name_to_hash const previous_symbol_name_to_hash = h::hash_module_declarations(previous_module_b, {});
+        iris::Module const previous_module_b = read_core_module(module_b_file_path);
+        iris::Symbol_name_to_hash const previous_symbol_name_to_hash = iris::hash_module_declarations(previous_module_b, {});
 
         std::string_view const new_module_b_code = R"(
             module B;
@@ -296,11 +296,11 @@ namespace h
                 a: Int32 = 1;
             }
         )";
-        h::common::write_to_file(module_b_code_file_path, new_module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, new_module_b_code);
         parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
-        h::Module const new_module_b = read_core_module(module_b_file_path);
-        h::Symbol_name_to_hash const new_symbol_name_to_hash = h::hash_module_declarations(new_module_b, {});
+        iris::Module const new_module_b = read_core_module(module_b_file_path);
+        iris::Symbol_name_to_hash const new_symbol_name_to_hash = iris::hash_module_declarations(new_module_b, {});
 
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path
@@ -314,7 +314,7 @@ namespace h
             std::make_pair("B", "A"),
         };
 
-        std::pmr::vector<std::pmr::string> const modules_to_recompile = h::compiler::find_modules_to_recompile(
+        std::pmr::vector<std::pmr::string> const modules_to_recompile = iris::compiler::find_modules_to_recompile(
             new_module_b,
             previous_symbol_name_to_hash,
             new_symbol_name_to_hash,
@@ -338,7 +338,7 @@ namespace h
 
         std::filesystem::path const root_directory = setup_root_directory("recompilation_3");
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
-        h::parser::Parser const parser = h::parser::create_parser();
+        iris::parser::Parser const parser = iris::parser::create_parser();
 
         std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
@@ -352,7 +352,7 @@ namespace h
                 return foo.bar.a;
             }
         )";
-        h::common::write_to_file(module_a_code_file_path, module_a_code);
+        iris::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
         std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
@@ -367,7 +367,7 @@ namespace h
                 bar: C.Bar = 0;
             }
         )";
-        h::common::write_to_file(module_b_code_file_path, module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
         std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
@@ -384,11 +384,11 @@ namespace h
                 a: *Other_bar = null;
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, module_c_code);
         std::filesystem::path const module_c_file_path = parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const previous_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const previous_symbol_name_to_hash = h::hash_module_declarations(previous_module_c, {});
+        iris::Module const previous_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const previous_symbol_name_to_hash = iris::hash_module_declarations(previous_module_c, {});
 
         std::string_view const new_module_c_code = R"(
             module C;
@@ -403,11 +403,11 @@ namespace h
                 a: *Other_bar = null;
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, new_module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, new_module_c_code);
         parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const new_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const new_symbol_name_to_hash = h::hash_module_declarations(new_module_c, {});
+        iris::Module const new_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const new_symbol_name_to_hash = iris::hash_module_declarations(new_module_c, {});
 
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path
@@ -423,7 +423,7 @@ namespace h
             std::make_pair("C", "B"),
         };
 
-        std::pmr::vector<std::pmr::string> const modules_to_recompile = h::compiler::find_modules_to_recompile(
+        std::pmr::vector<std::pmr::string> const modules_to_recompile = iris::compiler::find_modules_to_recompile(
             new_module_c,
             previous_symbol_name_to_hash,
             new_symbol_name_to_hash,
@@ -448,7 +448,7 @@ namespace h
 
         std::filesystem::path const root_directory = setup_root_directory("recompilation_4");
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
-        h::parser::Parser const parser = h::parser::create_parser();
+        iris::parser::Parser const parser = iris::parser::create_parser();
 
         std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
@@ -462,7 +462,7 @@ namespace h
                 return other.a;
             }
         )";
-        h::common::write_to_file(module_a_code_file_path, module_a_code);
+        iris::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
         std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
@@ -481,7 +481,7 @@ namespace h
                 bar: C.Bar = 0;
             }
         )";
-        h::common::write_to_file(module_b_code_file_path, module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
         std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
@@ -493,11 +493,11 @@ namespace h
                 a: Int32 = 0;
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, module_c_code);
         std::filesystem::path const module_c_file_path = parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const previous_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const previous_symbol_name_to_hash = h::hash_module_declarations(previous_module_c, {});
+        iris::Module const previous_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const previous_symbol_name_to_hash = iris::hash_module_declarations(previous_module_c, {});
 
         std::string_view const new_module_c_code = R"(
             module C;
@@ -507,11 +507,11 @@ namespace h
                 a: Int32 = 1;
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, new_module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, new_module_c_code);
         parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const new_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const new_symbol_name_to_hash = h::hash_module_declarations(new_module_c, {});
+        iris::Module const new_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const new_symbol_name_to_hash = iris::hash_module_declarations(new_module_c, {});
 
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path
@@ -527,7 +527,7 @@ namespace h
             std::make_pair("C", "B"),
         };
 
-        std::pmr::vector<std::pmr::string> const modules_to_recompile = h::compiler::find_modules_to_recompile(
+        std::pmr::vector<std::pmr::string> const modules_to_recompile = iris::compiler::find_modules_to_recompile(
             new_module_c,
             previous_symbol_name_to_hash,
             new_symbol_name_to_hash,
@@ -551,7 +551,7 @@ namespace h
 
         std::filesystem::path const root_directory = setup_root_directory("recompilation_5");
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
-        h::parser::Parser const parser = h::parser::create_parser();
+        iris::parser::Parser const parser = iris::parser::create_parser();
 
         std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
@@ -567,7 +567,7 @@ namespace h
                 return foo.b;
             }
         )";
-        h::common::write_to_file(module_a_code_file_path, module_a_code);
+        iris::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
         std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
@@ -582,7 +582,7 @@ namespace h
                 b: Int16;
             }
         )";
-        h::common::write_to_file(module_b_code_file_path, module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
         std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
@@ -595,11 +595,11 @@ namespace h
                 b: Float64;
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, module_c_code);
         std::filesystem::path const module_c_file_path = parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const previous_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const previous_symbol_name_to_hash = h::hash_module_declarations(previous_module_c, {});
+        iris::Module const previous_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const previous_symbol_name_to_hash = iris::hash_module_declarations(previous_module_c, {});
 
         std::string_view const new_module_c_code = R"(
             module C;
@@ -610,11 +610,11 @@ namespace h
                 b: Int64;
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, new_module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, new_module_c_code);
         parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const new_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const new_symbol_name_to_hash = h::hash_module_declarations(new_module_c, {});
+        iris::Module const new_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const new_symbol_name_to_hash = iris::hash_module_declarations(new_module_c, {});
 
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path
@@ -630,7 +630,7 @@ namespace h
             std::make_pair("C", "B"),
         };
 
-        std::pmr::vector<std::pmr::string> const modules_to_recompile = h::compiler::find_modules_to_recompile(
+        std::pmr::vector<std::pmr::string> const modules_to_recompile = iris::compiler::find_modules_to_recompile(
             new_module_c,
             previous_symbol_name_to_hash,
             new_symbol_name_to_hash,
@@ -655,7 +655,7 @@ namespace h
 
         std::filesystem::path const root_directory = setup_root_directory("recompilation_6");
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
-        h::parser::Parser const parser = h::parser::create_parser();
+        iris::parser::Parser const parser = iris::parser::create_parser();
 
         std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
@@ -669,7 +669,7 @@ namespace h
                 return value;
             }
         )";
-        h::common::write_to_file(module_a_code_file_path, module_a_code);
+        iris::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
         std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
@@ -680,7 +680,7 @@ namespace h
 
             export using My_int = C.My_int;
         )";
-        h::common::write_to_file(module_b_code_file_path, module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
         std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
@@ -689,22 +689,22 @@ namespace h
 
             export using My_int = Int64;
         )";
-        h::common::write_to_file(module_c_code_file_path, module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, module_c_code);
         std::filesystem::path const module_c_file_path = parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const previous_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const previous_symbol_name_to_hash = h::hash_module_declarations(previous_module_c, {});
+        iris::Module const previous_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const previous_symbol_name_to_hash = iris::hash_module_declarations(previous_module_c, {});
 
         std::string_view const new_module_c_code = R"(
             module C;
 
             export using My_int = Int32;
         )";
-        h::common::write_to_file(module_c_code_file_path, new_module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, new_module_c_code);
         parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const new_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const new_symbol_name_to_hash = h::hash_module_declarations(new_module_c, {});
+        iris::Module const new_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const new_symbol_name_to_hash = iris::hash_module_declarations(new_module_c, {});
 
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path
@@ -720,7 +720,7 @@ namespace h
             std::make_pair("C", "B"),
         };
 
-        std::pmr::vector<std::pmr::string> const modules_to_recompile = h::compiler::find_modules_to_recompile(
+        std::pmr::vector<std::pmr::string> const modules_to_recompile = iris::compiler::find_modules_to_recompile(
             new_module_c,
             previous_symbol_name_to_hash,
             new_symbol_name_to_hash,
@@ -745,7 +745,7 @@ namespace h
 
         std::filesystem::path const root_directory = setup_root_directory("recompilation_7");
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
-        h::parser::Parser const parser = h::parser::create_parser();
+        iris::parser::Parser const parser = iris::parser::create_parser();
 
         std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
@@ -759,7 +759,7 @@ namespace h
                 return 0;
             }
         )";
-        h::common::write_to_file(module_a_code_file_path, module_a_code);
+        iris::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
         std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
@@ -770,7 +770,7 @@ namespace h
 
             export using My_enum = C.My_enum;
         )";
-        h::common::write_to_file(module_b_code_file_path, module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
         std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
@@ -783,11 +783,11 @@ namespace h
                 B = 1,
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, module_c_code);
         std::filesystem::path const module_c_file_path = parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const previous_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const previous_symbol_name_to_hash = h::hash_module_declarations(previous_module_c, {});
+        iris::Module const previous_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const previous_symbol_name_to_hash = iris::hash_module_declarations(previous_module_c, {});
 
         std::string_view const new_module_c_code = R"(
             module C;
@@ -798,11 +798,11 @@ namespace h
                 B = 2,
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, new_module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, new_module_c_code);
         parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const new_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const new_symbol_name_to_hash = h::hash_module_declarations(new_module_c, {});
+        iris::Module const new_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const new_symbol_name_to_hash = iris::hash_module_declarations(new_module_c, {});
 
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path
@@ -818,7 +818,7 @@ namespace h
             std::make_pair("C", "B"),
         };
 
-        std::pmr::vector<std::pmr::string> const modules_to_recompile = h::compiler::find_modules_to_recompile(
+        std::pmr::vector<std::pmr::string> const modules_to_recompile = iris::compiler::find_modules_to_recompile(
             new_module_c,
             previous_symbol_name_to_hash,
             new_symbol_name_to_hash,
@@ -843,7 +843,7 @@ namespace h
 
         std::filesystem::path const root_directory = setup_root_directory("recompilation_8");
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
-        h::parser::Parser const parser = h::parser::create_parser();
+        iris::parser::Parser const parser = iris::parser::create_parser();
 
         std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
@@ -857,7 +857,7 @@ namespace h
                 return 0;
             }
         )";
-        h::common::write_to_file(module_a_code_file_path, module_a_code);
+        iris::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
         std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
@@ -871,7 +871,7 @@ namespace h
                 return C.add(a, b);
             }
         )";
-        h::common::write_to_file(module_b_code_file_path, module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
         std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
@@ -883,11 +883,11 @@ namespace h
                 return a + b;
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, module_c_code);
         std::filesystem::path const module_c_file_path = parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const previous_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const previous_symbol_name_to_hash = h::hash_module_declarations(previous_module_c, {});
+        iris::Module const previous_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const previous_symbol_name_to_hash = iris::hash_module_declarations(previous_module_c, {});
 
         std::string_view const new_module_c_code = R"(
             module C;
@@ -897,11 +897,11 @@ namespace h
                 return a + b;
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, new_module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, new_module_c_code);
         parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const new_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const new_symbol_name_to_hash = h::hash_module_declarations(new_module_c, {});
+        iris::Module const new_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const new_symbol_name_to_hash = iris::hash_module_declarations(new_module_c, {});
 
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path
@@ -917,7 +917,7 @@ namespace h
             std::make_pair("C", "B"),
         };
 
-        std::pmr::vector<std::pmr::string> const modules_to_recompile = h::compiler::find_modules_to_recompile(
+        std::pmr::vector<std::pmr::string> const modules_to_recompile = iris::compiler::find_modules_to_recompile(
             new_module_c,
             previous_symbol_name_to_hash,
             new_symbol_name_to_hash,
@@ -939,7 +939,7 @@ namespace h
     {
         std::filesystem::path const root_directory = setup_root_directory("recompilation_9");
         std::filesystem::path const build_directory_path = setup_build_directory(root_directory);
-        h::parser::Parser const parser = h::parser::create_parser();
+        iris::parser::Parser const parser = iris::parser::create_parser();
 
         std::filesystem::path const module_a_code_file_path = root_directory / "A.iris";
         std::string_view const module_a_code = R"(
@@ -953,7 +953,7 @@ namespace h
                 return 0;
             }
         )";
-        h::common::write_to_file(module_a_code_file_path, module_a_code);
+        iris::common::write_to_file(module_a_code_file_path, module_a_code);
         std::filesystem::path const module_a_file_path = parse_core_module(parser, build_directory_path, module_a_code_file_path);
 
         std::filesystem::path const module_b_code_file_path = root_directory / "B.iris";
@@ -967,7 +967,7 @@ namespace h
                 return C.add(a, b);
             }
         )";
-        h::common::write_to_file(module_b_code_file_path, module_b_code);
+        iris::common::write_to_file(module_b_code_file_path, module_b_code);
         std::filesystem::path const module_b_file_path = parse_core_module(parser, build_directory_path, module_b_code_file_path);
 
         std::filesystem::path const module_c_code_file_path = root_directory / "C.iris";
@@ -979,11 +979,11 @@ namespace h
                 return a + b;
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, module_c_code);
         std::filesystem::path const module_c_file_path = parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const previous_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const previous_symbol_name_to_hash = h::hash_module_declarations(previous_module_c, {});
+        iris::Module const previous_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const previous_symbol_name_to_hash = iris::hash_module_declarations(previous_module_c, {});
 
         std::string_view const new_module_c_code = R"(
             module C;
@@ -993,11 +993,11 @@ namespace h
                 return a - b;
             }
         )";
-        h::common::write_to_file(module_c_code_file_path, new_module_c_code);
+        iris::common::write_to_file(module_c_code_file_path, new_module_c_code);
         parse_core_module(parser, build_directory_path, module_c_code_file_path);
 
-        h::Module const new_module_c = read_core_module(module_c_file_path);
-        h::Symbol_name_to_hash const new_symbol_name_to_hash = h::hash_module_declarations(new_module_c, {});
+        iris::Module const new_module_c = read_core_module(module_c_file_path);
+        iris::Symbol_name_to_hash const new_symbol_name_to_hash = iris::hash_module_declarations(new_module_c, {});
 
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path
@@ -1013,7 +1013,7 @@ namespace h
             std::make_pair("C", "B"),
         };
 
-        std::pmr::vector<std::pmr::string> const modules_to_recompile = h::compiler::find_modules_to_recompile(
+        std::pmr::vector<std::pmr::string> const modules_to_recompile = iris::compiler::find_modules_to_recompile(
             new_module_c,
             previous_symbol_name_to_hash,
             new_symbol_name_to_hash,

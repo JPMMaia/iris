@@ -5,38 +5,38 @@ module;
 
 #include <clang/CodeGen/CodeGenABITypes.h>
 
-module h.compiler.builder;
+module iris.compiler.builder;
 
 import std;
 import llvm;
 
-import h.binary_serializer;
-import h.core;
-import h.core.struct_layout;
-import h.common;
-import h.common.filesystem;
-import h.common.filesystem_common;
-import h.compiler;
-import h.compiler.analysis;
-import h.compiler.artifact;
-import h.compiler.clang_code_generation;
-import h.compiler.clang_compiler;
-import h.compiler.clang_data;
-import h.compiler.compile_commands_generator;
-import h.compiler.linker;
-import h.compiler.profiler;
-import h.compiler.repository;
-import h.compiler.target;
-import h.compiler.test_framework;
-import h.compiler.types;
-import h.c_header_converter;
-import h.c_header_exporter;
-import h.json_serializer;
-import h.parser.convertor;
-import h.parser.parse_tree;
-import h.parser.parser;
+import iris.binary_serializer;
+import iris.core;
+import iris.core.struct_layout;
+import iris.common;
+import iris.common.filesystem;
+import iris.common.filesystem_common;
+import iris.compiler;
+import iris.compiler.analysis;
+import iris.compiler.artifact;
+import iris.compiler.clang_code_generation;
+import iris.compiler.clang_compiler;
+import iris.compiler.clang_data;
+import iris.compiler.compile_commands_generator;
+import iris.compiler.linker;
+import iris.compiler.profiler;
+import iris.compiler.repository;
+import iris.compiler.target;
+import iris.compiler.test_framework;
+import iris.compiler.types;
+import iris.c_header_converter;
+import iris.c_header_exporter;
+import iris.json_serializer;
+import iris.parser.convertor;
+import iris.parser.parse_tree;
+import iris.parser.parser;
 
-namespace h::compiler
+namespace iris::compiler
 {
     static std::filesystem::path get_hl_build_directory(
         std::filesystem::path const& build_directory_path
@@ -66,11 +66,11 @@ namespace h::compiler
     }
 
     Builder create_builder(
-        h::compiler::Target const& target,
+        iris::compiler::Target const& target,
         std::filesystem::path const& build_directory_path,
         std::span<std::filesystem::path const> header_search_paths,
         std::span<std::filesystem::path const> repository_paths,
-        h::compiler::Compilation_options const& compilation_options,
+        iris::compiler::Compilation_options const& compilation_options,
         Builder_options const& builder_options,
         std::pmr::polymorphic_allocator<> output_allocator
     )
@@ -86,7 +86,7 @@ namespace h::compiler
 
         if (builder_options.is_test_mode)
         {
-            std::filesystem::path const standard_repository_file_path = h::common::get_standard_repository_file_path();
+            std::filesystem::path const standard_repository_file_path = iris::common::get_standard_repository_file_path();
             auto const location = std::find(all_repository_paths.begin(), all_repository_paths.end(), standard_repository_file_path);
             if (location == all_repository_paths.end())
                 all_repository_paths.push_back(standard_repository_file_path);
@@ -144,7 +144,7 @@ namespace h::compiler
             temporaries_allocator
         );
 
-        std::pmr::vector<h::Module> core_modules = parse_source_files_and_cache(
+        std::pmr::vector<iris::Module> core_modules = parse_source_files_and_cache(
             builder,
             source_file_paths,
             output_allocator,
@@ -152,11 +152,11 @@ namespace h::compiler
         );
         if (builder.is_test_mode)
             core_modules.reserve(core_modules.size() + artifact_file_paths.size());
-        std::span<h::Module const> const non_test_modules = core_modules;
+        std::span<iris::Module const> const non_test_modules = core_modules;
 
         if (builder.is_test_mode)
         {
-            std::pmr::vector<h::Module> const test_artifact_modules = create_test_artifact_modules(
+            std::pmr::vector<iris::Module> const test_artifact_modules = create_test_artifact_modules(
                 builder,
                 artifact_file_paths,
                 artifacts,
@@ -176,8 +176,8 @@ namespace h::compiler
             output_allocator,
             temporaries_allocator
         );
-        std::span<h::Module const> const header_modules = modules_and_declaration_database.header_modules;
-        std::span<h::Module const* const> const sorted_modules = modules_and_declaration_database.sorted_modules;
+        std::span<iris::Module const> const header_modules = modules_and_declaration_database.header_modules;
+        std::span<iris::Module const* const> const sorted_modules = modules_and_declaration_database.sorted_modules;
 
         validate_modules_and_exit_if_needed(core_modules, modules_and_declaration_database.declaration_database, temporaries_allocator);
 
@@ -188,7 +188,7 @@ namespace h::compiler
         );
 
         if (!compile_cpp_and_write_to_bitcode_files(builder, artifacts, llvm_data, compilation_options, temporaries_allocator))
-            h::common::print_message_and_exit(std::format("Failed to compile c++."));
+            iris::common::print_message_and_exit(std::format("Failed to compile c++."));
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map = create_module_name_to_file_path_map(
             builder,
@@ -210,7 +210,7 @@ namespace h::compiler
 
         if (builder.is_test_mode)
         {
-            h::compiler::Compilation_options test_compilation_options = compilation_options;
+            iris::compiler::Compilation_options test_compilation_options = compilation_options;
             test_compilation_options.is_test_mode = true;
             compile_and_write_to_bitcode_files(
                 builder,
@@ -223,7 +223,7 @@ namespace h::compiler
             );
         }
 
-        std::pmr::vector<h::compiler::Artifact const*> const artifacts_to_link = get_artifact_pointers(artifacts, temporaries_allocator);
+        std::pmr::vector<iris::compiler::Artifact const*> const artifacts_to_link = get_artifact_pointers(artifacts, temporaries_allocator);
         link_artifacts(
             builder,
             artifacts,
@@ -235,7 +235,7 @@ namespace h::compiler
 
         if (builder.is_test_mode)
         {
-            std::pmr::vector<h::compiler::Artifact const*> const artifacts_to_test = filter_test_artifacts(artifact_file_paths, artifacts, core_modules, temporaries_allocator);
+            std::pmr::vector<iris::compiler::Artifact const*> const artifacts_to_test = filter_test_artifacts(artifact_file_paths, artifacts, core_modules, temporaries_allocator);
             link_artifacts(
                 builder,
                 artifacts,
@@ -268,7 +268,7 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        for (h::compiler::Dependency const& dependency : artifact.dependencies)
+        for (iris::compiler::Dependency const& dependency : artifact.dependencies)
         {
             auto const location = std::find_if(
                 dependencies.begin(),
@@ -278,7 +278,7 @@ namespace h::compiler
             if (location != dependencies.end())
                 continue;
 
-            std::optional<std::filesystem::path> const dependency_location = h::compiler::get_artifact_location(repositories, dependency.artifact_name);
+            std::optional<std::filesystem::path> const dependency_location = iris::compiler::get_artifact_location(repositories, dependency.artifact_name);
             if (!dependency_location.has_value())
             {
                 std::fprintf(stderr, "Could not find dependency '%s'.", dependency.artifact_name.c_str());
@@ -287,7 +287,7 @@ namespace h::compiler
 
             std::filesystem::path const dependency_configuration_file_path = dependency_location.value();
 
-            Artifact dependency_artifact = h::compiler::get_artifact(dependency_configuration_file_path);
+            Artifact dependency_artifact = iris::compiler::get_artifact(dependency_configuration_file_path);
             
             add_artifact_dependencies(
                 dependencies,
@@ -316,9 +316,9 @@ namespace h::compiler
             auto const location = std::find_if(artifacts.begin(), artifacts.end(), [](Artifact const& artifact) -> bool { return artifact.name == "Cpp_standard_library"; });
             if (location == artifacts.end())
             {
-                std::optional<std::filesystem::path> const cpp_standard_library_artifact_file_path = h::compiler::get_artifact_location(repositories, "Cpp_standard_library");
+                std::optional<std::filesystem::path> const cpp_standard_library_artifact_file_path = iris::compiler::get_artifact_location(repositories, "Cpp_standard_library");
                 if (!cpp_standard_library_artifact_file_path.has_value())
-                    h::common::print_message_and_exit("Could not find dependency 'Cpp_standard_library'");
+                    iris::common::print_message_and_exit("Could not find dependency 'Cpp_standard_library'");
 
                 Artifact const artifact = get_artifact(cpp_standard_library_artifact_file_path.value());
 
@@ -361,11 +361,11 @@ namespace h::compiler
     {
         std::pmr::vector<std::filesystem::path> source_files{temporaries_allocator};
 
-        source_files.push_back(h::common::get_builtin_module_file_path());
+        source_files.push_back(iris::common::get_builtin_module_file_path());
 
         for (Artifact const& artifact : artifacts)
         {
-            std::pmr::vector<std::filesystem::path> artifact_source_files = get_artifact_hlang_source_files(
+            std::pmr::vector<std::filesystem::path> artifact_source_files = get_artifact_iris_source_files(
                 artifact,
                 temporaries_allocator,
                 temporaries_allocator
@@ -385,19 +385,19 @@ namespace h::compiler
     };
 
     static C_header_groups get_c_headers(
-        std::span<h::compiler::Artifact const> const artifacts,
+        std::span<iris::compiler::Artifact const> const artifacts,
         std::span<std::filesystem::path const> const builder_header_search_paths,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::filesystem::path const builtin_include_directory = h::common::get_builtin_include_directory();
+        std::filesystem::path const builtin_include_directory = iris::common::get_builtin_include_directory();
 
         std::pmr::vector<C_header> all_c_headers{temporaries_allocator};
         std::pmr::vector<std::pmr::vector<std::filesystem::path>> all_header_search_paths{temporaries_allocator};
         std::pmr::vector<Import_c_header_source_group const*> all_source_groups{temporaries_allocator};
         
-        for (h::compiler::Artifact const& artifact : artifacts)
+        for (iris::compiler::Artifact const& artifact : artifacts)
         {
             std::filesystem::path const artifact_parent_path = artifact.file_path.parent_path();
             std::pmr::vector<Source_group const*> const c_header_source_groups = get_c_header_source_groups(artifact, temporaries_allocator);
@@ -431,7 +431,7 @@ namespace h::compiler
         };
     }
 
-    static std::optional<h::Module> parse_c_header_and_cache(
+    static std::optional<iris::Module> parse_c_header_and_cache(
         std::filesystem::path const& build_directory_path,
         bool const output_module_json,
         std::span<std::filesystem::path const> const header_search_paths,
@@ -443,9 +443,9 @@ namespace h::compiler
         std::string_view const header_module_name = c_header.module_name;
         std::string_view const header_filename = c_header.header;
 
-        std::optional<std::filesystem::path> const header_path = h::compiler::find_c_header_path(header_filename, header_search_paths);
+        std::optional<std::filesystem::path> const header_path = iris::compiler::find_c_header_path(header_filename, header_search_paths);
         if (!header_path.has_value())
-            h::common::print_message_and_exit(std::format("Could not find header {}. Please provide its location using --header-search-path.", header_filename));
+            iris::common::print_message_and_exit(std::format("Could not find header {}. Please provide its location using --header-search-path.", header_filename));
 
         std::filesystem::path const header_module_filename = std::format("{}.irisb", header_module_name);
         std::filesystem::path const output_header_module_path = build_directory_path / "artifacts" / header_module_filename;
@@ -454,16 +454,16 @@ namespace h::compiler
         {
             if (is_file_newer_than(output_header_module_path, header_path.value()))
             {
-                std::optional<Module> header_module = h::binary_serializer::read_module_from_file(output_header_module_path);
+                std::optional<Module> header_module = iris::binary_serializer::read_module_from_file(output_header_module_path);
 
                 if (!header_module.has_value())
-                    h::common::print_message_and_exit(std::format("Failed to read cached module {}.", output_header_module_path.generic_string()));
+                    iris::common::print_message_and_exit(std::format("Failed to read cached module {}.", output_header_module_path.generic_string()));
 
                 return header_module.value();
             }
         }
 
-        h::c::Options const options
+        iris::c::Options const options
         {
             .target_triple = std::nullopt,
             .include_directories = header_search_paths,
@@ -482,7 +482,7 @@ namespace h::compiler
             }
         }
 
-        std::optional<h::Module> header_module = h::c::import_header_and_write_to_file(header_module_name, header_path.value(), output_header_module_path, options);
+        std::optional<iris::Module> header_module = iris::c::import_header_and_write_to_file(header_module_name, header_path.value(), output_header_module_path, options);
         if (!header_module.has_value())
             return std::nullopt;
 
@@ -490,7 +490,7 @@ namespace h::compiler
         {
             std::filesystem::path const output_module_json_filename = std::format("{}.irisb.json", header_module_name);
             std::filesystem::path const output_module_json_path = get_hl_build_directory(build_directory_path) / output_module_json_filename;
-            h::json::write_module_to_file(output_module_json_path, *header_module);
+            iris::json::write_module_to_file(output_module_json_path, *header_module);
         }
 
         return header_module.value();
@@ -504,7 +504,7 @@ namespace h::compiler
     )
     {
         std::filesystem::path module_path = {};
-        std::pmr::vector<std::string_view> const parts = h::common::split_string(module_name, '.', temporaries_allocator);
+        std::pmr::vector<std::string_view> const parts = iris::common::split_string(module_name, '.', temporaries_allocator);
         for (std::string_view const part : parts)
             module_path = module_path / part;
 
@@ -522,24 +522,24 @@ namespace h::compiler
     static std::pmr::unordered_map<std::pmr::string, std::filesystem::path> create_output_header_paths(
         Builder& builder,
         std::span<Artifact const> const artifacts,
-        std::span<h::Module const> const core_modules,
+        std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> output_header_paths{temporaries_allocator};
 
-        for (h::compiler::Artifact const& artifact : artifacts)
+        for (iris::compiler::Artifact const& artifact : artifacts)
         {
             std::pmr::vector<Source_group const*> const source_groups = get_export_c_header_source_groups(artifact, temporaries_allocator);
             
             for (Source_group const* group : source_groups)
             {
-                h::compiler::Export_c_header_source_group const& export_group = std::get<h::compiler::Export_c_header_source_group>(group->data.value());
+                iris::compiler::Export_c_header_source_group const& export_group = std::get<iris::compiler::Export_c_header_source_group>(group->data.value());
                 
-                std::pmr::vector<std::filesystem::path> const included_files = h::compiler::find_included_files(artifact.file_path.parent_path(), group->include, temporaries_allocator, temporaries_allocator);
+                std::pmr::vector<std::filesystem::path> const included_files = iris::compiler::find_included_files(artifact.file_path.parent_path(), group->include, temporaries_allocator, temporaries_allocator);
                 
-                for (h::Module const& core_module : core_modules)
+                for (iris::Module const& core_module : core_modules)
                 {
                     if (!core_module.source_file_path.has_value())
                         continue;
@@ -558,9 +558,9 @@ namespace h::compiler
     }
 
     static void generate_c_header_file(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& output_header_paths,
-        h::Declaration_database const& declaration_database,
+        iris::Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -583,12 +583,12 @@ namespace h::compiler
         create_directory_if_it_does_not_exist(output_c_header_path.parent_path());
         
         ::printf("Generating c header \"%s\"\n", output_c_header_path.generic_string().c_str());
-        h::c::Exported_c_header const c_header = h::c::export_module_as_c_header(core_module, declaration_database, output_header_paths, temporaries_allocator, temporaries_allocator);
-        h::common::write_to_file(output_c_header_path, c_header.content);
+        iris::c::Exported_c_header const c_header = iris::c::export_module_as_c_header(core_module, declaration_database, output_header_paths, temporaries_allocator, temporaries_allocator);
+        iris::common::write_to_file(output_c_header_path, c_header.content);
 
         ::printf("Generating c++ header \"%s\"\n", output_cpp_header_path.generic_string().c_str());
-        h::c::Exported_cpp_header const cpp_header = h::c::export_module_as_cpp_header(core_module, output_c_header_path, temporaries_allocator, temporaries_allocator);
-        h::common::write_to_file(output_cpp_header_path, cpp_header.content);
+        iris::c::Exported_cpp_header const cpp_header = iris::c::export_module_as_cpp_header(core_module, output_c_header_path, temporaries_allocator, temporaries_allocator);
+        iris::common::write_to_file(output_cpp_header_path, cpp_header.content);
     }
 
     enum class Source_file_node_type
@@ -619,7 +619,7 @@ namespace h::compiler
 
     Source_file_graph create_source_file_graph(
         std::span<C_header const> const c_headers,
-        std::span<h::Module const> const core_modules,
+        std::span<iris::Module const> const core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& output_header_paths,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -644,7 +644,7 @@ namespace h::compiler
 
         for (std::size_t index = 0; index < core_modules.size(); ++index)
         {
-            h::Module const& core_module = core_modules[index];
+            iris::Module const& core_module = core_modules[index];
 
             auto const output_header_path_location = output_header_paths.find(core_module.name);
             Source_file_node_type const node_type = output_header_path_location != output_header_paths.end() ? Source_file_node_type::Export_c_header : Source_file_node_type::Module;
@@ -659,7 +659,7 @@ namespace h::compiler
             nodes.push_back(node);
         }
 
-        for (h::compiler::C_header const& c_header : c_headers)
+        for (iris::compiler::C_header const& c_header : c_headers)
         {
             std::size_t const source_node_index = module_name_to_node_index.at(c_header.module_name);
             for (std::string_view const dependency : c_header.dependencies)
@@ -669,10 +669,10 @@ namespace h::compiler
             }
         }
 
-        for (h::Module const& core_module : core_modules)
+        for (iris::Module const& core_module : core_modules)
         {
             std::size_t const source_node_index = module_name_to_node_index.at(core_module.name);
-            for (h::Import_module_with_alias const& import_module : core_module.dependencies.alias_imports)
+            for (iris::Import_module_with_alias const& import_module : core_module.dependencies.alias_imports)
             {
                 std::size_t const destination_node_index = module_name_to_node_index.at(import_module.module_name);
                 edges.insert(std::make_pair(source_node_index, destination_node_index));
@@ -723,7 +723,7 @@ namespace h::compiler
     Modules_and_declaration_database import_and_export_c_headers(
         Builder& builder,
         std::span<Artifact const> const artifacts,
-        std::span<h::Module> const core_modules,
+        std::span<iris::Module> const core_modules,
         bool const force_allow_errors,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -740,7 +740,7 @@ namespace h::compiler
 
         Source_file_graph const graph = create_source_file_graph(c_header_groups.c_headers, core_modules, output_header_paths, temporaries_allocator);
 
-        std::pmr::vector<h::Module> header_modules{output_allocator};
+        std::pmr::vector<iris::Module> header_modules{output_allocator};
         header_modules.resize(c_header_groups.c_headers.size());
 
         for (Source_file_graph_rank_range const rank : graph.ranks)
@@ -752,7 +752,7 @@ namespace h::compiler
 
                 if (node.type == Source_file_node_type::Module || node.type == Source_file_node_type::Export_c_header)
                 {
-                    h::Module const& core_module = core_modules[node.index];
+                    iris::Module const& core_module = core_modules[node.index];
                     add_declarations(declaration_database, core_module);
                 }
             }
@@ -765,7 +765,7 @@ namespace h::compiler
 
                 if (node.type == Source_file_node_type::Export_c_header)
                 {
-                    h::Module const& core_module = core_modules[node.index];
+                    iris::Module const& core_module = core_modules[node.index];
                     
                     generate_c_header_file(
                         core_module,
@@ -780,7 +780,7 @@ namespace h::compiler
                     std::span<std::filesystem::path const> const header_search_paths = c_header_groups.header_search_paths[node.index];
                     Import_c_header_source_group const& source_group = *c_header_groups.source_groups[node.index];
 
-                    std::optional<h::Module> header_module = parse_c_header_and_cache(
+                    std::optional<iris::Module> header_module = parse_c_header_and_cache(
                         builder.build_directory_path,
                         builder.output_module_json,
                         header_search_paths,
@@ -800,13 +800,13 @@ namespace h::compiler
 
                 if (node.type == Source_file_node_type::Import_c_header)
                 {
-                    h::Module const& header_module = header_modules[node.index];
+                    iris::Module const& header_module = header_modules[node.index];
                     add_declarations(declaration_database, header_module);
                 }
             }
         }
 
-        std::pmr::vector<h::Module const*> sorted_modules{output_allocator};
+        std::pmr::vector<iris::Module const*> sorted_modules{output_allocator};
         sorted_modules.resize(graph.nodes.size());
 
         for (std::size_t index = 0; index < graph.nodes.size(); ++index)
@@ -818,8 +818,8 @@ namespace h::compiler
                 sorted_modules[index] = &header_modules[node.index];
         }
 
-        for (h::Module& core_module : core_modules)
-            h::compiler::add_import_usages(core_module, output_allocator);
+        for (iris::Module& core_module : core_modules)
+            iris::compiler::add_import_usages(core_module, output_allocator);
 
         // TODO can be done in parallel but declaration_database.call_instances needs to be guarded...
         for (Module& core_module : core_modules)
@@ -837,7 +837,7 @@ namespace h::compiler
     }
 
     void validate_modules_and_exit_if_needed(
-        std::span<h::Module> const core_modules,
+        std::span<iris::Module> const core_modules,
         Declaration_database& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -858,7 +858,7 @@ namespace h::compiler
         if (!std::filesystem::exists(output_dependency_file))
             return false;
 
-        std::optional<std::pmr::string> const file_contents = h::common::get_file_contents(output_dependency_file);
+        std::optional<std::pmr::string> const file_contents = iris::common::get_file_contents(output_dependency_file);
         if (!file_contents.has_value())
             return false;
 
@@ -937,7 +937,7 @@ namespace h::compiler
         for (Artifact const& artifact : artifacts)
         {
             std::pmr::vector<std::filesystem::path> const public_include_directories = get_public_include_directories(artifact, artifacts, temporaries_allocator, temporaries_allocator);
-            std::pmr::vector<std::pmr::string> const public_include_directories_strings = h::common::convert_path_to_string(public_include_directories, temporaries_allocator);
+            std::pmr::vector<std::pmr::string> const public_include_directories_strings = iris::common::convert_path_to_string(public_include_directories, temporaries_allocator);
 
             for (Source_group const& group : artifact.sources)
             {
@@ -1007,10 +1007,10 @@ namespace h::compiler
 
         if (builder.is_test_mode)
         {
-            std::filesystem::path const tests_main_file_path = h::common::get_tests_main_file_path();
+            std::filesystem::path const tests_main_file_path = iris::common::get_tests_main_file_path();
 
-            std::filesystem::path const output_assembly_file = build_directory_path / std::format("hlang.tests_main.{}", extension);
-            std::filesystem::path const output_dependency_file = build_directory_path / std::format("hlang.tests_main.d");
+            std::filesystem::path const output_assembly_file = build_directory_path / std::format("iris.tests_main.{}", extension);
+            std::filesystem::path const output_dependency_file = build_directory_path / std::format("iris.tests_main.d");
 
             if (!is_compiled_cpp_up_to_date(output_dependency_file))
             {
@@ -1044,7 +1044,7 @@ namespace h::compiler
         return true;
     }
 
-    std::pmr::vector<h::Module> parse_source_files_and_cache(
+    std::pmr::vector<iris::Module> parse_source_files_and_cache(
         Builder& builder,
         std::span<std::filesystem::path const> const source_files_paths,
         std::pmr::polymorphic_allocator<> const& output_allocator,
@@ -1053,18 +1053,18 @@ namespace h::compiler
     {
         start_timer(get_profiler(builder), "parse_source_files_and_cache");
 
-        std::pmr::vector<h::Module> core_modules{output_allocator};
-        core_modules.resize(source_files_paths.size(), h::Module{});
+        std::pmr::vector<iris::Module> core_modules{output_allocator};
+        core_modules.resize(source_files_paths.size(), iris::Module{});
 
-        h::parser::Parser parser = h::parser::create_parser();
+        iris::parser::Parser parser = iris::parser::create_parser();
 
         for (std::size_t index = 0; index < source_files_paths.size(); ++index)
         {
             std::filesystem::path const& source_file_path = source_files_paths[index];
 
-            std::optional<std::pmr::string> const module_name = h::parser::read_module_name(source_file_path);
+            std::optional<std::pmr::string> const module_name = iris::parser::read_module_name(source_file_path);
             if (!module_name.has_value())
-                h::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
+                iris::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
 
             std::filesystem::path const output_module_filename = std::format("{}.irisb", module_name.value());
             std::filesystem::path const output_module_path = get_hl_build_directory(builder.build_directory_path) / output_module_filename;
@@ -1073,9 +1073,9 @@ namespace h::compiler
             {
                 if (is_file_newer_than(output_module_path, source_file_path))
                 {
-                    std::optional<Module> core_module = h::binary_serializer::read_module_from_file(output_module_path);
+                    std::optional<Module> core_module = iris::binary_serializer::read_module_from_file(output_module_path);
                     if (!core_module.has_value())
-                        h::common::print_message_and_exit(std::format("Failed to read cached module {}.", output_module_path.generic_string()));
+                        iris::common::print_message_and_exit(std::format("Failed to read cached module {}.", output_module_path.generic_string()));
 
                     core_modules[index] = std::move(core_module.value());
 
@@ -1083,16 +1083,16 @@ namespace h::compiler
                 }
             }
 
-            std::optional<std::pmr::string> const source_content = h::common::get_file_contents(source_file_path);
+            std::optional<std::pmr::string> const source_content = iris::common::get_file_contents(source_file_path);
             if (!source_content.has_value())
-                h::common::print_message_and_exit(std::format("Could not read source file {}.", source_file_path.generic_string()));
+                iris::common::print_message_and_exit(std::format("Could not read source file {}.", source_file_path.generic_string()));
 
             std::pmr::u8string const utf_8_source_content{reinterpret_cast<char8_t const*>(source_content->data()), source_content->size(), temporaries_allocator};
-            h::parser::Parse_tree parse_tree = h::parser::parse(parser, std::move(utf_8_source_content));
+            iris::parser::Parse_tree parse_tree = iris::parser::parse(parser, std::move(utf_8_source_content));
 
-            h::parser::Parse_node const root = get_root_node(parse_tree);
+            iris::parser::Parse_node const root = get_root_node(parse_tree);
     
-            std::optional<h::Module> core_module = h::parser::parse_node_to_module(
+            std::optional<iris::Module> core_module = iris::parser::parse_node_to_module(
                 parse_tree,
                 root,
                 source_file_path,
@@ -1100,34 +1100,34 @@ namespace h::compiler
                 temporaries_allocator
             );
             if (!core_module.has_value())
-                h::common::print_message_and_exit(std::format("Could not parse source file {}.", source_file_path.generic_string()));
+                iris::common::print_message_and_exit(std::format("Could not parse source file {}.", source_file_path.generic_string()));
 
-            h::binary_serializer::write_module_to_file(output_module_path, core_module.value(), {});
+            iris::binary_serializer::write_module_to_file(output_module_path, core_module.value(), {});
 
             if (builder.output_module_json)
             {
                 std::filesystem::path const output_module_json_filename = std::format("{}.irisb.json", module_name.value());
                 std::filesystem::path const output_module_json_path = get_hl_build_directory(builder.build_directory_path) / output_module_json_filename;
-                h::json::write_module_to_file(output_module_json_path, core_module.value());
+                iris::json::write_module_to_file(output_module_json_path, core_module.value());
             }
 
             core_modules[index] = std::move(core_module.value());
 
-            h::parser::destroy_tree(std::move(parse_tree));
+            iris::parser::destroy_tree(std::move(parse_tree));
         }
 
-        h::parser::destroy_parser(std::move(parser));
+        iris::parser::destroy_parser(std::move(parser));
 
         end_timer(get_profiler(builder), "parse_source_files_and_cache");
 
         return core_modules;
     }
 
-    std::pmr::vector<h::Module> create_test_artifact_modules(
+    std::pmr::vector<iris::Module> create_test_artifact_modules(
         Builder& builder,
         std::span<std::filesystem::path const> const artifact_file_paths,
         std::span<Artifact const> const artifacts,
-        std::span<h::Module const> const core_modules,
+        std::span<iris::Module const> const core_modules,
         Compilation_options const& compilation_options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -1137,7 +1137,7 @@ namespace h::compiler
         bool const use_objects = builder.compilation_options.output_debug_code_view;
         std::string_view const extension = use_objects ? "obj" : "bc";
 
-        std::pmr::vector<h::Module> test_modules{temporaries_allocator};
+        std::pmr::vector<iris::Module> test_modules{temporaries_allocator};
 
         for (std::filesystem::path const& artifact_file_path : artifact_file_paths)
         {
@@ -1147,19 +1147,19 @@ namespace h::compiler
 
             Artifact const& artifact = *artifact_location;
 
-            std::pmr::vector<std::filesystem::path> const hlang_source_files = get_artifact_hlang_source_files(
+            std::pmr::vector<std::filesystem::path> const iris_source_files = get_artifact_iris_source_files(
                 artifact,
                 temporaries_allocator,
                 temporaries_allocator
             );
 
-            std::pmr::string const test_module_name = h::compiler::get_test_module_name(artifact.name);
+            std::pmr::string const test_module_name = iris::compiler::get_test_module_name(artifact.name);
             std::filesystem::path const output_assembly_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}.{}", test_module_name, extension);
             if (std::filesystem::exists(output_assembly_file))
             {
                 bool is_up_to_date = true;
 
-                for (std::filesystem::path const& source_file : hlang_source_files)
+                for (std::filesystem::path const& source_file : iris_source_files)
                 {
                     if (is_file_newer_than(source_file, output_assembly_file))
                     {
@@ -1172,21 +1172,21 @@ namespace h::compiler
                     continue;
             }
 
-            std::pmr::vector<h::Module const*> artifact_core_modules;
-            artifact_core_modules.reserve(hlang_source_files.size());
+            std::pmr::vector<iris::Module const*> artifact_core_modules;
+            artifact_core_modules.reserve(iris_source_files.size());
 
-            for (std::filesystem::path const& source_file_path : hlang_source_files)
+            for (std::filesystem::path const& source_file_path : iris_source_files)
             {
-                std::optional<std::pmr::string> const module_name = h::parser::read_module_name(source_file_path);
+                std::optional<std::pmr::string> const module_name = iris::parser::read_module_name(source_file_path);
                 if (!module_name.has_value())
-                    h::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
+                    iris::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
 
-                auto const location = std::find_if(core_modules.begin(), core_modules.end(), [&](h::Module const& core_module) -> bool { return core_module.name == module_name.value(); });
+                auto const location = std::find_if(core_modules.begin(), core_modules.end(), [&](iris::Module const& core_module) -> bool { return core_module.name == module_name.value(); });
                 if (location != core_modules.end())
                     artifact_core_modules.push_back(&(*location));
             }
 
-            std::optional<h::Module> test_module = create_test_module(
+            std::optional<iris::Module> test_module = create_test_module(
                 artifact.name,
                 artifact_core_modules,
                 temporaries_allocator
@@ -1203,16 +1203,16 @@ namespace h::compiler
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> create_module_name_to_file_path_map(
         Builder const& builder,
-        std::span<h::Module const> const header_modules,
-        std::span<h::Module const> const core_modules,
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> map{temporaries_allocator};
 
-        auto const insert_entries = [&](std::span<h::Module const> const elements) -> void {
-            for (h::Module const& core_module : elements)
+        auto const insert_entries = [&](std::span<iris::Module const> const elements) -> void {
+            for (iris::Module const& core_module : elements)
             {
                 std::string_view const module_name = core_module.name;
 
@@ -1231,7 +1231,7 @@ namespace h::compiler
 
     static void compile_and_write_to_bitcode_file(
         Builder& builder,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         LLVM_data& llvm_data,
         Declaration_database const& declaration_database,
@@ -1275,17 +1275,17 @@ namespace h::compiler
         );
 
         if (builder.output_llvm_ir)
-            h::compiler::write_llvm_ir_to_file(*llvm_module, output_llvm_ir_file);
+            iris::compiler::write_llvm_ir_to_file(*llvm_module, output_llvm_ir_file);
 
         if (use_objects)
-            h::compiler::write_object_file(llvm_data, *llvm_module, output_assembly_file);
+            iris::compiler::write_object_file(llvm_data, *llvm_module, output_assembly_file);
         else
-            h::compiler::write_bitcode_to_file(llvm_data, *llvm_module, output_assembly_file);
+            iris::compiler::write_bitcode_to_file(llvm_data, *llvm_module, output_assembly_file);
     }
 
     void compile_and_write_to_bitcode_files(
         Builder& builder,
-        std::span<h::Module const> const core_modules,
+        std::span<iris::Module const> const core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         LLVM_data& llvm_data,
         Declaration_database const& declaration_database,
@@ -1299,7 +1299,7 @@ namespace h::compiler
 
         for (std::size_t index = 0; index < core_modules.size(); ++index)
         {
-            h::Module const& core_module = core_modules[index];
+            iris::Module const& core_module = core_modules[index];
             compile_and_write_to_bitcode_file(
                 builder,
                 core_module,
@@ -1314,28 +1314,28 @@ namespace h::compiler
         end_timer(get_profiler(builder), "compile_and_write_to_bitcode_files");
     }
 
-    std::pmr::vector<h::compiler::Artifact const*> get_artifact_pointers(
-        std::span<h::compiler::Artifact const> const artifacts,
+    std::pmr::vector<iris::compiler::Artifact const*> get_artifact_pointers(
+        std::span<iris::compiler::Artifact const> const artifacts,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
-        std::pmr::vector<h::compiler::Artifact const*> output{output_allocator};
+        std::pmr::vector<iris::compiler::Artifact const*> output{output_allocator};
         output.reserve(artifacts.size());
 
-        for (h::compiler::Artifact const& artifact : artifacts)
+        for (iris::compiler::Artifact const& artifact : artifacts)
             output.push_back(&artifact);
 
         return output;
     }
 
-    std::pmr::vector<h::compiler::Artifact const*> filter_test_artifacts(
+    std::pmr::vector<iris::compiler::Artifact const*> filter_test_artifacts(
         std::span<std::filesystem::path const> const artifact_file_paths,
-        std::span<h::compiler::Artifact const> const artifacts,
-        std::span<h::Module const> const core_modules,
+        std::span<iris::compiler::Artifact const> const artifacts,
+        std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
-        std::pmr::vector<h::compiler::Artifact const*> output{output_allocator};
+        std::pmr::vector<iris::compiler::Artifact const*> output{output_allocator};
         output.reserve(artifacts.size());
 
         for (std::filesystem::path const& artifact_file_path : artifact_file_paths)
@@ -1344,8 +1344,8 @@ namespace h::compiler
             if (artifact_location == artifacts.end())
                 continue;
 
-            std::pmr::string const test_module_name = h::compiler::get_test_module_name(artifact_location->name);
-            auto const test_location = std::find_if(core_modules.begin(), core_modules.end(), [&](h::Module const& core_module) -> bool { return core_module.name == test_module_name; });
+            std::pmr::string const test_module_name = iris::compiler::get_test_module_name(artifact_location->name);
+            auto const test_location = std::find_if(core_modules.begin(), core_modules.end(), [&](iris::Module const& core_module) -> bool { return core_module.name == test_module_name; });
             if (test_location == core_modules.end())
                 continue;
 
@@ -1366,7 +1366,7 @@ namespace h::compiler
 
         std::filesystem::path const build_directory_path = get_hl_build_directory(builder.build_directory_path);
 
-        std::pmr::vector<std::filesystem::path> const hlang_source_files = get_artifact_hlang_source_files(
+        std::pmr::vector<std::filesystem::path> const iris_source_files = get_artifact_iris_source_files(
             artifact,
             temporaries_allocator,
             temporaries_allocator
@@ -1376,11 +1376,11 @@ namespace h::compiler
         std::string_view const extension = use_objects ? "obj" : "bc";
         std::string_view const test_extension = is_test_mode ? ".test" : "";
 
-        for (std::filesystem::path const& source_file_path : hlang_source_files)
+        for (std::filesystem::path const& source_file_path : iris_source_files)
         {
-            std::optional<std::pmr::string> const module_name = h::parser::read_module_name(source_file_path);
+            std::optional<std::pmr::string> const module_name = iris::parser::read_module_name(source_file_path);
             if (!module_name.has_value())
-                h::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
+                iris::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
 
             std::filesystem::path bitcode_file = build_directory_path / std::format("{}{}.{}", module_name.value(), test_extension, extension);
             bitcode_files.push_back(std::move(bitcode_file));
@@ -1400,10 +1400,10 @@ namespace h::compiler
 
         if (is_test_mode)
         {
-            std::filesystem::path main_test_bitcode_file = build_directory_path / std::format("hlang.tests_main.{}", extension);
+            std::filesystem::path main_test_bitcode_file = build_directory_path / std::format("iris.tests_main.{}", extension);
             bitcode_files.push_back(std::move(main_test_bitcode_file));
 
-            std::pmr::string const test_module_name = h::compiler::get_test_module_name(artifact.name);
+            std::pmr::string const test_module_name = iris::compiler::get_test_module_name(artifact.name);
             std::filesystem::path generated_test_bitcode_file = build_directory_path / std::format("{}.test.{}", test_module_name, extension);
             bitcode_files.push_back(std::move(generated_test_bitcode_file));
         }
@@ -1421,7 +1421,7 @@ namespace h::compiler
         Artifact_libraries& artifact_libraries,
         Artifact const& artifact,
         std::span<Artifact const> const artifacts,
-        h::compiler::Target const& target,
+        iris::compiler::Target const& target,
         std::filesystem::path const& build_directory_path,
         bool const is_debug
     )
@@ -1432,13 +1432,13 @@ namespace h::compiler
             {
                 Library_info const& library_info = std::get<Library_info>(*artifact.info);
         
-                std::optional<h::compiler::External_library_info> const external_library = h::compiler::get_external_library(library_info.external_libraries, target, is_debug, true);
+                std::optional<iris::compiler::External_library_info> const external_library = iris::compiler::get_external_library(library_info.external_libraries, target, is_debug, true);
                 if (external_library.has_value())
                 {
                     for (std::pmr::string const& name : external_library->names)
                         artifact_libraries.libraries.push_back(name);
 
-                    std::pmr::vector<std::string_view> const dll_names = h::compiler::get_external_library_dlls(library_info.external_libraries, external_library.value().key);
+                    std::pmr::vector<std::string_view> const dll_names = iris::compiler::get_external_library_dlls(library_info.external_libraries, external_library.value().key);
                     for (std::string_view const dll_name : dll_names)
                     {
                         artifact_libraries.dll_names.push_back(std::pmr::string{dll_name});
@@ -1477,7 +1477,7 @@ namespace h::compiler
     static Artifact_libraries get_artifact_libraries_for_linking(
         Artifact const& artifact,
         std::span<Artifact const> const artifacts,
-        h::compiler::Target const& target,
+        iris::compiler::Target const& target,
         std::filesystem::path const& build_directory_path,
         bool const is_debug,
         bool const is_test_mode,
@@ -1504,7 +1504,7 @@ namespace h::compiler
         {
             auto const artifact_location = std::find_if(artifacts.begin(), artifacts.end(), [](Artifact const& artifact) -> bool { return artifact.name == "Cpp_standard_library"; });
             if (artifact_location == artifacts.end())
-                h::common::print_message_and_exit("Could not find artifact 'Cpp_standard_library'");
+                iris::common::print_message_and_exit("Could not find artifact 'Cpp_standard_library'");
 
             add_dependency_libraries(
                 artifact_libraries,
@@ -1560,68 +1560,68 @@ namespace h::compiler
 
             if (is_test_mode)
             {
-                h::compiler::Linker_options const linker_options
+                iris::compiler::Linker_options const linker_options
                 {
                     .entry_point = "main",
                     .debug = debug,
-                    .link_type = h::compiler::Link_type::Executable
+                    .link_type = iris::compiler::Link_type::Executable
                 };
 
-                std::filesystem::path const output = builder.build_directory_path / "bin" / (artifact.name + ".hlang.test");
+                std::filesystem::path const output = builder.build_directory_path / "bin" / (artifact.name + ".iris.test");
                 create_directory_if_it_does_not_exist(output.parent_path());
 
-                bool const result = h::compiler::link(
+                bool const result = iris::compiler::link(
                     bitcode_files,
                     artifact_libraries.libraries,
                     output,
                     linker_options
                 );
                 if (!result)
-                    h::common::print_message_and_exit(std::format("Failed to link executable '{}.test'.", artifact.name));
+                    iris::common::print_message_and_exit(std::format("Failed to link executable '{}.test'.", artifact.name));
             }
             else if (artifact.type == Artifact_type::Library)
             {
-                h::compiler::Linker_options const linker_options
+                iris::compiler::Linker_options const linker_options
                 {
                     .entry_point = std::nullopt,
                     .debug = debug,
-                    .link_type = h::compiler::Link_type::Static_library
+                    .link_type = iris::compiler::Link_type::Static_library
                 };
 
                 std::filesystem::path const output = builder.build_directory_path / "lib" / artifact.name;
                 create_directory_if_it_does_not_exist(output.parent_path());
 
-                bool const result = h::compiler::create_static_library(
+                bool const result = iris::compiler::create_static_library(
                     bitcode_files,
                     artifact_libraries.libraries,
                     output,
                     linker_options
                 );
                 if (!result)
-                    h::common::print_message_and_exit(std::format("Failed to link static library '{}'.", artifact.name));
+                    iris::common::print_message_and_exit(std::format("Failed to link static library '{}'.", artifact.name));
             }
-            else if (artifact.info.has_value() && std::holds_alternative<h::compiler::Executable_info>(*artifact.info))
+            else if (artifact.info.has_value() && std::holds_alternative<iris::compiler::Executable_info>(*artifact.info))
             {
-                h::compiler::Executable_info const& executable_info = std::get<h::compiler::Executable_info>(*artifact.info);
+                iris::compiler::Executable_info const& executable_info = std::get<iris::compiler::Executable_info>(*artifact.info);
 
-                h::compiler::Linker_options const linker_options
+                iris::compiler::Linker_options const linker_options
                 {
                     .entry_point = executable_info.entry_point,
                     .debug = debug,
-                    .link_type = h::compiler::Link_type::Executable
+                    .link_type = iris::compiler::Link_type::Executable
                 };
 
                 std::filesystem::path const output = builder.build_directory_path / "bin" / artifact.name;
                 create_directory_if_it_does_not_exist(output.parent_path());
 
-                bool const result = h::compiler::link(
+                bool const result = iris::compiler::link(
                     bitcode_files,
                     artifact_libraries.libraries,
                     output,
                     linker_options
                 );
                 if (!result)
-                    h::common::print_message_and_exit(std::format("Failed to link executable '{}'.", artifact.name));
+                    iris::common::print_message_and_exit(std::format("Failed to link executable '{}'.", artifact.name));
             }
         }
 
@@ -1714,34 +1714,34 @@ namespace h::compiler
         std::optional<std::string_view> const target_triple
     )
     {
-        std::optional<h::Module> core_module = h::compiler::read_core_module(input_file_path);
+        std::optional<iris::Module> core_module = iris::compiler::read_core_module(input_file_path);
         if (!core_module.has_value())
-            h::common::print_message_and_exit(std::format("Failed to read module of '{}'", input_file_path.generic_string()));
+            iris::common::print_message_and_exit(std::format("Failed to read module of '{}'", input_file_path.generic_string()));
 
-        h::compiler::Compilation_options const options
+        iris::compiler::Compilation_options const options
         {
             .target_triple = target_triple,
             .is_optimized = false,
             .debug = true,
         };
-        h::compiler::LLVM_data llvm_data = h::compiler::initialize_llvm(options);
+        iris::compiler::LLVM_data llvm_data = iris::compiler::initialize_llvm(options);
 
-        h::Declaration_database declaration_database = h::create_declaration_database();
-        h::add_declarations(declaration_database, *core_module);
+        iris::Declaration_database declaration_database = iris::create_declaration_database();
+        iris::add_declarations(declaration_database, *core_module);
 
-        std::pmr::vector<h::Module const*> core_modules{ &core_module.value() };
-        h::compiler::Clang_module_data clang_module_data = h::compiler::create_clang_module_data(
+        std::pmr::vector<iris::Module const*> core_modules{ &core_module.value() };
+        iris::compiler::Clang_module_data clang_module_data = iris::compiler::create_clang_module_data(
             *llvm_data.context,
             llvm_data.clang_data,
-            "Hl_clang_module",
+            "Iris_clang_module",
             core_modules,
             declaration_database
         );
 
-        h::compiler::Type_database type_database = h::compiler::create_type_database(*llvm_data.context);
-        h::compiler::add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, clang_module_data, *core_module);
+        iris::compiler::Type_database type_database = iris::compiler::create_type_database(*llvm_data.context);
+        iris::compiler::add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, clang_module_data, *core_module);
 
-        std::optional<h::Struct_layout> const struct_layout = h::compiler::calculate_struct_layout(llvm_data.data_layout, type_database, core_module->name, struct_name);
+        std::optional<iris::Struct_layout> const struct_layout = iris::compiler::calculate_struct_layout(llvm_data.data_layout, type_database, core_module->name, struct_name);
         if (!struct_layout.has_value())
         {
             std::puts("<error>");
@@ -1757,7 +1757,7 @@ namespace h::compiler
     void write_compile_commands_json_to_file(
         Builder const& builder,
         std::filesystem::path const& artifact_file_path,
-        h::compiler::Compilation_options const& compilation_options,
+        iris::compiler::Compilation_options const& compilation_options,
         std::filesystem::path const output_file_path
     )
     {
@@ -1793,7 +1793,7 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        return h::common::search_files(
+        return iris::common::search_files(
             path,
             "iris_artifact.json",
             temporaries_allocator,

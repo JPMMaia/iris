@@ -1,10 +1,10 @@
-export module h.compiler.diagnostic;
+export module iris.compiler.diagnostic;
 
 import std;
 
-import h.core;
+import iris.core;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export enum class Diagnostic_severity
     {
@@ -87,13 +87,13 @@ namespace h::compiler
     
     export struct Diagnostic_mismatch_type_data
     {
-        std::optional<h::Type_reference> provided_type;
-        std::optional<h::Type_reference> expected_type;
+        std::optional<iris::Type_reference> provided_type;
+        std::optional<iris::Type_reference> expected_type;
     };
 
     export Diagnostic_data create_diagnostic_mismatch_type_data(
-        std::optional<h::Type_reference> const& provided_type,
-        std::optional<h::Type_reference> const& expected_type
+        std::optional<iris::Type_reference> const& provided_type,
+        std::optional<iris::Type_reference> const& expected_type
     );
 
     export Diagnostic_mismatch_type_data read_diagnostic_mismatch_type_data(

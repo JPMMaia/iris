@@ -1,5 +1,5 @@
 {
-  "name": "h",
+  "name": "iris",
   "version-string": "0.1.0",
   "dependencies": [
     "argparse",

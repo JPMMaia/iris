@@ -1,16 +1,16 @@
-module h.compiler.recompilation;
+module iris.compiler.recompilation;
 
 import std;
 
-import h.common;
-import h.compiler;
-import h.compiler.common;
-import h.core.hash;
-import h.core;
-import h.core.types;
-import h.json_serializer;
+import iris.common;
+import iris.compiler;
+import iris.compiler.common;
+import iris.core.hash;
+import iris.core;
+import iris.core.types;
+import iris.json_serializer;
 
-namespace h::compiler
+namespace iris::compiler
 {
     std::optional<std::uint64_t> get_hash(
         Symbol_name_to_hash const& symbol_name_to_hash,
@@ -24,7 +24,7 @@ namespace h::compiler
     }
 
     std::pmr::unordered_set<std::pmr::string> compute_symbols_that_changed(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Symbol_name_to_hash const& previous_symbol_name_to_hash,
         Symbol_name_to_hash const& new_symbol_name_to_hash
     )
@@ -50,16 +50,16 @@ namespace h::compiler
 
         std::pmr::unordered_set<std::pmr::string> visited_symbols;
 
-        std::function<bool(std::string_view, h::Type_reference const&)> process_custom_type_reference;
+        std::function<bool(std::string_view, iris::Type_reference const&)> process_custom_type_reference;
 
         process_custom_type_reference = [&](
             std::string_view const declaration_name,
-            h::Type_reference const& type_reference
+            iris::Type_reference const& type_reference
             ) -> bool
         {
-            if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
+            if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
             {
-                h::Custom_type_reference const& custom_type_reference = std::get<h::Custom_type_reference>(type_reference.data);
+                iris::Custom_type_reference const& custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.data);
                 std::string_view const type_module_name = find_module_name(core_module, custom_type_reference.module_reference);
 
                 if (type_module_name == core_module.name)
@@ -74,7 +74,7 @@ namespace h::compiler
                             return true;
                         }
 
-                        h::visit_type_references_recursively_with_declaration_name(core_module, custom_type_reference.name, process_custom_type_reference);
+                        iris::visit_type_references_recursively_with_declaration_name(core_module, custom_type_reference.name, process_custom_type_reference);
                     }
                 }
             }
@@ -82,30 +82,30 @@ namespace h::compiler
             return false;
         };
 
-        h::visit_type_references_recursively_with_declaration_name(core_module.export_declarations, process_custom_type_reference);
+        iris::visit_type_references_recursively_with_declaration_name(core_module.export_declarations, process_custom_type_reference);
 
         return symbols_that_changed;
     }
 
     std::pmr::unordered_set<std::pmr::string> compute_symbols_that_changed(
-        h::Module const& core_module,
-        h::Module const& dependency_module,
+        iris::Module const& core_module,
+        iris::Module const& dependency_module,
         std::pmr::unordered_set<std::pmr::string> const& dependency_symbols_that_changed
     )
     {
         std::pmr::unordered_set<std::pmr::string> symbols_that_changed;
         std::pmr::unordered_set<std::pmr::string> visited_symbols;
 
-        std::function<bool(std::string_view, h::Type_reference const&)> process_custom_type_reference;
+        std::function<bool(std::string_view, iris::Type_reference const&)> process_custom_type_reference;
 
         process_custom_type_reference = [&](
             std::string_view const declaration_name,
-            h::Type_reference const& type_reference
+            iris::Type_reference const& type_reference
             ) -> bool
         {
-            if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
+            if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
             {
-                h::Custom_type_reference const& custom_type_reference = std::get<h::Custom_type_reference>(type_reference.data);
+                iris::Custom_type_reference const& custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.data);
                 std::string_view const type_module_name = find_module_name(core_module, custom_type_reference.module_reference);
 
                 if (type_module_name == dependency_module.name)
@@ -122,7 +122,7 @@ namespace h::compiler
                     if (!visited_symbols.contains(custom_type_reference.name))
                     {
                         visited_symbols.insert(custom_type_reference.name);
-                        h::visit_type_references_recursively_with_declaration_name(core_module, custom_type_reference.name, process_custom_type_reference);
+                        iris::visit_type_references_recursively_with_declaration_name(core_module, custom_type_reference.name, process_custom_type_reference);
                     }
                 }
             }
@@ -130,14 +130,14 @@ namespace h::compiler
             return false;
         };
 
-        h::visit_type_references_recursively_with_declaration_name(core_module.export_declarations, process_custom_type_reference);
+        iris::visit_type_references_recursively_with_declaration_name(core_module.export_declarations, process_custom_type_reference);
 
         return symbols_that_changed;
     }
 
     void find_modules_to_recompile(
         std::pmr::unordered_set<std::pmr::string>& modules_to_recompile,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::pmr::unordered_set<std::pmr::string> const& symbols_that_changed,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path,
         std::pmr::unordered_multimap<std::pmr::string, std::pmr::string> const& module_name_to_reverse_dependencies
@@ -154,7 +154,7 @@ namespace h::compiler
 
             std::filesystem::path const& reverse_dependency_file_path = module_name_to_file_path.at(reverse_dependency_name);
 
-            std::optional<h::Module> const reverse_dependency = h::compiler::read_core_module_declarations(reverse_dependency_file_path);
+            std::optional<iris::Module> const reverse_dependency = iris::compiler::read_core_module_declarations(reverse_dependency_file_path);
             if (!reverse_dependency)
             {
                 std::puts(std::format("Could not read '{}'!", reverse_dependency_file_path.generic_string()).c_str());
@@ -197,7 +197,7 @@ namespace h::compiler
     }
 
     std::pmr::vector<std::pmr::string> find_modules_to_recompile(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Symbol_name_to_hash const& previous_symbol_name_to_hash,
         Symbol_name_to_hash const& new_symbol_name_to_hash,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path,

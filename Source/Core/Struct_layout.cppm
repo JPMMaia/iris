@@ -1,8 +1,8 @@
-export module h.core.struct_layout;
+export module iris.core.struct_layout;
 
 import std;
 
-namespace h
+namespace iris
 {
     export struct Struct_member_layout
     {

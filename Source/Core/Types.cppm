@@ -1,10 +1,10 @@
-export module h.core.types;
+export module iris.core.types;
 
 import std;
 
-import h.core;
+import iris.core;
 
-namespace h
+namespace iris
 {
     export Type_reference create_array_slice_type_reference(std::pmr::vector<Type_reference> element_type, bool is_mutable);
     export bool is_array_slice_type_reference(Type_reference const& type);
@@ -69,7 +69,7 @@ namespace h
 
     export std::optional<std::string_view> get_type_module_name(Type_reference const& type);
 
-    export h::Struct_declaration create_array_slice_type_struct_declaration(std::pmr::vector<Type_reference> const& element_type);
+    export iris::Struct_declaration create_array_slice_type_struct_declaration(std::pmr::vector<Type_reference> const& element_type);
 
     export template <typename Value_t, typename Function_t>
         bool visit_type_references_recursively(
@@ -79,26 +79,26 @@ namespace h
 
     export template <typename Function_t>
         bool visit_expressions(
-            h::Expression const& expression,
-            h::Statement const& statement,
+            iris::Expression const& expression,
+            iris::Statement const& statement,
             Function_t predicate
         );
 
     export template <typename Function_t>
         bool visit_expressions(
-            h::Statement const& statement,
+            iris::Statement const& statement,
             Function_t predicate
         );
 
     export template <typename Function_t>
         bool visit_expressions(
-            std::optional<h::Statement> const statement,
+            std::optional<iris::Statement> const statement,
             Function_t predicate
         );
 
     export template <typename Function_t>
         bool visit_expressions(
-            std::span<h::Statement const> const statements,
+            std::span<iris::Statement const> const statements,
             Function_t predicate
         );
 
@@ -238,11 +238,11 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Alias_type_declaration const& declaration,
+            iris::Alias_type_declaration const& declaration,
             Function_t predicate
         )
     {
-        for (h::Type_reference const& type_reference : declaration.type)
+        for (iris::Type_reference const& type_reference : declaration.type)
         {
             if (visit_type_references(type_reference, predicate))
                 return true;
@@ -253,7 +253,7 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Enum_declaration const& declaration,
+            iris::Enum_declaration const& declaration,
             Function_t predicate
         )
     {
@@ -262,7 +262,7 @@ namespace h
 
     export template <typename Function_t>
     bool visit_type_references(
-        h::Forward_declaration const& declaration,
+        iris::Forward_declaration const& declaration,
         Function_t predicate
     )
     {
@@ -271,7 +271,7 @@ namespace h
 
     export template <typename Function_t>
     bool visit_type_references(
-        h::Global_variable_declaration const& declaration,
+        iris::Global_variable_declaration const& declaration,
         Function_t predicate
     )
     {
@@ -289,11 +289,11 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Struct_declaration const& declaration,
+            iris::Struct_declaration const& declaration,
             Function_t predicate
         )
     {
-        for (h::Type_reference const& type_reference : declaration.member_types)
+        for (iris::Type_reference const& type_reference : declaration.member_types)
         {
             if (visit_type_references(type_reference, predicate))
                 return true;
@@ -304,11 +304,11 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Union_declaration const& declaration,
+            iris::Union_declaration const& declaration,
             Function_t predicate
         )
     {
-        for (h::Type_reference const& type_reference : declaration.member_types)
+        for (iris::Type_reference const& type_reference : declaration.member_types)
         {
             if (visit_type_references(type_reference, predicate))
                 return true;
@@ -319,11 +319,11 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Function_constructor const& declaration,
+            iris::Function_constructor const& declaration,
             Function_t predicate
         )
     {
-        for (h::Function_constructor_parameter const& parameter : declaration.parameters)
+        for (iris::Function_constructor_parameter const& parameter : declaration.parameters)
         {
             if (visit_type_references(parameter.type, predicate))
                 return true;
@@ -334,11 +334,11 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Type_constructor const& declaration,
+            iris::Type_constructor const& declaration,
             Function_t predicate
         )
     {
-        for (h::Type_constructor_parameter const& parameter : declaration.parameters)
+        for (iris::Type_constructor_parameter const& parameter : declaration.parameters)
         {
             if (visit_type_references(parameter.type, predicate))
                 return true;
@@ -349,17 +349,17 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Function_declaration const& declaration,
+            iris::Function_declaration const& declaration,
             Function_t predicate
         )
     {
-        for (h::Type_reference const& type_reference : declaration.type.input_parameter_types)
+        for (iris::Type_reference const& type_reference : declaration.type.input_parameter_types)
         {
             if (visit_type_references(type_reference, predicate))
                 return true;
         }
 
-        for (h::Type_reference const& type_reference : declaration.type.output_parameter_types)
+        for (iris::Type_reference const& type_reference : declaration.type.output_parameter_types)
         {
             if (visit_type_references(type_reference, predicate))
                 return true;
@@ -370,18 +370,18 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Expression const& expression,
-            h::Statement const& statement,
+            iris::Expression const& expression,
+            iris::Statement const& statement,
             Function_t predicate
         );
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Statement const& statement,
+            iris::Statement const& statement,
             Function_t predicate
         )
     {
-        for (h::Expression const& expression : statement.expressions)
+        for (iris::Expression const& expression : statement.expressions)
         {
             if (visit_type_references(expression, statement, predicate))
                 return true;
@@ -392,13 +392,13 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            std::span<h::Statement const> const statements,
+            std::span<iris::Statement const> const statements,
             Function_t predicate
         )
     {
-        for (h::Statement const& statement : statements)
+        for (iris::Statement const& statement : statements)
         {
-            for (h::Expression const& expression : statement.expressions)
+            for (iris::Expression const& expression : statement.expressions)
             {
                 if (visit_type_references(expression, statement, predicate))
                     return true;
@@ -410,12 +410,12 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Expression const& expression,
-            h::Statement const& statement,
+            iris::Expression const& expression,
+            iris::Statement const& statement,
             Function_t predicate
         )
     {
-        auto const process_expression = [&predicate](h::Expression const& expression, h::Statement const& statement) -> bool
+        auto const process_expression = [&predicate](iris::Expression const& expression, iris::Statement const& statement) -> bool
         {
             if (std::holds_alternative<Cast_expression>(expression.data))
             {
@@ -480,13 +480,13 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Function_definition const& definition,
+            iris::Function_definition const& definition,
             Function_t predicate
         )
     {
-        for (h::Statement const& statement : definition.statements)
+        for (iris::Statement const& statement : definition.statements)
         {
-            for (h::Expression const& expression : statement.expressions)
+            for (iris::Expression const& expression : statement.expressions)
             {
                 if (visit_type_references(expression, statement, predicate))
                     return true;
@@ -504,7 +504,7 @@ namespace h
     {
         for (Alias_type_declaration const& declaration : declarations.alias_type_declarations)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration.name, type_reference);
             };
@@ -515,7 +515,7 @@ namespace h
 
         for (Global_variable_declaration const& declaration : declarations.global_variable_declarations)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration.name, type_reference);
             };
@@ -526,7 +526,7 @@ namespace h
 
         for (Struct_declaration const& declaration : declarations.struct_declarations)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration.name, type_reference);
             };
@@ -537,7 +537,7 @@ namespace h
 
         for (Union_declaration const& declaration : declarations.union_declarations)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration.name, type_reference);
             };
@@ -548,7 +548,7 @@ namespace h
 
         for (Function_declaration const& declaration : declarations.function_declarations)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration.name, type_reference);
             };
@@ -568,12 +568,12 @@ namespace h
     {
         for (Function_definition const& definition : definitions.function_definitions)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(definition.name, type_reference);
             };
 
-            for (h::Statement const& statement : definition.statements)
+            for (iris::Statement const& statement : definition.statements)
             {
                 if (visit_type_references(statement, predicate_with_name))
                     return true;
@@ -597,7 +597,7 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references(
-            h::Module const& core_module,
+            iris::Module const& core_module,
             std::string_view const declaration_name,
             Function_t predicate
         )
@@ -606,7 +606,7 @@ namespace h
         {
             if (declaration.name == declaration_name)
             {
-                auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+                auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
                 {
                     return predicate(declaration.name, type_reference);
                 };
@@ -620,7 +620,7 @@ namespace h
         {
             if (declaration.name == declaration_name)
             {
-                auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+                auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
                 {
                     return predicate(declaration.name, type_reference);
                 };
@@ -634,7 +634,7 @@ namespace h
         {
             if (declaration.name == declaration_name)
             {
-                auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+                auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
                 {
                     return predicate(declaration.name, type_reference);
                 };
@@ -648,7 +648,7 @@ namespace h
         {
             if (declaration.name == declaration_name)
             {
-                auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+                auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
                 {
                     return predicate(declaration.name, type_reference);
                 };
@@ -663,7 +663,7 @@ namespace h
         {
             if (declaration.name == declaration_name)
             {
-                auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+                auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
                 {
                     return predicate(declaration.name, type_reference);
                 };
@@ -677,7 +677,7 @@ namespace h
         {
             if (declaration.name == declaration_name)
             {
-                auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+                auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
                 {
                     return predicate(declaration.name, type_reference);
                 };
@@ -691,7 +691,7 @@ namespace h
         {
             if (declaration.name == declaration_name)
             {
-                auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+                auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
                 {
                     return predicate(declaration.name, type_reference);
                 };
@@ -705,7 +705,7 @@ namespace h
         {
             if (declaration.name == declaration_name)
             {
-                auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+                auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
                 {
                     return predicate(declaration.name, type_reference);
                 };
@@ -719,7 +719,7 @@ namespace h
         {
             if (declaration.name == declaration_name)
             {
-                auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+                auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
                 {
                     return predicate(declaration.name, type_reference);
                 };
@@ -733,7 +733,7 @@ namespace h
         {
             if (declaration.name == declaration_name)
             {
-                auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+                auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
                 {
                     return predicate(declaration.name, type_reference);
                 };
@@ -752,7 +752,7 @@ namespace h
             Function_t predicate
         )
     {
-        auto const call_recursive = [&](h::Type_reference const& type_reference) -> bool
+        auto const call_recursive = [&](iris::Type_reference const& type_reference) -> bool
         {
             return visit_type_references_recursively(type_reference, predicate);
         };
@@ -762,14 +762,14 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references_recursively_with_declaration_name(
-            h::Module const& core_module,
+            iris::Module const& core_module,
             std::string_view const declaration_name,
             Function_t predicate
         )
     {
-        auto const call_recursive = [&](std::string_view const declaration_name, h::Type_reference const& type_reference) -> bool
+        auto const call_recursive = [&](std::string_view const declaration_name, iris::Type_reference const& type_reference) -> bool
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration_name, type_reference);
             };
@@ -782,11 +782,11 @@ namespace h
 
     export template <typename Function_t>
         bool visit_type_references_recursively(
-            h::Module const& core_module,
+            iris::Module const& core_module,
             Function_t predicate
         )
     {
-        auto const call_recursive = [&](std::string_view const declaration_name, h::Type_reference const& type_reference) -> bool
+        auto const call_recursive = [&](std::string_view const declaration_name, iris::Type_reference const& type_reference) -> bool
         {
             return visit_type_references_recursively(type_reference, predicate);
         };
@@ -800,9 +800,9 @@ namespace h
             Function_t predicate
         )
     {
-        auto const call_recursive = [&](std::string_view const declaration_name, h::Type_reference const& type_reference) -> bool
+        auto const call_recursive = [&](std::string_view const declaration_name, iris::Type_reference const& type_reference) -> bool
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration_name, type_reference);
             };
@@ -815,8 +815,8 @@ namespace h
 
     export template <typename Function_t>
         bool visit_expressions(
-            h::Expression const& expression,
-            h::Statement const& statement,
+            iris::Expression const& expression,
+            iris::Statement const& statement,
             Function_t predicate
         )
     {
@@ -891,11 +891,11 @@ namespace h
 
     export template <typename Function_t>
         bool visit_expressions(
-            h::Statement const& statement,
+            iris::Statement const& statement,
             Function_t predicate
         )
     {
-        for (h::Expression const& expression : statement.expressions)
+        for (iris::Expression const& expression : statement.expressions)
         {
             if (visit_expressions(expression, statement, predicate))
                 return true;
@@ -906,7 +906,7 @@ namespace h
 
     export template <typename Function_t>
         bool visit_expressions(
-            std::optional<h::Statement> const statement,
+            std::optional<iris::Statement> const statement,
             Function_t predicate
         )
     {
@@ -920,11 +920,11 @@ namespace h
 
     export template <typename Function_t>
         bool visit_expressions(
-            std::span<h::Statement const> const statements,
+            std::span<iris::Statement const> const statements,
             Function_t predicate
         )
     {
-        for (h::Statement const& statement : statements)
+        for (iris::Statement const& statement : statements)
         {
             if (visit_expressions(statement, predicate))
                 return true;
@@ -935,7 +935,7 @@ namespace h
 
     export template <typename Function_t>
     bool visit_expressions(
-        h::Function_declaration const& declaration,
+        iris::Function_declaration const& declaration,
         Function_t predicate
     )
     {
@@ -944,7 +944,7 @@ namespace h
 
     export template <typename Function_t>
         bool visit_expressions(
-            h::Function_definition const& definition,
+            iris::Function_definition const& definition,
             Function_t predicate
         )
     {
@@ -953,7 +953,7 @@ namespace h
 
     export template <typename Function_t>
         bool visit_expressions(
-            h::Enum_declaration const& declaration,
+            iris::Enum_declaration const& declaration,
             Function_t predicate
         )
     {
@@ -968,7 +968,7 @@ namespace h
 
     export template <typename Function_t>
     bool visit_expressions(
-        h::Global_variable_declaration const& declaration,
+        iris::Global_variable_declaration const& declaration,
         Function_t predicate
     )
     {
@@ -980,7 +980,7 @@ namespace h
 
     export template <typename Function_t>
         bool visit_expressions(
-            h::Struct_declaration const& declaration,
+            iris::Struct_declaration const& declaration,
             Function_t predicate
         )
     {
@@ -1022,7 +1022,7 @@ namespace h
     {
         for (Function_definition const& definition : definitions.function_definitions)
         {
-            for (h::Statement const& statement : definition.statements)
+            for (iris::Statement const& statement : definition.statements)
             {
                 if (visit_expressions(statement, predicate))
                     return true;

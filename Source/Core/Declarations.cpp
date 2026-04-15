@@ -1,13 +1,13 @@
-module h.core.declarations;
+module iris.core.declarations;
 
 import std;
 
-import h.common;
-import h.core;
-import h.core.execution_engine;
-import h.core.types;
+import iris.common;
+import iris.core;
+import iris.core.execution_engine;
+import iris.core.types;
 
-namespace h
+namespace iris
 {
     bool are_type_instances_equivalent(Type_instance const& lhs, Type_instance const& rhs)
     {
@@ -47,15 +47,15 @@ namespace h
         Declaration_database& database,
         std::string_view const module_name,
         bool const are_export,
-        std::span<h::Alias_type_declaration const> const alias_type_declarations,
-        std::span<h::Enum_declaration const> const enum_declarations,
-        std::span<h::Forward_declaration const> forward_declarations,
-        std::span<h::Global_variable_declaration const> global_variable_declarations,
-        std::span<h::Struct_declaration const> const struct_declarations,
-        std::span<h::Union_declaration const> const union_declarations,
-        std::span<h::Function_declaration const> const function_declarations,
-        std::span<h::Function_constructor const> const function_constructors,
-        std::span<h::Type_constructor const> const type_constructors
+        std::span<iris::Alias_type_declaration const> const alias_type_declarations,
+        std::span<iris::Enum_declaration const> const enum_declarations,
+        std::span<iris::Forward_declaration const> forward_declarations,
+        std::span<iris::Global_variable_declaration const> global_variable_declarations,
+        std::span<iris::Struct_declaration const> const struct_declarations,
+        std::span<iris::Union_declaration const> const union_declarations,
+        std::span<iris::Function_declaration const> const function_declarations,
+        std::span<iris::Function_constructor const> const function_constructors,
+        std::span<iris::Type_constructor const> const type_constructors
     )
     {
         Declaration_map& map = database.map[module_name.data()];
@@ -153,7 +153,7 @@ namespace h
         Declaration_database& database,
         std::string_view const module_name,
         bool const is_export,
-        h::Struct_declaration const& declaration
+        iris::Struct_declaration const& declaration
     )
     {
         Declaration_map& map = database.map[module_name.data()];
@@ -164,7 +164,7 @@ namespace h
         Declaration_database& database,
         std::string_view const module_name,
         bool const is_export,
-        h::Function_declaration const& declaration
+        iris::Function_declaration const& declaration
     )
     {
         Declaration_map& map = database.map[module_name.data()];
@@ -256,7 +256,7 @@ namespace h
 
     std::optional<Declaration> find_declaration_using_import_alias(
         Declaration_database const& database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::string_view const import_alias_name,
         std::string_view const declaration_name
     )
@@ -278,7 +278,7 @@ namespace h
 
     std::optional<Declaration> find_underlying_declaration_using_import_alias(
         Declaration_database const& database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::string_view const import_alias_name,
         std::string_view const declaration_name
     )
@@ -299,7 +299,7 @@ namespace h
     }
 
     std::optional<Declaration> find_declaration_in_instanced_module_declarations(
-        h::Module_instanced_declarations const& declarations,
+        iris::Module_instanced_declarations const& declarations,
         std::string_view const module_name,
         std::string_view const declaration_name
     )
@@ -476,11 +476,11 @@ namespace h
 
         std::pmr::polymorphic_allocator<> allocator = {}; // TODO
 
-        h::execution_engine::Execution_engine engine = h::execution_engine::create_execution_engine(
+        iris::execution_engine::Execution_engine engine = iris::execution_engine::create_execution_engine(
             allocator
         );
 
-        h::execution_engine::Value_storage const created_declaration = h::execution_engine::evaluate_type_constructor(
+        iris::execution_engine::Value_storage const created_declaration = iris::execution_engine::evaluate_type_constructor(
             engine,
             type_constructor,
             type_instance.arguments
@@ -506,7 +506,7 @@ namespace h
         return std::pmr::string{std::format("{}@{}@{}", type_instance.type_constructor.module_reference.name, type_instance.type_constructor.name, type_instance_hash)};
     }
 
-    std::optional<h::Custom_type_reference> unmangle_type_instance_name(
+    std::optional<iris::Custom_type_reference> unmangle_type_instance_name(
         std::string_view const name
     )
     {
@@ -524,7 +524,7 @@ namespace h
         std::size_t const type_constructor_name_length = std::distance(first_location + 1, second_location);
         std::string_view const type_constructor_name = name.substr(module_name_length + 1, type_constructor_name_length);
 
-        return h::Custom_type_reference{
+        return iris::Custom_type_reference{
             .module_reference { .name = std::pmr::string{module_name} },
             .name = std::pmr::string{type_constructor_name}
         };
@@ -532,7 +532,7 @@ namespace h
 
     std::optional<Custom_type_reference> get_function_constructor_type_reference(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Expression const& expression,
         Statement const& statement
     )
@@ -572,9 +572,9 @@ namespace h
                 .name = access_expression.member_name
             };
         }
-        else if (std::holds_alternative<h::Instance_call_expression>(expression.data))
+        else if (std::holds_alternative<iris::Instance_call_expression>(expression.data))
         {
-            Instance_call_expression const& data = std::get<h::Instance_call_expression>(expression.data);
+            Instance_call_expression const& data = std::get<iris::Instance_call_expression>(expression.data);
 
             return get_function_constructor_type_reference(
                 declaration_database,
@@ -589,7 +589,7 @@ namespace h
 
     Instance_call_key create_instance_call_key(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Instance_call_expression const& expression,
         Statement const& statement
     )
@@ -634,7 +634,7 @@ namespace h
 
     Function_constructor const* get_function_constructor(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Expression const& expression,
         Statement const& statement
     )
@@ -683,7 +683,7 @@ namespace h
         return std::format("{}@{}@{}", key.module_name, key.function_constructor_name, instance_call_hash);
     }
 
-    std::optional<h::Custom_type_reference> unmangle_instance_call_name(
+    std::optional<iris::Custom_type_reference> unmangle_instance_call_name(
         std::string_view const name
     )
     {
@@ -701,7 +701,7 @@ namespace h
         std::size_t const function_constructor_name_length = std::distance(first_location + 1, second_location);
         std::string_view const function_constructor_name = name.substr(module_name_length + 1, function_constructor_name_length);
 
-        return h::Custom_type_reference{
+        return iris::Custom_type_reference{
             .module_reference { .name = std::pmr::string{module_name} },
             .name = std::pmr::string{function_constructor_name}
         };
@@ -715,11 +715,11 @@ namespace h
     {
         std::pmr::polymorphic_allocator<> allocator = {}; // TODO
 
-        h::execution_engine::Execution_engine engine = h::execution_engine::create_execution_engine(
+        iris::execution_engine::Execution_engine engine = iris::execution_engine::create_execution_engine(
             allocator
         );
 
-        Function_expression function_expression = h::execution_engine::evaluate_function_constructor(
+        Function_expression function_expression = iris::execution_engine::evaluate_function_constructor(
             engine,
             function_constructor,
             arguments
@@ -737,7 +737,7 @@ namespace h
 
     std::pair<Instance_call_key, Function_expression> create_instance_call_expression_value(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Instance_call_expression const& expression,
         Statement const& statement
     )
@@ -829,11 +829,11 @@ namespace h
         return name;
     }
 
-    std::optional<h::Source_range_location> get_declaration_source_location(
+    std::optional<iris::Source_range_location> get_declaration_source_location(
         Declaration const& declaration
     )
     {
-       std::optional<h::Source_range_location> source_location;
+       std::optional<iris::Source_range_location> source_location;
 
         std::visit([&](auto const& data) -> void {
             source_location = data->source_location;

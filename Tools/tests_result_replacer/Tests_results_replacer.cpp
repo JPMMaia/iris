@@ -9,9 +9,9 @@ module;
 #include <string_view>
 #include <vector>
 
-module h.tools.tests_results_replacer;
+module iris.tools.tests_results_replacer;
 
-namespace h::tools::tests_results_replacer
+namespace iris::tools::tests_results_replacer
 {
     std::optional<std::pmr::string> get_file_contents(std::filesystem::path const& path)
     {

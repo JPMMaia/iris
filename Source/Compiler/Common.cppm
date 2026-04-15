@@ -1,12 +1,12 @@
-export module h.compiler.common;
+export module iris.compiler.common;
 
 import std;
 import llvm;
 
-import h.core;
-import h.core.declarations;
+import iris.core;
+import iris.core.declarations;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export std::string_view to_string_view(llvm::StringRef const string);
 
@@ -17,7 +17,7 @@ namespace h::compiler
     );
 
     export std::string mangle_name(
-        h::Declaration_database const& declaration_database,
+        iris::Declaration_database const& declaration_database,
         std::string_view const module_name,
         std::string_view const declaration_name
     );
@@ -56,9 +56,9 @@ namespace h::compiler
         std::string_view name
     );
 
-    export h::Module const* get_module(
+    export iris::Module const* get_module(
         std::string_view const module_name,
-        h::Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, h::Module> const& core_module_dependencies
+        iris::Module const& core_module,
+        std::pmr::unordered_map<std::pmr::string, iris::Module> const& core_module_dependencies
     );
 }

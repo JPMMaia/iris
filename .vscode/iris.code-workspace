@@ -11,7 +11,7 @@
 				"name": "Generate JSON serializer",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
+				"program": "${workspaceFolder}/build/Tools/code_generator/Iris_Tools_Generate_JSON.exe",
 				"args": [
 					"serialize_json_code",
 					"${workspaceFolder}/Source/Core/Core.cppm",
@@ -23,7 +23,7 @@
 				"name": "Generate JSON operators",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
+				"program": "${workspaceFolder}/build/Tools/code_generator/Iris_Tools_Generate_JSON.exe",
 				"args": [
 					"operators",
 					"${workspaceFolder}/Source/Core/Core.cppm",
@@ -35,9 +35,9 @@
 				"name": "Replace Compiler Tests",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/tests_result_replacer/H_Tools_Replace_tests_results.exe",
+				"program": "${workspaceFolder}/build/Tools/tests_result_replacer/Iris_Tools_Replace_tests_results.exe",
 				"args": [
-					"${workspaceFolder}/build/Source/Compiler/H_compiler_tests.exe",
+					"${workspaceFolder}/build/Source/Compiler/Iris_compiler_tests.exe",
 					"${workspaceFolder}/Source/Compiler/Compiler.tests.cpp",
 				],
 				"cwd": "${workspaceFolder}"
@@ -46,7 +46,7 @@
 				"name": "C Header Importer tests",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Interoperability/H_c_header_importer_tests.exe",
+				"program": "${workspaceFolder}/build/Source/Interoperability/Iris_c_header_importer_tests.exe",
 				"args": [],
 				"cwd": "${workspaceFolder}",
 			},
@@ -54,7 +54,7 @@
 				"name": "Generate TypeScript interface",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
+				"program": "${workspaceFolder}/build/Tools/code_generator/Iris_Tools_Generate_JSON.exe",
 				"args": [
 					"typescript_interface",
 					"${workspaceFolder}/Source/Core/Core.cppm",
@@ -66,7 +66,7 @@
 				"name": "Generate TypeScript intermediate representation",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/H_Tools_Generate_JSON.exe",
+				"program": "${workspaceFolder}/build/Tools/code_generator/Iris_Tools_Generate_JSON.exe",
 				"args": [
 					"typescript_intermediate_representation",
 					"${workspaceFolder}/Source/Core/Core.cppm",
@@ -75,10 +75,10 @@
 				"cwd": "${workspaceFolder}",
 			},
 			{
-				"name": "hlang build-artifact",
+				"name": "iris build-artifact",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"build-artifact",
 					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/iris_artifact.json",
@@ -89,10 +89,10 @@
 				"cwd": "${workspaceFolder}/build",
 			},
 			{
-				"name": "hlang build-artifact rts-game",
+				"name": "iris build-artifact rts-game",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"build-artifact",
 					"--output-llvm-ir",
@@ -106,10 +106,10 @@
 				"cwd": "${workspaceFolder}/build",
 			},
 			{
-				"name": "hlang build-tests rts-game",
+				"name": "iris build-tests rts-game",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"build-tests",
 					"--output-llvm-ir",
@@ -134,10 +134,10 @@
 				"cwd": "${workspaceFolder}/build",
 			},
 			{
-				"name": "hlang run-with-jit",
+				"name": "iris run-with-jit",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"run-with-jit",
 					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/iris_artifact.json",
@@ -148,10 +148,10 @@
 				"cwd": "${workspaceFolder}/build/tmp",
 			},
 			{
-				"name": "hlang run-with-jit MythologyEngine",
+				"name": "iris run-with-jit MythologyEngine",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"run-with-jit",
 					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/iris_artifact.json",
@@ -163,10 +163,10 @@
 				"cwd": "${workspaceFolder}/../MythologyEngine",
 			},
 			{
-				"name": "hlang import-c-header",
+				"name": "iris import-c-header",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"import-c-header",
 					"c.complex",
@@ -176,10 +176,10 @@
 				"cwd": "${workspaceFolder}/build",
 			},
 			{
-				"name": "hlang print-struct-layout",
+				"name": "iris print-struct-layout",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"print-struct-layout",
 					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/no_artifact/code_lens_0.generated.irisb",
@@ -188,10 +188,10 @@
 				"cwd": "${workspaceFolder}/build",
 			},
 			{
-				"name": "hlang generate-compile-commands rts-game",
+				"name": "iris generate-compile-commands rts-game",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
+				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"generate-compile-commands",
 					"--artifact-file=${workspaceFolder}/../rts-game/source/game/iris_artifact.json",
@@ -208,7 +208,7 @@
 				"name": "Run Language Server",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Language_server/hlang_language_server.exe",
+				"program": "${workspaceFolder}/build/Source/Language_server/iris_language_server.exe",
 				"args": [],
 				"cwd": "${workspaceFolder}/build"
 			},
@@ -216,7 +216,7 @@
 				"name": "Attach to Language Server",
 				"type": "lldb-dap",
 				"request": "attach",
-				"program": "${workspaceFolder}/build/Source/Language_server/hlang_language_server"
+				"program": "${workspaceFolder}/build/Source/Language_server/iris_language_server"
 			},
 			{
 				"name": "Run Language Client",
@@ -235,7 +235,7 @@
 				],
 				"env": {
 					"mode": "debug",
-					"hlang_language_server": "${workspaceFolder}/build/Source/Language_server/hlang_language_server.exe"
+					"iris_language_server": "${workspaceFolder}/build/Source/Language_server/iris_language_server.exe"
 				}
 			},
 			{
@@ -249,14 +249,14 @@
 				"preLaunchTask": "Build Language Client and Server",
 				"env": {
 					"mode": "debug",
-					"hlang_language_server": "${workspaceFolder}/build/Source/Language_server/hlang_language_server.exe"
+					"iris_language_server": "${workspaceFolder}/build/Source/Language_server/iris_language_server.exe"
 				}
 			},
 			{
 				"name": "Compiler Tests",
 				"type": "lldb-dap",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Compiler/H_compiler_tests.exe",
+				"program": "${workspaceFolder}/build/Source/Compiler/Iris_compiler_tests.exe",
 				"args": [
 					"[JIT]"
 				],
@@ -284,7 +284,7 @@
 				],
 				"preLaunchTask": "Build Language Client",
 				"env": {
-					"hlang_language_server": "${workspaceFolder}/build/Source/Language_server/hlang_language_server.exe"
+					"iris_language_server": "${workspaceFolder}/build/Source/Language_server/iris_language_server.exe"
 				}
 			},
 		],
@@ -350,7 +350,7 @@
 					"--build",
 					"${workspaceFolder}/build",
 					"--target",
-					"H_language_server_app"
+					"Iris_language_server_app"
 				],
 				"problemMatcher": [
 					"$msCompile"
@@ -432,13 +432,13 @@
 				]
 			},
 			{
-				"label": "Install Debug Hlang",
+				"label": "Install Debug Iris",
 				"type": "shell",
 				"command": "python",
 				"args": [
 					"${workspaceFolder}/Scripts/build_utilities.py",
-					"install_hlang",
-					"${workspaceFolder}/../Hlang_install",
+					"install_iris",
+					"${workspaceFolder}/../Iris_install",
 					"--configuration",
 					"debug"
 				],
@@ -451,13 +451,13 @@
 				]
 			},
 			{
-				"label": "Install Release Hlang",
+				"label": "Install Release Iris",
 				"type": "shell",
 				"command": "python",
 				"args": [
 					"${workspaceFolder}/Scripts/build_utilities.py",
-					"install_hlang",
-					"${workspaceFolder}/../Hlang_install"
+					"install_iris",
+					"${workspaceFolder}/../Iris_install"
 				],
 				"presentation": {
 					"reveal": "always"
@@ -618,7 +618,7 @@
 		"chat.tools.terminal.autoApprove": {
 			"Enter-VsDevEnv": true,
 			"cmake": true,
-			"./build/Source/Compiler/H_compiler_tests.exe": true
+			"./build/Source/Compiler/Iris_compiler_tests.exe": true
 		}
 	}
 }

@@ -8,19 +8,19 @@ module;
 
 #include <lsp/types.h>
 
-module h.language_server.completion;
+module iris.language_server.completion;
 
-import h.compiler.analysis;
-import h.compiler.artifact;
-import h.core;
-import h.core.declarations;
-import h.core.types;
-import h.language_server.core;
-import h.language_server.location;
-import h.parser.convertor;
-import h.parser.parse_tree;
+import iris.compiler.analysis;
+import iris.compiler.artifact;
+import iris.core;
+import iris.core.declarations;
+import iris.core.types;
+import iris.language_server.core;
+import iris.language_server.location;
+import iris.parser.convertor;
+import iris.parser.parse_tree;
 
-namespace h::language_server
+namespace iris::language_server
 {
     static std::optional<std::string> create_sort_string(
         std::string_view const label
@@ -46,14 +46,14 @@ namespace h::language_server
     }
 
     static std::pmr::vector<std::string_view> get_module_names(
-        std::span<h::Module const* const> const core_modules,
+        std::span<iris::Module const* const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
         std::pmr::vector<std::string_view> module_names{output_allocator};
         module_names.reserve(core_modules.size());
 
-        for (h::Module const* core_module : core_modules)
+        for (iris::Module const* core_module : core_modules)
         {
             if (core_module == nullptr)
                 continue;
@@ -112,12 +112,12 @@ namespace h::language_server
 
     static void add_enum_member_items(
         std::vector<lsp::CompletionItem>& items,
-        h::Enum_declaration const& declaration
+        iris::Enum_declaration const& declaration
     )
     {
         items.reserve(items.size() + declaration.values.size());
 
-        for (h::Enum_value const& value : declaration.values)
+        for (iris::Enum_value const& value : declaration.values)
         {
             items.push_back(
                 create_completion_item(value.name, lsp::CompletionItemKind::EnumMember)
@@ -130,10 +130,10 @@ namespace h::language_server
         Declaration const& declaration
     )
     {
-        std::pmr::vector<h::compiler::Declaration_member_info> const member_infos = h::compiler::get_declaration_member_infos(declaration, {});
+        std::pmr::vector<iris::compiler::Declaration_member_info> const member_infos = iris::compiler::get_declaration_member_infos(declaration, {});
         items.reserve(items.size() + member_infos.size());
         
-        for (h::compiler::Declaration_member_info const& member_info : member_infos)
+        for (iris::compiler::Declaration_member_info const& member_info : member_infos)
         {
             items.push_back(
                 create_completion_item(member_info.member_name, lsp::CompletionItemKind::Field)
@@ -157,12 +157,12 @@ namespace h::language_server
 
     static void add_scope_variable_items(
         std::vector<lsp::CompletionItem>& items,
-        h::compiler::Scope const& scope
+        iris::compiler::Scope const& scope
     )
     {
         items.reserve(items.size() + scope.variables.size());
 
-        for (h::compiler::Variable const& variable : scope.variables)
+        for (iris::compiler::Variable const& variable : scope.variables)
         {
             items.push_back(
                 create_completion_item(variable.name, lsp::CompletionItemKind::Variable)
@@ -191,7 +191,7 @@ namespace h::language_server
 
     static void add_import_alias_items(
         std::vector<lsp::CompletionItem>& items,
-        h::Module const& core_module
+        iris::Module const& core_module
     )
     {
         items.reserve(items.size() + core_module.dependencies.alias_imports.size());
@@ -212,41 +212,41 @@ namespace h::language_server
     {
         auto const process_declaration = [&](Declaration const& declaration) -> bool {
 
-            if (std::holds_alternative<h::Alias_type_declaration const*>(declaration.data))
+            if (std::holds_alternative<iris::Alias_type_declaration const*>(declaration.data))
             {
-                h::Alias_type_declaration const& data = *std::get<h::Alias_type_declaration const*>(declaration.data);
+                iris::Alias_type_declaration const& data = *std::get<iris::Alias_type_declaration const*>(declaration.data);
 
                 items.push_back(
                     create_completion_item(data.name, lsp::CompletionItemKind::TypeParameter)
                 );
             }
-            else if (std::holds_alternative<h::Enum_declaration const*>(declaration.data))
+            else if (std::holds_alternative<iris::Enum_declaration const*>(declaration.data))
             {
-                h::Enum_declaration const& data = *std::get<h::Enum_declaration const*>(declaration.data);
+                iris::Enum_declaration const& data = *std::get<iris::Enum_declaration const*>(declaration.data);
                 
                 items.push_back(
                     create_completion_item(data.name, lsp::CompletionItemKind::Enum)
                 );
             }
-            else if (std::holds_alternative<h::Struct_declaration const*>(declaration.data))
+            else if (std::holds_alternative<iris::Struct_declaration const*>(declaration.data))
             {
-                h::Struct_declaration const& data = *std::get<h::Struct_declaration const*>(declaration.data);
+                iris::Struct_declaration const& data = *std::get<iris::Struct_declaration const*>(declaration.data);
 
                 items.push_back(
                     create_completion_item(data.name, lsp::CompletionItemKind::Struct)
                 );
             }
-            else if (std::holds_alternative<h::Union_declaration const*>(declaration.data))
+            else if (std::holds_alternative<iris::Union_declaration const*>(declaration.data))
             {
-                h::Union_declaration const& data = *std::get<h::Union_declaration const*>(declaration.data);
+                iris::Union_declaration const& data = *std::get<iris::Union_declaration const*>(declaration.data);
 
                 items.push_back(
                     create_completion_item(data.name, lsp::CompletionItemKind::Struct)
                 );
             }
-            else if (std::holds_alternative<h::Type_constructor const*>(declaration.data))
+            else if (std::holds_alternative<iris::Type_constructor const*>(declaration.data))
             {
-                h::Type_constructor const& data = *std::get<h::Type_constructor const*>(declaration.data);
+                iris::Type_constructor const& data = *std::get<iris::Type_constructor const*>(declaration.data);
 
                 items.push_back(
                     create_completion_item(data.name, lsp::CompletionItemKind::Constructor)
@@ -271,33 +271,33 @@ namespace h::language_server
     {
         auto const process_declaration = [&](Declaration const& declaration) -> bool {
 
-            if (std::holds_alternative<h::Enum_declaration const*>(declaration.data))
+            if (std::holds_alternative<iris::Enum_declaration const*>(declaration.data))
             {
-                h::Enum_declaration const& data = *std::get<h::Enum_declaration const*>(declaration.data);
+                iris::Enum_declaration const& data = *std::get<iris::Enum_declaration const*>(declaration.data);
                 
                 items.push_back(
                     create_completion_item(data.name, lsp::CompletionItemKind::Enum)
                 );
             }
-            else if (std::holds_alternative<h::Function_declaration const*>(declaration.data))
+            else if (std::holds_alternative<iris::Function_declaration const*>(declaration.data))
             {
-                h::Function_declaration const& data = *std::get<h::Function_declaration const*>(declaration.data);
+                iris::Function_declaration const& data = *std::get<iris::Function_declaration const*>(declaration.data);
 
                 items.push_back(
                     create_completion_item(data.name, lsp::CompletionItemKind::Function)
                 );
             }
-            else if (std::holds_alternative<h::Global_variable_declaration const*>(declaration.data))
+            else if (std::holds_alternative<iris::Global_variable_declaration const*>(declaration.data))
             {
-                h::Global_variable_declaration const& data = *std::get<h::Global_variable_declaration const*>(declaration.data);
+                iris::Global_variable_declaration const& data = *std::get<iris::Global_variable_declaration const*>(declaration.data);
 
                 items.push_back(
-                    create_completion_item(data.name, data.global_type == h::Global_variable_type::Macro ? lsp::CompletionItemKind::Constant : lsp::CompletionItemKind::Variable)
+                    create_completion_item(data.name, data.global_type == iris::Global_variable_type::Macro ? lsp::CompletionItemKind::Constant : lsp::CompletionItemKind::Variable)
                 );
             }
-            else if (std::holds_alternative<h::Function_constructor const*>(declaration.data))
+            else if (std::holds_alternative<iris::Function_constructor const*>(declaration.data))
             {
-                h::Function_constructor const& data = *std::get<h::Function_constructor const*>(declaration.data);
+                iris::Function_constructor const& data = *std::get<iris::Function_constructor const*>(declaration.data);
 
                 items.push_back(
                     create_completion_item(data.name, lsp::CompletionItemKind::Constructor)
@@ -316,7 +316,7 @@ namespace h::language_server
 
     static lsp::CompletionList create_type_completion_list(
         Declaration_database const& declaration_database,
-        h::Module const& core_module
+        iris::Module const& core_module
     )
     {
         std::vector<lsp::CompletionItem> items = {};
@@ -334,17 +334,17 @@ namespace h::language_server
 
     static std::optional<lsp::CompletionList> create_module_type_completion_list(
         Declaration_database const& declaration_database,
-        h::parser::Parse_tree const& parse_tree,
-        h::Module const& core_module,
-        h::parser::Parse_node const& node_before
+        iris::parser::Parse_tree const& parse_tree,
+        iris::Module const& core_module,
+        iris::parser::Parse_node const& node_before
     )
     {
-        std::optional<h::parser::Parse_node> const node_to_access = h::parser::get_node_previous_sibling(node_before);
+        std::optional<iris::parser::Parse_node> const node_to_access = iris::parser::get_node_previous_sibling(node_before);
         if (!node_to_access.has_value())
             return std::nullopt;
 
-        std::string_view const node_to_access_value = h::parser::get_node_value(parse_tree, node_to_access.value());
-        h::Import_module_with_alias const* import_module = find_import_module_with_alias(
+        std::string_view const node_to_access_value = iris::parser::get_node_value(parse_tree, node_to_access.value());
+        iris::Import_module_with_alias const* import_module = find_import_module_with_alias(
             core_module,
             node_to_access_value
         );
@@ -364,12 +364,12 @@ namespace h::language_server
 
     static lsp::CompletionList create_value_completion_list(
         Declaration_database const& declaration_database,
-        h::parser::Parse_tree const& parse_tree,
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
-        h::Function_definition const* const function_definition,
-        h::parser::Parse_node const& node_before,
-        h::Source_position const& source_position
+        iris::parser::Parse_tree const& parse_tree,
+        iris::Module const& core_module,
+        iris::Function_declaration const* const function_declaration,
+        iris::Function_definition const* const function_definition,
+        iris::parser::Parse_node const& node_before,
+        iris::Source_position const& source_position
     )
     {
         std::vector<lsp::CompletionItem> items = {};
@@ -378,14 +378,14 @@ namespace h::language_server
 
         if (function_declaration != nullptr && function_definition != nullptr)
         {
-            h::Source_range const node_before_source_range = h::parser::get_node_source_range(node_before);
+            iris::Source_range const node_before_source_range = iris::parser::get_node_source_range(node_before);
             std::string_view const node_before_value = get_node_value(parse_tree, node_before);
-            h::Source_position const scope_source_position = 
+            iris::Source_position const scope_source_position = 
                 node_before_value.ends_with(";") ?
-                h::Source_position{ .line = node_before_source_range.end.line, .column = node_before_source_range.end.column - 1 } :
+                iris::Source_position{ .line = node_before_source_range.end.line, .column = node_before_source_range.end.column - 1 } :
                 node_before_source_range.end;
 
-            std::optional<h::compiler::Scope> const scope = h::compiler::calculate_scope(
+            std::optional<iris::compiler::Scope> const scope = iris::compiler::calculate_scope(
                 core_module,
                 *function_declaration,
                 *function_definition,
@@ -424,16 +424,16 @@ namespace h::language_server
         };
     }
 
-    static h::Source_position get_access_operator_source_position(
+    static iris::Source_position get_access_operator_source_position(
         std::string_view const operator_value,
-        h::Source_position const source_position_after_dot
+        iris::Source_position const source_position_after_dot
     )
     {
         if (source_position_after_dot.column > 1)
         {
             if (source_position_after_dot.column > 1)
             {
-                return h::Source_position
+                return iris::Source_position
                 {
                     .line = source_position_after_dot.line,
                     .column = source_position_after_dot.column - static_cast<std::uint32_t>(operator_value.size())
@@ -445,12 +445,12 @@ namespace h::language_server
     }
 
     static std::optional<std::string_view> find_access_operator_before_source_position(
-        h::parser::Parse_tree const& parse_tree,
-        h::parser::Parse_node const& hint_node,
-        h::Source_position const source_position
+        iris::parser::Parse_tree const& parse_tree,
+        iris::parser::Parse_node const& hint_node,
+        iris::Source_position const source_position
     )
     {
-        std::uint32_t const end_byte = h::parser::calculate_byte(
+        std::uint32_t const end_byte = iris::parser::calculate_byte(
             parse_tree,
             hint_node,
             source_position
@@ -482,7 +482,7 @@ namespace h::language_server
 
     static std::optional<lsp::CompletionList> create_access_value_completion_list_for_expression_type(
         Declaration_database const& declaration_database,
-        h::Type_reference const& expression_type
+        iris::Type_reference const& expression_type
     )
     {
         if (is_array_slice_type_reference(expression_type))
@@ -551,16 +551,16 @@ namespace h::language_server
 
     static std::optional<lsp::CompletionList> create_access_value_completion_list(
         Declaration_database const& declaration_database,
-        h::parser::Parse_tree const& parse_tree,
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
-        h::Function_definition const* const function_definition,
-        h::parser::Parse_node const& hint_node,
+        iris::parser::Parse_tree const& parse_tree,
+        iris::Module const& core_module,
+        iris::Function_declaration const* const function_declaration,
+        iris::Function_definition const* const function_definition,
+        iris::parser::Parse_node const& hint_node,
         std::string_view const access_operator,
-        h::Source_position const source_position
+        iris::Source_position const source_position
     )
     {
-        std::optional<h::parser::Parse_node> const node_to_access = h::parser::find_node_before_source_position(
+        std::optional<iris::parser::Parse_node> const node_to_access = iris::parser::find_node_before_source_position(
             parse_tree,
             hint_node,
             get_access_operator_source_position(access_operator, source_position)
@@ -568,8 +568,8 @@ namespace h::language_server
         if (!node_to_access.has_value())
             return std::nullopt;
 
-        std::string_view const node_to_access_value = h::parser::get_node_value(parse_tree, node_to_access.value());
-        h::Import_module_with_alias const* import_module = find_import_module_with_alias(
+        std::string_view const node_to_access_value = iris::parser::get_node_value(parse_tree, node_to_access.value());
+        iris::Import_module_with_alias const* import_module = find_import_module_with_alias(
             core_module,
             node_to_access_value
         );
@@ -586,10 +586,10 @@ namespace h::language_server
             };
         }
 
-        h::Statement access_statement;
-        h::parser::node_to_expression(
+        iris::Statement access_statement;
+        iris::parser::node_to_expression(
             access_statement,
-            h::parser::create_module_info(core_module),
+            iris::parser::create_module_info(core_module),
             parse_tree,
             node_to_access.value(),
             {},
@@ -599,9 +599,9 @@ namespace h::language_server
         if (access_statement.expressions.empty())
             return std::nullopt;
 
-        h::Expression const& first_expression = access_statement.expressions[0];
+        iris::Expression const& first_expression = access_statement.expressions[0];
 
-        h::Enum_declaration const* const enum_declaration = find_enum_declaration_using_expression(
+        iris::Enum_declaration const* const enum_declaration = find_enum_declaration_using_expression(
             declaration_database,
             core_module,
             access_statement,
@@ -622,12 +622,12 @@ namespace h::language_server
 
         if (function_declaration != nullptr && function_definition != nullptr)
         {
-            h::Source_position const scope_source_position = get_access_operator_source_position(
+            iris::Source_position const scope_source_position = get_access_operator_source_position(
                 access_operator,
                 source_position
             );
 
-            std::optional<h::compiler::Scope> const scope = h::compiler::calculate_scope(
+            std::optional<iris::compiler::Scope> const scope = iris::compiler::calculate_scope(
                 core_module,
                 *function_declaration,
                 *function_definition,
@@ -637,7 +637,7 @@ namespace h::language_server
 
             if (scope.has_value())
             {
-                std::optional<h::Type_reference> const expression_type = h::compiler::get_expression_type(
+                std::optional<iris::Type_reference> const expression_type = iris::compiler::get_expression_type(
                     core_module,
                     function_declaration,
                     scope.value(),
@@ -652,7 +652,7 @@ namespace h::language_server
                     {
                         if (is_soa_array_type_reference(expression_type.value()))
                         {
-                            h::Soa_array_type const& soa_type = std::get<h::Soa_array_type>(expression_type.value().data);
+                            iris::Soa_array_type const& soa_type = std::get<iris::Soa_array_type>(expression_type.value().data);
                             if (!soa_type.value_type.empty())
                             {
                                 std::optional<Declaration> const element_declaration = find_underlying_declaration(
@@ -677,7 +677,7 @@ namespace h::language_server
 
                         if (is_soa_array_view_type_reference(expression_type.value()))
                         {
-                            h::Soa_array_view_type const& soa_view_type = std::get<h::Soa_array_view_type>(expression_type.value().data);
+                            iris::Soa_array_view_type const& soa_view_type = std::get<iris::Soa_array_view_type>(expression_type.value().data);
                             if (!soa_view_type.value_type.empty())
                             {
                                 std::optional<Declaration> const element_declaration = find_underlying_declaration(
@@ -700,7 +700,7 @@ namespace h::language_server
                             return std::nullopt;
                         }
 
-                        std::optional<h::Type_reference> const value_type = remove_pointer(expression_type.value());
+                        std::optional<iris::Type_reference> const value_type = remove_pointer(expression_type.value());
                         if (value_type.has_value())
                         {
                             return create_access_value_completion_list_for_expression_type(declaration_database, value_type.value());
@@ -716,11 +716,11 @@ namespace h::language_server
     }
 
     static bool expects_type(
-        h::parser::Parse_tree const& parse_tree,
-        h::parser::Parse_node const& node_before
+        iris::parser::Parse_tree const& parse_tree,
+        iris::parser::Parse_node const& node_before
     )
     {
-        std::string_view const node_before_value = h::parser::get_node_value(parse_tree, node_before);
+        std::string_view const node_before_value = iris::parser::get_node_value(parse_tree, node_before);
 
         if (node_before_value == "as")
         {
@@ -728,10 +728,10 @@ namespace h::language_server
         }
         else if (node_before_value == ":")
         {
-            std::optional<h::parser::Parse_node> const var_node = h::parser::get_node_previous_sibling(node_before, 2);
+            std::optional<iris::parser::Parse_node> const var_node = iris::parser::get_node_previous_sibling(node_before, 2);
             if (var_node.has_value())
             {
-                std::string_view const var_value = h::parser::get_node_value(parse_tree, var_node.value());
+                std::string_view const var_value = iris::parser::get_node_value(parse_tree, var_node.value());
                 if (var_value == "var" || var_value == "mutable")
                     return true;
             }
@@ -741,28 +741,28 @@ namespace h::language_server
     }
 
     static bool expects_access_type(
-        h::parser::Parse_tree const& parse_tree,
-        h::parser::Parse_node const& node_before
+        iris::parser::Parse_tree const& parse_tree,
+        iris::parser::Parse_node const& node_before
     )
     {
-        std::string_view const node_before_value = h::parser::get_node_value(parse_tree, node_before);
+        std::string_view const node_before_value = iris::parser::get_node_value(parse_tree, node_before);
 
         if (node_before_value == ".")
         {
-            std::optional<h::parser::Parse_node> const previous_sibling_node = h::parser::get_node_previous_sibling(node_before, 2);
+            std::optional<iris::parser::Parse_node> const previous_sibling_node = iris::parser::get_node_previous_sibling(node_before, 2);
             if (previous_sibling_node.has_value())
             {
-                std::string_view const previous_sibling_value = h::parser::get_node_value(parse_tree, previous_sibling_node.value());
+                std::string_view const previous_sibling_value = iris::parser::get_node_value(parse_tree, previous_sibling_node.value());
                 if (previous_sibling_value == "as")
                 {
                     return true;
                 }
                 else if (previous_sibling_value == ":")
                 {
-                    std::optional<h::parser::Parse_node> const var_node = h::parser::get_node_previous_sibling(previous_sibling_node.value(), 2);
+                    std::optional<iris::parser::Parse_node> const var_node = iris::parser::get_node_previous_sibling(previous_sibling_node.value(), 2);
                     if (var_node.has_value())
                     {
-                        std::string_view const var_value = h::parser::get_node_value(parse_tree, var_node.value());
+                        std::string_view const var_value = iris::parser::get_node_value(parse_tree, var_node.value());
                         if (var_value == "var" || var_value == "mutable")
                             return true;
                     }
@@ -779,15 +779,15 @@ namespace h::language_server
     }
 
     static bool is_at_instantiate_member(
-        h::parser::Parse_node const smallest_node,
+        iris::parser::Parse_node const smallest_node,
         std::string_view const smallest_node_symbol,
         std::string_view const previous_sibling_symbol
     )
     {
-        std::optional<h::parser::Parse_node> const parent_node = h::parser::get_parent_node(smallest_node);
+        std::optional<iris::parser::Parse_node> const parent_node = iris::parser::get_parent_node(smallest_node);
         if (parent_node.has_value())
         {
-            std::string_view const parent_node_symbol = h::parser::get_node_symbol(parent_node.value());
+            std::string_view const parent_node_symbol = iris::parser::get_node_symbol(parent_node.value());
             if (parent_node_symbol == "Expression_instantiate_members" && (previous_sibling_symbol == "{" || previous_sibling_symbol == ","))
                 return true;    
         }
@@ -796,34 +796,34 @@ namespace h::language_server
     }
 
     lsp::TextDocument_CompletionResult compute_completion(
-        std::span<h::compiler::Artifact const> const artifacts,
-        std::span<h::Module const> const header_modules,
-        std::span<h::Module const> const core_modules,
+        std::span<iris::compiler::Artifact const> const artifacts,
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module const> const core_modules,
         Declaration_database const& declaration_database,
-        h::parser::Parse_tree const& parse_tree,
-        h::Module const& core_module,
+        iris::parser::Parse_tree const& parse_tree,
+        iris::Module const& core_module,
         lsp::Position const position
     )
     {
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
-        h::Source_position const source_position = to_source_position(position);
-        h::parser::Parse_node const root_node = h::parser::get_root_node(parse_tree);
+        iris::Source_position const source_position = to_source_position(position);
+        iris::parser::Parse_node const root_node = iris::parser::get_root_node(parse_tree);
 
-        h::parser::Parse_node const smallest_node = h::parser::get_smallest_node_that_contains_position(
+        iris::parser::Parse_node const smallest_node = iris::parser::get_smallest_node_that_contains_position(
             root_node,
             source_position
         );
-        std::string_view const smallest_node_symbol = h::parser::get_node_symbol(smallest_node);
-        h::Source_range const smallest_node_range = h::parser::get_node_source_range(smallest_node);
+        std::string_view const smallest_node_symbol = iris::parser::get_node_symbol(smallest_node);
+        iris::Source_range const smallest_node_range = iris::parser::get_node_source_range(smallest_node);
 
-        std::optional<h::parser::Parse_node> const previous_sibling = h::parser::get_node_previous_sibling(smallest_node);
-        std::string_view const previous_sibling_symbol = previous_sibling.has_value() ? h::parser::get_node_symbol(previous_sibling.value()) : std::string_view{""};
-        std::string_view const previous_sibling_value = previous_sibling.has_value() ? h::parser::get_node_value(parse_tree, previous_sibling.value()) : std::string_view{""};
-        h::Source_range const previous_sibling_range = previous_sibling.has_value() ? h::parser::get_node_source_range(previous_sibling.value()) : smallest_node_range;
+        std::optional<iris::parser::Parse_node> const previous_sibling = iris::parser::get_node_previous_sibling(smallest_node);
+        std::string_view const previous_sibling_symbol = previous_sibling.has_value() ? iris::parser::get_node_symbol(previous_sibling.value()) : std::string_view{""};
+        std::string_view const previous_sibling_value = previous_sibling.has_value() ? iris::parser::get_node_value(parse_tree, previous_sibling.value()) : std::string_view{""};
+        iris::Source_range const previous_sibling_range = previous_sibling.has_value() ? iris::parser::get_node_source_range(previous_sibling.value()) : smallest_node_range;
 
-        std::optional<h::parser::Parse_node> const node_before = h::parser::find_node_before_source_position(parse_tree, smallest_node, source_position);
-        std::string_view const node_before_value = node_before.has_value() ? h::parser::get_node_value(parse_tree, node_before.value()) : std::string_view{""};
+        std::optional<iris::parser::Parse_node> const node_before = iris::parser::find_node_before_source_position(parse_tree, smallest_node, source_position);
+        std::string_view const node_before_value = node_before.has_value() ? iris::parser::get_node_value(parse_tree, node_before.value()) : std::string_view{""};
         std::optional<std::string_view> access_operator =
             (node_before_value == "." || node_before_value == "->")
             ? std::optional<std::string_view>{node_before_value}
@@ -833,16 +833,16 @@ namespace h::language_server
         {
             if (core_module.source_file_path.has_value())
             {
-                std::optional<std::size_t> const artifact_index = h::compiler::find_artifact_index_that_includes_source_file(
+                std::optional<std::size_t> const artifact_index = iris::compiler::find_artifact_index_that_includes_source_file(
                     artifacts,
                     core_module.source_file_path.value(),
                     temporaries_allocator
                 );
                 if (artifact_index.has_value())
                 {
-                    h::compiler::Artifact const& artifact = artifacts[artifact_index.value()];
+                    iris::compiler::Artifact const& artifact = artifacts[artifact_index.value()];
 
-                    std::pmr::vector<h::Module const*> const artifact_modules_and_dependencies = h::compiler::get_artifact_modules_and_dependencies(
+                    std::pmr::vector<iris::Module const*> const artifact_modules_and_dependencies = iris::compiler::get_artifact_modules_and_dependencies(
                         artifact,
                         artifacts,
                         header_modules,
@@ -877,9 +877,9 @@ namespace h::language_server
         {
             std::optional<lsp::CompletionList> completion_list = std::nullopt;
 
-            auto const process_expression = [&](h::Function_declaration const* const function_declaration, h::compiler::Scope const& scope, h::Statement const& statement, h::Expression const& expression) -> bool
+            auto const process_expression = [&](iris::Function_declaration const* const function_declaration, iris::compiler::Scope const& scope, iris::Statement const& statement, iris::Expression const& expression) -> bool
             {
-                std::optional<h::Type_reference> const expression_type = h::compiler::get_expression_type(
+                std::optional<iris::Type_reference> const expression_type = iris::compiler::get_expression_type(
                     core_module,
                     function_declaration,
                     scope,
@@ -928,7 +928,7 @@ namespace h::language_server
         {
             Declaration const& declaration = declaration_optional.value();
 
-            if (std::holds_alternative<h::Alias_type_declaration const*>(declaration.data))
+            if (std::holds_alternative<iris::Alias_type_declaration const*>(declaration.data))
             {
                 if (node_before_value == "=")
                 {
@@ -953,9 +953,9 @@ namespace h::language_server
                     .itemDefaults = std::nullopt,
                 };
             }
-            else if (std::holds_alternative<h::Function_declaration const*>(declaration.data))
+            else if (std::holds_alternative<iris::Function_declaration const*>(declaration.data))
             {
-                h::Function_declaration const& function_declaration = *std::get<h::Function_declaration const*>(declaration.data);
+                iris::Function_declaration const& function_declaration = *std::get<iris::Function_declaration const*>(declaration.data);
 
                 bool const is_access_expression = previous_sibling_value.ends_with(".");
                 bool const is_function_type_parameter =
@@ -991,7 +991,7 @@ namespace h::language_server
                     }
                 }
             }
-            else if (std::holds_alternative<h::Struct_declaration const*>(declaration.data) || std::holds_alternative<h::Union_declaration const*>(declaration.data))
+            else if (std::holds_alternative<iris::Struct_declaration const*>(declaration.data) || std::holds_alternative<iris::Union_declaration const*>(declaration.data))
             {
                 if (node_before_value == ":")
                 {
@@ -1011,7 +1011,7 @@ namespace h::language_server
             }
         }
 
-        std::optional<h::Function> const function = find_function_that_contains_source_position(
+        std::optional<iris::Function> const function = find_function_that_contains_source_position(
             core_module,
             source_position
         );
@@ -1039,7 +1039,7 @@ namespace h::language_server
                 }
                 else
                 {
-                    h::parser::Parse_node const& access_hint_node = root_node;
+                    iris::parser::Parse_node const& access_hint_node = root_node;
                     std::optional<lsp::CompletionList> module_value_completion_list = create_access_value_completion_list(
                         declaration_database,
                         parse_tree,

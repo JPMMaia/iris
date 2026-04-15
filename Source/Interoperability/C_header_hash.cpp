@@ -7,13 +7,13 @@ module;
 #include <llvm/Support/VirtualFileSystem.h>
 #include <xxhash.h>
 
-module h.c_header_hash;
+module iris.c_header_hash;
 
 import std;
 
-import h.common;
+import iris.common;
 
-namespace h::c
+namespace iris::c
 {
     std::unique_ptr<clang::CompilerInstance> create_clang_instance(
         std::filesystem::path const& input_file_path,
@@ -65,7 +65,7 @@ namespace h::c
     std::filesystem::path get_temporary_file_path()
     {
         llvm::SmallString<256> temporary_file_path;
-        llvm::sys::fs::createTemporaryFile("hlang-cheader-", "h", temporary_file_path);
+        llvm::sys::fs::createTemporaryFile("iris-cheader-", "h", temporary_file_path);
         return std::filesystem::path{temporary_file_path.data(), temporary_file_path.data() + temporary_file_path.size()};
     }
 
@@ -82,7 +82,7 @@ namespace h::c
         auto const printPreprocessedAction = std::make_unique<clang::PrintPreprocessedAction>();
         compiler_instance->ExecuteAction(*printPreprocessedAction);
 
-        std::optional<std::pmr::string> file_contents = h::common::get_file_contents(output_file_path);
+        std::optional<std::pmr::string> file_contents = iris::common::get_file_contents(output_file_path);
         return file_contents;
     }
 

@@ -1,26 +1,26 @@
-add_library(H_compiler)
-add_library(H::Compiler ALIAS H_compiler)
+add_library(Iris_compiler)
+add_library(Iris::Compiler ALIAS Iris_compiler)
 
-target_compile_features(H_compiler PRIVATE cxx_std_23)
+target_compile_features(Iris_compiler PRIVATE cxx_std_23)
 
-target_link_libraries(H_compiler PRIVATE H::Binary_serializer H::Core H::Common H::C_header_exporter H::C_header_importer H::JSON_serializer H::Parser)
-target_link_libraries(H_compiler PUBLIC clang_target llvm_target)
+target_link_libraries(Iris_compiler PRIVATE Iris::Binary_serializer Iris::Core Iris::Common Iris::C_header_exporter Iris::C_header_importer Iris::JSON_serializer Iris::Parser)
+target_link_libraries(Iris_compiler PUBLIC clang_target llvm_target)
 
-target_link_libraries(H_compiler PUBLIC "wtr.hdr_watcher")
+target_link_libraries(Iris_compiler PUBLIC "wtr.hdr_watcher")
 
 if(WIN32)
    find_package(xxHash CONFIG REQUIRED)
-   target_link_libraries(H_compiler PRIVATE xxHash::xxhash)
+   target_link_libraries(Iris_compiler PRIVATE xxHash::xxhash)
    install(IMPORTED_RUNTIME_ARTIFACTS xxHash::xxhash)
 else()
    find_package(PkgConfig REQUIRED)
    pkg_check_modules(XXHASH REQUIRED IMPORTED_TARGET libxxhash)
 
-   target_include_directories(H_compiler PRIVATE ${XXHASH_INCLUDE_DIRS})
-   target_link_libraries(H_compiler PRIVATE PkgConfig::XXHASH)
+   target_include_directories(Iris_compiler PRIVATE ${XXHASIris_INCLUDE_DIRS})
+   target_link_libraries(Iris_compiler PRIVATE PkgConfig::XXHASH)
 endif()
 
-target_sources(H_compiler
+target_sources(Iris_compiler
    PUBLIC FILE_SET modules TYPE CXX_MODULES
       FILES
          "Analysis.cppm"
@@ -84,32 +84,32 @@ target_sources(H_compiler
 )
 
 if(WIN32)
-   target_sources(H_compiler PRIVATE
+   target_sources(Iris_compiler PRIVATE
       "Linker_coff.cpp"
       "Project/Target_windows.cpp"
    )
 else()
-   target_sources(H_compiler PRIVATE
+   target_sources(Iris_compiler PRIVATE
       "Linker_elf.cpp"
       "Project/Target_linux.cpp"
    )
 endif()
 
 if(BUILD_TESTING)
-   add_executable(H_compiler_tests)
-   target_link_libraries(H_compiler_tests PRIVATE H::C_header_importer H::Compiler H::JSON_serializer H::Parser)
+   add_executable(Iris_compiler_tests)
+   target_link_libraries(Iris_compiler_tests PRIVATE Iris::C_header_importer Iris::Compiler Iris::JSON_serializer Iris::Parser)
 
-   target_sources(H_compiler_tests
+   target_sources(Iris_compiler_tests
       PUBLIC FILE_SET modules TYPE CXX_MODULES
          FILES
             "passes/Pass_test_helpers.cppm"
    )
 
    find_package(Catch2 CONFIG REQUIRED)
-   target_link_libraries(H_compiler_tests PRIVATE Catch2::Catch2 Catch2::Catch2WithMain)
+   target_link_libraries(Iris_compiler_tests PRIVATE Catch2::Catch2 Catch2::Catch2WithMain)
 
    target_compile_definitions(
-      H_compiler_tests
+      Iris_compiler_tests
       PRIVATE
          EXAMPLES_DIRECTORY="${CMAKE_SOURCE_DIR}/Examples"
          TEST_SOURCE_FILES_PATH="${CMAKE_SOURCE_DIR}/Examples/txt"
@@ -118,7 +118,7 @@ if(BUILD_TESTING)
          STANDARD_REPOSITORY_FILE_PATH="${CMAKE_SOURCE_DIR}/share/iris/libraries/iris_repository.json"
    )
 
-   target_sources(H_compiler_tests PRIVATE
+   target_sources(Iris_compiler_tests PRIVATE
       "main.tests.cpp"
       "Builder.tests.cpp"
       "Compiler.tests.cpp"
@@ -131,9 +131,9 @@ if(BUILD_TESTING)
       "JIT/JIT_runner.tests.cpp"
    )
 
-   # add_dependencies(H_compiler_tests C_standard_library)
+   # add_dependencies(Iris_compiler_tests C_standard_library)
 
    include(Catch)
-   catch_discover_tests(H_compiler_tests)
+   catch_discover_tests(Iris_compiler_tests)
 
 endif()

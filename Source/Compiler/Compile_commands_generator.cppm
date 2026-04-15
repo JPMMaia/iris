@@ -2,15 +2,15 @@ module;
 
 #include <nlohmann/json.hpp>
 
-export module h.compiler.compile_commands_generator;
+export module iris.compiler.compile_commands_generator;
 
 import std;
 
-import h.common;
-import h.compiler.artifact;
-import h.compiler.clang_compiler;
+import iris.common;
+import iris.compiler.artifact;
+import iris.compiler.clang_compiler;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Compile_command
     {
@@ -39,7 +39,7 @@ namespace h::compiler
         for (Artifact const& artifact : artifacts)
         {
             std::pmr::vector<std::filesystem::path> const public_include_directories = get_public_include_directories(artifact, artifacts, temporaries_allocator, temporaries_allocator);
-            std::pmr::vector<std::pmr::string> const public_include_directories_strings = h::common::convert_path_to_string(public_include_directories, temporaries_allocator);
+            std::pmr::vector<std::pmr::string> const public_include_directories_strings = iris::common::convert_path_to_string(public_include_directories, temporaries_allocator);
 
             for (Source_group const& group : artifact.sources)
             {
@@ -108,12 +108,12 @@ namespace h::compiler
         if (!std::filesystem::exists(parent_path))
             std::filesystem::create_directories(parent_path);
 
-        h::common::write_to_file(output_path, content);
+        iris::common::write_to_file(output_path, content);
     }
 
     export std::pmr::vector<Compile_command> read_compile_commands_from_file(std::filesystem::path const& file_path)
     {
-        std::optional<std::pmr::string> const contents = h::common::get_file_contents(file_path);
+        std::optional<std::pmr::string> const contents = iris::common::get_file_contents(file_path);
         if (!contents.has_value())
             return {};
 

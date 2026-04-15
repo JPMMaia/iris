@@ -1,8 +1,8 @@
-export module h.c_header_hash;
+export module iris.c_header_hash;
 
 import std;
 
-namespace h::c
+namespace iris::c
 {
     export std::optional<std::uint64_t> calculate_header_file_hash(
         std::filesystem::path const& header_path,

@@ -1,19 +1,19 @@
 ---
 name: 'Architecture Overview'
-description: 'Overview of the H language repository structure and components'
+description: 'Overview of the Iris language repository structure and components'
 ---
 
-# H Language Repository - GitHub Copilot Instructions
+# Iris Language Repository - GitHub Copilot Instructions
 
 ## Repository Overview
 
-This is the **H language compiler** repository. H is a systems programming language that uses LLVM for code generation and tree-sitter for parsing.
+This is the **Iris language compiler** repository. Iris is a systems programming language that uses LLVM for code generation and tree-sitter for parsing.
 
 The compiler accepts `.iris` source files, parses them using tree-sitter, and then compiles to bitcode using LLVM.
 
-For interoperability with C, it can generate C headers from H source files, and it can also import C headers as H modules that can then be used directly in H code.
+For interoperability with C, it can generate C headers from Iris source files, and it can also import C headers as Iris modules that can then be used directly in Iris code.
 
-It also contains a Builder component that orchestrates the entire build pipeline, reading configuration files to determine which source files to compile, which C headers to import, and which H modules to export as C headers. It can also compile C++ source files as part of the build process.
+It also contains a Builder component that orchestrates the entire build pipeline, reading configuration files to determine which source files to compile, which C headers to import, and which Iris modules to export as C headers. It can also compile C++ source files as part of the build process.
 
 ## Directory Structure & Responsibilities
 
@@ -21,9 +21,9 @@ It also contains a Builder component that orchestrates the entire build pipeline
 
 - **`Core/`** - Core Module data structures and semantics
   - `Core.cppm` - Defines the internal representation of modules, types, expressions, and statements. This is the central data structure used throughout the compiler.
-  - `Types.cppm` - Mostly utility functions for working with `h::Type_reference`
-  - `Declarations.cppm` - Contains `h::Declaration_database` which is used to store all declarations (types, functions, global variables) accross all modules (including imported C header modules). This is used during validation and code generation to resolve type references and function calls.
-  - `Expressions.cppm` - Helper functions for working with `h::Expression` values.
+  - `Types.cppm` - Mostly utility functions for working with `iris::Type_reference`
+  - `Declarations.cppm` - Contains `iris::Declaration_database` which is used to store all declarations (types, functions, global variables) accross all modules (including imported C header modules). This is used during validation and code generation to resolve type references and function calls.
+  - `Expressions.cppm` - Helper functions for working with `iris::Expression` values.
 
 - **`Compiler/`** - Core compilation logic
   - `Builder.cpp`
@@ -41,7 +41,7 @@ It also contains a Builder component that orchestrates the entire build pipeline
   - `Project/` - Defines Artifact and Repository data structures which are used to configure the Builder's behavior. The Builder reads `iris_artifact.json` and `iris_repository.json` files to determine how to organize the build pipeline.
 
 - **`Builder/`** - Build pipeline orchestration
-  - For now this is only contains a `main.cpp` file which is used to create the `hlang` executable. This might be moved into `Compiler/` in the future, as most of the work is done in the `Compiler/Builder.cpp` file.
+  - For now this is only contains a `main.cpp` file which is used to create the `iris` executable. This might be moved into `Compiler/` in the future, as most of the work is done in the `Compiler/Builder.cpp` file.
 
 - **`Parser/`** - tree-sitter parsing and CST conversion
   - `Parser.cppm` - Uses tree-sitter to parse `.iris` source files into the tree-sitter Concrete Syntax Tree (CST).
@@ -58,7 +58,7 @@ It also contains a Builder component that orchestrates the entire build pipeline
 - **`JSON_serializer/`** - JSON serialization utilities. Same as Binary_serializer but for JSON format. This can be useful for debugging purposes (e.g. outputting the Core Module into a JSON file and then inspect).
 
 - **`Language_server/`** - Language Server Protocol implementation
-  - Provides IntelliSense for H language
+  - Provides IntelliSense for Iris language
   - `Completion.cppm` - Code completion
   - `Diagnostics.cppm` - Error diagnostics
   - `Go_to_location.cppm` - Jump to definition
@@ -72,7 +72,7 @@ It also contains a Builder component that orchestrates the entire build pipeline
 ### Examples Directory (`Examples/`)
 - Contains example `.iris` source files and projects. This is used by the tests.
 
-- **`Hello_world/`** - Basic H program example
+- **`Hello_world/`** - Basic Iris program example
 - **`Export_and_import_c_header/`** - Project that exports a C header and imports another C header.
 - **`Export_c_header/`** - Project that exports a C header.
 - **`Mix_with_cpp/`** - Project that compiles C++.
@@ -107,7 +107,7 @@ It also contains a Builder component that orchestrates the entire build pipeline
 ## Builder Project Files
 
 ### `iris_repository.json`
-Defines the structure of an H language repository:
+Defines the structure of an Iris language repository:
 - Lists artifacts (libraries, executables)
 - Specifies source file groups
 - Indicates import/export/compile targets
@@ -147,16 +147,16 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-### Installing Hlang
+### Installing Iris
 
 #### Install Debug version
 ```bash
-python Scripts/build_utilities.py install_hlang <install_path> --configuration debug
+python Scripts/build_utilities.py install_iris <install_path> --configuration debug
 ```
 
 #### Install Release version
 ```bash
-python Scripts/build_utilities.py install_hlang <install_path> --configuration release
+python Scripts/build_utilities.py install_iris <install_path> --configuration release
 ```
 
 ### Testing
@@ -213,7 +213,7 @@ Lists external dependencies managed by vcpkg.
 
 | Extension | Purpose | Description |
 |-----------|---------|-------------|
-| `.iris` | H Language Source | H language code that contains user code that is input to this compiler |
+| `.iris` | Iris Language Source | Iris language code that contains user code that is input to this compiler |
 | `.h` | C Header | C header files |
 | `.cppm` | C++ Modules | C++ module interface files |
 | `.cpp` | C++ Implementation | C++ implementation files |

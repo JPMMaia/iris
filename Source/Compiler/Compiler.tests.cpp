@@ -15,30 +15,30 @@
 #include <llvm/Passes/StandardInstrumentations.h>
 #include <llvm/Target/TargetMachine.h>
 
-import h.binary_serializer;
-import h.core;
-import h.core.declarations;
-import h.core.struct_layout;
-import h.common;
-import h.common.filesystem;
-import h.compiler;
-import h.compiler.artifact;
-import h.compiler.clang_code_generation;
-import h.compiler.clang_data;
-import h.compiler.common;
-import h.compiler.expressions;
-import h.compiler.types;
-import h.json_serializer.operators;
-import h.c_header_converter;
-import h.parser.convertor;
-import h.parser.parse_tree;
-import h.parser.parser;
+import iris.binary_serializer;
+import iris.core;
+import iris.core.declarations;
+import iris.core.struct_layout;
+import iris.common;
+import iris.common.filesystem;
+import iris.compiler;
+import iris.compiler.artifact;
+import iris.compiler.clang_code_generation;
+import iris.compiler.clang_data;
+import iris.compiler.common;
+import iris.compiler.expressions;
+import iris.compiler.types;
+import iris.json_serializer.operators;
+import iris.c_header_converter;
+import iris.parser.convertor;
+import iris.parser.parse_tree;
+import iris.parser.parser;
 
-using h::json::operators::operator<<;
+using iris::json::operators::operator<<;
 
 #include <catch2/catch_all.hpp>
 
-namespace h
+namespace iris
 {
   static std::filesystem::path const g_test_source_files_path = std::filesystem::path{ TEST_SOURCE_FILES_PATH };
   static std::filesystem::path const g_standard_library_path = std::filesystem::path{ C_STANDARD_LIBRARY_PATH };
@@ -46,8 +46,8 @@ namespace h
 
   std::filesystem::path find_c_header_path(std::string_view const filename)
   {
-    std::pmr::vector<std::filesystem::path> header_search_directories = h::common::get_default_header_search_directories();
-    std::optional<std::filesystem::path> const header_path = h::compiler::find_c_header_path(filename, header_search_directories);
+    std::pmr::vector<std::filesystem::path> header_search_directories = iris::common::get_default_header_search_directories();
+    std::optional<std::filesystem::path> const header_path = iris::compiler::find_c_header_path(filename, header_search_directories);
     REQUIRE(header_path.has_value());
     return header_path.value();
   }
@@ -69,8 +69,8 @@ namespace h
     if (!std::filesystem::exists(output_file_path.parent_path()))
       std::filesystem::create_directories(output_file_path.parent_path());
 
-    h::c::Options const options = {};
-    std::optional<h::Module> const header_module = h::c::import_header_and_write_to_file(
+    iris::c::Options const options = {};
+    std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(
       header_name,
       input_file_path,
       output_file_path,
@@ -90,10 +90,10 @@ namespace h
   )
   {
     std::filesystem::path const header_file_path = output_directory / header_filename;
-    h::common::write_to_file(header_file_path, header_content);
+    iris::common::write_to_file(header_file_path, header_content);
 
     std::filesystem::path const header_module_file_path = output_directory / header_module_filename;
-    std::optional<h::Module> const header_module = h::c::import_header_and_write_to_file(header_module_name, header_file_path, header_module_file_path, {});
+    std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(header_module_name, header_file_path, header_module_file_path, {});
     REQUIRE(header_module.has_value());
 
     return header_module_file_path;
@@ -103,7 +103,7 @@ namespace h
     std::filesystem::path const& source_file_path
   )
   {
-    std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(
+    std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(
         source_file_path,
         {},
         {}
@@ -114,7 +114,7 @@ namespace h
     if (!std::filesystem::exists(output_file_path.parent_path()))
       std::filesystem::create_directories(output_file_path.parent_path());
 
-    h::binary_serializer::write_module_to_file(output_file_path, core_module.value(), {});
+    iris::binary_serializer::write_module_to_file(output_file_path, core_module.value(), {});
 
     return output_file_path;
   }
@@ -135,7 +135,7 @@ namespace h
   {
     bool debug = false;
     std::string_view target_triple = "x86_64-pc-linux-gnu";
-    h::compiler::Contract_options contract_options = h::compiler::Contract_options::Log_error_and_abort;
+    iris::compiler::Contract_options contract_options = iris::compiler::Contract_options::Log_error_and_abort;
     bool is_test_mode = false;
   };
 
@@ -147,16 +147,16 @@ namespace h
   )
   {
     std::filesystem::path const input_file_path = g_test_source_files_path / input_file;
-    std::optional<std::pmr::u8string> input_content = h::common::get_file_utf8_contents(input_file_path);
+    std::optional<std::pmr::u8string> input_content = iris::common::get_file_utf8_contents(input_file_path);
     REQUIRE(input_content.has_value());
 
-    h::parser::Parser parser = h::parser::create_parser();
+    iris::parser::Parser parser = iris::parser::create_parser();
 
-    h::parser::Parse_tree parse_tree = h::parser::parse(parser, std::move(input_content.value()));
+    iris::parser::Parse_tree parse_tree = iris::parser::parse(parser, std::move(input_content.value()));
 
-    h::parser::Parse_node const root = get_root_node(parse_tree);
+    iris::parser::Parse_node const root = get_root_node(parse_tree);
 
-    std::optional<h::Module> core_module = h::parser::parse_node_to_module(
+    std::optional<iris::Module> core_module = iris::parser::parse_node_to_module(
       parse_tree,
       root,
       input_file_path,
@@ -165,7 +165,7 @@ namespace h
     );
     REQUIRE(core_module.has_value());
 
-    h::compiler::Compilation_options const compilation_options
+    iris::compiler::Compilation_options const compilation_options
     {
       .target_triple = test_options.target_triple,
       .is_optimized = false,
@@ -174,17 +174,17 @@ namespace h
       .is_test_mode = test_options.is_test_mode,
     };
 
-    h::compiler::LLVM_data llvm_data = h::compiler::initialize_llvm(compilation_options);
+    iris::compiler::LLVM_data llvm_data = iris::compiler::initialize_llvm(compilation_options);
 
-    h::compiler::LLVM_module_data llvm_module_data = h::compiler::create_llvm_module(llvm_data, core_module.value(), module_name_to_file_path_map, compilation_options);
-    std::string const llvm_ir = h::compiler::to_string(*llvm_module_data.module);
+    iris::compiler::LLVM_module_data llvm_module_data = iris::compiler::create_llvm_module(llvm_data, core_module.value(), module_name_to_file_path_map, compilation_options);
+    std::string const llvm_ir = iris::compiler::to_string(*llvm_module_data.module);
 
     std::string_view const llvm_ir_body = exclude_header(llvm_ir);
 
     CHECK(llvm_ir_body == expected_llvm_ir);
 
-    h::parser::destroy_tree(std::move(parse_tree));
-    h::parser::destroy_parser(std::move(parser));
+    iris::parser::destroy_tree(std::move(parse_tree));
+    iris::parser::destroy_parser(std::move(parser));
   }
 
   TEST_CASE("Compile Address Of", "[LLVM_IR]")
@@ -399,7 +399,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "array_slices.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "take", linkageName: "Array_slices_take", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !13)
 !4 = !DISubroutineType(types: !5)
@@ -517,7 +517,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "array_slices_instantiate.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Array_slices_instantiate_run", scope: null, file: !2, line: 8, type: !4, scopeLine: 9, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
@@ -1969,7 +1969,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "soa_array_type_debug_information.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "soa_array_type_debug_information_run", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
@@ -2251,7 +2251,7 @@ attributes #2 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "soa_array_view_type_debug_information.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "soa_array_view_type_debug_information_run", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
@@ -2349,7 +2349,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_c_headers.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 5, type: !4, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
@@ -2448,7 +2448,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_array_slices.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 5, type: !4, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !16)
 !4 = !DISubroutineType(types: !5)
@@ -2530,7 +2530,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_bit_fields.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "instantiate", linkageName: "Debug_information_instantiate", scope: null, file: !2, line: 10, type: !4, scopeLine: 11, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !12)
 !4 = !DISubroutineType(types: !5)
@@ -2603,7 +2603,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_for_loop.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
@@ -2667,7 +2667,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_function_call.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 8, type: !4, scopeLine: 9, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
@@ -2737,7 +2737,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_if.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
@@ -2794,7 +2794,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_structs.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "instantiate", linkageName: "Debug_information_instantiate", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !11)
 !4 = !DISubroutineType(types: !5)
@@ -2858,7 +2858,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_switch.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
@@ -2910,7 +2910,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_temporary_replacement.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_temporary_replacement_run", scope: null, file: !2, line: 10, type: !4, scopeLine: 11, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
@@ -2961,7 +2961,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_unions.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "instantiate", linkageName: "Debug_information_instantiate", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !12)
 !4 = !DISubroutineType(types: !5)
@@ -3011,7 +3011,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_variables.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
@@ -3094,7 +3094,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_while_loop.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
@@ -3415,7 +3415,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "debug_information_decimal_expressions.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "decimal_constants", linkageName: "Debug_information_decimal_expressions_decimal_constants", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
@@ -3423,24 +3423,24 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !6 = !{{}}
 !7 = !DILocation(line: 4, column: 1, scope: !3)
 !8 = !DILocalVariable(name: "a", scope: !3, file: !2, line: 5, type: !9)
-!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal2", scope: !10, size: 32, align: 32, elements: !11)
+!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "iris::Decimal2", scope: !10, size: 32, align: 32, elements: !11)
 !10 = !DINamespace(name: "h", scope: null)
 !11 = !{{!12}}
 !12 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !13, size: 32, align: 32)
-!13 = !DIBasicType(name: "h::Decimal2_storage", size: 32, encoding: DW_ATE_signed)
+!13 = !DIBasicType(name: "iris::Decimal2_storage", size: 32, encoding: DW_ATE_signed)
 !14 = !DILocation(line: 5, column: 5, scope: !3)
 !15 = !DILocation(line: 6, column: 5, scope: !3)
 !16 = !DILocation(line: 7, column: 5, scope: !3)
 !17 = !DILocalVariable(name: "b", scope: !3, file: !2, line: 6, type: !18)
-!18 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal4", scope: !10, size: 32, align: 32, elements: !19)
+!18 = !DICompositeType(tag: DW_TAG_structure_type, name: "iris::Decimal4", scope: !10, size: 32, align: 32, elements: !19)
 !19 = !{{!20}}
 !20 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !21, size: 32, align: 32)
-!21 = !DIBasicType(name: "h::Decimal4_storage", size: 32, encoding: DW_ATE_signed)
+!21 = !DIBasicType(name: "iris::Decimal4_storage", size: 32, encoding: DW_ATE_signed)
 !22 = !DILocalVariable(name: "c", scope: !3, file: !2, line: 7, type: !23)
-!23 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal7", scope: !10, size: 64, align: 64, elements: !24)
+!23 = !DICompositeType(tag: DW_TAG_structure_type, name: "iris::Decimal7", scope: !10, size: 64, align: 64, elements: !24)
 !24 = !{{!25}}
 !25 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !26, size: 64, align: 64)
-!26 = !DIBasicType(name: "h::Decimal7_storage", size: 64, encoding: DW_ATE_signed)
+!26 = !DIBasicType(name: "iris::Decimal7_storage", size: 64, encoding: DW_ATE_signed)
 !27 = !DILocalVariable(name: "d", scope: !3, file: !2, line: 8, type: !9)
 !28 = !DILocation(line: 8, column: 5, scope: !3)
 )", g_test_source_files_path.generic_string());
@@ -3754,7 +3754,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !2 = !DIFile(filename: "defer_expressions_with_debug_information.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "do_defer", linkageName: "Defer_expressions_with_debug_information_do_defer", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
@@ -5541,7 +5541,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     std::string const test_source_file_path = (g_test_source_files_path / input_file).generic_string();
 
     std::string const expected_llvm_ir = std::format(R"(
-@hlang_test_source_file_path = internal constant [{} x i8] c"{}\00"
+@iris_test_source_file_path = internal constant [{} x i8] c"{}\00"
 
 ; Function Attrs: convergent
 define private i32 @Test_framework_add(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b") #0 {{
@@ -5561,15 +5561,15 @@ define void @Test_framework_test_addition() #0 {{
 entry:
   %0 = call i32 @Test_framework_add(i32 noundef 1, i32 noundef 2)
   %1 = icmp eq i32 %0, 3
-  call void @hlang_test_check(i1 noundef zeroext %1, ptr noundef @hlang_test_source_file_path, i64 noundef 11)
+  call void @iris_test_check(i1 noundef zeroext %1, ptr noundef @iris_test_source_file_path, i64 noundef 11)
   %2 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
   %3 = icmp eq i32 %2, 5
-  call void @hlang_test_check(i1 noundef zeroext %3, ptr noundef @hlang_test_source_file_path, i64 noundef 12)
+  call void @iris_test_check(i1 noundef zeroext %3, ptr noundef @iris_test_source_file_path, i64 noundef 12)
   ret void
 }}
 
 ; Function Attrs: convergent
-declare void @hlang_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
+declare void @iris_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
 )", test_source_file_path.size() + 1, test_source_file_path);
@@ -6724,7 +6724,7 @@ if_s1_after:                                      ; preds = %entry
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.contract_options = h::compiler::Contract_options::Disabled});
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.contract_options = iris::compiler::Contract_options::Disabled});
   }
 
   TEST_CASE("Struct layout of imported C header matches 0", "[LLVM_IR]")
@@ -6749,30 +6749,30 @@ struct My_struct
 std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_struct.h", "my_struct.iris", "my_module", root_directory_path);
 
     std::filesystem::path const header_file_path = root_directory_path / "my_struct.h";
-    std::optional<h::Struct_layout> const expected_struct_layout = h::c::calculate_struct_layout(header_file_path, "My_struct", {});
+    std::optional<iris::Struct_layout> const expected_struct_layout = iris::c::calculate_struct_layout(header_file_path, "My_struct", {});
     REQUIRE(expected_struct_layout.has_value());
 
-    std::optional<h::Module> core_module = h::compiler::read_core_module(header_module_file_path);
+    std::optional<iris::Module> core_module = iris::compiler::read_core_module(header_module_file_path);
     REQUIRE(core_module.has_value());
 
-    h::compiler::LLVM_data llvm_data = h::compiler::initialize_llvm({});
+    iris::compiler::LLVM_data llvm_data = iris::compiler::initialize_llvm({});
 
-    h::Declaration_database declaration_database = h::create_declaration_database();
-    h::add_declarations(declaration_database, *core_module);
+    iris::Declaration_database declaration_database = iris::create_declaration_database();
+    iris::add_declarations(declaration_database, *core_module);
 
-    std::pmr::vector<h::Module const*> core_modules{ &core_module.value() };
-    h::compiler::Clang_module_data clang_module_data = h::compiler::create_clang_module_data(
+    std::pmr::vector<iris::Module const*> core_modules{ &core_module.value() };
+    iris::compiler::Clang_module_data clang_module_data = iris::compiler::create_clang_module_data(
         *llvm_data.context,
         llvm_data.clang_data,
-        "Hl_clang_module",
+        "Iris_clang_module",
         core_modules,
         declaration_database
     );
 
-    h::compiler::Type_database type_database = h::compiler::create_type_database(*llvm_data.context);
-    h::compiler::add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, clang_module_data, *core_module);
+    iris::compiler::Type_database type_database = iris::compiler::create_type_database(*llvm_data.context);
+    iris::compiler::add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, clang_module_data, *core_module);
 
-    h::Struct_layout const actual_struct_layout = h::compiler::calculate_struct_layout(llvm_data.data_layout, type_database, "my_module", "My_struct");
+    iris::Struct_layout const actual_struct_layout = iris::compiler::calculate_struct_layout(llvm_data.data_layout, type_database, "my_module", "My_struct");
 
     CHECK(actual_struct_layout == expected_struct_layout.value());
   }

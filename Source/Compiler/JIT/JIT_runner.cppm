@@ -1,27 +1,27 @@
-export module h.compiler.jit_runner;
+export module iris.compiler.jit_runner;
 
 import std;
 import llvm;
 
-import h.compiler;
-import h.compiler.artifact;
-import h.compiler.file_watcher;
-import h.core.hash;
-import h.compiler.jit_compiler;
-import h.compiler.repository;
-import h.compiler.target;
-import h.core;
-import h.parser.parser;
+import iris.compiler;
+import iris.compiler.artifact;
+import iris.compiler.file_watcher;
+import iris.core.hash;
+import iris.compiler.jit_compiler;
+import iris.compiler.repository;
+import iris.compiler.target;
+import iris.core;
+import iris.parser.parser;
 
-namespace h::compiler
+namespace iris::compiler
 {
     struct JIT_runner_unprotected_data
     {
         std::filesystem::path build_directory_path;
         std::pmr::vector<std::filesystem::path> header_search_paths;
         Target target;
-        h::parser::Parser parser;
-        std::unique_ptr<h::compiler::LLVM_data> llvm_data;
+        iris::parser::Parser parser;
+        std::unique_ptr<iris::compiler::LLVM_data> llvm_data;
         std::unique_ptr<JIT_data> jit_data;
         int log_level;
         Compilation_options compilation_options;

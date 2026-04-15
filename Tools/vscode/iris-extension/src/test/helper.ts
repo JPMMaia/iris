@@ -9,7 +9,7 @@ export let platformEol: string;
 
 export async function activate(docUri: vscode.Uri): Promise<LanguageClient> {
 	// The extensionId is `publisher.name` from package.json
-	const ext = vscode.extensions.getExtension('JPMMaia.hlang')!;
+	const ext = vscode.extensions.getExtension('JPMMaia.iris')!;
 	const client: LanguageClient = await ext.activate();
 	try {
 		doc = await vscode.workspace.openTextDocument(docUri);

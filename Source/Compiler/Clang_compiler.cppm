@@ -1,10 +1,10 @@
-export module h.compiler.clang_compiler;
+export module iris.compiler.clang_compiler;
 
 import std;
 
-import h.compiler.clang_data;
+import iris.compiler.clang_data;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export std::filesystem::path find_clang(bool const use_clang_cl);
 

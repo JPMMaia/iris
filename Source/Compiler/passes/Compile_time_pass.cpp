@@ -3,35 +3,35 @@ module;
 #include <cassert>
 #include <compare>
 
-module h.compiler.compile_time_pass;
+module iris.compiler.compile_time_pass;
 
 import llvm;
 import std;
 import std.compat;
 
-import h.compiler.types;
-import h.core;
-import h.core.declarations;
-import h.core.expressions;
-import h.core.formatter;
-import h.core.types;
+import iris.compiler.types;
+import iris.core;
+import iris.core.declarations;
+import iris.core.expressions;
+import iris.core.formatter;
+import iris.core.types;
 
-namespace h::compiler
+namespace iris::compiler
 {    
-    static h::Statement create_block_statement(
-        std::pmr::vector<h::Statement> statements,
+    static iris::Statement create_block_statement(
+        std::pmr::vector<iris::Statement> statements,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
         std::pmr::vector<Statement> block_statements{output_allocator};
         block_statements.assign(statements.begin(), statements.end());
 
-        return h::Statement
+        return iris::Statement
         {
             .expressions = {
-                h::Expression
+                iris::Expression
                 {
-                    .data = h::Block_expression
+                    .data = iris::Block_expression
                     {
                         .statements = std::move(statements)
                     }
@@ -40,17 +40,17 @@ namespace h::compiler
         };
     }
 
-    static h::Statement create_constant_expression_statement(
+    static iris::Statement create_constant_expression_statement(
         Type_reference type,
         std::pmr::string data
     )
     {
-        return h::Statement
+        return iris::Statement
         {
             .expressions = {
-                h::Expression
+                iris::Expression
                 {
-                    .data = h::Constant_expression
+                    .data = iris::Constant_expression
                     {
                         .type = std::move(type),
                         .data = std::move(data)
@@ -60,14 +60,14 @@ namespace h::compiler
         };
     }
 
-    static h::Statement create_constant_bool_expression_statement(bool const value)
+    static iris::Statement create_constant_bool_expression_statement(bool const value)
     {
-        return h::Statement
+        return iris::Statement
         {
             .expressions = {
-                h::Expression
+                iris::Expression
                 {
-                    .data = h::Constant_expression
+                    .data = iris::Constant_expression
                     {
                         .type = create_bool_type_reference(),
                         .data = value ? "true" : "false"
@@ -77,14 +77,14 @@ namespace h::compiler
         };
     }
 
-    static h::Statement create_type_expression_statement(Type_reference type)
+    static iris::Statement create_type_expression_statement(Type_reference type)
     {
-        return h::Statement
+        return iris::Statement
         {
             .expressions = {
-                h::Expression
+                iris::Expression
                 {
-                    .data = h::Type_expression
+                    .data = iris::Type_expression
                     {
                         .type = std::move(type)
                     }
@@ -94,7 +94,7 @@ namespace h::compiler
     }
 
     static void add_import_usage_for_module(
-        h::Module& core_module,
+        iris::Module& core_module,
         std::string_view const module_name,
         std::string_view const usage,
         std::pmr::polymorphic_allocator<> const& output_allocator
@@ -116,7 +116,7 @@ namespace h::compiler
     }
 
     static Compile_time_value_and_type create_value_and_type(
-        h::Statement statement
+        iris::Statement statement
     )
     {
         return Compile_time_value_and_type
@@ -130,15 +130,15 @@ namespace h::compiler
         Compile_time_value_and_type const& value
     )
     {
-        h::Statement const& statement = value.statement;
+        iris::Statement const& statement = value.statement;
         if (statement.expressions.empty())
             return std::nullopt;
 
-        h::Expression const& expression = statement.expressions[0];
-        if (std::holds_alternative<h::Constant_expression>(expression.data))
+        iris::Expression const& expression = statement.expressions[0];
+        if (std::holds_alternative<iris::Constant_expression>(expression.data))
         {
-            h::Constant_expression const& constant_expression = std::get<h::Constant_expression>(expression.data);
-            if (h::is_bool(constant_expression.type) || h::is_c_bool(constant_expression.type))
+            iris::Constant_expression const& constant_expression = std::get<iris::Constant_expression>(expression.data);
+            if (iris::is_bool(constant_expression.type) || iris::is_c_bool(constant_expression.type))
                 return constant_expression.data == "true" || constant_expression.data == "1";
         }
 
@@ -156,19 +156,19 @@ namespace h::compiler
         Compile_time_value_and_type const& value
     )
     {
-        h::Statement const& statement = value.statement;
+        iris::Statement const& statement = value.statement;
         if (statement.expressions.empty())
             return std::nullopt;
 
-        h::Expression const& expression = statement.expressions[0];
-        if (!std::holds_alternative<h::Constant_expression>(expression.data))
+        iris::Expression const& expression = statement.expressions[0];
+        if (!std::holds_alternative<iris::Constant_expression>(expression.data))
             return std::nullopt;
 
-        h::Constant_expression const constant_expression = std::get<h::Constant_expression>(expression.data);
-        if (!h::is_integer(constant_expression.type) && !h::is_byte(constant_expression.type))
+        iris::Constant_expression const constant_expression = std::get<iris::Constant_expression>(expression.data);
+        if (!iris::is_integer(constant_expression.type) && !iris::is_byte(constant_expression.type))
             return std::nullopt;
 
-        if (h::is_unsigned_integer(constant_expression.type) || h::is_byte(constant_expression.type))
+        if (iris::is_unsigned_integer(constant_expression.type) || iris::is_byte(constant_expression.type))
         {
             std::uint64_t unsigned_value = 0;
             auto [pointer, error_code] = std::from_chars(constant_expression.data.data(), constant_expression.data.data() + constant_expression.data.size(), unsigned_value);
@@ -178,7 +178,7 @@ namespace h::compiler
             return Compile_time_integer_value{.is_signed = false, .signed_value = 0, .unsigned_value = unsigned_value};
         }
 
-        if (h::is_signed_integer(constant_expression.type))
+        if (iris::is_signed_integer(constant_expression.type))
         {
             std::int64_t signed_value = 0;
             auto [pointer, error_code] = std::from_chars(constant_expression.data.data(), constant_expression.data.data() + constant_expression.data.size(), signed_value);
@@ -192,8 +192,8 @@ namespace h::compiler
     }
 
     static std::uint64_t get_required_reflection_index_argument(
-        h::Statement const& statement,
-        h::Reflection_expression const& expression,
+        iris::Statement const& statement,
+        iris::Reflection_expression const& expression,
         std::string_view const function_name,
         Compile_time_parameters const& parameters
     )
@@ -201,11 +201,11 @@ namespace h::compiler
         if (expression.arguments.size() != 1)
             throw std::runtime_error{ std::format("{}() requires exactly one argument!", function_name) };
 
-        h::Expression_index const index_expression_index = expression.arguments[0];
+        iris::Expression_index const index_expression_index = expression.arguments[0];
         if (index_expression_index.expression_index >= statement.expressions.size())
             throw std::runtime_error{ std::format("{}() has an invalid argument index!", function_name) };
 
-        h::Expression const& index_expression = statement.expressions[index_expression_index.expression_index];
+        iris::Expression const& index_expression = statement.expressions[index_expression_index.expression_index];
         std::optional<Compile_time_value_and_type> const index_value = evaluate_compile_time_expression(statement, index_expression, parameters);
         if (!index_value.has_value())
             throw std::runtime_error{ std::format("{}() argument must be a compile-time integer constant!", function_name) };
@@ -233,127 +233,127 @@ namespace h::compiler
         std::optional<Type_reference> const underlying_type = get_underlying_type(parameters.declaration_database, type_reference);
         Type_reference const& resolved_type = underlying_type.value_or(type_reference);
 
-        if (std::holds_alternative<h::Array_slice_type>(resolved_type.data))
+        if (std::holds_alternative<iris::Array_slice_type>(resolved_type.data))
             return std::pmr::string{"Array_slice", parameters.output_allocator};
 
-        if (std::holds_alternative<h::Builtin_type_reference>(resolved_type.data))
+        if (std::holds_alternative<iris::Builtin_type_reference>(resolved_type.data))
             return std::pmr::string{"Builtin", parameters.output_allocator};
 
-        if (std::holds_alternative<h::Constant_array_type>(resolved_type.data))
+        if (std::holds_alternative<iris::Constant_array_type>(resolved_type.data))
             return std::pmr::string{"Constant_array", parameters.output_allocator};
 
-        if (std::holds_alternative<h::Custom_type_reference>(resolved_type.data))
+        if (std::holds_alternative<iris::Custom_type_reference>(resolved_type.data))
         {
-            std::optional<h::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, resolved_type);
+            std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, resolved_type);
             if (!declaration.has_value())
                 return std::pmr::string{"Custom", parameters.output_allocator};
 
-            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+            if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data))
                 return std::pmr::string{"Struct", parameters.output_allocator};
-            if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+            if (std::holds_alternative<iris::Union_declaration const*>(declaration->data))
                 return std::pmr::string{"Union", parameters.output_allocator};
-            if (std::holds_alternative<h::Enum_declaration const*>(declaration->data))
+            if (std::holds_alternative<iris::Enum_declaration const*>(declaration->data))
                 return std::pmr::string{"Enum", parameters.output_allocator};
 
             return std::pmr::string{"Custom", parameters.output_allocator};
         }
 
-        if (std::holds_alternative<h::Fundamental_type>(resolved_type.data))
+        if (std::holds_alternative<iris::Fundamental_type>(resolved_type.data))
         {
-            h::Fundamental_type const fundamental_type = std::get<h::Fundamental_type>(resolved_type.data);
+            iris::Fundamental_type const fundamental_type = std::get<iris::Fundamental_type>(resolved_type.data);
             switch (fundamental_type)
             {
-                case h::Fundamental_type::Bool:
-                case h::Fundamental_type::C_bool:
+                case iris::Fundamental_type::Bool:
+                case iris::Fundamental_type::C_bool:
                     return std::pmr::string{"Bool", parameters.output_allocator};
-                case h::Fundamental_type::Float16:
-                case h::Fundamental_type::Float32:
-                case h::Fundamental_type::Float64:
-                case h::Fundamental_type::C_longdouble:
+                case iris::Fundamental_type::Float16:
+                case iris::Fundamental_type::Float32:
+                case iris::Fundamental_type::Float64:
+                case iris::Fundamental_type::C_longdouble:
                     return std::pmr::string{"Float", parameters.output_allocator};
-                case h::Fundamental_type::Byte:
-                case h::Fundamental_type::C_uchar:
-                case h::Fundamental_type::C_ushort:
-                case h::Fundamental_type::C_uint:
-                case h::Fundamental_type::C_ulong:
-                case h::Fundamental_type::C_ulonglong:
+                case iris::Fundamental_type::Byte:
+                case iris::Fundamental_type::C_uchar:
+                case iris::Fundamental_type::C_ushort:
+                case iris::Fundamental_type::C_uint:
+                case iris::Fundamental_type::C_ulong:
+                case iris::Fundamental_type::C_ulonglong:
                     return std::pmr::string{"Uint", parameters.output_allocator};
-                case h::Fundamental_type::C_char:
-                case h::Fundamental_type::C_schar:
-                case h::Fundamental_type::C_short:
-                case h::Fundamental_type::C_int:
-                case h::Fundamental_type::C_long:
-                case h::Fundamental_type::C_longlong:
+                case iris::Fundamental_type::C_char:
+                case iris::Fundamental_type::C_schar:
+                case iris::Fundamental_type::C_short:
+                case iris::Fundamental_type::C_int:
+                case iris::Fundamental_type::C_long:
+                case iris::Fundamental_type::C_longlong:
                     return std::pmr::string{"Int", parameters.output_allocator};
-                case h::Fundamental_type::String:
-                case h::Fundamental_type::Any_type:
+                case iris::Fundamental_type::String:
+                case iris::Fundamental_type::Any_type:
                     return std::pmr::string{"Builtin", parameters.output_allocator};
                 default:
                     return std::pmr::string{"Builtin", parameters.output_allocator};
             }
         }
 
-        if (std::holds_alternative<h::Function_pointer_type>(resolved_type.data))
+        if (std::holds_alternative<iris::Function_pointer_type>(resolved_type.data))
             return std::pmr::string{"Function_pointer", parameters.output_allocator};
 
-        if (std::holds_alternative<h::Integer_type>(resolved_type.data))
+        if (std::holds_alternative<iris::Integer_type>(resolved_type.data))
         {
-            h::Integer_type const& integer_type = std::get<h::Integer_type>(resolved_type.data);
+            iris::Integer_type const& integer_type = std::get<iris::Integer_type>(resolved_type.data);
             return std::pmr::string{integer_type.is_signed ? "Int" : "Uint", parameters.output_allocator};
         }
 
-        if (std::holds_alternative<h::Null_pointer_type>(resolved_type.data))
+        if (std::holds_alternative<iris::Null_pointer_type>(resolved_type.data))
             return std::pmr::string{"Null_pointer", parameters.output_allocator};
 
-        if (std::holds_alternative<h::Pointer_type>(resolved_type.data))
+        if (std::holds_alternative<iris::Pointer_type>(resolved_type.data))
             return std::pmr::string{"Pointer", parameters.output_allocator};
 
-        if (std::holds_alternative<h::Type_instance>(resolved_type.data))
+        if (std::holds_alternative<iris::Type_instance>(resolved_type.data))
             return std::pmr::string{"Custom", parameters.output_allocator};
 
         return std::pmr::string{"Custom", parameters.output_allocator};
     }
 
     static void replace_variable_with_constant_in_statement(
-        h::Statement& statement,
+        iris::Statement& statement,
         std::string_view const variable_name,
-        h::Type_reference const& constant_type,
+        iris::Type_reference const& constant_type,
         std::pmr::string const& constant_data
     );
 
     static void replace_variable_with_constant_in_expression(
-        h::Expression& expression,
+        iris::Expression& expression,
         std::string_view const variable_name,
-        h::Type_reference const& constant_type,
+        iris::Type_reference const& constant_type,
         std::pmr::string const& constant_data
     );
 
     static void replace_variable_with_constant_in_statement(
-        h::Statement& statement,
+        iris::Statement& statement,
         std::string_view const variable_name,
-        h::Type_reference const& constant_type,
+        iris::Type_reference const& constant_type,
         std::pmr::string const& constant_data
     )
     {
-        for (h::Expression& expression : statement.expressions)
+        for (iris::Expression& expression : statement.expressions)
             replace_variable_with_constant_in_expression(expression, variable_name, constant_type, constant_data);
     }
 
     static void replace_variable_with_constant_in_expression(
-        h::Expression& expression,
+        iris::Expression& expression,
         std::string_view const variable_name,
-        h::Type_reference const& constant_type,
+        iris::Type_reference const& constant_type,
         std::pmr::string const& constant_data
     )
     {
-        if (std::holds_alternative<h::Variable_expression>(expression.data))
+        if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
             if (variable_expression.name == variable_name)
             {
-                expression = h::Expression
+                expression = iris::Expression
                 {
-                    .data = h::Constant_expression
+                    .data = iris::Constant_expression
                     {
                         .type = constant_type,
                         .data = constant_data
@@ -363,62 +363,62 @@ namespace h::compiler
             }
         }
 
-        if (std::holds_alternative<h::Block_expression>(expression.data))
+        if (std::holds_alternative<iris::Block_expression>(expression.data))
         {
-            h::Block_expression& data = std::get<h::Block_expression>(expression.data);
-            for (h::Statement& statement : data.statements)
+            iris::Block_expression& data = std::get<iris::Block_expression>(expression.data);
+            for (iris::Statement& statement : data.statements)
                 replace_variable_with_constant_in_statement(statement, variable_name, constant_type, constant_data);
         }
-        else if (std::holds_alternative<h::Constant_array_expression>(expression.data))
+        else if (std::holds_alternative<iris::Constant_array_expression>(expression.data))
         {
-            h::Constant_array_expression& data = std::get<h::Constant_array_expression>(expression.data);
-            for (h::Statement& statement : data.array_data)
+            iris::Constant_array_expression& data = std::get<iris::Constant_array_expression>(expression.data);
+            for (iris::Statement& statement : data.array_data)
                 replace_variable_with_constant_in_statement(statement, variable_name, constant_type, constant_data);
         }
-        else if (std::holds_alternative<h::For_loop_expression>(expression.data))
+        else if (std::holds_alternative<iris::For_loop_expression>(expression.data))
         {
-            h::For_loop_expression& data = std::get<h::For_loop_expression>(expression.data);
+            iris::For_loop_expression& data = std::get<iris::For_loop_expression>(expression.data);
             replace_variable_with_constant_in_statement(data.range_end, variable_name, constant_type, constant_data);
-            for (h::Statement& statement : data.then_statements)
+            for (iris::Statement& statement : data.then_statements)
                 replace_variable_with_constant_in_statement(statement, variable_name, constant_type, constant_data);
         }
-        else if (std::holds_alternative<h::If_expression>(expression.data))
+        else if (std::holds_alternative<iris::If_expression>(expression.data))
         {
-            h::If_expression& data = std::get<h::If_expression>(expression.data);
-            for (h::Condition_statement_pair& pair : data.series)
+            iris::If_expression& data = std::get<iris::If_expression>(expression.data);
+            for (iris::Condition_statement_pair& pair : data.series)
             {
                 if (pair.condition.has_value())
                     replace_variable_with_constant_in_statement(*pair.condition, variable_name, constant_type, constant_data);
 
-                for (h::Statement& statement : pair.then_statements)
+                for (iris::Statement& statement : pair.then_statements)
                     replace_variable_with_constant_in_statement(statement, variable_name, constant_type, constant_data);
             }
         }
-        else if (std::holds_alternative<h::Switch_expression>(expression.data))
+        else if (std::holds_alternative<iris::Switch_expression>(expression.data))
         {
-            h::Switch_expression& data = std::get<h::Switch_expression>(expression.data);
-            for (h::Switch_case_expression_pair& pair : data.cases)
-                for (h::Statement& statement : pair.statements)
+            iris::Switch_expression& data = std::get<iris::Switch_expression>(expression.data);
+            for (iris::Switch_case_expression_pair& pair : data.cases)
+                for (iris::Statement& statement : pair.statements)
                     replace_variable_with_constant_in_statement(statement, variable_name, constant_type, constant_data);
         }
-        else if (std::holds_alternative<h::Ternary_condition_expression>(expression.data))
+        else if (std::holds_alternative<iris::Ternary_condition_expression>(expression.data))
         {
-            h::Ternary_condition_expression& data = std::get<h::Ternary_condition_expression>(expression.data);
+            iris::Ternary_condition_expression& data = std::get<iris::Ternary_condition_expression>(expression.data);
             replace_variable_with_constant_in_statement(data.then_statement, variable_name, constant_type, constant_data);
             replace_variable_with_constant_in_statement(data.else_statement, variable_name, constant_type, constant_data);
         }
-        else if (std::holds_alternative<h::While_loop_expression>(expression.data))
+        else if (std::holds_alternative<iris::While_loop_expression>(expression.data))
         {
-            h::While_loop_expression& data = std::get<h::While_loop_expression>(expression.data);
+            iris::While_loop_expression& data = std::get<iris::While_loop_expression>(expression.data);
             replace_variable_with_constant_in_statement(data.condition, variable_name, constant_type, constant_data);
-            for (h::Statement& statement : data.then_statements)
+            for (iris::Statement& statement : data.then_statements)
                 replace_variable_with_constant_in_statement(statement, variable_name, constant_type, constant_data);
         }
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_for_loop_expression(
-        h::Statement const& statement,
-        h::For_loop_expression const& expression,
+        iris::Statement const& statement,
+        iris::For_loop_expression const& expression,
         Compile_time_parameters const& parameters
     )
     {
@@ -427,16 +427,16 @@ namespace h::compiler
 
         switch (expression.range_comparison_operation)
         {
-            case h::Binary_operation::Less_than:
-            case h::Binary_operation::Less_than_or_equal_to:
-            case h::Binary_operation::Greater_than:
-            case h::Binary_operation::Greater_than_or_equal_to:
+            case iris::Binary_operation::Less_than:
+            case iris::Binary_operation::Less_than_or_equal_to:
+            case iris::Binary_operation::Greater_than:
+            case iris::Binary_operation::Greater_than_or_equal_to:
                 break;
             default:
                 return std::nullopt;
         }
 
-        h::Expression const& range_begin_expression = statement.expressions[expression.range_begin.expression_index];
+        iris::Expression const& range_begin_expression = statement.expressions[expression.range_begin.expression_index];
         std::optional<Compile_time_value_and_type> const range_begin_value = evaluate_compile_time_expression(statement, range_begin_expression, parameters);
         if (!range_begin_value.has_value())
             return std::nullopt;
@@ -460,7 +460,7 @@ namespace h::compiler
                 if (expression.step_by->expression_index >= statement.expressions.size())
                     return std::nullopt;
 
-                h::Expression const& step_expression = statement.expressions[expression.step_by->expression_index];
+                iris::Expression const& step_expression = statement.expressions[expression.step_by->expression_index];
                 std::optional<Compile_time_value_and_type> const step_value = evaluate_compile_time_expression(statement, step_expression, parameters);
                 if (!step_value.has_value())
                     return std::nullopt;
@@ -474,18 +474,18 @@ namespace h::compiler
 
         // Limits to avoid runaway unrolling
         constexpr std::size_t maximum_unroll_iterations = 1024;
-        std::pmr::vector<h::Statement> iteration_blocks{parameters.output_allocator};
+        std::pmr::vector<iris::Statement> iteration_blocks{parameters.output_allocator};
         iteration_blocks.reserve(16);
 
         auto const create_iteration_block = [&](auto const loop_index_value) -> void
         {
-            std::pmr::vector<h::Statement> body{parameters.output_allocator};
+            std::pmr::vector<iris::Statement> body{parameters.output_allocator};
             body.assign(expression.then_statements.begin(), expression.then_statements.end());
 
             std::pmr::string const integer_string = std::pmr::string{std::to_string(loop_index_value)};
-            h::Type_reference const index_type = range_begin_value->type.value_or(create_integer_type_type_reference(64, true));
+            iris::Type_reference const index_type = range_begin_value->type.value_or(create_integer_type_type_reference(64, true));
 
-            for (h::Statement& statement : body)
+            for (iris::Statement& statement : body)
                 replace_variable_with_constant_in_statement(statement, expression.variable_name, index_type, integer_string);
 
             iteration_blocks.push_back(create_block_statement(std::move(body), parameters.output_allocator));
@@ -495,13 +495,13 @@ namespace h::compiler
         {
             switch (expression.range_comparison_operation)
             {
-                case h::Binary_operation::Less_than:
+                case iris::Binary_operation::Less_than:
                     return value < range_end;
-                case h::Binary_operation::Less_than_or_equal_to:
+                case iris::Binary_operation::Less_than_or_equal_to:
                     return value <= range_end;
-                case h::Binary_operation::Greater_than:
+                case iris::Binary_operation::Greater_than:
                     return value > range_end;
-                case h::Binary_operation::Greater_than_or_equal_to:
+                case iris::Binary_operation::Greater_than_or_equal_to:
                     return value >= range_end;
                 default:
                     return false;
@@ -547,8 +547,8 @@ namespace h::compiler
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_reflection_expression(
-        h::Statement const& statement,
-        h::Reflection_expression const& expression,
+        iris::Statement const& statement,
+        iris::Reflection_expression const& expression,
         Compile_time_parameters const& parameters
     )
     {
@@ -626,19 +626,19 @@ namespace h::compiler
                 throw std::runtime_error{ "member_count() does not take runtime arguments!" };
 
             Type_reference const& type_reference = expression.type_arguments[0];
-            std::optional<h::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
+            std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
             if (!declaration.has_value())
                 throw std::runtime_error{ "member_count() could not resolve declaration for type argument!" };
 
             std::uint64_t member_count = 0;
-            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+            if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data))
             {
-                h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration->data);
+                iris::Struct_declaration const& struct_declaration = *std::get<iris::Struct_declaration const*>(declaration->data);
                 member_count = struct_declaration.member_types.size();
             }
-            else if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+            else if (std::holds_alternative<iris::Union_declaration const*>(declaration->data))
             {
-                h::Union_declaration const& union_declaration = *std::get<h::Union_declaration const*>(declaration->data);
+                iris::Union_declaration const& union_declaration = *std::get<iris::Union_declaration const*>(declaration->data);
                 member_count = union_declaration.member_types.size();
             }
             else
@@ -659,22 +659,22 @@ namespace h::compiler
             std::uint64_t const member_index = get_required_reflection_index_argument(statement, expression, "member_type", parameters);
 
             Type_reference const& type_reference = expression.type_arguments[0];
-            std::optional<h::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
+            std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
             if (!declaration.has_value())
                 throw std::runtime_error{ "member_type() could not resolve declaration for type argument!" };
 
             std::optional<Type_reference> output_type = std::nullopt;
-            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+            if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data))
             {
-                h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration->data);
+                iris::Struct_declaration const& struct_declaration = *std::get<iris::Struct_declaration const*>(declaration->data);
                 if (member_index >= struct_declaration.member_types.size())
                     throw std::runtime_error{ "member_type() index is out of bounds!" };
 
                 output_type = struct_declaration.member_types[member_index];
             }
-            else if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+            else if (std::holds_alternative<iris::Union_declaration const*>(declaration->data))
             {
-                h::Union_declaration const& union_declaration = *std::get<h::Union_declaration const*>(declaration->data);
+                iris::Union_declaration const& union_declaration = *std::get<iris::Union_declaration const*>(declaration->data);
                 if (member_index >= union_declaration.member_types.size())
                     throw std::runtime_error{ "member_type() index is out of bounds!" };
 
@@ -697,14 +697,14 @@ namespace h::compiler
             std::uint64_t const member_index = get_required_reflection_index_argument(statement, expression, "member_offset", parameters);
 
             Type_reference const& type_reference = expression.type_arguments[0];
-            std::optional<h::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
+            std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
             if (!declaration.has_value())
                 throw std::runtime_error{ "member_offset() could not resolve declaration for type argument!" };
 
             std::uint64_t offset_in_bits = 0;
-            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+            if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data))
             {
-                h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration->data);
+                iris::Struct_declaration const& struct_declaration = *std::get<iris::Struct_declaration const*>(declaration->data);
                 if (member_index >= struct_declaration.member_types.size())
                     throw std::runtime_error{ "member_offset() index is out of bounds!" };
 
@@ -723,9 +723,9 @@ namespace h::compiler
                 llvm::StructLayout const* const llvm_struct_layout = parameters.llvm_data_layout.getStructLayout(llvm_struct_type);
                 offset_in_bits = 8 * llvm_struct_layout->getElementOffset(member_index);
             }
-            else if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+            else if (std::holds_alternative<iris::Union_declaration const*>(declaration->data))
             {
-                h::Union_declaration const& union_declaration = *std::get<h::Union_declaration const*>(declaration->data);
+                iris::Union_declaration const& union_declaration = *std::get<iris::Union_declaration const*>(declaration->data);
                 if (member_index >= union_declaration.member_types.size())
                     throw std::runtime_error{ "member_offset() index is out of bounds!" };
 
@@ -749,22 +749,22 @@ namespace h::compiler
             std::uint64_t const member_index = get_required_reflection_index_argument(statement, expression, "member_name", parameters);
 
             Type_reference const& type_reference = expression.type_arguments[0];
-            std::optional<h::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
+            std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
             if (!declaration.has_value())
                 throw std::runtime_error{ "member_name() could not resolve declaration for type argument!" };
 
             std::pmr::string member_name{parameters.output_allocator};
-            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+            if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data))
             {
-                h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration->data);
+                iris::Struct_declaration const& struct_declaration = *std::get<iris::Struct_declaration const*>(declaration->data);
                 if (member_index >= struct_declaration.member_names.size())
                     throw std::runtime_error{ "member_name() index is out of bounds!" };
 
                 member_name = struct_declaration.member_names[member_index];
             }
-            else if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+            else if (std::holds_alternative<iris::Union_declaration const*>(declaration->data))
             {
-                h::Union_declaration const& union_declaration = *std::get<h::Union_declaration const*>(declaration->data);
+                iris::Union_declaration const& union_declaration = *std::get<iris::Union_declaration const*>(declaration->data);
                 if (member_index >= union_declaration.member_names.size())
                     throw std::runtime_error{ "member_name() index is out of bounds!" };
 
@@ -789,7 +789,7 @@ namespace h::compiler
                 throw std::runtime_error{ "get_type_kind() does not take runtime arguments!" };
 
             std::pmr::string const member_name = get_type_kind_member_name(expression.type_arguments[0], parameters);
-            h::Statement enum_statement =
+            iris::Statement enum_statement =
             {
                 .expressions = create_enum_value_expressions("Type_kind", member_name)
             };
@@ -803,32 +803,32 @@ namespace h::compiler
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_unary_expression(
-        h::Statement const& statement,
-        h::Unary_expression const& expression,
+        iris::Statement const& statement,
+        iris::Unary_expression const& expression,
         Compile_time_parameters const& parameters
     )
     {
         switch (expression.operation)
         {
-            case h::Unary_operation::Bitwise_not:
-            case h::Unary_operation::Minus:
-            case h::Unary_operation::Pre_increment:
-            case h::Unary_operation::Post_increment:
-            case h::Unary_operation::Pre_decrement:
-            case h::Unary_operation::Post_decrement:
-            case h::Unary_operation::Indirection:
-            case h::Unary_operation::Address_of:
+            case iris::Unary_operation::Bitwise_not:
+            case iris::Unary_operation::Minus:
+            case iris::Unary_operation::Pre_increment:
+            case iris::Unary_operation::Post_increment:
+            case iris::Unary_operation::Pre_decrement:
+            case iris::Unary_operation::Post_decrement:
+            case iris::Unary_operation::Indirection:
+            case iris::Unary_operation::Address_of:
                 return std::nullopt;
             default:
                 break;
         }
 
-        h::Expression const& right_side_expression = statement.expressions[expression.expression.expression_index];
+        iris::Expression const& right_side_expression = statement.expressions[expression.expression.expression_index];
         std::optional<Compile_time_value_and_type> const right_side_value = evaluate_compile_time_expression(statement, right_side_expression, parameters);
         if (!right_side_value.has_value())
             return std::nullopt;
 
-        if (expression.operation == h::Unary_operation::Not)
+        if (expression.operation == iris::Unary_operation::Not)
         {
             std::optional<bool> const value = get_bool_from_value(right_side_value.value());
             if (!value.has_value())
@@ -842,8 +842,8 @@ namespace h::compiler
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_binary_expression(
-        h::Statement const& statement,
-        h::Binary_expression const& expression,
+        iris::Statement const& statement,
+        iris::Binary_expression const& expression,
         Compile_time_parameters const& parameters
     )
     {
@@ -856,8 +856,8 @@ namespace h::compiler
         if (expression.right_hand_side.expression_index >= statement.expressions.size())
             throw std::runtime_error{ "Invalid right operand index in compile_time binary expression" };
 
-        h::Expression const& left_expression = statement.expressions[expression.left_hand_side.expression_index];
-        h::Expression const& right_expression = statement.expressions[expression.right_hand_side.expression_index];
+        iris::Expression const& left_expression = statement.expressions[expression.left_hand_side.expression_index];
+        iris::Expression const& right_expression = statement.expressions[expression.right_hand_side.expression_index];
 
         std::optional<Compile_time_value_and_type> const left_value = evaluate_compile_time_expression(statement, left_expression, parameters);
         if (!left_value.has_value())
@@ -882,17 +882,17 @@ namespace h::compiler
         {
             switch (expression.operation)
             {
-                case h::Binary_operation::Equal:
+                case iris::Binary_operation::Equal:
                     return left_side == right_side;
-                case h::Binary_operation::Not_equal:
+                case iris::Binary_operation::Not_equal:
                     return left_side != right_side;
-                case h::Binary_operation::Less_than:
+                case iris::Binary_operation::Less_than:
                     return left_side < right_side;
-                case h::Binary_operation::Less_than_or_equal_to:
+                case iris::Binary_operation::Less_than_or_equal_to:
                     return left_side <= right_side;
-                case h::Binary_operation::Greater_than:
+                case iris::Binary_operation::Greater_than:
                     return left_side > right_side;
-                case h::Binary_operation::Greater_than_or_equal_to:
+                case iris::Binary_operation::Greater_than_or_equal_to:
                     return left_side >= right_side;
                 default:
                     throw std::runtime_error{ "Unsupported compile_time comparison operation" };
@@ -909,17 +909,17 @@ namespace h::compiler
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_variable_expression(
-        h::Statement const& statement,
-        h::Variable_expression const& expression,
+        iris::Statement const& statement,
+        iris::Variable_expression const& expression,
         Compile_time_parameters const& parameters
     )
     {
         // Search for global variables:
         {
-            std::optional<h::Global_variable_declaration const*> const declaration = h::find_global_variable_declaration(parameters.core_module, expression.name);
+            std::optional<iris::Global_variable_declaration const*> const declaration = iris::find_global_variable_declaration(parameters.core_module, expression.name);
             if (declaration.has_value())
             {
-                h::Global_variable_declaration const& global_variable_declaration = *declaration.value();
+                iris::Global_variable_declaration const& global_variable_declaration = *declaration.value();
                 return Compile_time_value_and_type
                 {
                     .statement = global_variable_declaration.initial_value,
@@ -932,37 +932,37 @@ namespace h::compiler
     }
 
     std::optional<Compile_time_value_and_type> evaluate_compile_time_expression(
-        h::Statement const& statement,
-        h::Expression const& expression,
+        iris::Statement const& statement,
+        iris::Expression const& expression,
         Compile_time_parameters const& parameters
     )
     {
-        if (std::holds_alternative<h::Compile_time_expression>(expression.data))
+        if (std::holds_alternative<iris::Compile_time_expression>(expression.data))
         {
-            h::Compile_time_expression const& compile_time_expression = std::get<h::Compile_time_expression>(expression.data);
+            iris::Compile_time_expression const& compile_time_expression = std::get<iris::Compile_time_expression>(expression.data);
             if (compile_time_expression.expression.expression_index >= statement.expressions.size())
                 return std::nullopt;
                 
-            h::Expression const& right_side_expression = statement.expressions[compile_time_expression.expression.expression_index];
+            iris::Expression const& right_side_expression = statement.expressions[compile_time_expression.expression.expression_index];
             return evaluate_compile_time_expression(statement, right_side_expression, parameters);
         }
-        else if (std::holds_alternative<h::Constant_expression>(expression.data))
+        else if (std::holds_alternative<iris::Constant_expression>(expression.data))
         {
-            h::Constant_expression const& constant_expression = std::get<h::Constant_expression>(expression.data);
-            return create_value_and_type({.expressions = {h::Expression{.data = constant_expression}}});
+            iris::Constant_expression const& constant_expression = std::get<iris::Constant_expression>(expression.data);
+            return create_value_and_type({.expressions = {iris::Expression{.data = constant_expression}}});
         }
-        else if (std::holds_alternative<h::If_expression>(expression.data))
+        else if (std::holds_alternative<iris::If_expression>(expression.data))
         {
-            h::If_expression const& if_expression = std::get<h::If_expression>(expression.data);
+            iris::If_expression const& if_expression = std::get<iris::If_expression>(expression.data);
 
             for (std::size_t index = 0; index < if_expression.series.size(); ++index)
             {
-                h::Condition_statement_pair const& serie = if_expression.series[index];
+                iris::Condition_statement_pair const& serie = if_expression.series[index];
 
                 if (!serie.condition.has_value())
                     return create_value_and_type(create_block_statement(serie.then_statements, parameters.output_allocator));
 
-                h::Statement const& condition_statement = serie.condition.value();
+                iris::Statement const& condition_statement = serie.condition.value();
                 std::optional<Compile_time_value_and_type> const condition_value = evaluate_compile_time_statement(condition_statement, parameters);
                 if (!condition_value.has_value())
                     return std::nullopt;
@@ -977,29 +977,29 @@ namespace h::compiler
 
             return std::nullopt;
         }
-        else if (std::holds_alternative<h::For_loop_expression>(expression.data))
+        else if (std::holds_alternative<iris::For_loop_expression>(expression.data))
         {
-            h::For_loop_expression const& for_loop_expression = std::get<h::For_loop_expression>(expression.data);
+            iris::For_loop_expression const& for_loop_expression = std::get<iris::For_loop_expression>(expression.data);
             return evaluate_compile_time_for_loop_expression(statement, for_loop_expression, parameters);
         }
-        else if (std::holds_alternative<h::Reflection_expression>(expression.data))
+        else if (std::holds_alternative<iris::Reflection_expression>(expression.data))
         {
-            h::Reflection_expression const& reflection_expression = std::get<h::Reflection_expression>(expression.data);
+            iris::Reflection_expression const& reflection_expression = std::get<iris::Reflection_expression>(expression.data);
             return evaluate_compile_time_reflection_expression(statement, reflection_expression, parameters);
         }
-        else if (std::holds_alternative<h::Unary_expression>(expression.data))
+        else if (std::holds_alternative<iris::Unary_expression>(expression.data))
         {
-            h::Unary_expression const& unary_expression = std::get<h::Unary_expression>(expression.data);
+            iris::Unary_expression const& unary_expression = std::get<iris::Unary_expression>(expression.data);
             return evaluate_compile_time_unary_expression(statement, unary_expression, parameters);
         }
-        else if (std::holds_alternative<h::Binary_expression>(expression.data))
+        else if (std::holds_alternative<iris::Binary_expression>(expression.data))
         {
-            h::Binary_expression const& binary_expression = std::get<h::Binary_expression>(expression.data);
+            iris::Binary_expression const& binary_expression = std::get<iris::Binary_expression>(expression.data);
             return evaluate_compile_time_binary_expression(statement, binary_expression, parameters);
         }
-        else if (std::holds_alternative<h::Variable_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
             return evaluate_compile_time_variable_expression(statement, variable_expression, parameters);
         }
 
@@ -1007,14 +1007,14 @@ namespace h::compiler
     }
 
     std::optional<Compile_time_value_and_type> evaluate_compile_time_statement(
-        h::Statement const& statement,
+        iris::Statement const& statement,
         Compile_time_parameters const& parameters
     )
     {
         if (statement.expressions.empty())
             return std::nullopt;
 
-        h::Expression const& expression = statement.expressions[0];
+        iris::Expression const& expression = statement.expressions[0];
         return evaluate_compile_time_expression(
             statement,
             expression,
@@ -1023,18 +1023,18 @@ namespace h::compiler
     }
 
     static void visit_and_replace_compile_time_expressions(
-        h::Statement& statement,
-        h::Expression const& expression,
+        iris::Statement& statement,
+        iris::Expression const& expression,
         Compile_time_parameters const& parameters
     )
     {
-        if (std::holds_alternative<h::Compile_time_expression>(expression.data))
+        if (std::holds_alternative<iris::Compile_time_expression>(expression.data))
         {
-            h::Compile_time_expression const& compile_time_expression = std::get<h::Compile_time_expression>(expression.data);
+            iris::Compile_time_expression const& compile_time_expression = std::get<iris::Compile_time_expression>(expression.data);
             if (compile_time_expression.expression.expression_index >= statement.expressions.size())
                 return;
                 
-            h::Expression const& right_side_expression = statement.expressions[compile_time_expression.expression.expression_index];
+            iris::Expression const& right_side_expression = statement.expressions[compile_time_expression.expression.expression_index];
             
             std::optional<Compile_time_value_and_type> new_value = evaluate_compile_time_expression(
                 statement,
@@ -1046,9 +1046,9 @@ namespace h::compiler
                 replace_expression(statement, expression, new_value->statement, parameters.temporaries_allocator);
             }
         }
-        else if (std::holds_alternative<h::Reflection_expression>(expression.data))
+        else if (std::holds_alternative<iris::Reflection_expression>(expression.data))
         {
-            h::Reflection_expression const& reflection_expression = std::get<h::Reflection_expression>(expression.data);
+            iris::Reflection_expression const& reflection_expression = std::get<iris::Reflection_expression>(expression.data);
             
             std::optional<Compile_time_value_and_type> new_value = evaluate_compile_time_reflection_expression(
                 statement,
@@ -1063,11 +1063,11 @@ namespace h::compiler
     }
 
     void run_compile_time_pass_on_module(
-        h::Module& core_module,
+        iris::Module& core_module,
         Compile_time_parameters const& parameters
     )
     {
-        for (h::Function_definition& function_definition : core_module.definitions.function_definitions)
+        for (iris::Function_definition& function_definition : core_module.definitions.function_definitions)
         {
             std::optional<Function_declaration const*> const function_declaration = find_function_declaration(core_module, function_definition.name);
             if (!function_declaration.has_value())
@@ -1082,14 +1082,14 @@ namespace h::compiler
     }
 
     void run_compile_time_pass_on_function(
-        h::Function_declaration const& function_declaration,
-        h::Function_definition& function_definition,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_definition& function_definition,
         Compile_time_parameters const& parameters
     )
     {
-        auto const visit_and_replace = [&](h::Expression const& expression, h::Statement const& statement) -> bool
+        auto const visit_and_replace = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
         {
-            h::Statement& mutable_statement = const_cast<h::Statement&>(statement);
+            iris::Statement& mutable_statement = const_cast<iris::Statement&>(statement);
             visit_and_replace_compile_time_expressions(mutable_statement, expression, parameters);
             return false;
         };

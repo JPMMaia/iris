@@ -11,26 +11,26 @@
 
 using Test_function_pointer = void(*)();
 
-extern "C" uint64_t hlang_get_test_count();
-extern "C" char const* const* hlang_get_test_names();
-extern "C" char const* hlang_get_test_source_file(uint64_t test_index);
-extern "C" uint64_t const* hlang_get_test_source_file_lines();
-extern "C" Test_function_pointer* hlang_get_tests();
+extern "C" uint64_t iris_get_test_count();
+extern "C" char const* const* iris_get_test_names();
+extern "C" char const* iris_get_test_source_file(uint64_t test_index);
+extern "C" uint64_t const* iris_get_test_source_file_lines();
+extern "C" Test_function_pointer* iris_get_tests();
 
-extern "C" struct hlang_test_context
+extern "C" struct iris_test_context
 {
     bool success = true;
 };
 
-static hlang_test_context* g_hlang_current_test_context;
+static iris_test_context* g_iris_current_test_context;
 
-extern "C" void hlang_test_check(bool const condition, char const* const source_file_path, uint64_t const line)
+extern "C" void iris_test_check(bool const condition, char const* const source_file_path, uint64_t const line)
 {
-    if (g_hlang_current_test_context == nullptr)
+    if (g_iris_current_test_context == nullptr)
         return;
 
     if (!condition)
-        g_hlang_current_test_context->success = false;
+        g_iris_current_test_context->success = false;
 
     std::fprintf(stderr, "Test check failed @ \"%s:%llu\"\n", source_file_path, line);
     std::fflush(stderr);
@@ -38,15 +38,15 @@ extern "C" void hlang_test_check(bool const condition, char const* const source_
 
 static std::span<char const* const> get_all_test_names()
 {
-    std::uint64_t const count = hlang_get_test_count();
-    char const* const* const tests = hlang_get_test_names();
+    std::uint64_t const count = iris_get_test_count();
+    char const* const* const tests = iris_get_test_names();
     return { tests, count };
 }
 
 static std::span<std::uint64_t const> get_all_source_file_lines()
 {
-    std::uint64_t const count = hlang_get_test_count();
-    std::uint64_t const* const lines = hlang_get_test_source_file_lines();
+    std::uint64_t const count = iris_get_test_count();
+    std::uint64_t const* const lines = iris_get_test_source_file_lines();
     return { lines, count };
 }
 
@@ -123,7 +123,7 @@ static std::pmr::vector<Test_function_pointer> get_tests_function_pointers(std::
     std::pmr::vector<Test_function_pointer> output;
     output.reserve(tests_indices.size());
 
-    Test_function_pointer* const tests = hlang_get_tests();
+    Test_function_pointer* const tests = iris_get_tests();
 
     for (std::uint64_t const test_index : tests_indices)
         output.push_back(tests[test_index]);
@@ -245,7 +245,7 @@ static void print_test_names_json(std::filesystem::path const& output_file_path)
             if (!first_test) std::fprintf(output, ",");
             first_test = false;
 
-            std::string_view const source_file = hlang_get_test_source_file(test_case_info.index);
+            std::string_view const source_file = iris_get_test_source_file(test_case_info.index);
             std::uint64_t const line = source_file_lines[test_case_info.index];
 
             std::string const full = std::string(module) + "." + std::string(test_case_info.name);
@@ -273,11 +273,11 @@ static Test_results run_tests(std::span<Test_function_pointer const> const tests
 
     for (Test_function_pointer const test_function_pointer : tests_function_pointers)
     {
-        hlang_test_context current_test_context = {};
+        iris_test_context current_test_context = {};
 
-        g_hlang_current_test_context = &current_test_context;
+        g_iris_current_test_context = &current_test_context;
         test_function_pointer();
-        g_hlang_current_test_context = nullptr;
+        g_iris_current_test_context = nullptr;
 
         if (current_test_context.success)
             results.success_count += 1;

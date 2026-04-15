@@ -1,9 +1,9 @@
-import h.common;
-import h.common.filesystem;
-import h.compiler;
-import h.compiler.builder;
-import h.compiler.compile_commands_generator;
-import h.compiler.target;
+import iris.common;
+import iris.common.filesystem;
+import iris.compiler;
+import iris.compiler.builder;
+import iris.compiler.compile_commands_generator;
+import iris.compiler.target;
 
 #include <filesystem>
 #include <fstream>
@@ -13,14 +13,14 @@ import h.compiler.target;
 
 #include <catch2/catch_all.hpp>
 
-namespace h::compiler
+namespace iris::compiler
 {
     static std::filesystem::path const g_examples_directory = std::filesystem::path{ EXAMPLES_DIRECTORY };
     static std::filesystem::path const g_standard_repository_file_path = std::filesystem::path{ STANDARD_REPOSITORY_FILE_PATH };
 
     static std::pmr::string get_binary_name(
         std::string_view const name,
-        h::compiler::Target const& target
+        iris::compiler::Target const& target
     )
     {
         if (target.operating_system == "windows")
@@ -33,7 +33,7 @@ namespace h::compiler
 
     static std::pmr::string get_static_library_name(
         std::string_view const name,
-        h::compiler::Target const& target
+        iris::compiler::Target const& target
     )
     {
         if (target.operating_system == "windows")
@@ -46,7 +46,7 @@ namespace h::compiler
 
     static std::pmr::string get_object_name(
         std::string_view const name,
-        h::compiler::Target const& target
+        iris::compiler::Target const& target
     )
     {
         if (target.operating_system == "windows")
@@ -60,11 +60,11 @@ namespace h::compiler
     void test_builder(
         std::string_view const project_name,
         std::pmr::vector<std::filesystem::path> const& artifact_paths,
-        h::compiler::Target const& target,
+        iris::compiler::Target const& target,
         std::span<std::filesystem::path const> const additional_repository_paths,
         std::span<std::filesystem::path const> const expected_output_paths,
         std::optional<std::string_view> const temporary_directory_name = std::nullopt,
-        h::compiler::Builder_options const builder_options = {}
+        iris::compiler::Builder_options const builder_options = {}
     )
     {
         std::filesystem::path const temporary_directory_path = std::filesystem::temp_directory_path();
@@ -75,14 +75,14 @@ namespace h::compiler
         for (std::filesystem::path const& relative_path : artifact_paths)
             artifact_absolute_paths.push_back(g_examples_directory / project_name / relative_path);
 
-        std::pmr::vector<std::filesystem::path> header_search_directories = h::common::get_default_header_search_directories();
+        std::pmr::vector<std::filesystem::path> header_search_directories = iris::common::get_default_header_search_directories();
         
         std::pmr::vector<std::filesystem::path> repository_paths{ g_standard_repository_file_path };
         repository_paths.insert(repository_paths.end(), additional_repository_paths.begin(), additional_repository_paths.end());
 
         std::filesystem::remove_all(build_directory_path);
 
-        h::compiler::Compilation_options const compilation_options
+        iris::compiler::Compilation_options const compilation_options
         {
         };
 
@@ -109,17 +109,17 @@ namespace h::compiler
         std::filesystem::path const& build_directory_path,
         std::filesystem::path const& artifact_file_path,
         std::filesystem::path const& output_file_path,
-        h::compiler::Target const& target,
+        iris::compiler::Target const& target,
         std::span<std::filesystem::path const> const additional_repository_paths,
         std::pmr::vector<Compile_command> const& expected_compile_commands
     )
     {
-        std::pmr::vector<std::filesystem::path> header_search_directories = h::common::get_default_header_search_directories();
+        std::pmr::vector<std::filesystem::path> header_search_directories = iris::common::get_default_header_search_directories();
         
         std::pmr::vector<std::filesystem::path> repository_paths{ g_standard_repository_file_path };
         repository_paths.insert(repository_paths.end(), additional_repository_paths.begin(), additional_repository_paths.end());
 
-        h::compiler::Compilation_options const compilation_options
+        iris::compiler::Compilation_options const compilation_options
         {
         };
 
@@ -155,7 +155,7 @@ namespace h::compiler
 
     TEST_CASE("Build Hello_world", "[Builder]")
     {
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const expected_output_paths
         {
@@ -167,7 +167,7 @@ namespace h::compiler
 
     TEST_CASE("Build Link_with_library", "[Builder]")
     {
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
@@ -185,7 +185,7 @@ namespace h::compiler
 
     TEST_CASE("Build Mix_with_cpp", "[Builder]")
     {
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
@@ -206,7 +206,7 @@ namespace h::compiler
     TEST_CASE("Build Mix_with_cpp compile commands", "[Builder]")
     {
         std::string_view const project_name = "Mix_with_cpp";
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
@@ -219,8 +219,8 @@ namespace h::compiler
         std::filesystem::path const build_directory_path = temporary_directory_path / project_name / "build";
         std::filesystem::path const output_file_path = build_directory_path / "compile_commands.json";
 
-        std::filesystem::path const executable_directory = h::common::get_executable_directory();
-        std::filesystem::path const builtin_include_directory = h::common::get_builtin_include_directory();
+        std::filesystem::path const executable_directory = iris::common::get_executable_directory();
+        std::filesystem::path const builtin_include_directory = iris::common::get_builtin_include_directory();
 
         bool const use_clang_cl = true;
 
@@ -256,7 +256,7 @@ namespace h::compiler
 
     TEST_CASE("Build Export_c_header", "[Builder]")
     {
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
@@ -273,7 +273,7 @@ namespace h::compiler
 
     TEST_CASE("Build Export_and_import_c_header", "[Builder]")
     {
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
@@ -293,7 +293,7 @@ namespace h::compiler
 
     TEST_CASE("Build Test_framework my_app in non-test mode", "[Builder]")
     {
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
@@ -312,7 +312,7 @@ namespace h::compiler
 
     TEST_CASE("Build Test_framework my_library in test mode", "[Builder]")
     {
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
@@ -323,7 +323,7 @@ namespace h::compiler
         {
             std::filesystem::path{"artifacts"} / "my_library.test.bc",
             std::filesystem::path{"artifacts"} / "my_library.generated_tests_information.test.bc",
-            std::filesystem::path{"bin"} / get_binary_name("my_library.hlang.test", target)
+            std::filesystem::path{"bin"} / get_binary_name("my_library.iris.test", target)
         };
 
         test_builder("Test_framework", {"my_library/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_0", {.is_test_mode = true});
@@ -331,7 +331,7 @@ namespace h::compiler
 
     TEST_CASE("Build Test_framework my_app in test mode", "[Builder]")
     {
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
@@ -343,7 +343,7 @@ namespace h::compiler
             std::filesystem::path{"artifacts"} / "my_library.bc",
             std::filesystem::path{"artifacts"} / "my_app.test.bc",
             std::filesystem::path{"artifacts"} / "my_app.generated_tests_information.test.bc",
-            std::filesystem::path{"bin"} / get_binary_name("my_app.hlang.test", target)
+            std::filesystem::path{"bin"} / get_binary_name("my_app.iris.test", target)
         };
 
         test_builder("Test_framework", {"my_app/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_1", {.is_test_mode = true});
@@ -351,7 +351,7 @@ namespace h::compiler
 
     TEST_CASE("Build Test_framework my_library and my_app in test mode", "[Builder]")
     {
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
@@ -365,8 +365,8 @@ namespace h::compiler
             std::filesystem::path{"artifacts"} / "my_library.generated_tests_information.test.bc",
             std::filesystem::path{"artifacts"} / "my_app.test.bc",
             std::filesystem::path{"artifacts"} / "my_app.generated_tests_information.test.bc",
-            std::filesystem::path{"bin"} / get_binary_name("my_library.hlang.test", target),
-            std::filesystem::path{"bin"} / get_binary_name("my_app.hlang.test", target)
+            std::filesystem::path{"bin"} / get_binary_name("my_library.iris.test", target),
+            std::filesystem::path{"bin"} / get_binary_name("my_app.iris.test", target)
         };
 
         test_builder("Test_framework", {"my_library/iris_artifact.json", "my_app/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_2", {.is_test_mode = true});
@@ -374,7 +374,7 @@ namespace h::compiler
 
     TEST_CASE("Build Test_framework empty_app in test mode", "[Builder]")
     {
-        h::compiler::Target const target = h::compiler::get_default_target();
+        iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
@@ -399,7 +399,7 @@ namespace h::compiler
             std::ofstream{ root / "subdir" / "iris_artifact.json" };
         }
 
-        std::pmr::vector<std::filesystem::path> const found = h::compiler::find_artifact_file_paths(root, {}, {});
+        std::pmr::vector<std::filesystem::path> const found = iris::compiler::find_artifact_file_paths(root, {}, {});
 
         CHECK(found.size() == 2);
         for (std::filesystem::path const& artifact_file_path : found)

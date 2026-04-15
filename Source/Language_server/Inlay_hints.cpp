@@ -7,29 +7,29 @@ module;
 
 #include <lsp/types.h>
 
-module h.language_server.inlay_hints;
+module iris.language_server.inlay_hints;
 
-import h.compiler.analysis;
-import h.core;
-import h.core.declarations;
-import h.core.formatter;
-import h.core.types;
-import h.language_server.core;
+import iris.compiler.analysis;
+import iris.core;
+import iris.core.declarations;
+import iris.core.formatter;
+import iris.core.types;
+import iris.language_server.core;
 
-namespace h::language_server
+namespace iris::language_server
 {
     std::pmr::vector<lsp::InlayHint> create_function_inlay_hints(
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_definition const& function_definition,
-        h::Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_definition const& function_definition,
+        iris::Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
         std::pmr::vector<lsp::InlayHint> output{temporaries_allocator};
 
-        h::compiler::Scope scope
+        iris::compiler::Scope scope
         {
             .variables{temporaries_allocator}
         };
@@ -41,21 +41,21 @@ namespace h::language_server
             function_declaration.input_parameter_source_positions
         );
 
-        auto const process_statement = [&](h::Statement const& statement, h::compiler::Scope const& scope) -> void
+        auto const process_statement = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> void
         {
             if (statement.expressions.empty())
                 return;
 
-            h::Expression const& expression = statement.expressions[0];
+            iris::Expression const& expression = statement.expressions[0];
 
             if (!expression.source_range.has_value())
                 return;
 
-            if (std::holds_alternative<h::Variable_declaration_expression>(expression.data))
+            if (std::holds_alternative<iris::Variable_declaration_expression>(expression.data))
             {
-                h::Variable_declaration_expression const& variable_declaration = std::get<h::Variable_declaration_expression>(expression.data);
+                iris::Variable_declaration_expression const& variable_declaration = std::get<iris::Variable_declaration_expression>(expression.data);
 
-                std::optional<h::Type_reference> const variable_type = get_expression_type(
+                std::optional<iris::Type_reference> const variable_type = get_expression_type(
                     core_module,
                     &function_declaration,
                     scope,
@@ -98,7 +98,7 @@ namespace h::language_server
             }
         };
 
-        h::compiler::visit_statements_using_scope(
+        iris::compiler::visit_statements_using_scope(
             core_module,
             &function_declaration,
             scope,
@@ -112,10 +112,10 @@ namespace h::language_server
 
     void create_inlay_hint_variable_type_label_for_function_parameters(
         std::vector<lsp::InlayHintLabelPart>& parts,
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database,
         std::span<std::pmr::string const> const parameter_names,
-        std::span<h::Type_reference const> const parameter_types,
+        std::span<iris::Type_reference const> const parameter_types,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -153,9 +153,9 @@ namespace h::language_server
 
     void create_inlay_hint_variable_type_label_aux(
         std::vector<lsp::InlayHintLabelPart>& parts,
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database,
-        std::optional<h::Type_reference> const& type_optional,
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database,
+        std::optional<iris::Type_reference> const& type_optional,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -164,11 +164,11 @@ namespace h::language_server
             return;
         }
 
-        h::Type_reference const& type = type_optional.value();
+        iris::Type_reference const& type = type_optional.value();
 
-        if (h::is_custom_type_reference(type))
+        if (iris::is_custom_type_reference(type))
         {
-            std::pmr::string const type_name = h::format_type_reference(
+            std::pmr::string const type_name = iris::format_type_reference(
                 core_module,
                 type,
                 temporaries_allocator,
@@ -183,7 +183,7 @@ namespace h::language_server
             std::optional<Declaration> const declaration = find_declaration(declaration_database, type);
             if (declaration.has_value())
             {
-                std::optional<h::Source_range_location> const declaration_source_location = get_declaration_source_location(
+                std::optional<iris::Source_range_location> const declaration_source_location = get_declaration_source_location(
                     declaration.value()
                 );
                 if (declaration_source_location.has_value() && declaration_source_location->file_path.has_value())
@@ -207,9 +207,9 @@ namespace h::language_server
 
             parts.push_back(std::move(part));
         }
-        else if (std::holds_alternative<h::Constant_array_type>(type.data))
+        else if (std::holds_alternative<iris::Constant_array_type>(type.data))
         {
-            h::Constant_array_type const& constant_array_type = std::get<h::Constant_array_type>(type.data);
+            iris::Constant_array_type const& constant_array_type = std::get<iris::Constant_array_type>(type.data);
             if (constant_array_type.value_type.empty())
                 return;
 
@@ -235,9 +235,9 @@ namespace h::language_server
                 }
             );
         }
-        else if (std::holds_alternative<h::Function_pointer_type>(type.data))
+        else if (std::holds_alternative<iris::Function_pointer_type>(type.data))
         {
-            h::Function_pointer_type const& function_pointer_type = std::get<h::Function_pointer_type>(type.data);
+            iris::Function_pointer_type const& function_pointer_type = std::get<iris::Function_pointer_type>(type.data);
 
             parts.push_back(
                 lsp::InlayHintLabelPart
@@ -278,9 +278,9 @@ namespace h::language_server
                 }
             );
         }
-        else if (std::holds_alternative<h::Pointer_type>(type.data))
+        else if (std::holds_alternative<iris::Pointer_type>(type.data))
         {
-            h::Pointer_type const& pointer_type = std::get<h::Pointer_type>(type.data);
+            iris::Pointer_type const& pointer_type = std::get<iris::Pointer_type>(type.data);
 
             parts.push_back(
                 lsp::InlayHintLabelPart
@@ -303,19 +303,19 @@ namespace h::language_server
                 parts,
                 core_module,
                 declaration_database,
-                !pointer_type.element_type.empty() ? std::optional<h::Type_reference>(pointer_type.element_type[0]) : std::optional<h::Type_reference>{std::nullopt},
+                !pointer_type.element_type.empty() ? std::optional<iris::Type_reference>(pointer_type.element_type[0]) : std::optional<iris::Type_reference>{std::nullopt},
                 temporaries_allocator
             );
         }
-        else if (std::holds_alternative<h::Type_instance>(type.data))
+        else if (std::holds_alternative<iris::Type_instance>(type.data))
         {
-            h::Type_instance const& type_instance = std::get<h::Type_instance>(type.data);
+            iris::Type_instance const& type_instance = std::get<iris::Type_instance>(type.data);
 
             create_inlay_hint_variable_type_label_aux(
                 parts,
                 core_module,
                 declaration_database,
-                h::Type_reference{.data = type_instance.type_constructor},
+                iris::Type_reference{.data = type_instance.type_constructor},
                 temporaries_allocator
             );
 
@@ -328,15 +328,15 @@ namespace h::language_server
 
             for (std::size_t index = 0; index < type_instance.arguments.size(); ++index)
             {
-                h::Statement const& statement = type_instance.arguments[index];
+                iris::Statement const& statement = type_instance.arguments[index];
                 if (statement.expressions.empty())
                     continue;
 
-                h::Expression const& first_expression = statement.expressions[0];
+                iris::Expression const& first_expression = statement.expressions[0];
 
-                if (std::holds_alternative<h::Type_expression>(first_expression.data))
+                if (std::holds_alternative<iris::Type_expression>(first_expression.data))
                 {
-                    h::Type_expression const& argument = std::get<h::Type_expression>(first_expression.data);
+                    iris::Type_expression const& argument = std::get<iris::Type_expression>(first_expression.data);
                     
                     create_inlay_hint_variable_type_label_aux(
                         parts,
@@ -348,7 +348,7 @@ namespace h::language_server
                 }
                 else
                 {
-                    std::pmr::string const type_name = h::format_type_reference(
+                    std::pmr::string const type_name = iris::format_type_reference(
                         core_module,
                         type,
                         temporaries_allocator,
@@ -383,7 +383,7 @@ namespace h::language_server
         }
         else
         {
-            std::pmr::string const type_name = h::format_type_reference(
+            std::pmr::string const type_name = iris::format_type_reference(
                 core_module,
                 type,
                 temporaries_allocator,
@@ -400,9 +400,9 @@ namespace h::language_server
     }
 
     std::vector<lsp::InlayHintLabelPart> create_inlay_hint_variable_type_label(
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database,
-        h::Type_reference const& type,
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database,
+        iris::Type_reference const& type,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {

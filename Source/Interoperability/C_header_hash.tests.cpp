@@ -1,13 +1,13 @@
-import h.c_header_hash;
+import iris.c_header_hash;
 
-import h.common;
+import iris.common;
 
 #include <filesystem>
 #include <string>
 
 #include <catch2/catch_all.hpp>
 
-namespace h::c
+namespace iris::c
 {
     TEST_CASE("Calculates C header hash 0")
     {
@@ -43,15 +43,15 @@ struct My_data_2
 )";
 
         std::filesystem::path const dependency_0_file_path = root_directory_path / "Dependency_0.h";
-        h::common::write_to_file(dependency_0_file_path, dependency_0_content);
+        iris::common::write_to_file(dependency_0_file_path, dependency_0_content);
 
         std::filesystem::path const dependency_1_file_path = root_directory_path / "Dependency_1.h";
-        h::common::write_to_file(dependency_1_file_path, dependency_1_content);
+        iris::common::write_to_file(dependency_1_file_path, dependency_1_content);
         
         std::filesystem::path const main_file_path = root_directory_path / "Main.h";
-        h::common::write_to_file(main_file_path, main_content);
+        iris::common::write_to_file(main_file_path, main_content);
 
-        std::optional<std::uint64_t> const file_hash = h::c::calculate_header_file_hash(main_file_path, std::nullopt, {});
+        std::optional<std::uint64_t> const file_hash = iris::c::calculate_header_file_hash(main_file_path, std::nullopt, {});
         CHECK(*file_hash == 15268198287479747170ull);
     }
 }

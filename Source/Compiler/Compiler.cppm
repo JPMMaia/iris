@@ -1,16 +1,16 @@
-export module h.compiler;
+export module iris.compiler;
 
 import std;
 import llvm;
 
-import h.core;
-import h.core.declarations;
-import h.compiler.clang_data;
-import h.compiler.diagnostic;
-import h.compiler.expressions;
-import h.compiler.types;
+import iris.core;
+import iris.core.declarations;
+import iris.compiler.clang_data;
+import iris.compiler.diagnostic;
+import iris.compiler.expressions;
+import iris.compiler.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Optimization_managers
     {
@@ -34,7 +34,7 @@ namespace h::compiler
 
     export struct LLVM_module_data
     {
-        std::pmr::unordered_map<std::pmr::string, h::Module> dependencies;
+        std::pmr::unordered_map<std::pmr::string, iris::Module> dependencies;
         std::unique_ptr<llvm::Module> module;
     };
 
@@ -48,11 +48,11 @@ namespace h::compiler
         bool is_test_mode = false;
     };
 
-    export std::optional<h::Module> read_core_module(
+    export std::optional<iris::Module> read_core_module(
         std::filesystem::path const& path
     );
 
-    export std::optional<h::Module> read_core_module_declarations(
+    export std::optional<iris::Module> read_core_module_declarations(
         std::filesystem::path const& path
     );
 
@@ -82,33 +82,33 @@ namespace h::compiler
         Compilation_options const& compilation_options
     );
 
-    export std::pmr::vector<h::Module const*> sort_core_modules(
-        std::span<h::Module const> const core_modules,
+    export std::pmr::vector<iris::Module const*> sort_core_modules(
+        std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
-    std::pmr::vector<h::Module const*> sort_core_modules(
-        std::pmr::unordered_map<std::pmr::string, h::Module> const& core_module_dependencies,
-        h::Module const* const core_module,
+    std::pmr::vector<iris::Module const*> sort_core_modules(
+        std::pmr::unordered_map<std::pmr::string, iris::Module> const& core_module_dependencies,
+        iris::Module const* const core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     export Declaration_database create_declaration_database_and_add_modules(
-        std::span<h::Module const> const header_modules,
-        std::span<h::Module const* const> const sorted_core_modules
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module const* const> const sorted_core_modules
     );
 
     export struct Declaration_database_and_sorted_modules
     {
-        std::pmr::vector<h::Module const*> sorted_core_modules;
+        std::pmr::vector<iris::Module const*> sorted_core_modules;
         Declaration_database declaration_database;
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics;
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics;
     };
 
     export void print_diagnostics_and_exit_if_needed(
-        std::span<h::compiler::Diagnostic const> const diagnostics,
+        std::span<iris::compiler::Diagnostic const> const diagnostics,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
@@ -121,7 +121,7 @@ namespace h::compiler
     export Compilation_database process_modules_and_create_compilation_database(
         LLVM_data& llvm_data,
         Clang_context&& clang_context,
-        std::span<h::Module const* const> const sorted_modules,
+        std::span<iris::Module const* const> const sorted_modules,
         Declaration_database& declaration_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -129,7 +129,7 @@ namespace h::compiler
 
     export std::unique_ptr<llvm::Module> create_llvm_module(
         LLVM_data& llvm_data,
-        h::Module core_module,
+        iris::Module core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         Declaration_database declaration_database,
         Compilation_options const& compilation_options
@@ -169,7 +169,7 @@ namespace h::compiler
     );
 
     export void add_import_usages(
-        h::Module& core_module,
+        iris::Module& core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 }

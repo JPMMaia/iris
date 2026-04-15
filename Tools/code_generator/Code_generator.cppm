@@ -1,8 +1,8 @@
-export module h.tools.code_generator;
+export module iris.tools.code_generator;
 
 import std;
 
-namespace h::tools::code_generator
+namespace iris::tools::code_generator
 {
     export struct Type
     {

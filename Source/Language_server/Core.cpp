@@ -7,14 +7,14 @@ module;
 
 #include <lsp/types.h>
 
-module h.language_server.core;
+module iris.language_server.core;
 
-import h.core;
+import iris.core;
 
-namespace h::language_server
+namespace iris::language_server
 {
     lsp::Position to_lsp_position(
-        h::Source_position const& input
+        iris::Source_position const& input
     )
     {
         return lsp::Position
@@ -25,7 +25,7 @@ namespace h::language_server
     }
 
     lsp::Range to_lsp_range(
-        h::Source_range const& input
+        iris::Source_range const& input
     )
     {
         return lsp::Range
@@ -35,22 +35,22 @@ namespace h::language_server
         };
     }
 
-    h::Source_position to_source_position(
+    iris::Source_position to_source_position(
         lsp::Position const& input
     )
     {
-        return h::Source_position
+        return iris::Source_position
         {
             .line = input.line + 1,
             .column = input.character + 1,
         };
     }
 
-    h::Source_range to_source_range(
+    iris::Source_range to_source_range(
         lsp::Range const& input
     )
     {
-        return h::Source_range
+        return iris::Source_range
         {
             .start = to_source_position(input.start),
             .end = to_source_position(input.end),

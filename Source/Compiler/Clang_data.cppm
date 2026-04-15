@@ -1,14 +1,14 @@
-export module h.compiler.clang_data;
+export module iris.compiler.clang_data;
 
 import std;
 import clang;
 
-import h.core;
-import h.core.declarations;
-import h.core.hash;
-import h.core.string_hash;
+import iris.core;
+import iris.core.declarations;
+import iris.core.hash;
+import iris.core.string_hash;
 
-namespace h::compiler
+namespace iris::compiler
 {    
     export struct Clang_data
     {
@@ -17,16 +17,16 @@ namespace h::compiler
 
     export struct Clang_module_declarations
     {
-        std::pmr::unordered_map<std::pmr::string, clang::FunctionDecl*, h::String_hash, h::String_equal> function_declarations;
-        std::pmr::unordered_map<std::pmr::string, clang::TypedefDecl*, h::String_hash, h::String_equal> alias_type_declarations;
-        std::pmr::unordered_map<std::pmr::string, clang::EnumDecl*, h::String_hash, h::String_equal> enum_declarations;
-        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, h::String_hash, h::String_equal> struct_declarations;
-        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, h::String_hash, h::String_equal> union_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::FunctionDecl*, iris::String_hash, iris::String_equal> function_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::TypedefDecl*, iris::String_hash, iris::String_equal> alias_type_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::EnumDecl*, iris::String_hash, iris::String_equal> enum_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, iris::String_hash, iris::String_equal> struct_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, iris::String_hash, iris::String_equal> union_declarations;
     };
 
     export struct Clang_declaration_database
     {
-        std::pmr::unordered_map<std::pmr::string, Clang_module_declarations, h::String_hash, h::String_equal> map;
+        std::pmr::unordered_map<std::pmr::string, Clang_module_declarations, iris::String_hash, iris::String_equal> map;
     };
 
     export struct Clang_context

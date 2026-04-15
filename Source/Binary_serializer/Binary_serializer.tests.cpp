@@ -4,23 +4,23 @@
 
 #include <catch2/catch_all.hpp>
 
-import h.binary_serializer;
-import h.core;
-import h.core.types;
+import iris.binary_serializer;
+import iris.core;
+import iris.core.types;
 
-namespace h::binary_serializer
+namespace iris::binary_serializer
 {
-    h::Function_declaration create_function_declaration()
+    iris::Function_declaration create_function_declaration()
     {
-        std::pmr::vector<h::Type_reference> input_parameter_types
+        std::pmr::vector<iris::Type_reference> input_parameter_types
         {
-            h::Type_reference{.data = h::Fundamental_type::Byte},
-            h::Type_reference{.data = h::Fundamental_type::Byte},
+            iris::Type_reference{.data = iris::Fundamental_type::Byte},
+            iris::Type_reference{.data = iris::Fundamental_type::Byte},
         };
 
-        std::pmr::vector<h::Type_reference> output_parameter_types
+        std::pmr::vector<iris::Type_reference> output_parameter_types
         {
-            Type_reference{.data = h::Fundamental_type::Byte},
+            Type_reference{.data = iris::Fundamental_type::Byte},
         };
 
         std::pmr::vector<std::pmr::string> input_parameter_names
@@ -33,14 +33,14 @@ namespace h::binary_serializer
             {"sum"}
         };
 
-        h::Function_type function_type
+        iris::Function_type function_type
         {
             .input_parameter_types = std::move(input_parameter_types),
             .output_parameter_types = std::move(output_parameter_types),
             .is_variadic = false
         };
 
-        std::pmr::vector<h::Source_position> input_parameter_source_positions
+        std::pmr::vector<iris::Source_position> input_parameter_source_positions
         {
             {
                 .line = 3,
@@ -48,7 +48,7 @@ namespace h::binary_serializer
             }
         };
 
-        std::pmr::vector<h::Source_position> output_parameter_source_positions
+        std::pmr::vector<iris::Source_position> output_parameter_source_positions
         {
             {
                 .line = 3,
@@ -56,7 +56,7 @@ namespace h::binary_serializer
             }
         };
 
-        return h::Function_declaration
+        return iris::Function_declaration
         {
             .name = "Add",
             .type = std::move(function_type),
@@ -82,35 +82,35 @@ namespace h::binary_serializer
         };
     }
 
-    h::Function_definition create_function_definition()
+    iris::Function_definition create_function_definition()
     {
-        std::pmr::vector<h::Expression> expressions
+        std::pmr::vector<iris::Expression> expressions
         {
             {
-                h::Expression{
-                    .data = h::Variable_expression{
+                iris::Expression{
+                    .data = iris::Variable_expression{
                         .name = "lhs"
                     }
                 },
-                h::Expression{
+                iris::Expression{
                     .data = Variable_expression{
                         .name = "rhs"
                     }
                 },
-                h::Expression{
-                    .data = h::Binary_expression{
-                        .left_hand_side = h::Expression_index{
+                iris::Expression{
+                    .data = iris::Binary_expression{
+                        .left_hand_side = iris::Expression_index{
                             .expression_index = 0
                         },
-                        .right_hand_side = h::Expression_index{
+                        .right_hand_side = iris::Expression_index{
                             .expression_index = 1
                         },
-                        .operation = h::Binary_operation::Add
+                        .operation = iris::Binary_operation::Add
                     }
                 },
-                h::Expression{
-                    .data = h::Return_expression{
-                        .expression = h::Expression_index{
+                iris::Expression{
+                    .data = iris::Return_expression{
+                        .expression = iris::Expression_index{
                             .expression_index = 2
                         },
                     }
@@ -118,16 +118,16 @@ namespace h::binary_serializer
             }
         };
 
-        std::pmr::vector<h::Statement> statements
+        std::pmr::vector<iris::Statement> statements
         {
             {
-                h::Statement{
+                iris::Statement{
                     .expressions = std::move(expressions)
                 }
             }
         };
 
-        h::Function_definition function
+        iris::Function_definition function
         {
             .name = "Add",
             .statements = std::move(statements)
@@ -136,11 +136,11 @@ namespace h::binary_serializer
         return function;
     }
 
-    h::Struct_declaration create_struct_declaration()
+    iris::Struct_declaration create_struct_declaration()
     {
-        h::Type_reference const uint32_type = h::create_integer_type_type_reference(32, false);
+        iris::Type_reference const uint32_type = iris::create_integer_type_type_reference(32, false);
 
-        h::Struct_declaration declaration = {};
+        iris::Struct_declaration declaration = {};
         declaration.name = "My_struct";
         declaration.member_names = {
             "first",
@@ -160,8 +160,8 @@ namespace h::binary_serializer
         declaration.member_default_values = {
             {
                 .expressions = {
-                    h::Expression{
-                        .data = h::Constant_expression{
+                    iris::Expression{
+                        .data = iris::Constant_expression{
                             .type = uint32_type,
                             .data = "0"
                         }
@@ -170,8 +170,8 @@ namespace h::binary_serializer
             },
             {
                 .expressions = {
-                    h::Expression{
-                        .data = h::Constant_expression{
+                    iris::Expression{
+                        .data = iris::Constant_expression{
                             .type = uint32_type,
                             .data = "0"
                         }
@@ -180,8 +180,8 @@ namespace h::binary_serializer
             },
             {
                 .expressions = {
-                    h::Expression{
-                        .data = h::Constant_expression{
+                    iris::Expression{
+                        .data = iris::Constant_expression{
                             .type = uint32_type,
                             .data = "0"
                         }
@@ -192,16 +192,16 @@ namespace h::binary_serializer
         return declaration;
     }
 
-    h::Module create_core_module()
+    iris::Module create_core_module()
     {
-        h::Language_version const language_version
+        iris::Language_version const language_version
         {
             .major = 1,
             .minor = 2,
             .patch = 3
         };
 
-        h::Module_dependencies dependencies
+        iris::Module_dependencies dependencies
         {
             .alias_imports = {
                 {
@@ -212,18 +212,18 @@ namespace h::binary_serializer
             }
         };
 
-        h::Module_declarations export_declarations
+        iris::Module_declarations export_declarations
         {
             .struct_declarations = { create_struct_declaration() },
             .function_declarations = { create_function_declaration() },
         };
 
-        h::Module_definitions definitions
+        iris::Module_definitions definitions
         {
             .function_definitions = { create_function_definition() }
         };
 
-        return h::Module
+        return iris::Module
         {
             .language_version = language_version,
             .name = "module_name",
@@ -240,7 +240,7 @@ namespace h::binary_serializer
         std::pmr::polymorphic_allocator<> output_allocator;
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
-        h::Module const input = create_core_module();
+        iris::Module const input = create_core_module();
 
         std::optional<std::pmr::vector<std::byte>> const data = serialize_module(
             input,
@@ -249,7 +249,7 @@ namespace h::binary_serializer
         );
         REQUIRE(data.has_value());
 
-        std::optional<h::Module> const output = deserialize_module(
+        std::optional<iris::Module> const output = deserialize_module(
             data.value()
         );
         REQUIRE(output.has_value());
@@ -262,8 +262,8 @@ namespace h::binary_serializer
         std::pmr::polymorphic_allocator<> output_allocator;
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
-        h::Struct_declaration const declaration = create_struct_declaration();
-        h::Module const input
+        iris::Struct_declaration const declaration = create_struct_declaration();
+        iris::Module const input
         {
             .instanced_declarations = {
                 .struct_declarations = {
@@ -280,7 +280,7 @@ namespace h::binary_serializer
         );
         REQUIRE(data.has_value());
 
-        std::optional<h::Module> const output = deserialize_module(
+        std::optional<iris::Module> const output = deserialize_module(
             data.value()
         );
         REQUIRE(output.has_value());

@@ -133,7 +133,7 @@ async function test_code_actions(document_uri: vscode.Uri, range_or_selection: v
     const client = await activate(document_uri);
     
     const parameters: language_client.WorkspaceDiagnosticParams = {
-            identifier: "hlang",
+            identifier: "iris",
             previousResultIds: []
         };
     

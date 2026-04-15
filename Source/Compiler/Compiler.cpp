@@ -5,38 +5,38 @@ module;
 
 #include <clang/CodeGen/CodeGenABITypes.h>
 
-module h.compiler;
+module iris.compiler;
 
 import std;
 import llvm;
 import clang;
 
-import h.binary_serializer;
-import h.common;
-import h.common.filesystem_common;
-import h.core;
-import h.core.declarations;
-import h.core.formatter;
-import h.core.types;
-import h.compiler.analysis;
-import h.compiler.clang_code_generation;
-import h.compiler.clang_data;
-import h.compiler.common;
-import h.compiler.instantiate_pass;
-import h.compiler.compile_time_pass;
-import h.compiler.debug_info;
-import h.compiler.diagnostic;
-import h.compiler.expressions;
-import h.compiler.all_passes;
-import h.compiler.instructions;
-import h.compiler.test_framework;
-import h.compiler.types;
-import h.compiler.validation;
-import h.parser.convertor;
-import h.parser.parse_tree;
-import h.parser.parser;
+import iris.binary_serializer;
+import iris.common;
+import iris.common.filesystem_common;
+import iris.core;
+import iris.core.declarations;
+import iris.core.formatter;
+import iris.core.types;
+import iris.compiler.analysis;
+import iris.compiler.clang_code_generation;
+import iris.compiler.clang_data;
+import iris.compiler.common;
+import iris.compiler.instantiate_pass;
+import iris.compiler.compile_time_pass;
+import iris.compiler.debug_info;
+import iris.compiler.diagnostic;
+import iris.compiler.expressions;
+import iris.compiler.all_passes;
+import iris.compiler.instructions;
+import iris.compiler.test_framework;
+import iris.compiler.types;
+import iris.compiler.validation;
+import iris.parser.convertor;
+import iris.parser.parse_tree;
+import iris.parser.parser;
 
-namespace h::compiler
+namespace iris::compiler
 {
     static constexpr bool g_debug = false;
 
@@ -742,7 +742,7 @@ namespace h::compiler
     void create_dependency_core_modules(
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        std::pmr::unordered_map<std::pmr::string, h::Module>& core_module_dependencies
+        std::pmr::unordered_map<std::pmr::string, iris::Module>& core_module_dependencies
     )
     {
         for (Import_module_with_alias const& alias_import : core_module.dependencies.alias_imports)
@@ -768,22 +768,22 @@ namespace h::compiler
         }
     }
 
-    std::optional<h::Module> parse_and_convert(
+    std::optional<iris::Module> parse_and_convert(
         std::filesystem::path const input_file_path
     )
     {
-        std::optional<std::pmr::string> input_content = h::common::get_file_contents(input_file_path);
+        std::optional<std::pmr::string> input_content = iris::common::get_file_contents(input_file_path);
         if (!input_content.has_value())
             return std::nullopt;
 
-        h::parser::Parser parser = h::parser::create_parser();
+        iris::parser::Parser parser = iris::parser::create_parser();
         
         std::pmr::u8string utf_8_source{reinterpret_cast<char8_t const*>(input_content->data()), input_content->size()};
-        h::parser::Parse_tree parse_tree = h::parser::parse(parser, std::move(utf_8_source));
+        iris::parser::Parse_tree parse_tree = iris::parser::parse(parser, std::move(utf_8_source));
 
-        h::parser::Parse_node const root = get_root_node(parse_tree);
+        iris::parser::Parse_node const root = get_root_node(parse_tree);
 
-        std::optional<h::Module> core_module = h::parser::parse_node_to_module(
+        std::optional<iris::Module> core_module = iris::parser::parse_node_to_module(
             parse_tree,
             root,
             input_file_path,
@@ -791,24 +791,24 @@ namespace h::compiler
             {}
         );
 
-        h::parser::destroy_tree(std::move(parse_tree));
-        h::parser::destroy_parser(std::move(parser));
+        iris::parser::destroy_tree(std::move(parse_tree));
+        iris::parser::destroy_parser(std::move(parser));
 
         return core_module;
     }
 
-    std::pmr::unordered_map<std::pmr::string, h::Module> create_dependency_core_modules(
+    std::pmr::unordered_map<std::pmr::string, iris::Module> create_dependency_core_modules(
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map
     )
     {
-        std::pmr::unordered_map<std::pmr::string, h::Module> core_module_dependencies;
+        std::pmr::unordered_map<std::pmr::string, iris::Module> core_module_dependencies;
         core_module_dependencies.reserve(module_name_to_file_path_map.size() + 1);
 
         if (core_module.name != "iris.builtin")
         {
-            std::filesystem::path const builtin_file_path = h::common::get_builtin_module_file_path();
-            std::optional<h::Module> builtin_module = parse_and_convert(builtin_file_path);
+            std::filesystem::path const builtin_file_path = iris::common::get_builtin_module_file_path();
+            std::optional<iris::Module> builtin_module = parse_and_convert(builtin_file_path);
             if (!builtin_module.has_value())
                 throw std::runtime_error{"Failed to read builtin module!"};
             core_module_dependencies.insert(std::make_pair(builtin_module->name, std::move(builtin_module.value())));
@@ -950,7 +950,7 @@ namespace h::compiler
                 new llvm::GlobalVariable(
                     llvm_module,
                     llvm_type,
-                    global_variable_declaration.global_type == h::Global_variable_type::Constant,
+                    global_variable_declaration.global_type == iris::Global_variable_type::Constant,
                     llvm::GlobalValue::ExternalLinkage, // TODO
                     initial_value,
                     mangled_name
@@ -1071,7 +1071,7 @@ namespace h::compiler
         llvm::DICompileUnit* const llvm_debug_compile_unit = llvm_debug_builder->createCompileUnit(
             llvm::dwarf::DW_LANG_C,
             llvm_debug_file,
-            "Hlang Compiler",
+            "Iris Compiler",
             compilation_options.is_optimized,
             "",
             0
@@ -1090,13 +1090,13 @@ namespace h::compiler
             {}
         );
 
-        std::pmr::vector<h::Module const*> const sorted_core_module_dependencies = sort_core_modules(core_module_dependencies, nullptr, {}, {});
+        std::pmr::vector<iris::Module const*> const sorted_core_module_dependencies = sort_core_modules(core_module_dependencies, nullptr, {}, {});
 
-        for (h::Module const* module_dependency : sorted_core_module_dependencies)
+        for (iris::Module const* module_dependency : sorted_core_module_dependencies)
         {
             if (!module_dependency->source_file_path)
             {
-                //h::common::print_message_and_exit(std::format("Module '{}' did not contain source file path for debugging!", module_dependency->name));
+                //iris::common::print_message_and_exit(std::format("Module '{}' did not contain source file path for debugging!", module_dependency->name));
                 continue;
             }
 
@@ -1135,7 +1135,7 @@ namespace h::compiler
         );
 
         if (!core_module.source_file_path)
-            h::common::print_message_and_exit("Module did not contain source file path!");
+            iris::common::print_message_and_exit("Module did not contain source file path!");
 
         llvm_debug_builder->finalize();
 
@@ -1167,7 +1167,7 @@ namespace h::compiler
         {
              llvm::FunctionType* const llvm_function_type = create_llvm_function_type(
                 clang_module_data,
-                "Hlang.Test_main",
+                "Iris.Test_main",
                 declaration.name
             );
 
@@ -1272,18 +1272,18 @@ namespace h::compiler
         return llvm_module;
     }
 
-    std::optional<h::Module> read_core_module(
+    std::optional<iris::Module> read_core_module(
         std::filesystem::path const& path
     )
     {
-        std::optional<Module> core_module = h::binary_serializer::read_module_from_file(path);
+        std::optional<Module> core_module = iris::binary_serializer::read_module_from_file(path);
         if (!core_module)
             return std::nullopt;
 
         return core_module;
     }
 
-    std::optional<h::Module> read_core_module_declarations(
+    std::optional<iris::Module> read_core_module_declarations(
         std::filesystem::path const& path
     )
     {
@@ -1384,14 +1384,14 @@ namespace h::compiler
         };
     }
 
-    std::pmr::vector<h::Module const*> sort_core_modules(
-        std::pmr::unordered_map<std::pmr::string, h::Module> const& core_module_dependencies,
-        h::Module const* const core_module,
+    std::pmr::vector<iris::Module const*> sort_core_modules(
+        std::pmr::unordered_map<std::pmr::string, iris::Module> const& core_module_dependencies,
+        iris::Module const* const core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::Module const*> remaining{ temporaries_allocator };
+        std::pmr::vector<iris::Module const*> remaining{ temporaries_allocator };
         remaining.reserve(core_module_dependencies.size());
 
         for (auto const& pair : core_module_dependencies)
@@ -1399,21 +1399,21 @@ namespace h::compiler
             remaining.push_back(&pair.second);
         }
 
-        std::pmr::vector<h::Module const*> sorted{ output_allocator };
+        std::pmr::vector<iris::Module const*> sorted{ output_allocator };
         sorted.reserve(core_module_dependencies.size() + 1);
 
         while (!remaining.empty())
         {
             for (std::size_t remaining_index = 0; remaining_index < remaining.size(); ++remaining_index)
             {
-                h::Module const* core_module = remaining[remaining_index];
+                iris::Module const* core_module = remaining[remaining_index];
 
                 bool const all_dependencies_are_in_sorted = std::all_of(
                     core_module->dependencies.alias_imports.begin(),
                     core_module->dependencies.alias_imports.end(),
                     [&](Import_module_with_alias const& alias_import) -> bool
                 {
-                    auto const location = std::find_if(sorted.begin(), sorted.end(), [&](h::Module const* sorted_module) -> bool { return sorted_module->name == alias_import.module_name; });
+                    auto const location = std::find_if(sorted.begin(), sorted.end(), [&](iris::Module const* sorted_module) -> bool { return sorted_module->name == alias_import.module_name; });
                     return location != sorted.end();
                 }
                 );
@@ -1447,22 +1447,22 @@ namespace h::compiler
         // TODO perhaps we should do the core module transformations in another place?
         Module new_core_module = core_module;
         
-        std::pmr::vector<h::Module const*> const sorted_core_modules = sort_core_modules(core_module_dependencies, &new_core_module, {}, {});
+        std::pmr::vector<iris::Module const*> const sorted_core_modules = sort_core_modules(core_module_dependencies, &new_core_module, {}, {});
         
         Declaration_database declaration_database = create_declaration_database();
         for (Module const* module_dependency : sorted_core_modules)
             add_declarations(declaration_database, *module_dependency);
 
         {
-            std::pmr::vector<h::compiler::Diagnostic> const diagnostics = validate_module(
+            std::pmr::vector<iris::compiler::Diagnostic> const diagnostics = validate_module(
                 new_core_module,
                 declaration_database,
                 {}
             );
             if (!diagnostics.empty())
             {
-                for (h::compiler::Diagnostic const& diagnostic : diagnostics)
-                    std::cerr << h::compiler::diagnostic_to_string(diagnostic, {}, {}) << std::endl;
+                for (iris::compiler::Diagnostic const& diagnostic : diagnostics)
+                    std::cerr << iris::compiler::diagnostic_to_string(diagnostic, {}, {}) << std::endl;
                 
                 throw std::runtime_error{"Module contains errors!"};
             }
@@ -1473,17 +1473,17 @@ namespace h::compiler
         Clang_context clang_context = create_clang_context(
             *llvm_data.context,
             llvm_data.clang_data,
-            "Hl_clang_module"
+            "Iris_clang_module"
         );
 
         if constexpr (g_debug)
         {
-            h::Format_options const format_options
+            iris::Format_options const format_options
             {
                 .output_allocator = output_allocator,
                 .temporaries_allocator = temporaries_allocator,
             };
-            std::pmr::string const output_text = h::format_module(new_core_module, format_options);
+            std::pmr::string const output_text = iris::format_module(new_core_module, format_options);
             std::printf("Before: %s\n", output_text.c_str());
             std::fflush(stdout);
         }
@@ -1504,12 +1504,12 @@ namespace h::compiler
 
         if constexpr (g_debug)
         {
-            h::Format_options const format_options
+            iris::Format_options const format_options
             {
                 .output_allocator = output_allocator,
                 .temporaries_allocator = temporaries_allocator,
             };
-            std::pmr::string const output_text = h::format_module(new_core_module, format_options);
+            std::pmr::string const output_text = iris::format_module(new_core_module, format_options);
             std::printf("After: %s\n", output_text.c_str());
             std::fflush(stdout);
         }
@@ -1534,15 +1534,15 @@ namespace h::compiler
     }
 
     static void add_sorted_core_module(
-        std::pmr::vector<h::Module const*>& sorted,
-        h::Module const& core_module,
-        std::span<h::Module const> const core_modules
+        std::pmr::vector<iris::Module const*>& sorted,
+        iris::Module const& core_module,
+        std::span<iris::Module const> const core_modules
     )
     {
         auto const location = std::find_if(
             sorted.begin(),
             sorted.end(),
-            [&](h::Module const* current) -> bool { return current == &core_module; }
+            [&](iris::Module const* current) -> bool { return current == &core_module; }
         );
         if (location != sorted.end())
             return;
@@ -1554,12 +1554,12 @@ namespace h::compiler
             auto const location = std::find_if(
                 core_modules.begin(),
                 core_modules.end(),
-                [&](h::Module const& current) -> bool { return current.name == alias_import.module_name; }
+                [&](iris::Module const& current) -> bool { return current.name == alias_import.module_name; }
             );
             if (location == core_modules.end())
                 continue;
 
-            h::Module const& dependency_module = *location;
+            iris::Module const& dependency_module = *location;
 
             add_sorted_core_module(
                 sorted,
@@ -1571,18 +1571,18 @@ namespace h::compiler
         sorted.push_back(&core_module);
     }
 
-    std::pmr::vector<h::Module const*> sort_core_modules(
-        std::span<h::Module const> const core_modules,
+    std::pmr::vector<iris::Module const*> sort_core_modules(
+        std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::Module const*> sorted{ output_allocator };
+        std::pmr::vector<iris::Module const*> sorted{ output_allocator };
         sorted.reserve(core_modules.size());
 
         for (std::size_t core_module_index = 0; core_module_index < core_modules.size(); ++core_module_index)
         {
-            h::Module const& core_module = core_modules[core_module_index];
+            iris::Module const& core_module = core_modules[core_module_index];
 
             add_sorted_core_module(
                 sorted,
@@ -1596,7 +1596,7 @@ namespace h::compiler
     }
 
     void add_import_usages(
-        h::Module& core_module,
+        iris::Module& core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
@@ -1627,32 +1627,32 @@ namespace h::compiler
             }
         };
 
-        auto const process_type = [&](h::Type_reference const& type_reference) -> bool
+        auto const process_type = [&](iris::Type_reference const& type_reference) -> bool
         {
-            if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
+            if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
             {
-                h::Custom_type_reference const& custom_type_reference = std::get<h::Custom_type_reference>(type_reference.data);
+                iris::Custom_type_reference const& custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.data);
                 add_unique_usage(custom_type_reference.module_reference.name, custom_type_reference.name);
             }
 
             return false;
         };
 
-        h::visit_type_references_recursively(
+        iris::visit_type_references_recursively(
             core_module,
             process_type
         );
 
-        auto const process_expression = [&](h::Expression const& expression, h::Statement const& statement) -> bool
+        auto const process_expression = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
         {
-            if (std::holds_alternative<h::Access_expression>(expression.data))
+            if (std::holds_alternative<iris::Access_expression>(expression.data))
             {
-                h::Access_expression const& access_expression = std::get<h::Access_expression>(expression.data);
+                iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
                 
-                h::Expression const& left_hand_side = statement.expressions[access_expression.expression.expression_index];
-                if (std::holds_alternative<h::Variable_expression>(left_hand_side.data))
+                iris::Expression const& left_hand_side = statement.expressions[access_expression.expression.expression_index];
+                if (std::holds_alternative<iris::Variable_expression>(left_hand_side.data))
                 {
-                    h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_hand_side.data);
+                    iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_hand_side.data);
 
                     std::string_view const left_hand_side_name = variable_expression.name;
 
@@ -1672,7 +1672,7 @@ namespace h::compiler
             return false;
         };
 
-        h::visit_expressions(
+        iris::visit_expressions(
             core_module,
             process_expression
         );
@@ -1682,8 +1682,8 @@ namespace h::compiler
     }
 
     Declaration_database create_declaration_database_and_add_modules(
-        std::span<h::Module const> const header_modules,
-        std::span<h::Module const* const> const sorted_core_modules
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module const* const> const sorted_core_modules
     )
     {
         Declaration_database declaration_database = create_declaration_database();
@@ -1698,18 +1698,18 @@ namespace h::compiler
     }
 
     Declaration_database_and_sorted_modules create_declaration_database_and_sorted_modules(
-        std::span<h::Module const> const header_modules,
-        std::span<h::Module> const core_modules,
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        for (h::Module& core_module : core_modules)
+        for (iris::Module& core_module : core_modules)
             add_import_usages(core_module, output_allocator);
 
         std::pmr::unordered_map<std::string_view, std::pmr::vector<std::pmr::string>> usages_per_module;
 
-        std::pmr::vector<h::Module const*> sorted_core_modules = sort_core_modules(
+        std::pmr::vector<iris::Module const*> sorted_core_modules = sort_core_modules(
             core_modules,
             output_allocator,
             output_allocator
@@ -1746,7 +1746,7 @@ namespace h::compiler
 
     
     void print_diagnostics_and_exit_if_needed(
-        std::span<h::compiler::Diagnostic const> const diagnostics,
+        std::span<iris::compiler::Diagnostic const> const diagnostics,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -1778,7 +1778,7 @@ namespace h::compiler
             );
 
             if (contains_errors)
-                h::common::print_message_and_exit("Validation failed.");
+                iris::common::print_message_and_exit("Validation failed.");
         }
     }
 
@@ -1788,7 +1788,7 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::Function_declaration> function_declarations{temporaries_allocator};
+        std::pmr::vector<iris::Function_declaration> function_declarations{temporaries_allocator};
         function_declarations.reserve(1);
         function_declarations.push_back(create_test_check_function_declaration());
 
@@ -1797,7 +1797,7 @@ namespace h::compiler
             add_clang_function_declaration(
                 clang_module_data.declaration_database,
                 clang_module_data.ast_context,
-                "Hlang.Test_main",
+                "Iris.Test_main",
                 declaration,
                 declaration_database
             );
@@ -1807,7 +1807,7 @@ namespace h::compiler
     Compilation_database process_modules_and_create_compilation_database(
         LLVM_data& llvm_data,
         Clang_context&& clang_context,
-        std::span<h::Module const* const> const sorted_modules,
+        std::span<iris::Module const* const> const sorted_modules,
         Declaration_database& declaration_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -1834,23 +1834,23 @@ namespace h::compiler
 
     std::unique_ptr<llvm::Module> create_llvm_module(
         LLVM_data& llvm_data,
-        h::Module core_module,
+        iris::Module core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         Declaration_database declaration_database,
         Compilation_options const& compilation_options
     )
     {
-        std::pmr::unordered_map<std::pmr::string, h::Module> core_module_dependencies = create_dependency_core_modules(
+        std::pmr::unordered_map<std::pmr::string, iris::Module> core_module_dependencies = create_dependency_core_modules(
             core_module,
             module_name_to_file_path_map
         );
 
-        std::pmr::vector<h::Module const*> const sorted_core_modules = sort_core_modules(core_module_dependencies, &core_module, {}, {});
+        std::pmr::vector<iris::Module const*> const sorted_core_modules = sort_core_modules(core_module_dependencies, &core_module, {}, {});
 
         Clang_context clang_context = create_clang_context(
             *llvm_data.context,
             llvm_data.clang_data,
-            "Hl_clang_module"
+            "Iris_clang_module"
         );
 
         {
@@ -1911,7 +1911,7 @@ namespace h::compiler
         Compilation_options const& compilation_options
     )
     {
-        std::pmr::unordered_map<std::pmr::string, h::Module> core_module_dependencies = create_dependency_core_modules(core_module, module_name_to_file_path_map);
+        std::pmr::unordered_map<std::pmr::string, iris::Module> core_module_dependencies = create_dependency_core_modules(core_module, module_name_to_file_path_map);
 
         std::unique_ptr<llvm::Module> llvm_module = create_llvm_module(llvm_data, core_module, core_module_dependencies, compilation_options);
 

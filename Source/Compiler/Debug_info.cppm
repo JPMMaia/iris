@@ -1,12 +1,12 @@
-export module h.compiler.debug_info;
+export module iris.compiler.debug_info;
 
 import std;
 import llvm;
 
-import h.compiler.types;
-import h.core;
+import iris.compiler.types;
+import iris.core;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Debug_info
     {
@@ -48,13 +48,13 @@ namespace h::compiler
     export void set_debug_location_at_statement(
         llvm::IRBuilder<>& llvm_builder,
         Debug_info& debug_info,
-        h::Statement const& statement
+        iris::Statement const& statement
     );
 
     export void set_debug_location_at_range(
         llvm::IRBuilder<>& llvm_builder,
         Debug_info& debug_info,
-        std::optional<h::Source_range> const& source_range
+        std::optional<iris::Source_range> const& source_range
     );
 
     export using Debug_type_names = std::pmr::vector<std::pmr::string>;

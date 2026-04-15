@@ -2,13 +2,13 @@ module;
 
 #include <charconv>
 
-module h.core;
+module iris.core;
 
 import std;
 
-import h.common;
+import iris.common;
 
-namespace h
+namespace iris
 {
 #if HACK_SPACESHIP_OPERATOR
     template<typename... Ts>
@@ -96,8 +96,8 @@ namespace h
         };
     }
 
-    std::optional<h::Source_range> create_sub_source_range(
-        std::optional<h::Source_range> const& source_range,
+    std::optional<iris::Source_range> create_sub_source_range(
+        std::optional<iris::Source_range> const& source_range,
         std::uint32_t const start_index,
         std::uint32_t const count
     )
@@ -105,9 +105,9 @@ namespace h
         if (!source_range.has_value())
             return std::nullopt;
 
-        h::Source_range const& original_source_range = source_range.value();
+        iris::Source_range const& original_source_range = source_range.value();
 
-        return h::Source_range
+        return iris::Source_range
         {
             .start = {
                 .line = original_source_range.start.line,
@@ -136,8 +136,8 @@ namespace h
     }
 
     bool range_contains_position(
-        h::Source_range const& range,
-        h::Source_position const& position
+        iris::Source_range const& range,
+        iris::Source_position const& position
     )
     {
         if (position.line < range.start.line || (position.line == range.start.line && position.column < range.start.column))
@@ -150,8 +150,8 @@ namespace h
     }
 
     bool range_contains_position_inclusive(
-        h::Source_range const& range,
-        h::Source_position const& position
+        iris::Source_range const& range,
+        iris::Source_position const& position
     )
     {
         if (position.line < range.start.line || (position.line == range.start.line && position.column < range.start.column))
@@ -164,63 +164,63 @@ namespace h
     }
 
     
-    bool is_bit_shift_binary_operation(h::Binary_operation const operation)
+    bool is_bit_shift_binary_operation(iris::Binary_operation const operation)
     {
         switch (operation)
         {
-            case h::Binary_operation::Bit_shift_left:
-            case h::Binary_operation::Bit_shift_right:
+            case iris::Binary_operation::Bit_shift_left:
+            case iris::Binary_operation::Bit_shift_right:
                 return true;
             default:
                 return false;
         }
     }
     
-    bool is_bitwise_binary_operation(h::Binary_operation const operation)
+    bool is_bitwise_binary_operation(iris::Binary_operation const operation)
     {
         switch (operation)
         {
-            case h::Binary_operation::Bitwise_and:
-            case h::Binary_operation::Bitwise_or:
-            case h::Binary_operation::Bitwise_xor:
+            case iris::Binary_operation::Bitwise_and:
+            case iris::Binary_operation::Bitwise_or:
+            case iris::Binary_operation::Bitwise_xor:
                 return true;
             default:
                 return false;
         }
     }
 
-    bool is_equality_binary_operation(h::Binary_operation const operation)
+    bool is_equality_binary_operation(iris::Binary_operation const operation)
     {
         switch (operation)
         {
-            case h::Binary_operation::Equal:
-            case h::Binary_operation::Not_equal:
+            case iris::Binary_operation::Equal:
+            case iris::Binary_operation::Not_equal:
                 return true;
             default:
                 return false;
         }
     }
 
-    bool is_comparison_binary_operation(h::Binary_operation const operation)
+    bool is_comparison_binary_operation(iris::Binary_operation const operation)
     {
         switch (operation)
         {
-            case h::Binary_operation::Less_than:
-            case h::Binary_operation::Less_than_or_equal_to:
-            case h::Binary_operation::Greater_than:
-            case h::Binary_operation::Greater_than_or_equal_to:
+            case iris::Binary_operation::Less_than:
+            case iris::Binary_operation::Less_than_or_equal_to:
+            case iris::Binary_operation::Greater_than:
+            case iris::Binary_operation::Greater_than_or_equal_to:
                 return true;
             default:
                 return false;
         }
     }
 
-    bool is_logical_binary_operation(h::Binary_operation const operation)
+    bool is_logical_binary_operation(iris::Binary_operation const operation)
     {
         switch (operation)
         {
-            case h::Binary_operation::Logical_and:
-            case h::Binary_operation::Logical_or:
+            case iris::Binary_operation::Logical_and:
+            case iris::Binary_operation::Logical_or:
                 return true;
             default:
                 return false;
@@ -228,24 +228,24 @@ namespace h
     }
 
     
-    bool is_numeric_binary_operation(h::Binary_operation const operation)
+    bool is_numeric_binary_operation(iris::Binary_operation const operation)
     {
         switch (operation)
         {
-            case h::Binary_operation::Add:
-            case h::Binary_operation::Subtract:
-            case h::Binary_operation::Multiply:
-            case h::Binary_operation::Divide:
-            case h::Binary_operation::Modulus:
+            case iris::Binary_operation::Add:
+            case iris::Binary_operation::Subtract:
+            case iris::Binary_operation::Multiply:
+            case iris::Binary_operation::Divide:
+            case iris::Binary_operation::Modulus:
                 return true;
             default:
                 return false;
         }
     }
 
-    h::Module const& find_module(
-        h::Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, h::Module> const& core_module_dependencies,
+    iris::Module const& find_module(
+        iris::Module const& core_module,
+        std::pmr::unordered_map<std::pmr::string, iris::Module> const& core_module_dependencies,
         std::string_view const name
     )
     {
@@ -256,13 +256,13 @@ namespace h
         if (location != core_module_dependencies.end())
             return location->second;
 
-        h::common::print_message_and_exit(std::format("Could not find module '{}'", name));
+        iris::common::print_message_and_exit(std::format("Could not find module '{}'", name));
         std::unreachable();
     }
 
     std::string_view find_module_name(
-        h::Module const& core_module,
-        h::Module_reference const& module_reference
+        iris::Module const& core_module,
+        iris::Module_reference const& module_reference
     )
     {
         return module_reference.name;
@@ -333,27 +333,27 @@ namespace h
         return std::nullopt;
     }
 
-    std::optional<Alias_type_declaration const*> find_alias_type_declaration(h::Module const& module, std::string_view const name)
+    std::optional<Alias_type_declaration const*> find_alias_type_declaration(iris::Module const& module, std::string_view const name)
     {
         return get_value(name, module.export_declarations.alias_type_declarations, module.internal_declarations.alias_type_declarations, {});
     }
 
-    std::optional<Enum_declaration const*> find_enum_declaration(h::Module const& module, std::string_view const name)
+    std::optional<Enum_declaration const*> find_enum_declaration(iris::Module const& module, std::string_view const name)
     {
         return get_value(name, module.export_declarations.enum_declarations, module.internal_declarations.enum_declarations, {});
     }
 
-    std::optional<Forward_declaration const*> find_forward_declaration(h::Module const& module, std::string_view const name)
+    std::optional<Forward_declaration const*> find_forward_declaration(iris::Module const& module, std::string_view const name)
     {
         return get_value(name, module.export_declarations.forward_declarations, module.internal_declarations.forward_declarations, {});
     }
 
-    std::optional<Global_variable_declaration const*> find_global_variable_declaration(h::Module const& module, std::string_view name)
+    std::optional<Global_variable_declaration const*> find_global_variable_declaration(iris::Module const& module, std::string_view name)
     {
         return get_value(name, module.export_declarations.global_variable_declarations, module.internal_declarations.global_variable_declarations, {});
     }
 
-    std::optional<Function_declaration const*> find_function_declaration(h::Module const& module, std::string_view const name)
+    std::optional<Function_declaration const*> find_function_declaration(iris::Module const& module, std::string_view const name)
     {
         return get_value(name, module.export_declarations.function_declarations, module.internal_declarations.function_declarations, module.instanced_declarations.function_declarations);
     }
@@ -363,18 +363,18 @@ namespace h
         return get_value(name, {}, {}, module.definitions.function_definitions);
     }
 
-    std::optional<Struct_declaration const*> find_struct_declaration(h::Module const& module, std::string_view const name)
+    std::optional<Struct_declaration const*> find_struct_declaration(iris::Module const& module, std::string_view const name)
     {
         return get_value(name, module.export_declarations.struct_declarations, module.internal_declarations.struct_declarations, module.instanced_declarations.struct_declarations);
     }
 
-    std::optional<Union_declaration const*> find_union_declaration(h::Module const& module, std::string_view const name)
+    std::optional<Union_declaration const*> find_union_declaration(iris::Module const& module, std::string_view const name)
     {
         return get_value(name, module.export_declarations.union_declarations, module.internal_declarations.union_declarations, module.instanced_declarations.union_declarations);
     }
 
     Import_module_with_alias const* find_import_module_with_alias(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::string_view const alias_name
     )
     {
@@ -390,7 +390,7 @@ namespace h
     }
 
     Import_module_with_alias* find_import_module_with_alias(
-        h::Module& core_module,
+        iris::Module& core_module,
         std::string_view const alias_name
     )
     {
@@ -406,7 +406,7 @@ namespace h
     }
 
     Import_module_with_alias const* find_import_module_with_module_name(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::string_view const module_name
     )
     {
@@ -421,179 +421,179 @@ namespace h
         return &(*location);
     }
 
-    h::Expression_index copy_expressions_to_new_statement(
-        h::Statement& destination_statement,
-        h::Statement const& source_statement,
-        h::Expression_index const source_expression_index
+    iris::Expression_index copy_expressions_to_new_statement(
+        iris::Statement& destination_statement,
+        iris::Statement const& source_statement,
+        iris::Expression_index const source_expression_index
     )
     {
-        h::Expression current_expression = source_statement.expressions[source_expression_index.expression_index];
+        iris::Expression current_expression = source_statement.expressions[source_expression_index.expression_index];
         
         std::uint64_t const destination_expression_index = destination_statement.expressions.size();
         destination_statement.expressions.push_back({});
 
-        if (std::holds_alternative<h::Access_expression>(current_expression.data))
+        if (std::holds_alternative<iris::Access_expression>(current_expression.data))
         {
             Access_expression& data = std::get<Access_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
         }
-        else if (std::holds_alternative<h::Access_array_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Access_array_expression>(current_expression.data))
         {
             Access_array_expression& data = std::get<Access_array_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
             data.index = copy_expressions_to_new_statement(destination_statement, source_statement, data.index);
         }
-        else if (std::holds_alternative<h::Assert_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Assert_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Assignment_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Assignment_expression>(current_expression.data))
         {
             Assignment_expression& data = std::get<Assignment_expression>(current_expression.data);
             data.left_hand_side = copy_expressions_to_new_statement(destination_statement, source_statement, data.left_hand_side);
             data.right_hand_side = copy_expressions_to_new_statement(destination_statement, source_statement, data.right_hand_side);
         }
-        else if (std::holds_alternative<h::Binary_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Binary_expression>(current_expression.data))
         {
             Binary_expression& data = std::get<Binary_expression>(current_expression.data);
             data.left_hand_side = copy_expressions_to_new_statement(destination_statement, source_statement, data.left_hand_side);
             data.right_hand_side = copy_expressions_to_new_statement(destination_statement, source_statement, data.right_hand_side);
         }
-        else if (std::holds_alternative<h::Block_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Block_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Break_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Break_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Call_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Call_expression>(current_expression.data))
         {
             Call_expression& data = std::get<Call_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
-            for (h::Expression_index& expression_index : data.arguments)
+            for (iris::Expression_index& expression_index : data.arguments)
                 expression_index = copy_expressions_to_new_statement(destination_statement, source_statement, expression_index);
         }
-        else if (std::holds_alternative<h::Cast_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Cast_expression>(current_expression.data))
         {
             Cast_expression& data = std::get<Cast_expression>(current_expression.data);
             data.source = copy_expressions_to_new_statement(destination_statement, source_statement, data.source);
         }
-        else if (std::holds_alternative<h::Comment_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Comment_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Compile_time_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Compile_time_expression>(current_expression.data))
         {
             Compile_time_expression& data = std::get<Compile_time_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
         }
-        else if (std::holds_alternative<h::Constant_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Constant_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Constant_array_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Constant_array_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Continue_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Continue_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Defer_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Defer_expression>(current_expression.data))
         {
             Defer_expression& data = std::get<Defer_expression>(current_expression.data);
             data.expression_to_defer = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression_to_defer);
         }
-        else if (std::holds_alternative<h::Dereference_and_access_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Dereference_and_access_expression>(current_expression.data))
         {
             Dereference_and_access_expression& data = std::get<Dereference_and_access_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
         }
-        else if (std::holds_alternative<h::For_loop_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::For_loop_expression>(current_expression.data))
         {
             For_loop_expression& data = std::get<For_loop_expression>(current_expression.data);
             data.range_begin = copy_expressions_to_new_statement(destination_statement, source_statement, data.range_begin);
             if (data.step_by.has_value())
                 data.step_by = copy_expressions_to_new_statement(destination_statement, source_statement, data.step_by.value());
         }
-        else if (std::holds_alternative<h::Function_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Function_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Instance_call_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Instance_call_expression>(current_expression.data))
         {
             Instance_call_expression& data = std::get<Instance_call_expression>(current_expression.data);
             data.left_hand_side = copy_expressions_to_new_statement(destination_statement, source_statement, data.left_hand_side);
         }
-        else if (std::holds_alternative<h::If_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::If_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Instantiate_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Instantiate_expression>(current_expression.data))
         {
             Instantiate_expression& data = std::get<Instantiate_expression>(current_expression.data);
-            for (h::Instantiate_member_value_pair& member : data.members)
+            for (iris::Instantiate_member_value_pair& member : data.members)
                 member.value = copy_expressions_to_new_statement(destination_statement, source_statement, member.value);
         }
-        else if (std::holds_alternative<h::Invalid_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Invalid_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Null_pointer_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Null_pointer_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Parenthesis_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Parenthesis_expression>(current_expression.data))
         {
             Parenthesis_expression& data = std::get<Parenthesis_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
         }
-        else if (std::holds_alternative<h::Reflection_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Reflection_expression>(current_expression.data))
         {
             Reflection_expression& data = std::get<Reflection_expression>(current_expression.data);
-            for (h::Expression_index& expression_index : data.arguments)
+            for (iris::Expression_index& expression_index : data.arguments)
                 expression_index = copy_expressions_to_new_statement(destination_statement, source_statement, expression_index);
         }
-        else if (std::holds_alternative<h::Return_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Return_expression>(current_expression.data))
         {
             Return_expression& data = std::get<Return_expression>(current_expression.data);
             if (data.expression.has_value())
                 data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression.value());
         }
-        else if (std::holds_alternative<h::Struct_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Struct_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Switch_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Switch_expression>(current_expression.data))
         {
             Switch_expression& data = std::get<Switch_expression>(current_expression.data);
             data.value = copy_expressions_to_new_statement(destination_statement, source_statement, data.value);
-            for (h::Switch_case_expression_pair& pair : data.cases)
+            for (iris::Switch_case_expression_pair& pair : data.cases)
             {
                 if (pair.case_value.has_value())
                     pair.case_value = copy_expressions_to_new_statement(destination_statement, source_statement, pair.case_value.value());
             }
         }
-        else if (std::holds_alternative<h::Ternary_condition_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Ternary_condition_expression>(current_expression.data))
         {
             Ternary_condition_expression& data = std::get<Ternary_condition_expression>(current_expression.data);
             data.condition = copy_expressions_to_new_statement(destination_statement, source_statement, data.condition);
         }
-        else if (std::holds_alternative<h::Type_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Type_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Unary_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Unary_expression>(current_expression.data))
         {
             Unary_expression& data = std::get<Unary_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
         }
-        else if (std::holds_alternative<h::Union_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Union_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::Variable_declaration_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Variable_declaration_expression>(current_expression.data))
         {
             Variable_declaration_expression& data = std::get<Variable_declaration_expression>(current_expression.data);
             data.right_hand_side = copy_expressions_to_new_statement(destination_statement, source_statement, data.right_hand_side);
         }
-        else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Variable_declaration_with_type_expression>(current_expression.data))
         {
             Variable_declaration_with_type_expression& data = std::get<Variable_declaration_with_type_expression>(current_expression.data);
             data.type = copy_expressions_to_new_statement(destination_statement, source_statement, data.type);
             data.right_hand_side = copy_expressions_to_new_statement(destination_statement, source_statement, data.right_hand_side);
         }
-        else if (std::holds_alternative<h::Variable_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::Variable_expression>(current_expression.data))
         {
         }
-        else if (std::holds_alternative<h::While_loop_expression>(current_expression.data))
+        else if (std::holds_alternative<iris::While_loop_expression>(current_expression.data))
         {
         }
         else
@@ -603,7 +603,7 @@ namespace h
         
         destination_statement.expressions[destination_expression_index] = std::move(current_expression);
 
-        return h::Expression_index{.expression_index = destination_expression_index};
+        return iris::Expression_index{.expression_index = destination_expression_index};
     }
 
     std::optional<Type_reference> get_variable_declaration_with_type_expression_type(
@@ -614,11 +614,11 @@ namespace h
         if (expression.type.expression_index >= statement.expressions.size())
             return std::nullopt;
 
-        h::Expression const& type_expression = statement.expressions[expression.type.expression_index];
-        if (!std::holds_alternative<h::Type_expression>(type_expression.data))
+        iris::Expression const& type_expression = statement.expressions[expression.type.expression_index];
+        if (!std::holds_alternative<iris::Type_expression>(type_expression.data))
             return std::nullopt;
 
-        return std::get<h::Type_expression>(type_expression.data).type;
+        return std::get<iris::Type_expression>(type_expression.data).type;
     }
 
     bool is_builtin_function_name(
@@ -633,12 +633,12 @@ namespace h
     }
 
     bool is_expression_address_of(
-        h::Expression const& expression
+        iris::Expression const& expression
     )
     {
-        if (std::holds_alternative<h::Unary_expression>(expression.data))
+        if (std::holds_alternative<iris::Unary_expression>(expression.data))
         {
-            h::Unary_expression const& unary_expression = std::get<h::Unary_expression>(expression.data);
+            iris::Unary_expression const& unary_expression = std::get<iris::Unary_expression>(expression.data);
             return unary_expression.operation == Unary_operation::Address_of;
         }
 
@@ -646,18 +646,18 @@ namespace h
     }
 
     bool is_offset_pointer(
-        h::Statement const& statement,
-        h::Expression const& expression
+        iris::Statement const& statement,
+        iris::Expression const& expression
     )
     {
-        if (std::holds_alternative<h::Call_expression>(expression.data))
+        if (std::holds_alternative<iris::Call_expression>(expression.data))
         {
-            h::Call_expression const& call_expression = std::get<h::Call_expression>(expression.data);
+            iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
 
-            h::Expression const& left_call_expression = statement.expressions[call_expression.expression.expression_index];
-            if (std::holds_alternative<h::Variable_expression>(left_call_expression.data))
+            iris::Expression const& left_call_expression = statement.expressions[call_expression.expression.expression_index];
+            if (std::holds_alternative<iris::Variable_expression>(left_call_expression.data))
             {
-                h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_call_expression.data);
+                iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_call_expression.data);
                 return variable_expression.name == "offset_pointer";
             }
         }
@@ -665,12 +665,12 @@ namespace h
         return false;
     }
 
-    bool is_add_scope_expression(h::Expression const& expression)
+    bool is_add_scope_expression(iris::Expression const& expression)
     {
-        return std::holds_alternative<h::Block_expression>(expression.data)
-            || std::holds_alternative<h::For_loop_expression>(expression.data)
-            || std::holds_alternative<h::If_expression>(expression.data)
-            || std::holds_alternative<h::Switch_expression>(expression.data)
-            || std::holds_alternative<h::While_loop_expression>(expression.data);
+        return std::holds_alternative<iris::Block_expression>(expression.data)
+            || std::holds_alternative<iris::For_loop_expression>(expression.data)
+            || std::holds_alternative<iris::If_expression>(expression.data)
+            || std::holds_alternative<iris::Switch_expression>(expression.data)
+            || std::holds_alternative<iris::While_loop_expression>(expression.data);
     }
 }

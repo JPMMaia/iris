@@ -1,18 +1,18 @@
-export module h.compiler.core_module_layer;
+export module iris.compiler.core_module_layer;
 
 import std;
 import llvm;
 
-import h.core;
-import h.compiler;
+import iris.core;
+import iris.compiler;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Core_module_compilation_data
     {
         LLVM_data& llvm_data;
-        h::Module core_module;
-        std::pmr::unordered_map<std::pmr::string, h::Module> core_module_dependencies;
+        iris::Module core_module;
+        std::pmr::unordered_map<std::pmr::string, iris::Module> core_module_dependencies;
         Compilation_options compilation_options;
     };
 

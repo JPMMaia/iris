@@ -6,9 +6,9 @@ module;
 #include <string_view>
 #include <vector>
 
-export module h.tools.tests_results_replacer;
+export module iris.tools.tests_results_replacer;
 
-namespace h::tools::tests_results_replacer
+namespace iris::tools::tests_results_replacer
 {
     export struct Test_result
     {

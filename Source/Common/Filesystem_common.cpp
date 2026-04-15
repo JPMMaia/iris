@@ -1,10 +1,10 @@
-module h.common.filesystem_common;
+module iris.common.filesystem_common;
 
 import std;
 
-import h.common.filesystem;
+import iris.common.filesystem;
 
-namespace h::common
+namespace iris::common
 {
     std::optional<std::filesystem::path> search_file(
         std::string_view const filename,

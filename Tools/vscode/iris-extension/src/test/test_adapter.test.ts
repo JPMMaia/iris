@@ -53,7 +53,7 @@ suite("Test Adapter", () => {
 			}
 		];
 		
-		const test_controller = test_adapter.create_test_controller("hlang.test_controller");
+		const test_controller = test_adapter.create_test_controller("iris.test_controller");
 		test_adapter.add_tests_to_controller(test_controller, "/path/to/executable", test_suites);
 
 		assert.equal(test_controller.items.size, 1);

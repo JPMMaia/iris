@@ -23,8 +23,8 @@ async function create_server_options_to_create(
 	output_channel: vscode.OutputChannel
 ): Promise<ServerOptions> {
 
-	const server_env_path = process.env.hlang_language_server;
-	const server_path = server_env_path !== undefined ? server_env_path : configuration.get<string>("hlang_language_server_executable", "hlang_language_server") ;
+	const server_env_path = process.env.iris_language_server;
+	const server_path = server_env_path !== undefined ? server_env_path : configuration.get<string>("iris_language_server_executable", "iris_language_server") ;
 
 	const options: child_process.ExecSyncOptions = {};
 
@@ -125,12 +125,12 @@ async function create_server_options_to_attach(
 
 export async function activate(context: vscode.ExtensionContext): Promise<LanguageClient> {
 
-	const configuration = vscode.workspace.getConfiguration("hlang");
+	const configuration = vscode.workspace.getConfiguration("iris");
 
 	const mode: string | undefined = process.env.mode;
 	const attach_to_server = mode !== undefined && mode === "debug";
 
-	const output_channel = vscode.window.createOutputChannel("hlang", "hlang");
+	const output_channel = vscode.window.createOutputChannel("iris", "iris");
 	
 	const server_options = 
 		attach_to_server ?
@@ -141,7 +141,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 	// Options to control the language client
 	const client_options: LanguageClientOptions = {
 		// Register the server for plain text documents
-		documentSelector: [{ scheme: 'file', language: 'hlang' }],
+		documentSelector: [{ scheme: 'file', language: 'iris' }],
 		synchronize: {
 			// Notify the server about file changes to '.clientrc files contained in the workspace
 			fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
@@ -151,8 +151,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 
 	// Create the language client and start the client.
 	client = new LanguageClient(
-		'HLanglanguageServer',
-		'HLang Language Server',
+		'IrisLanguageServer',
+		'Iris Language Server',
 		server_options,
 		client_options
 	);
@@ -171,9 +171,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 	// Set up test executable watcher (discover and show tests in the Test Explorer)
 	try {
 		output_channel.appendLine("Starting test adapter");
-		const tests_configuration = vscode.workspace.getConfiguration("hlang");
-		const test_controller = create_test_controller("hlang-test-controller");
-		const glob = tests_configuration.get<string>("test_executable_glob", "build/bin/*.hlang.test*");
+		const tests_configuration = vscode.workspace.getConfiguration("iris");
+		const test_controller = create_test_controller("iris-test-controller");
+		const glob = tests_configuration.get<string>("test_executable_glob", "build/bin/*.iris.test*");
 		const watcher_disposable = await setup_test_executables_watcher(test_controller, glob);
 		context.subscriptions.push(watcher_disposable);
 	} catch (error) {
@@ -187,7 +187,7 @@ async function wait_for_workspace_initialized_notification(
 	client: LanguageClient
 ): Promise<void> {
 	return new Promise( resolve => {
-		client.onNotification("hlang/workspaceInitialized", () => {
+		client.onNotification("iris/workspaceInitialized", () => {
 			resolve();
 		});
 	});

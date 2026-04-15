@@ -1,20 +1,20 @@
 #include <iosfwd>
 
-import h.common;
-import h.common.filesystem;
-import h.core;
-import h.core.expressions;
-import h.core.types;
-import h.c_header_converter;
-import h.json_serializer.operators;
+import iris.common;
+import iris.common.filesystem;
+import iris.core;
+import iris.core.expressions;
+import iris.core.types;
+import iris.c_header_converter;
+import iris.json_serializer.operators;
 
-using h::json::operators::operator<<;
+using iris::json::operators::operator<<;
 
 #include <catch2/catch_test_macros.hpp>
 
 import std;
 
-namespace h::c
+namespace iris::c
 {
     constexpr char const* g_vulkan_headers_location = VULKAN_HEADERS_LOCATION;
 
@@ -44,91 +44,91 @@ namespace h::c
         return "";
     }
 
-    h::Alias_type_declaration const& find_alias_type_declaration(h::Module const& header_module, std::string_view const name)
+    iris::Alias_type_declaration const& find_alias_type_declaration(iris::Module const& header_module, std::string_view const name)
     {
-        std::span<h::Alias_type_declaration const> const declarations = header_module.export_declarations.alias_type_declarations;
-        auto const location = std::find_if(declarations.begin(), declarations.end(), [name](h::Alias_type_declaration const& value) -> bool { return value.name == name; });
+        std::span<iris::Alias_type_declaration const> const declarations = header_module.export_declarations.alias_type_declarations;
+        auto const location = std::find_if(declarations.begin(), declarations.end(), [name](iris::Alias_type_declaration const& value) -> bool { return value.name == name; });
         REQUIRE(location != declarations.end());
         return *location;
     }
 
-    h::Enum_declaration const& find_enum_declaration(h::Module const& header_module, std::string_view const name)
+    iris::Enum_declaration const& find_enum_declaration(iris::Module const& header_module, std::string_view const name)
     {
-        std::span<h::Enum_declaration const> const declarations = header_module.export_declarations.enum_declarations;
-        auto const location = std::find_if(declarations.begin(), declarations.end(), [name](h::Enum_declaration const& value) -> bool { return value.name == name; });
+        std::span<iris::Enum_declaration const> const declarations = header_module.export_declarations.enum_declarations;
+        auto const location = std::find_if(declarations.begin(), declarations.end(), [name](iris::Enum_declaration const& value) -> bool { return value.name == name; });
         REQUIRE(location != declarations.end());
         return *location;
     }
 
-    h::Function_declaration const& find_function_declaration(h::Module const& header_module, std::string_view const name)
+    iris::Function_declaration const& find_function_declaration(iris::Module const& header_module, std::string_view const name)
     {
-        std::span<h::Function_declaration const> const function_declarations = header_module.export_declarations.function_declarations;
-        auto const location = std::find_if(function_declarations.begin(), function_declarations.end(), [name](h::Function_declaration const& function_declaration) -> bool { return function_declaration.name == name; });
+        std::span<iris::Function_declaration const> const function_declarations = header_module.export_declarations.function_declarations;
+        auto const location = std::find_if(function_declarations.begin(), function_declarations.end(), [name](iris::Function_declaration const& function_declaration) -> bool { return function_declaration.name == name; });
         REQUIRE(location != function_declarations.end());
         return *location;
     }
 
-    h::Global_variable_declaration const& find_global_variable_declaration(h::Module const& header_module, std::string_view const name)
+    iris::Global_variable_declaration const& find_global_variable_declaration(iris::Module const& header_module, std::string_view const name)
     {
-        std::span<h::Global_variable_declaration const> const global_variable_declarations = header_module.export_declarations.global_variable_declarations;
-        auto const location = std::find_if(global_variable_declarations.begin(), global_variable_declarations.end(), [name](h::Global_variable_declaration const& global_variable_declaration) -> bool { return global_variable_declaration.name == name; });
+        std::span<iris::Global_variable_declaration const> const global_variable_declarations = header_module.export_declarations.global_variable_declarations;
+        auto const location = std::find_if(global_variable_declarations.begin(), global_variable_declarations.end(), [name](iris::Global_variable_declaration const& global_variable_declaration) -> bool { return global_variable_declaration.name == name; });
         REQUIRE(location != global_variable_declarations.end());
         return *location;
     }
 
-    h::Struct_declaration const& find_struct_declaration(h::Module const& header_module, std::string_view const name)
+    iris::Struct_declaration const& find_struct_declaration(iris::Module const& header_module, std::string_view const name)
     {
-        std::span<h::Struct_declaration const> const struct_declarations = header_module.export_declarations.struct_declarations;
-        auto const location = std::find_if(struct_declarations.begin(), struct_declarations.end(), [name](h::Struct_declaration const& struct_declaration) -> bool { return struct_declaration.name == name; });
+        std::span<iris::Struct_declaration const> const struct_declarations = header_module.export_declarations.struct_declarations;
+        auto const location = std::find_if(struct_declarations.begin(), struct_declarations.end(), [name](iris::Struct_declaration const& struct_declaration) -> bool { return struct_declaration.name == name; });
         REQUIRE(location != struct_declarations.end());
         return *location;
     }
 
-    h::Union_declaration const& find_union_declaration(h::Module const& header_module, std::string_view const name)
+    iris::Union_declaration const& find_union_declaration(iris::Module const& header_module, std::string_view const name)
     {
-        std::span<h::Union_declaration const> const union_declarations = header_module.export_declarations.union_declarations;
-        auto const location = std::find_if(union_declarations.begin(), union_declarations.end(), [name](h::Union_declaration const& union_declaration) -> bool { return union_declaration.name == name; });
+        std::span<iris::Union_declaration const> const union_declarations = header_module.export_declarations.union_declarations;
+        auto const location = std::find_if(union_declarations.begin(), union_declarations.end(), [name](iris::Union_declaration const& union_declaration) -> bool { return union_declaration.name == name; });
         REQUIRE(location != union_declarations.end());
         return *location;
     }
 
-    void check_enum_constant_value(h::Enum_declaration const& actual, std::size_t const value_index, std::string_view const value_expected_data)
+    void check_enum_constant_value(iris::Enum_declaration const& actual, std::size_t const value_index, std::string_view const value_expected_data)
     {
         auto const& expression_data = actual.values[value_index].value.value().expressions[0].data;
 
-        REQUIRE(std::holds_alternative<h::Constant_expression>(expression_data));
-        Constant_expression const& expression = std::get<h::Constant_expression>(expression_data);
+        REQUIRE(std::holds_alternative<iris::Constant_expression>(expression_data));
+        Constant_expression const& expression = std::get<iris::Constant_expression>(expression_data);
 
-        h::Integer_type const int32_type
+        iris::Integer_type const int32_type
         {
             .number_of_bits = 32,
             .is_signed = true
         };
 
-        CHECK(expression == h::Constant_expression{ .type = int32_type, .data = std::pmr::string{value_expected_data} });
+        CHECK(expression == iris::Constant_expression{ .type = int32_type, .data = std::pmr::string{value_expected_data} });
     }
 
-    static h::Statement create_cast_constant_statement(
+    static iris::Statement create_cast_constant_statement(
         std::string_view const data,
-        h::Type_reference source_type,
-        h::Type_reference destination_type
+        iris::Type_reference source_type,
+        iris::Type_reference destination_type
     )
     {
         return
         {
             .expressions = {
-                h::Expression
+                iris::Expression
                 {
-                    .data = h::Cast_expression
+                    .data = iris::Cast_expression
                     {
                         .source = { .expression_index = 1 },
                         .destination_type = destination_type,
                         .cast_type = Cast_type::Numeric
                     }
                 },
-                h::Expression
+                iris::Expression
                 {
-                    .data = h::Constant_expression
+                    .data = iris::Constant_expression
                     {
                         .type = source_type,
                         .data = std::pmr::string{data}
@@ -138,9 +138,9 @@ namespace h::c
         };
     }
 
-    h::Module const& import_vulkan_header_module()
+    iris::Module const& import_vulkan_header_module()
     {
-        static std::optional<h::Module> header_module_optional = std::nullopt;
+        static std::optional<iris::Module> header_module_optional = std::nullopt;
         if (header_module_optional.has_value())
             return header_module_optional.value();
 
@@ -150,14 +150,14 @@ namespace h::c
         std::pmr::vector<std::filesystem::path> include_directories;
         include_directories.push_back(vulkan_headers_path);
 
-        h::c::Options const options = {
+        iris::c::Options const options = {
             .include_directories = include_directories,
             .allow_errors = false,
         };
 
-        header_module_optional = h::c::import_header("vulkan", vulkan_header_path, options);
+        header_module_optional = iris::c::import_header("vulkan", vulkan_header_path, options);
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == vulkan_header_path);
     
@@ -168,17 +168,17 @@ namespace h::c
     TEST_CASE("Import stdio.h C header creates 'puts' function declaration")
     {
         std::pmr::vector<std::filesystem::path> const header_search_directories = 
-            h::common::get_default_header_search_directories();
+            iris::common::get_default_header_search_directories();
 
         std::filesystem::path const stdio_header_path = find_c_header_path("stdio.h", header_search_directories);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.stdio", stdio_header_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.stdio", stdio_header_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == stdio_header_path);
 
-        h::Function_declaration const& actual = h::c::find_function_declaration(header_module, "puts");
+        iris::Function_declaration const& actual = iris::c::find_function_declaration(header_module, "puts");
 
         CHECK(actual.name == "puts");
 
@@ -186,13 +186,13 @@ namespace h::c
         CHECK(actual.unique_name.value() == "puts");
 
         {
-            h::Type_reference const c_char_type_reference{ .data = h::Fundamental_type::C_char };
-            h::Type_reference const c_char_const_pointer_type_reference{ .data = h::Pointer_type{.element_type = {c_char_type_reference}, .is_mutable = false } };
-            CHECK(actual.type.input_parameter_types == std::pmr::vector<h::Type_reference>{c_char_const_pointer_type_reference});
+            iris::Type_reference const c_char_type_reference{ .data = iris::Fundamental_type::C_char };
+            iris::Type_reference const c_char_const_pointer_type_reference{ .data = iris::Pointer_type{.element_type = {c_char_type_reference}, .is_mutable = false } };
+            CHECK(actual.type.input_parameter_types == std::pmr::vector<iris::Type_reference>{c_char_const_pointer_type_reference});
         }
 
         {
-            h::Type_reference const expected_return_type{ .data = h::Fundamental_type::C_int };
+            iris::Type_reference const expected_return_type{ .data = iris::Fundamental_type::C_int };
 
             REQUIRE(actual.type.output_parameter_types.size() == 1);
             CHECK(actual.type.output_parameter_types[0] == expected_return_type);
@@ -208,17 +208,17 @@ namespace h::c
     TEST_CASE("Import time.h C header creates 'time_t' typedef")
     {
         std::pmr::vector<std::filesystem::path> const header_search_directories = 
-            h::common::get_default_header_search_directories();
+            iris::common::get_default_header_search_directories();
 
         std::filesystem::path const time_header_path = find_c_header_path("time.h", header_search_directories);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.time", time_header_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.time", time_header_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == time_header_path);
 
-        h::Alias_type_declaration const& actual = h::c::find_alias_type_declaration(header_module, "time_t");
+        iris::Alias_type_declaration const& actual = iris::c::find_alias_type_declaration(header_module, "time_t");
 
         CHECK(actual.name == "time_t");
 
@@ -230,9 +230,9 @@ namespace h::c
 
     TEST_CASE("Import vulkan.h C header creates 'VkPhysicalDeviceType' enum")
     {
-        h::Module const& header_module = import_vulkan_header_module();
+        iris::Module const& header_module = import_vulkan_header_module();
 
-        h::Enum_declaration const& actual = h::c::find_enum_declaration(header_module, "VkPhysicalDeviceType");
+        iris::Enum_declaration const& actual = iris::c::find_enum_declaration(header_module, "VkPhysicalDeviceType");
 
         CHECK(actual.name == "VkPhysicalDeviceType");
         REQUIRE(actual.unique_name.has_value());
@@ -258,9 +258,9 @@ namespace h::c
 
     TEST_CASE("Import vulkan.h C header creates 'VkCommandPoolCreateInfo' struct")
     {
-        h::Module const& header_module = import_vulkan_header_module();
+        iris::Module const& header_module = import_vulkan_header_module();
 
-        h::Struct_declaration const& actual = h::c::find_struct_declaration(header_module, "VkCommandPoolCreateInfo");
+        iris::Struct_declaration const& actual = iris::c::find_struct_declaration(header_module, "VkCommandPoolCreateInfo");
 
         CHECK(actual.name == "VkCommandPoolCreateInfo");
 
@@ -276,34 +276,34 @@ namespace h::c
 
         {
             CHECK(actual.member_names[0] == "sType");
-            CHECK(actual.member_types[0] == h::create_custom_type_reference("vulkan", "VkStructureType"));
+            CHECK(actual.member_types[0] == iris::create_custom_type_reference("vulkan", "VkStructureType"));
             CHECK(actual.member_bit_fields[0].has_value() == false);
         }
 
         {
             CHECK(actual.member_names[1] == "pNext");
-            CHECK(actual.member_types[1] == h::create_pointer_type_type_reference({}, false));
+            CHECK(actual.member_types[1] == iris::create_pointer_type_type_reference({}, false));
             CHECK(actual.member_bit_fields[1].has_value() == false);
         }
 
         {
             CHECK(actual.member_names[2] == "flags");
-            CHECK(actual.member_types[2] == h::create_custom_type_reference("vulkan", "VkCommandPoolCreateFlags"));
+            CHECK(actual.member_types[2] == iris::create_custom_type_reference("vulkan", "VkCommandPoolCreateFlags"));
             CHECK(actual.member_bit_fields[2].has_value() == false);
         }
 
         {
             CHECK(actual.member_names[3] == "queueFamilyIndex");
-            CHECK(actual.member_types[3] == h::create_integer_type_type_reference(32, false));
+            CHECK(actual.member_types[3] == iris::create_integer_type_type_reference(32, false));
             CHECK(actual.member_bit_fields[3].has_value() == false);
         }
     }
 
     TEST_CASE("Import vulkan.h C header creates 'VkExtent2D' struct")
     {
-        h::Module const& header_module = import_vulkan_header_module();
+        iris::Module const& header_module = import_vulkan_header_module();
 
-        h::Struct_declaration const& actual = h::c::find_struct_declaration(header_module, "VkExtent2D");
+        iris::Struct_declaration const& actual = iris::c::find_struct_declaration(header_module, "VkExtent2D");
 
         CHECK(actual.name == "VkExtent2D");
 
@@ -315,21 +315,21 @@ namespace h::c
         REQUIRE(actual.member_bit_fields.size() == 2);
         REQUIRE(actual.member_default_values.size() == 2);
 
-        h::Type_reference const uint32_type
+        iris::Type_reference const uint32_type
         {
-            .data = h::Integer_type
+            .data = iris::Integer_type
             {
                 .number_of_bits = 32,
                 .is_signed = false
             }
         };
 
-        h::Statement const expected_default_value =
+        iris::Statement const expected_default_value =
         {
             .expressions = {
-                h::Expression
+                iris::Expression
                 {
-                    .data = h::Constant_expression
+                    .data = iris::Constant_expression
                     {
                         .type = uint32_type,
                         .data = "0"
@@ -355,9 +355,9 @@ namespace h::c
 
     TEST_CASE("Import vulkan.h C header creates 'VkRect2D' struct")
     {
-        h::Module const& header_module = import_vulkan_header_module();
+        iris::Module const& header_module = import_vulkan_header_module();
 
-        h::Struct_declaration const& actual = h::c::find_struct_declaration(header_module, "VkRect2D");
+        iris::Struct_declaration const& actual = iris::c::find_struct_declaration(header_module, "VkRect2D");
 
         CHECK(actual.name == "VkRect2D");
 
@@ -372,7 +372,7 @@ namespace h::c
         {
             CHECK(actual.member_names[0] == "offset");
 
-            h::Custom_type_reference const expected_type =
+            iris::Custom_type_reference const expected_type =
             {
                 .module_reference = {
                     .name = "vulkan"
@@ -380,15 +380,15 @@ namespace h::c
                 .name = "VkOffset2D"
             };
 
-            CHECK(actual.member_types[0] == h::Type_reference{ .data = expected_type });
+            CHECK(actual.member_types[0] == iris::Type_reference{ .data = expected_type });
             CHECK(actual.member_bit_fields[0].has_value() == false);
 
-            h::Statement const expected_default_value =
+            iris::Statement const expected_default_value =
             {
                 .expressions = {
-                    h::Expression
+                    iris::Expression
                     {
-                        .data = h::Instantiate_expression
+                        .data = iris::Instantiate_expression
                         {
                             .type = Instantiate_expression_type::Default,
                             .members = {}
@@ -403,7 +403,7 @@ namespace h::c
         {
             CHECK(actual.member_names[1] == "extent");
 
-            h::Custom_type_reference const expected_type =
+            iris::Custom_type_reference const expected_type =
             {
                 .module_reference = {
                     .name = "vulkan"
@@ -411,15 +411,15 @@ namespace h::c
                 .name = "VkExtent2D"
             };
 
-            CHECK(actual.member_types[1] == h::Type_reference{ .data = expected_type });
+            CHECK(actual.member_types[1] == iris::Type_reference{ .data = expected_type });
             CHECK(actual.member_bit_fields[1].has_value() == false);
 
-            h::Statement const expected_default_value =
+            iris::Statement const expected_default_value =
             {
                 .expressions = {
-                    h::Expression
+                    iris::Expression
                     {
-                        .data = h::Instantiate_expression
+                        .data = iris::Instantiate_expression
                         {
                             .type = Instantiate_expression_type::Default,
                             .members = {}
@@ -434,9 +434,9 @@ namespace h::c
 
     TEST_CASE("Import vulkan.h C header creates 'VkClearAttachment' struct")
     {
-        h::Module const& header_module = import_vulkan_header_module();
+        iris::Module const& header_module = import_vulkan_header_module();
 
-        h::Struct_declaration const& actual = h::c::find_struct_declaration(header_module, "VkClearAttachment");
+        iris::Struct_declaration const& actual = iris::c::find_struct_declaration(header_module, "VkClearAttachment");
 
         CHECK(actual.name == "VkClearAttachment");
 
@@ -448,9 +448,9 @@ namespace h::c
         REQUIRE(actual.member_bit_fields.size() == 3);
         REQUIRE(actual.member_default_values.size() == 3);
 
-        h::Type_reference const uint32_type
+        iris::Type_reference const uint32_type
         {
-            .data = h::Integer_type
+            .data = iris::Integer_type
             {
                 .number_of_bits = 32,
                 .is_signed = false
@@ -460,7 +460,7 @@ namespace h::c
         {
             CHECK(actual.member_names[0] == "aspectMask");
 
-            h::Custom_type_reference const expected_type =
+            iris::Custom_type_reference const expected_type =
             {
                 .module_reference = {
                     .name = "vulkan"
@@ -468,24 +468,24 @@ namespace h::c
                 .name = "VkImageAspectFlags"
             };
 
-            CHECK(actual.member_types[0] == h::Type_reference{ .data = expected_type });
+            CHECK(actual.member_types[0] == iris::Type_reference{ .data = expected_type });
             CHECK(actual.member_bit_fields[0].has_value() == false);
 
-            h::Statement const expected_default_value =
+            iris::Statement const expected_default_value =
             {
                 .expressions = {
-                    h::Expression
+                    iris::Expression
                     {
-                        .data = h::Cast_expression
+                        .data = iris::Cast_expression
                         {
                             .source = { .expression_index = 1 },
                             .destination_type = actual.member_types[0],
                             .cast_type = Cast_type::Numeric
                         }
                     },
-                    h::Expression
+                    iris::Expression
                     {
-                        .data = h::Constant_expression
+                        .data = iris::Constant_expression
                         {
                             .type = uint32_type,
                             .data = "0"
@@ -502,12 +502,12 @@ namespace h::c
             CHECK(actual.member_types[1] == uint32_type);
             CHECK(actual.member_bit_fields[1].has_value() == false);
 
-            h::Statement const expected_default_value =
+            iris::Statement const expected_default_value =
             {
                 .expressions = {
-                    h::Expression
+                    iris::Expression
                     {
-                        .data = h::Constant_expression
+                        .data = iris::Constant_expression
                         {
                             .type = uint32_type,
                             .data = "0"
@@ -522,7 +522,7 @@ namespace h::c
         {
             CHECK(actual.member_names[2] == "clearValue");
 
-            h::Custom_type_reference const expected_type =
+            iris::Custom_type_reference const expected_type =
             {
                 .module_reference = {
                     .name = "vulkan"
@@ -530,31 +530,31 @@ namespace h::c
                 .name = "VkClearValue"
             };
 
-            CHECK(actual.member_types[2] == h::Type_reference{ .data = expected_type });
+            CHECK(actual.member_types[2] == iris::Type_reference{ .data = expected_type });
             CHECK(actual.member_bit_fields[2].has_value() == false);
 
-            Type_reference const float32_type = h::create_fundamental_type_type_reference(h::Fundamental_type::Float32);
+            Type_reference const float32_type = iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float32);
 
-            h::Expression const color_array_value = h::Expression
+            iris::Expression const color_array_value = iris::Expression
             {
-                .data = h::Constant_array_expression
+                .data = iris::Constant_array_expression
                 {
                     .array_data =
                     {
-                        h::create_statement({h::create_constant_expression(float32_type, "0.0")}),
-                        h::create_statement({h::create_constant_expression(float32_type, "0.0")}),
-                        h::create_statement({h::create_constant_expression(float32_type, "0.0")}),
-                        h::create_statement({h::create_constant_expression(float32_type, "0.0")}),
+                        iris::create_statement({iris::create_constant_expression(float32_type, "0.0")}),
+                        iris::create_statement({iris::create_constant_expression(float32_type, "0.0")}),
+                        iris::create_statement({iris::create_constant_expression(float32_type, "0.0")}),
+                        iris::create_statement({iris::create_constant_expression(float32_type, "0.0")}),
                     }
                 }
             };
 
-            h::Statement const expected_default_value =
+            iris::Statement const expected_default_value =
             {
                 .expressions = {
-                    h::Expression
+                    iris::Expression
                     {
-                        .data = h::Instantiate_expression
+                        .data = iris::Instantiate_expression
                         {
                             .type = Instantiate_expression_type::Default,
                             .members = {
@@ -567,7 +567,7 @@ namespace h::c
                         }
                     },
                     {
-                        .data = h::Instantiate_expression
+                        .data = iris::Instantiate_expression
                         {
                             .type = Instantiate_expression_type::Default,
                             .members = {
@@ -580,14 +580,14 @@ namespace h::c
                         }
                     },
                     {
-                        .data = h::Constant_array_expression
+                        .data = iris::Constant_array_expression
                         {
                             .array_data =
                             {
-                                h::create_statement({h::create_constant_expression(float32_type, "0.0")}),
-                                h::create_statement({h::create_constant_expression(float32_type, "0.0")}),
-                                h::create_statement({h::create_constant_expression(float32_type, "0.0")}),
-                                h::create_statement({h::create_constant_expression(float32_type, "0.0")}),
+                                iris::create_statement({iris::create_constant_expression(float32_type, "0.0")}),
+                                iris::create_statement({iris::create_constant_expression(float32_type, "0.0")}),
+                                iris::create_statement({iris::create_constant_expression(float32_type, "0.0")}),
+                                iris::create_statement({iris::create_constant_expression(float32_type, "0.0")}),
                             }
                         }
                     }
@@ -600,9 +600,9 @@ namespace h::c
 
     TEST_CASE("Import vulkan.h C header creates 'VkBufferCreateInfo' struct")
     {
-        h::Module const& header_module = import_vulkan_header_module();
+        iris::Module const& header_module = import_vulkan_header_module();
 
-        h::Struct_declaration const& actual = h::c::find_struct_declaration(header_module, "VkBufferCreateInfo");
+        iris::Struct_declaration const& actual = iris::c::find_struct_declaration(header_module, "VkBufferCreateInfo");
 
         CHECK(actual.name == "VkBufferCreateInfo");
 
@@ -614,18 +614,18 @@ namespace h::c
         REQUIRE(actual.member_bit_fields.size() == 8);
         REQUIRE(actual.member_default_values.size() == 8);
 
-        h::Type_reference const uint32_type
+        iris::Type_reference const uint32_type
         {
-            .data = h::Integer_type
+            .data = iris::Integer_type
             {
                 .number_of_bits = 32,
                 .is_signed = false
             }
         };
 
-        h::Type_reference const uint64_type
+        iris::Type_reference const uint64_type
         {
-            .data = h::Integer_type
+            .data = iris::Integer_type
             {
                 .number_of_bits = 64,
                 .is_signed = false
@@ -635,12 +635,12 @@ namespace h::c
         CHECK(actual.member_names[0] == "sType");
         CHECK(actual.member_types[0] == create_custom_type_reference("vulkan", "VkStructureType"));
         CHECK(actual.member_bit_fields[0].has_value() == false);
-        CHECK(actual.member_default_values[0] == h::create_statement(h::create_enum_value_expressions("VkStructureType", "Application_info")));
+        CHECK(actual.member_default_values[0] == iris::create_statement(iris::create_enum_value_expressions("VkStructureType", "Application_info")));
 
         CHECK(actual.member_names[1] == "pNext");
-        CHECK(actual.member_types[1] == h::create_pointer_type_type_reference({}, false));
+        CHECK(actual.member_types[1] == iris::create_pointer_type_type_reference({}, false));
         CHECK(actual.member_bit_fields[1].has_value() == false);
-        CHECK(actual.member_default_values[1] == h::create_statement({ h::create_null_pointer_expression() }));
+        CHECK(actual.member_default_values[1] == iris::create_statement({ iris::create_null_pointer_expression() }));
 
         CHECK(actual.member_names[2] == "flags");
         CHECK(actual.member_types[2] == create_custom_type_reference("vulkan", "VkBufferCreateFlags"));
@@ -660,32 +660,32 @@ namespace h::c
         CHECK(actual.member_names[5] == "sharingMode");
         CHECK(actual.member_types[5] == create_custom_type_reference("vulkan", "VkSharingMode"));
         CHECK(actual.member_bit_fields[5].has_value() == false);
-        CHECK(actual.member_default_values[5] == h::create_statement(h::create_enum_value_expressions("VkSharingMode", "Exclusive")));
+        CHECK(actual.member_default_values[5] == iris::create_statement(iris::create_enum_value_expressions("VkSharingMode", "Exclusive")));
 
         CHECK(actual.member_names[6] == "queueFamilyIndexCount");
         CHECK(actual.member_types[6] == uint32_type);
         CHECK(actual.member_bit_fields[6].has_value() == false);
-        CHECK(actual.member_default_values[6] == h::create_statement({ h::create_constant_expression(uint32_type, "0") }));
+        CHECK(actual.member_default_values[6] == iris::create_statement({ iris::create_constant_expression(uint32_type, "0") }));
 
         CHECK(actual.member_names[7] == "pQueueFamilyIndices");
-        CHECK(actual.member_types[7] == h::create_pointer_type_type_reference({ h::create_integer_type_type_reference(32, false) }, false));
+        CHECK(actual.member_types[7] == iris::create_pointer_type_type_reference({ iris::create_integer_type_type_reference(32, false) }, false));
         CHECK(actual.member_bit_fields[7].has_value() == false);
-        CHECK(actual.member_default_values[7] == h::create_statement({ h::create_null_pointer_expression() }));
+        CHECK(actual.member_default_values[7] == iris::create_statement({ iris::create_null_pointer_expression() }));
     }
 
     TEST_CASE("Import vulkan.h C header has correct macro types")
     {
-        h::Module const& header_module = import_vulkan_header_module();
-        h::Global_variable_declaration const& actual = h::c::find_global_variable_declaration(header_module, "VK_API_VERSION_1_0");
+        iris::Module const& header_module = import_vulkan_header_module();
+        iris::Global_variable_declaration const& actual = iris::c::find_global_variable_declaration(header_module, "VK_API_VERSION_1_0");
 
         CHECK(actual.name == "VK_API_VERSION_1_0");
 
         REQUIRE(actual.unique_name.has_value());
         CHECK(actual.unique_name.value() == "VK_API_VERSION_1_0");
 
-        h::Type_reference const uint32_type
+        iris::Type_reference const uint32_type
         {
-            .data = h::Integer_type
+            .data = iris::Integer_type
             {
                 .number_of_bits = 32,
                 .is_signed = false
@@ -695,14 +695,14 @@ namespace h::c
         REQUIRE(actual.type.has_value());
         CHECK(actual.type.value() == uint32_type);
         
-        CHECK(actual.global_type == h::Global_variable_type::Macro);
+        CHECK(actual.global_type == iris::Global_variable_type::Macro);
     }
 
     TEST_CASE("Import vulkan.h C header creates 'VkClearColorValue' union")
     {
-        h::Module const& header_module = import_vulkan_header_module();
+        iris::Module const& header_module = import_vulkan_header_module();
 
-        h::Union_declaration const& actual = h::c::find_union_declaration(header_module, "VkClearColorValue");
+        iris::Union_declaration const& actual = iris::c::find_union_declaration(header_module, "VkClearColorValue");
 
         CHECK(actual.name == "VkClearColorValue");
 
@@ -715,29 +715,29 @@ namespace h::c
         {
             CHECK(actual.member_names[0] == "float32");
 
-            h::Constant_array_type const expected_type =
+            iris::Constant_array_type const expected_type =
             {
                 .value_type = {
-                     h::Type_reference
+                     iris::Type_reference
                     {
-                        .data = h::Fundamental_type::Float32
+                        .data = iris::Fundamental_type::Float32
                     }
                 },
                 .size = 4
             };
 
-            CHECK(actual.member_types[0] == h::Type_reference{ .data = expected_type });
+            CHECK(actual.member_types[0] == iris::Type_reference{ .data = expected_type });
         }
 
         {
             CHECK(actual.member_names[1] == "int32");
 
-            h::Constant_array_type const expected_type =
+            iris::Constant_array_type const expected_type =
             {
                 .value_type = {
-                    h::Type_reference
+                    iris::Type_reference
                     {
-                        .data = h::Integer_type
+                        .data = iris::Integer_type
                         {
                             .number_of_bits = 32,
                             .is_signed = true
@@ -747,18 +747,18 @@ namespace h::c
                 .size = 4
             };
 
-            CHECK(actual.member_types[1] == h::Type_reference{ .data = expected_type });
+            CHECK(actual.member_types[1] == iris::Type_reference{ .data = expected_type });
         }
 
         {
             CHECK(actual.member_names[2] == "uint32");
 
-            h::Constant_array_type const expected_type =
+            iris::Constant_array_type const expected_type =
             {
                 .value_type = {
-                    h::Type_reference
+                    iris::Type_reference
                     {
-                        .data = h::Integer_type
+                        .data = iris::Integer_type
                         {
                             .number_of_bits = 32,
                             .is_signed = false
@@ -768,7 +768,7 @@ namespace h::c
                 .size = 4
             };
 
-            CHECK(actual.member_types[2] == h::Type_reference{ .data = expected_type });
+            CHECK(actual.member_types[2] == iris::Type_reference{ .data = expected_type });
         }
     }
 
@@ -807,90 +807,90 @@ struct My_data
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.My_data", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
+            iris::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
             CHECK(declaration.name == "My_data");
 
             CHECK(declaration.member_names[0] == "type");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
             CHECK(declaration.member_bit_fields[0].has_value() == false);
 
             CHECK(declaration.member_names[1] == "anonymous_0");
-            CHECK(declaration.member_types[1] == h::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_1"));
+            CHECK(declaration.member_types[1] == iris::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_1"));
             CHECK(declaration.member_bit_fields[1].has_value() == false);
 
             CHECK(declaration.member_names[2] == "anonymous_1");
-            CHECK(declaration.member_types[2] == h::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_2"));
+            CHECK(declaration.member_types[2] == iris::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_2"));
             CHECK(declaration.member_bit_fields[2].has_value() == false);
 
             CHECK(declaration.member_names[3] == "member_1");
-            CHECK(declaration.member_types[3] == h::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_3"));
+            CHECK(declaration.member_types[3] == iris::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_3"));
             CHECK(declaration.member_bit_fields[3].has_value() == false);
 
             CHECK(declaration.member_names[4] == "member_2");
-            CHECK(declaration.member_types[4] == h::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_4"));
+            CHECK(declaration.member_types[4] == iris::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_4"));
             CHECK(declaration.member_bit_fields[4].has_value() == false);
         }
 
         {
-            h::Union_declaration const& declaration = header_module.internal_declarations.union_declarations[0];
+            iris::Union_declaration const& declaration = header_module.internal_declarations.union_declarations[0];
             CHECK(declaration.name == "_c_My_data_Anonymous_1");
 
             CHECK(declaration.member_names[0] == "x");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
 
             CHECK(declaration.member_names[1] == "y");
-            CHECK(declaration.member_types[1] == h::create_fundamental_type_type_reference(h::Fundamental_type::Float64));
+            CHECK(declaration.member_types[1] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float64));
 
             CHECK(declaration.member_names[2] == "z");
-            CHECK(declaration.member_types[2] == h::create_fundamental_type_type_reference(h::Fundamental_type::Float32));
+            CHECK(declaration.member_types[2] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float32));
         }
 
         {
-            h::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[0];
+            iris::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[0];
             CHECK(declaration.name == "_c_My_data_Anonymous_2");
 
             CHECK(declaration.member_names[0] == "v1");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
             CHECK(declaration.member_bit_fields[0].has_value() == false);
 
             CHECK(declaration.member_names[1] == "v2");
-            CHECK(declaration.member_types[1] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[1] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
             CHECK(declaration.member_bit_fields[1].has_value() == false);
         }
 
         {
-            h::Union_declaration const& declaration = header_module.internal_declarations.union_declarations[1];
+            iris::Union_declaration const& declaration = header_module.internal_declarations.union_declarations[1];
             CHECK(declaration.name == "_c_My_data_Anonymous_3");
 
             CHECK(declaration.member_names[0] == "a");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
 
             CHECK(declaration.member_names[1] == "b");
-            CHECK(declaration.member_types[1] == h::create_fundamental_type_type_reference(h::Fundamental_type::Float64));
+            CHECK(declaration.member_types[1] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float64));
 
             CHECK(declaration.member_names[2] == "c");
-            CHECK(declaration.member_types[2] == h::create_fundamental_type_type_reference(h::Fundamental_type::Float32));
+            CHECK(declaration.member_types[2] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float32));
         }
 
         {
-            h::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[1];
+            iris::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[1];
             CHECK(declaration.name == "_c_My_data_Anonymous_4");
 
             CHECK(declaration.member_names[0] == "v1");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
             CHECK(declaration.member_bit_fields[0].has_value() == false);
 
             CHECK(declaration.member_names[1] == "v2");
-            CHECK(declaration.member_types[1] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[1] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
             CHECK(declaration.member_bit_fields[1].has_value() == false);
         }
     }
@@ -930,85 +930,85 @@ union My_data
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.My_data", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Union_declaration const& declaration = header_module.export_declarations.union_declarations[0];
+            iris::Union_declaration const& declaration = header_module.export_declarations.union_declarations[0];
             CHECK(declaration.name == "My_data");
 
             CHECK(declaration.member_names[0] == "type");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
 
             CHECK(declaration.member_names[1] == "anonymous_0");
-            CHECK(declaration.member_types[1] == h::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_1"));
+            CHECK(declaration.member_types[1] == iris::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_1"));
 
             CHECK(declaration.member_names[2] == "anonymous_1");
-            CHECK(declaration.member_types[2] == h::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_2"));
+            CHECK(declaration.member_types[2] == iris::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_2"));
 
             CHECK(declaration.member_names[3] == "member_1");
-            CHECK(declaration.member_types[3] == h::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_3"));
+            CHECK(declaration.member_types[3] == iris::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_3"));
 
             CHECK(declaration.member_names[4] == "member_2");
-            CHECK(declaration.member_types[4] == h::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_4"));
+            CHECK(declaration.member_types[4] == iris::create_custom_type_reference("c.My_data", "_c_My_data_Anonymous_4"));
         }
 
         {
-            h::Union_declaration const& declaration = header_module.internal_declarations.union_declarations[0];
+            iris::Union_declaration const& declaration = header_module.internal_declarations.union_declarations[0];
             CHECK(declaration.name == "_c_My_data_Anonymous_1");
 
             CHECK(declaration.member_names[0] == "x");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
 
             CHECK(declaration.member_names[1] == "y");
-            CHECK(declaration.member_types[1] == h::create_fundamental_type_type_reference(h::Fundamental_type::Float64));
+            CHECK(declaration.member_types[1] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float64));
 
             CHECK(declaration.member_names[2] == "z");
-            CHECK(declaration.member_types[2] == h::create_fundamental_type_type_reference(h::Fundamental_type::Float32));
+            CHECK(declaration.member_types[2] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float32));
         }
 
         {
-            h::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[0];
+            iris::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[0];
             CHECK(declaration.name == "_c_My_data_Anonymous_2");
 
             CHECK(declaration.member_names[0] == "v1");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
             CHECK(declaration.member_bit_fields[0].has_value() == false);
 
             CHECK(declaration.member_names[1] == "v2");
-            CHECK(declaration.member_types[1] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[1] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
             CHECK(declaration.member_bit_fields[1].has_value() == false);
         }
 
         {
-            h::Union_declaration const& declaration = header_module.internal_declarations.union_declarations[1];
+            iris::Union_declaration const& declaration = header_module.internal_declarations.union_declarations[1];
             CHECK(declaration.name == "_c_My_data_Anonymous_3");
 
             CHECK(declaration.member_names[0] == "a");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
 
             CHECK(declaration.member_names[1] == "b");
-            CHECK(declaration.member_types[1] == h::create_fundamental_type_type_reference(h::Fundamental_type::Float64));
+            CHECK(declaration.member_types[1] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float64));
 
             CHECK(declaration.member_names[2] == "c");
-            CHECK(declaration.member_types[2] == h::create_fundamental_type_type_reference(h::Fundamental_type::Float32));
+            CHECK(declaration.member_types[2] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float32));
         }
 
         {
-            h::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[1];
+            iris::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[1];
             CHECK(declaration.name == "_c_My_data_Anonymous_4");
 
             CHECK(declaration.member_names[0] == "v1");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
             CHECK(declaration.member_bit_fields[0].has_value() == false);
 
             CHECK(declaration.member_names[1] == "v2");
-            CHECK(declaration.member_types[1] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
+            CHECK(declaration.member_types[1] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
             CHECK(declaration.member_bit_fields[1].has_value() == false);
         }
     }
@@ -1034,22 +1034,22 @@ struct My_data
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.My_data", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         REQUIRE(header_module.internal_declarations.struct_declarations.size() == 1);
         REQUIRE(header_module.internal_declarations.union_declarations.size() == 1);
 
         {
-            h::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[0];
+            iris::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[0];
             CHECK(declaration.name == "_c_My_data_Anonymous_2");
         }
 
         {
-            h::Union_declaration const& declaration = header_module.internal_declarations.union_declarations[0];
+            iris::Union_declaration const& declaration = header_module.internal_declarations.union_declarations[0];
             CHECK(declaration.name == "_c_My_data_Anonymous_1");
         }
     }
@@ -1072,51 +1072,51 @@ Sint32 my_global_2 = 0;
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.My_data", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[0];
+            iris::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[0];
             CHECK(declaration.name == "my_global_0");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.global_type == h::Global_variable_type::Constant);
+            CHECK(declaration.global_type == iris::Global_variable_type::Constant);
             
-            CHECK(declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::Float32));
+            CHECK(declaration.type == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float32));
             REQUIRE(declaration.type.has_value());
-            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "3.500000") }));
+            CHECK(declaration.initial_value == iris::create_statement({ iris::create_constant_expression(*declaration.type, "3.500000") }));
 
-            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 5, 12, 5, 13));
+            CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 5, 12, 5, 13));
         }
 
         {
-            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[1];
+            iris::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[1];
             CHECK(declaration.name == "my_global_1");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.global_type == h::Global_variable_type::Mutable);
+            CHECK(declaration.global_type == iris::Global_variable_type::Mutable);
             
-            CHECK(declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::Float32));
+            CHECK(declaration.type == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float32));
             REQUIRE(declaration.type.has_value());
-            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "0.000000") }));
+            CHECK(declaration.initial_value == iris::create_statement({ iris::create_constant_expression(*declaration.type, "0.000000") }));
 
-            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 6, 7, 6, 8));
+            CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 6, 7, 6, 8));
         }
 
         {
-            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[2];
+            iris::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[2];
             CHECK(declaration.name == "my_global_2");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.global_type == h::Global_variable_type::Mutable);
+            CHECK(declaration.global_type == iris::Global_variable_type::Mutable);
             
             CHECK(declaration.type == create_custom_type_reference("c.My_data", "Sint32"));
             REQUIRE(declaration.type.has_value());
-            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(h::create_custom_type_reference("c.My_data", "Sint32"), "0") }));
+            CHECK(declaration.initial_value == iris::create_statement({ iris::create_constant_expression(iris::create_custom_type_reference("c.My_data", "Sint32"), "0") }));
 
-            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 9, 8, 9, 9));
+            CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 9, 8, 9, 9));
         }
     }
 
@@ -1138,77 +1138,77 @@ Sint32 my_global_2 = 0;
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.My_data", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[0];
+            iris::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[0];
             CHECK(declaration.name == "MY_INT");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.global_type == h::Global_variable_type::Macro);
+            CHECK(declaration.global_type == iris::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
-            CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
-            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "10") }));
+            CHECK(*declaration.type == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
+            CHECK(declaration.initial_value == iris::create_statement({ iris::create_constant_expression(*declaration.type, "10") }));
 
-            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 2, 9, 2, 10));
+            CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 2, 9, 2, 10));
         }
 
         {
-            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[1];
+            iris::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[1];
             CHECK(declaration.name == "MY_FLOAT");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.global_type == h::Global_variable_type::Macro);
+            CHECK(declaration.global_type == iris::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
-            CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::Float32));
-            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "3.500000") }));
+            CHECK(*declaration.type == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float32));
+            CHECK(declaration.initial_value == iris::create_statement({ iris::create_constant_expression(*declaration.type, "3.500000") }));
 
-            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 4, 9, 4, 10));
+            CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 4, 9, 4, 10));
         }
 
         {
-            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[2];
+            iris::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[2];
             CHECK(declaration.name == "MY_DOUBLE");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.global_type == h::Global_variable_type::Macro);
+            CHECK(declaration.global_type == iris::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
-            CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::Float64));
-            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "3.500000") }));
+            CHECK(*declaration.type == iris::create_fundamental_type_type_reference(iris::Fundamental_type::Float64));
+            CHECK(declaration.initial_value == iris::create_statement({ iris::create_constant_expression(*declaration.type, "3.500000") }));
 
-            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 5, 9, 5, 10));
+            CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 5, 9, 5, 10));
         }
 
         {
-            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[3];
+            iris::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[3];
             CHECK(declaration.name == "MY_STRING");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.global_type == h::Global_variable_type::Macro);
+            CHECK(declaration.global_type == iris::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
-            CHECK(*declaration.type == h::create_c_string_type_reference(true));
-            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "a string") }));
+            CHECK(*declaration.type == iris::create_c_string_type_reference(true));
+            CHECK(declaration.initial_value == iris::create_statement({ iris::create_constant_expression(*declaration.type, "a string") }));
 
-            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 6, 9, 6, 10));
+            CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 6, 9, 6, 10));
         }
 
         {
-            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[4];
+            iris::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[4];
             CHECK(declaration.name == "MY_UINT64");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.global_type == h::Global_variable_type::Macro);
+            CHECK(declaration.global_type == iris::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
-            CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::C_ulonglong));
-            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "20") }));
+            CHECK(*declaration.type == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_ulonglong));
+            CHECK(declaration.initial_value == iris::create_statement({ iris::create_constant_expression(*declaration.type, "20") }));
 
-            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 9, 9, 9, 10));
+            CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 9, 9, 9, 10));
         }
     }
 
@@ -1223,38 +1223,38 @@ const int my_global = 2;
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.My_data", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[0];
+            iris::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[0];
             CHECK(declaration.name == "MY_VAR");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.global_type == h::Global_variable_type::Macro);
+            CHECK(declaration.global_type == iris::Global_variable_type::Macro);
             
             REQUIRE(declaration.type.has_value());
-            CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
-            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "1") }));
+            CHECK(*declaration.type == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
+            CHECK(declaration.initial_value == iris::create_statement({ iris::create_constant_expression(*declaration.type, "1") }));
 
-            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 2, 18, 2, 19));
+            CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 2, 18, 2, 19));
         }
 
         {
-            h::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[1];
+            iris::Global_variable_declaration const& declaration = header_module.export_declarations.global_variable_declarations[1];
             CHECK(declaration.name == "my_global");
             CHECK(declaration.name == declaration.unique_name.value());
-            CHECK(declaration.global_type == h::Global_variable_type::Constant);
+            CHECK(declaration.global_type == iris::Global_variable_type::Constant);
             
             REQUIRE(declaration.type.has_value());
-            CHECK(*declaration.type == h::create_fundamental_type_type_reference(h::Fundamental_type::C_int));
-            CHECK(declaration.initial_value == h::create_statement({ h::create_constant_expression(*declaration.type, "2") }));
+            CHECK(*declaration.type == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int));
+            CHECK(declaration.initial_value == iris::create_statement({ iris::create_constant_expression(*declaration.type, "2") }));
 
-            CHECK(*declaration.source_location == h::create_source_range_location(header_file_path, 3, 11, 3, 12));
+            CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 3, 11, 3, 12));
         }
     }
 
@@ -1284,16 +1284,16 @@ int add(int first, int second)
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.comments", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.comments", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Function_declaration const& declaration = header_module.export_declarations.function_declarations[0];
+            iris::Function_declaration const& declaration = header_module.export_declarations.function_declarations[0];
             CHECK(declaration.name == "add");
             CHECK(declaration.name == declaration.unique_name.value());
             
@@ -1336,29 +1336,29 @@ struct MyVector2i
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "vector2i.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
         std::array<std::pmr::string, 1> const public_prefixes
         {
             "PRE_",
         };
-        h::c::Options const options
+        iris::c::Options const options
         {
             .public_prefixes = public_prefixes,
         };
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.vector2i", header_file_path, options);
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.vector2i", header_file_path, options);
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         REQUIRE(header_module.export_declarations.struct_declarations.size() == 1);
         {
-            h::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
+            iris::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
             CHECK(declaration.name == "PRE_Vector2i");
         }
 
         REQUIRE(header_module.internal_declarations.struct_declarations.size() == 1);
         {
-            h::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[0];
+            iris::Struct_declaration const& declaration = header_module.internal_declarations.struct_declarations[0];
             CHECK(declaration.name == "MyVector2i");
         }
     }
@@ -1383,30 +1383,30 @@ struct MyNestedVector
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "vector2i.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
         std::array<std::pmr::string, 1> const remove_prefixes
         {
             "PRE_",
         };
-        h::c::Options const options
+        iris::c::Options const options
         {
             .remove_prefixes = remove_prefixes,
         };
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.vector2i", header_file_path, options);
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.vector2i", header_file_path, options);
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         REQUIRE(header_module.export_declarations.struct_declarations.size() == 2);
         
         {
-            h::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
+            iris::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
             CHECK(declaration.name == "Vector2i");
             CHECK(*declaration.unique_name == "PRE_Vector2i");
         }
 
         {
-            h::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[1];
+            iris::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[1];
             CHECK(declaration.name == "MyNestedVector");
             CHECK(*declaration.unique_name == "MyNestedVector");
 
@@ -1427,28 +1427,28 @@ typedef int(*function_pointer_type)(int a, int b);
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "function_pointer_type.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.function_pointer_type", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.function_pointer_type", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         {
-            h::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[0];
+            iris::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[0];
             CHECK(declaration.name == "function_pointer_type");
 
             REQUIRE(declaration.type.size() == 1);
 
-            h::Type_reference const c_int_type = h::create_fundamental_type_type_reference(h::Fundamental_type::C_int);
+            iris::Type_reference const c_int_type = iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int);
 
-            h::Function_type const expected_function_type
+            iris::Function_type const expected_function_type
             {
                 .input_parameter_types = {c_int_type, c_int_type},
                 .output_parameter_types = {c_int_type},
                 .is_variadic = false,
             };
             
-            h::Type_reference const expected_function_pointer_type = h::create_function_type_type_reference(
+            iris::Type_reference const expected_function_pointer_type = iris::create_function_type_type_reference(
                 expected_function_type,
                 {"a", "b"},
                 {"result"}
@@ -1475,16 +1475,16 @@ struct My_data
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.My_data", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
+            iris::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
             CHECK(declaration.name == "My_data");
 
             REQUIRE(declaration.member_names.size() == 5);
@@ -1492,23 +1492,23 @@ struct My_data
             REQUIRE(declaration.member_bit_fields.size() == 5);
 
             CHECK(declaration.member_names[0] == "a");
-            CHECK(declaration.member_types[0] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_uint));
+            CHECK(declaration.member_types[0] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_uint));
             CHECK(declaration.member_bit_fields[0] == 24);
 
             CHECK(declaration.member_names[1] == "b");
-            CHECK(declaration.member_types[1] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_uint));
+            CHECK(declaration.member_types[1] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_uint));
             CHECK(declaration.member_bit_fields[1] == 8);
 
             CHECK(declaration.member_names[2] == "c");
-            CHECK(declaration.member_types[2] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_uint));
+            CHECK(declaration.member_types[2] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_uint));
             CHECK(declaration.member_bit_fields[2] == 1);
 
             CHECK(declaration.member_names[3] == "d");
-            CHECK(declaration.member_types[3] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_uint));
+            CHECK(declaration.member_types[3] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_uint));
             CHECK(declaration.member_bit_fields[3] == 20);
 
             CHECK(declaration.member_names[4] == "e");
-            CHECK(declaration.member_types[4] == h::create_fundamental_type_type_reference(h::Fundamental_type::C_uint));
+            CHECK(declaration.member_types[4] == iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_uint));
             CHECK(declaration.member_bit_fields[4] == 11);
         }
     }
@@ -1532,11 +1532,11 @@ DEFINE_HANDLE(My_macro_type)
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.My_data", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
@@ -1548,49 +1548,49 @@ DEFINE_HANDLE(My_macro_type)
         REQUIRE(header_module.export_declarations.forward_declarations.size() == 2);
 
         {
-            h::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[0];
+            iris::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[0];
             CHECK(declaration.name == "My_opaque_type");
 
             REQUIRE(declaration.type.size() == 1);
-            CHECK(declaration.type[0] == h::create_pointer_type_type_reference({h::create_custom_type_reference("c.My_data", "My_opaque_type_t")}, true));
+            CHECK(declaration.type[0] == iris::create_pointer_type_type_reference({iris::create_custom_type_reference("c.My_data", "My_opaque_type_t")}, true));
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 2, 34, 2, 35));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 2, 34, 2, 35));
         }
 
         {
-            h::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[1];
+            iris::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[1];
             CHECK(declaration.name == "My_non_opaque_type_alias");
 
             REQUIRE(declaration.type.size() == 1);
-            CHECK(declaration.type[0] == h::create_pointer_type_type_reference({h::create_custom_type_reference("c.My_data", "My_non_opaque_type")}, false));
+            CHECK(declaration.type[0] == iris::create_pointer_type_type_reference({iris::create_custom_type_reference("c.My_data", "My_non_opaque_type")}, false));
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 7, 35, 7, 36));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 7, 35, 7, 36));
         }
 
         {
-            h::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[2];
+            iris::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[2];
             CHECK(declaration.name == "My_macro_type");
 
             REQUIRE(declaration.type.size() == 1);
-            CHECK(declaration.type[0] == h::create_pointer_type_type_reference({h::create_custom_type_reference("c.My_data", "My_macro_type_t")}, true));
+            CHECK(declaration.type[0] == iris::create_pointer_type_type_reference({iris::create_custom_type_reference("c.My_data", "My_macro_type_t")}, true));
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 10, 15, 10, 16));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 10, 15, 10, 16));
         }
 
         {
-            h::Forward_declaration const& declaration = header_module.export_declarations.forward_declarations[0];
+            iris::Forward_declaration const& declaration = header_module.export_declarations.forward_declarations[0];
             CHECK(declaration.name == "My_opaque_type_t");
             CHECK(declaration.unique_name == "My_opaque_type_t");
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 2, 16, 2, 17));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 2, 16, 2, 17));
         }
 
         {
-            h::Forward_declaration const& declaration = header_module.export_declarations.forward_declarations[1];
+            iris::Forward_declaration const& declaration = header_module.export_declarations.forward_declarations[1];
             CHECK(declaration.name == "My_macro_type_t");
             CHECK(declaration.unique_name == "My_macro_type_t");
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 10, 1, 10, 2));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 10, 1, 10, 2));
         }
     }
 
@@ -1609,7 +1609,7 @@ struct My_struct {
 )";
 
         std::filesystem::path const dependency_file_path = root_directory_path / "Dependency.h";
-        h::common::write_to_file(dependency_file_path, dependency_content);
+        iris::common::write_to_file(dependency_file_path, dependency_content);
 
         std::string const header_content = R"(
 #include "Dependency.h"
@@ -1618,11 +1618,11 @@ struct My_struct create_my_struct();
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.My_data", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.My_data", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
@@ -1648,21 +1648,21 @@ Vector2i add(Vector2i lhs, Vector2i rhs);
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "vector2i.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.vector2i", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.vector2i", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Function_declaration const& declaration = header_module.export_declarations.function_declarations[0];
+            iris::Function_declaration const& declaration = header_module.export_declarations.function_declarations[0];
             CHECK(declaration.name == "add");
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 8, 10, 8, 11));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 8, 10, 8, 11));
 
-            std::pmr::vector<h::Source_position> expected_input_parameter_source_positions
+            std::pmr::vector<iris::Source_position> expected_input_parameter_source_positions
             {
                 {.line = 8, .column = 23},
                 {.line = 8, .column = 37},
@@ -1670,7 +1670,7 @@ Vector2i add(Vector2i lhs, Vector2i rhs);
 
             CHECK(declaration.input_parameter_source_positions == expected_input_parameter_source_positions);
 
-            std::pmr::vector<h::Source_position> expected_output_parameter_source_positions
+            std::pmr::vector<iris::Source_position> expected_output_parameter_source_positions
             {
                 {.line = 8, .column = 1},
             };
@@ -1695,21 +1695,21 @@ Vector2i add(Vector2i lhs, Vector2i rhs);
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "vector2i.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.vector2i", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.vector2i", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
+            iris::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
             CHECK(declaration.name == "Vector2i");
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 2, 8, 2, 9));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 2, 8, 2, 9));
 
-            std::pmr::vector<h::Source_position> expected_member_source_positions
+            std::pmr::vector<iris::Source_position> expected_member_source_positions
             {
                 {.line = 4, .column = 9},
                 {.line = 5, .column = 9},
@@ -1733,21 +1733,21 @@ union Value
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "value.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.value", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.value", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Union_declaration const& declaration = header_module.export_declarations.union_declarations[0];
+            iris::Union_declaration const& declaration = header_module.export_declarations.union_declarations[0];
             CHECK(declaration.name == "Value");
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 2, 7, 2, 8));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 2, 7, 2, 8));
 
-            std::pmr::vector<h::Source_position> expected_member_source_positions
+            std::pmr::vector<iris::Source_position> expected_member_source_positions
             {
                 {.line = 4, .column = 9},
                 {.line = 5, .column = 11},
@@ -1771,19 +1771,19 @@ enum My_enum
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "my_enum.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.my_enum", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.my_enum", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Enum_declaration const& declaration = header_module.export_declarations.enum_declarations[0];
+            iris::Enum_declaration const& declaration = header_module.export_declarations.enum_declarations[0];
             CHECK(declaration.name == "My_enum");
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 2, 6, 2, 7));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 2, 6, 2, 7));
         }
     }
 
@@ -1798,26 +1798,26 @@ typedef My_int My_alias;
 )";
 
         std::filesystem::path const header_file_path = root_directory_path / "alias.h";
-        h::common::write_to_file(header_file_path, header_content);
+        iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<h::Module> const header_module_optional = h::c::import_header("c.alias", header_file_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.alias", header_file_path, {});
         REQUIRE(header_module_optional.has_value());
-        h::Module const& header_module = header_module_optional.value();
+        iris::Module const& header_module = header_module_optional.value();
 
         CHECK(header_module.source_file_path == header_file_path);
 
         {
-            h::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[0];
+            iris::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[0];
             CHECK(declaration.name == "My_int");
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 2, 13, 2, 14));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 2, 13, 2, 14));
         }
 
         {
-            h::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[1];
+            iris::Alias_type_declaration const& declaration = header_module.export_declarations.alias_type_declarations[1];
             CHECK(declaration.name == "My_alias");
 
-            CHECK(declaration.source_location == h::create_source_range_location(header_file_path, 3, 16, 3, 17));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 3, 16, 3, 17));
         }
     }
 }

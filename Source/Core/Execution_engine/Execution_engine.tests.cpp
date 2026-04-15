@@ -1,8 +1,8 @@
 #include <catch2/catch_all.hpp>
 
-import h.core.execution_engine;
+import iris.core.execution_engine;
 
-namespace h
+namespace iris
 {
 
 }

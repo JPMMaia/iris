@@ -1,10 +1,10 @@
-export module h.core.execution_engine;
+export module iris.core.execution_engine;
 
 import std;
 
-import h.core;
+import iris.core;
 
-namespace h::execution_engine
+namespace iris::execution_engine
 {
     export struct Value_storage
     {

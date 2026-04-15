@@ -35,23 +35,23 @@ Use the #askQuestions tool to validate the changes with the user.
 
 5. Core helpers
 
-Check if [h.core.types](../../../Source/Core/Types.cppm), [h.core.declarations](../../../Source/Core/Declarations.cppm), and [h.core.hash](../../../Source/Core/Hash.cpp) need to be updated.
+Check if [iris.core.types](../../../Source/Core/Types.cppm), [iris.core.declarations](../../../Source/Core/Declarations.cppm), and [iris.core.hash](../../../Source/Core/Hash.cpp) need to be updated.
 If so, and after edits, ensure that it builds correctly.
 Use the #askQuestions tool to validate the changes with the user.
 
 6. Compiler changes
 
 Use the [compiler](../compiler/SKILL.md) to make changes if needed.
-Check if [h.compiler.clang_code_generation](../../../Source/Compiler/Clang_code_generation.cpp) needs to be updated.
-Check if we need to update [h.compiler.expressions](../../../Source/Compiler/Expressions.cpp).
+Check if [iris.compiler.clang_code_generation](../../../Source/Compiler/Clang_code_generation.cpp) needs to be updated.
+Check if we need to update [iris.compiler.expressions](../../../Source/Compiler/Expressions.cpp).
 Check if we need to update any of [passes](../../../Source/Compiler/passes/).
-Check if we need to update `get_expression_type_info` in [h.compiler.analysis](../../../Source/Compiler/Analysis.cpp).
+Check if we need to update `get_expression_type_info` in [iris.compiler.analysis](../../../Source/Compiler/Analysis.cpp).
 After all this, build and test.
 Use the #askQuestions tool to validate the changes with the user.
 
 7. Debug Info
 
-If debug info changes are needed check [h.compiler.types](../../../Source/Compiler/Types.cpp) and the [natvis visualizers](../../../share/iris/visualizers).
+If debug info changes are needed check [iris.compiler.types](../../../Source/Compiler/Types.cpp) and the [natvis visualizers](../../../share/iris/visualizers).
 If natvis is added, add the natvis linker flag in [Linker_coff.cpp](../../../Source/Compiler/Linker_coff.cpp).
 After all this, build and test.
 Use the #askQuestions tool to validate the changes with the user.

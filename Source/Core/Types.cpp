@@ -2,20 +2,20 @@ module;
 
 #include <charconv>
 
-module h.core.types;
+module iris.core.types;
 
 import std;
 
-import h.common;
-import h.core;
+import iris.common;
+import iris.core;
 
-namespace h
+namespace iris
 {
     Type_reference create_array_slice_type_reference(std::pmr::vector<Type_reference> element_type, bool const is_mutable)
     {
         return
         {
-            .data = h::Array_slice_type
+            .data = iris::Array_slice_type
             {
                 .element_type = std::move(element_type),
                 .is_mutable = is_mutable,
@@ -211,7 +211,7 @@ namespace h
             );
 
             if (location == core_module.dependencies.alias_imports.end())
-                h::common::print_message_and_exit(std::format("Could not find import alias '{}' in module '{}'", type.module_reference.name, core_module.name));
+                iris::common::print_message_and_exit(std::format("Could not find import alias '{}' in module '{}'", type.module_reference.name, core_module.name));
 
             type.module_reference.name = location->module_name;
         }
@@ -255,7 +255,7 @@ namespace h
     {
         return Type_reference
         {
-            .data = h::Function_pointer_type
+            .data = iris::Function_pointer_type
             {
                 .type = function_type,
                 .input_parameter_names = std::move(input_parameter_names),
@@ -617,37 +617,37 @@ namespace h
 
     std::optional<std::string_view> get_type_module_name(Type_reference const& type)
     {
-        if (std::holds_alternative<h::Custom_type_reference>(type.data))
+        if (std::holds_alternative<iris::Custom_type_reference>(type.data))
         {
-            h::Custom_type_reference const& data = std::get<h::Custom_type_reference>(type.data);
+            iris::Custom_type_reference const& data = std::get<iris::Custom_type_reference>(type.data);
             return data.module_reference.name;
         }
-        else if (std::holds_alternative<h::Type_instance>(type.data))
+        else if (std::holds_alternative<iris::Type_instance>(type.data))
         {
-            h::Type_instance const& data = std::get<h::Type_instance>(type.data);
+            iris::Type_instance const& data = std::get<iris::Type_instance>(type.data);
             return data.type_constructor.module_reference.name;
         }
 
         return std::nullopt;
     }
 
-    h::Struct_declaration create_array_slice_type_struct_declaration(std::pmr::vector<Type_reference> const& element_type)
+    iris::Struct_declaration create_array_slice_type_struct_declaration(std::pmr::vector<Type_reference> const& element_type)
     {
-        h::Type_reference const uint64_type
+        iris::Type_reference const uint64_type
         {
-            .data = h::Integer_type
+            .data = iris::Integer_type
             {
                 .number_of_bits = 64,
                 .is_signed = false
             }
         };
 
-        return h::Struct_declaration
+        return iris::Struct_declaration
         {
             .name = "Generic_array_slice",
             .member_types = {
-                h::create_pointer_type_type_reference(element_type, false),
-                h::create_integer_type_type_reference(64, false)
+                iris::create_pointer_type_type_reference(element_type, false),
+                iris::create_integer_type_type_reference(64, false)
             },
             .member_names = {
                 "data",
@@ -658,15 +658,15 @@ namespace h
                 std::nullopt
             },
             .member_default_values = {
-                h::Statement{ 
+                iris::Statement{ 
                     .expressions = {
-                        h::Expression{ .data = h::Null_pointer_expression{} }
+                        iris::Expression{ .data = iris::Null_pointer_expression{} }
                     }
                 },
-                h::Statement{
+                iris::Statement{
                     .expressions = {
-                        h::Expression{
-                            .data = h::Constant_expression {
+                        iris::Expression{
+                            .data = iris::Constant_expression {
                                 .type = uint64_type,
                                 .data = "0"
                             }

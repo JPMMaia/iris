@@ -1,17 +1,17 @@
-export module h.core.declarations;
+export module iris.core.declarations;
 
 import std;
 
-import h.core;
-import h.core.hash;
-import h.core.string_hash;
+import iris.core;
+import iris.core.hash;
+import iris.core.string_hash;
 
-namespace h
+namespace iris
 {
     export struct Function
     {
-        h::Function_declaration const* declaration;
-        h::Function_definition const* definition;
+        iris::Function_declaration const* declaration;
+        iris::Function_definition const* definition;
     };
 
     export struct Declaration
@@ -70,15 +70,15 @@ namespace h
         Declaration_database& database,
         std::string_view const module_name,
         bool const are_export,
-        std::span<h::Alias_type_declaration const> alias_type_declarations,
-        std::span<h::Enum_declaration const> enum_declarations,
-        std::span<h::Forward_declaration const> forward_declarations,
-        std::span<h::Global_variable_declaration const> global_variable_declarations,
-        std::span<h::Struct_declaration const> struct_declarations,
-        std::span<h::Union_declaration const> union_declarations,
-        std::span<h::Function_declaration const> function_declarations,
-        std::span<h::Function_constructor const> function_constructors,
-        std::span<h::Type_constructor const> type_constructors
+        std::span<iris::Alias_type_declaration const> alias_type_declarations,
+        std::span<iris::Enum_declaration const> enum_declarations,
+        std::span<iris::Forward_declaration const> forward_declarations,
+        std::span<iris::Global_variable_declaration const> global_variable_declarations,
+        std::span<iris::Struct_declaration const> struct_declarations,
+        std::span<iris::Union_declaration const> union_declarations,
+        std::span<iris::Function_declaration const> function_declarations,
+        std::span<iris::Function_constructor const> function_constructors,
+        std::span<iris::Type_constructor const> type_constructors
     );
 
     export void add_declarations(
@@ -97,14 +97,14 @@ namespace h
         Declaration_database& database,
         std::string_view const module_name,
         bool const is_export,
-        h::Struct_declaration const& declaration
+        iris::Struct_declaration const& declaration
     );
 
     export void add_function_declaration(
         Declaration_database& database,
         std::string_view const module_name,
         bool const is_export,
-        h::Function_declaration const& declaration
+        iris::Function_declaration const& declaration
     );
 
     export void add_instance_type_struct_declaration(
@@ -137,20 +137,20 @@ namespace h
 
     export std::optional<Declaration> find_declaration_using_import_alias(
         Declaration_database const& database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::string_view const import_alias_name,
         std::string_view const declaration_name
     );
 
     export std::optional<Declaration> find_underlying_declaration_using_import_alias(
         Declaration_database const& database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::string_view const import_alias_name,
         std::string_view const declaration_name
     );
 
     export std::optional<Declaration> find_declaration_in_instanced_module_declarations(
-        h::Module_instanced_declarations const& declarations,
+        iris::Module_instanced_declarations const& declarations,
         std::string_view const module_name,
         std::string_view const declaration_name
     );
@@ -189,20 +189,20 @@ namespace h
         Type_instance const& type_instance
     );
 
-    export std::optional<h::Custom_type_reference> unmangle_type_instance_name(
+    export std::optional<iris::Custom_type_reference> unmangle_type_instance_name(
         std::string_view const name
     );
 
     export std::optional<Custom_type_reference> get_function_constructor_type_reference(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Expression const& expression,
         Statement const& statement
     );
 
     export Instance_call_key create_instance_call_key(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Instance_call_expression const& expression,
         Statement const& statement
     );
@@ -220,7 +220,7 @@ namespace h
 
     export Function_constructor const* get_function_constructor(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Expression const& expression,
         Statement const& statement
     );
@@ -235,7 +235,7 @@ namespace h
         Instance_call_key const& key
     );
 
-    export std::optional<h::Custom_type_reference> unmangle_instance_call_name(
+    export std::optional<iris::Custom_type_reference> unmangle_instance_call_name(
         std::string_view const name
     );
 
@@ -260,7 +260,7 @@ namespace h
         Declaration const& declaration
     );
 
-    export std::optional<h::Source_range_location> get_declaration_source_location(
+    export std::optional<iris::Source_range_location> get_declaration_source_location(
         Declaration const& declaration
     );
 

@@ -1,16 +1,16 @@
-export module h.compiler.expressions;
+export module iris.compiler.expressions;
 
 import std;
 import llvm;
 
-import h.core;
-import h.core.declarations;
-import h.compiler.clang_data;
-import h.compiler.debug_info;
-import h.compiler.instructions;
-import h.compiler.types;
+import iris.core;
+import iris.core.declarations;
+import iris.compiler.clang_data;
+import iris.compiler.debug_info;
+import iris.compiler.instructions;
+import iris.compiler.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export enum class Block_type
     {
@@ -138,8 +138,8 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         Expression_parameters const& expression_parameters
     );
 
@@ -148,8 +148,8 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         Expression_parameters const& expression_parameters
     );
 
@@ -158,9 +158,9 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_condition const& function_condition,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_condition const& function_condition,
         Condition_type const condition_type,
         Expression_parameters const& expression_parameters
     );

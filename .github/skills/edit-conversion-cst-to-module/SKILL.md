@@ -27,11 +27,11 @@ The Core Module representation is the data structure where we store all the info
 Build Parser Convertor tests:
 
 ```
-cmake --build build --target H_parser_tests
+cmake --build build --target Iris_parser_tests
 ```
 
 Run Parser Convertor tests:
 
 ```
-./build/Source/Parser/H_parser_tests
+./build/Source/Parser/Iris_parser_tests
 ```

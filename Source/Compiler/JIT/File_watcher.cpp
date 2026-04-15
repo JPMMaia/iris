@@ -4,14 +4,14 @@ module;
 
 #include <memory_resource>
 
-module h.compiler.file_watcher;
+module iris.compiler.file_watcher;
 
 import std;
 
-import h.compiler.artifact;
-import h.compiler.repository;
+import iris.compiler.artifact;
+import iris.compiler.repository;
 
-namespace h::compiler
+namespace iris::compiler
 {
     static std::pmr::vector<std::filesystem::path> find_artifact_directories_to_watch(
         Artifact const& artifact,

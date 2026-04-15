@@ -1,13 +1,13 @@
-export module h.compiler.recompile_module_layer;
+export module iris.compiler.recompile_module_layer;
 
 import std;
 import llvm;
 
-import h.core;
-import h.compiler;
-import h.compiler.core_module_layer;
+import iris.core;
+import iris.compiler;
+import iris.compiler.core_module_layer;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export class Recompile_module_layer
     {
@@ -15,7 +15,7 @@ namespace h::compiler
 
         Recompile_module_layer(
             llvm::orc::ExecutionSession& execution_session,
-            h::compiler::Core_module_layer& base_layer,
+            iris::compiler::Core_module_layer& base_layer,
             llvm::orc::LazyCallThroughManager& lazy_call_through_manager,
             llvm::orc::IndirectStubsManager& indirect_stubs_manager,
             llvm::orc::MangleAndInterner& mangle
@@ -33,7 +33,7 @@ namespace h::compiler
         ) final;
 
     private:
-        h::compiler::Core_module_layer& m_base_layer;
+        iris::compiler::Core_module_layer& m_base_layer;
         llvm::orc::ExecutionSession& m_execution_session;
         llvm::orc::LazyCallThroughManager& m_lazy_call_through_manager;
         llvm::orc::IndirectStubsManager& m_indirect_stubs_manager;

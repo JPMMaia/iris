@@ -53,7 +53,7 @@ suite("Should get inlay hints", () => {
 
 		const module_tooltip = new vscode.MarkdownString(
 			[
-				'```hlang',
+				'```iris',
 				'module c.complex',
 				'```'
 			].join("\n")
@@ -85,7 +85,7 @@ suite("Should get inlay hints", () => {
 
 		const lhs_tooltip = new vscode.MarkdownString(
 			[
-				'```hlang',
+				'```iris',
 				'lhs: Int32',
 				'```'
 			].join("\n")
@@ -93,7 +93,7 @@ suite("Should get inlay hints", () => {
 
 		const rhs_tooltip = new vscode.MarkdownString(
 			[
-				'```hlang',
+				'```iris',
 				'rhs: Int32',
 				'```'
 			].join("\n")

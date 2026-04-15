@@ -3,14 +3,14 @@ name: 'compiler'
 description: 'Describes the Compiler which takes care of making Core Module transformations and lowering a Core Module to LLVM IR.'
 ---
 
-The main compiler logic is located in `Source/Compiler/Compiler.cpp`. It lowers `h::Module` to `llvm::Module` and `h::Function_declaration` and `h::Function_definition` to `llvm::Function`s.
+The main compiler logic is located in `Source/Compiler/Compiler.cpp`. It lowers `iris::Module` to `llvm::Module` and `iris::Function_declaration` and `iris::Function_definition` to `llvm::Function`s.
 
-`Source/Compiler/Expressions.cpp` lowers `h::Statement` and `h::Expression` to LLVM instructions (`llvm::Value`).
+`Source/Compiler/Expressions.cpp` lowers `iris::Statement` and `iris::Expression` to LLVM instructions (`llvm::Value`).
 `Source/Compiler/Instructions.cpp` contains utility functions to create llvm instructions (e.g. alloca, load, memcpy).
 
 ## Core Module representation transformations
 
-Before we lower `h::Module` to `llvm::Module` we want to do some transformations on the `h::Module` such as reflection, instantiate new functions and types (from function constructors and type constructors) and also replace compile-time expressions. These passes should be called from `Source/Compiler/Compiler.cpp` and they are located in `Source/Compiler/passes`.
+Before we lower `iris::Module` to `llvm::Module` we want to do some transformations on the `iris::Module` such as reflection, instantiate new functions and types (from function constructors and type constructors) and also replace compile-time expressions. These passes should be called from `Source/Compiler/Compiler.cpp` and they are located in `Source/Compiler/passes`.
 
 ## C Platform ABI
 
@@ -22,13 +22,13 @@ The compiler tests are located in `Source/Compiler/Compiler.tests.cpp`. Each tes
 
 ## Building and running tests
 
-Run `cmake --build build --target H_compiler_tests` to build the tests.
-Run `build/Source/Compiler/H_compiler_tests.exe [LLVM_IR]` to run all LLVM-IR tests.
+Run `cmake --build build --target Iris_compiler_tests` to build the tests.
+Run `build/Source/Compiler/Iris_compiler_tests.exe [LLVM_IR]` to run all LLVM-IR tests.
 
 To update the IR of the tests so that the expected IR is replaced by the actual IR you can run:
 
 ```
-build/Tools/tests_result_replacer/H_Tools_Replace_tests_results.exe ${pwd}/build/Source/Compiler/H_compiler_tests.exe ${pwd}/Source/Compiler/Compiler.tests.cpp
+build/Tools/tests_result_replacer/Iris_Tools_Replace_tests_results.exe ${pwd}/build/Source/Compiler/Iris_compiler_tests.exe ${pwd}/Source/Compiler/Compiler.tests.cpp
 ```
 
 ## Editing the compiler or expressions

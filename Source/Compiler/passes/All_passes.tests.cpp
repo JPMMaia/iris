@@ -19,54 +19,54 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/Support/VirtualFileSystem.h>
 
-import h.compiler;
-import h.compiler.all_passes;
-import h.compiler.clang_code_generation;
-import h.compiler.clang_data;
-import h.compiler.pass_test_helpers;
-import h.core;
-import h.core.declarations;
-import h.core.formatter;
-import h.parser.convertor;
+import iris.compiler;
+import iris.compiler.all_passes;
+import iris.compiler.clang_code_generation;
+import iris.compiler.clang_data;
+import iris.compiler.pass_test_helpers;
+import iris.core;
+import iris.core.declarations;
+import iris.core.formatter;
+import iris.parser.convertor;
 
 #include <catch2/catch_test_macros.hpp>
 
 import std;
 
-namespace h::compiler
+namespace iris::compiler
 {
     struct All_passes_runtime_context
     {
-        h::compiler::LLVM_data llvm_data;
-        h::compiler::Clang_context clang_context;
+        iris::compiler::LLVM_data llvm_data;
+        iris::compiler::Clang_context clang_context;
     };
 
     static All_passes_runtime_context create_all_passes_runtime_context(
-        h::Module const& core_module,
-        std::span<h::Module const> const dependency_core_modules,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        std::span<iris::Module const> const dependency_core_modules,
+        iris::Declaration_database const& declaration_database
     )
     {
-        h::compiler::Compilation_options const options =
+        iris::compiler::Compilation_options const options =
         {
             .is_optimized = false,
             .debug = true,
         };
 
-        h::compiler::LLVM_data llvm_data = h::compiler::initialize_llvm(options);
+        iris::compiler::LLVM_data llvm_data = iris::compiler::initialize_llvm(options);
 
-        std::pmr::vector<h::Module const*> sorted_modules;
+        std::pmr::vector<iris::Module const*> sorted_modules;
         sorted_modules.reserve(dependency_core_modules.size() + 1);
 
-        for (h::Module const& dependency_module : dependency_core_modules)
+        for (iris::Module const& dependency_module : dependency_core_modules)
             sorted_modules.push_back(&dependency_module);
 
         sorted_modules.push_back(&core_module);
 
-        h::compiler::Clang_context clang_context = h::compiler::create_clang_context(
+        iris::compiler::Clang_context clang_context = iris::compiler::create_clang_context(
             *llvm_data.context,
             llvm_data.clang_data,
-            "Hl_clang_module"
+            "Iris_clang_module"
         );
 
         return All_passes_runtime_context
@@ -82,12 +82,12 @@ namespace h::compiler
         std::string_view const function_name
     )
     {
-        h::compiler::tests::Parsed_module_context context = h::compiler::tests::parse_module_context(input_text, input_dependencies_text);
+        iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input_text, input_dependencies_text);
 
-        h::Function_declaration* function_declaration = h::compiler::tests::find_mutable_function_declaration(context.core_module, function_name);
+        iris::Function_declaration* function_declaration = iris::compiler::tests::find_mutable_function_declaration(context.core_module, function_name);
         REQUIRE(function_declaration != nullptr);
 
-        h::Function_definition* function_definition = h::compiler::tests::find_mutable_function_definition(context.core_module, function_name);
+        iris::Function_definition* function_definition = iris::compiler::tests::find_mutable_function_definition(context.core_module, function_name);
         REQUIRE(function_definition != nullptr);
 
         All_passes_runtime_context runtime_context = create_all_passes_runtime_context(
@@ -116,7 +116,7 @@ namespace h::compiler
             parameters
         );
 
-        return h::compiler::tests::format_core_module_to_text(context.core_module);
+        return iris::compiler::tests::format_core_module_to_text(context.core_module);
     }
 
     TEST_CASE("Combines compile_time_pass and instantiate_pass", "[All_passes][Passes]")

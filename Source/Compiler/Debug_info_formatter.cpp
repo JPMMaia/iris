@@ -2,17 +2,17 @@ module;
 
 #include <assert.h>
 
-module h.compiler.debug_info_formatter;
+module iris.compiler.debug_info_formatter;
 
 import llvm;
 import std;
 
-import h.compiler.common;
-import h.compiler.types;
-import h.core;
-import h.core.declarations;
+import iris.compiler.common;
+import iris.compiler.types;
+import iris.core;
+import iris.core.declarations;
 
-namespace h::compiler
+namespace iris::compiler
 {
     namespace
     {
@@ -21,11 +21,11 @@ namespace h::compiler
             std::pmr::polymorphic_allocator<> const& allocator
         )
         {
-            if (name.starts_with("h::"))
+            if (name.starts_with("iris::"))
                 return std::pmr::string{ name, allocator };
 
             std::pmr::string output{ allocator };
-            output += "h::";
+            output += "iris::";
             output += name;
             return output;
         }
@@ -123,7 +123,7 @@ namespace h::compiler
         }
 
         std::pmr::string format_debug_integer_type_name_internal(
-            h::Integer_type const& type,
+            iris::Integer_type const& type,
             std::pmr::polymorphic_allocator<> const& output_allocator
         )
         {
@@ -138,8 +138,8 @@ namespace h::compiler
         }
 
         std::pmr::string format_debug_type_name_internal(
-            h::Module const& core_module,
-            h::Type_reference const& type_reference,
+            iris::Module const& core_module,
+            iris::Type_reference const& type_reference,
             Debug_type_database const& debug_type_database,
             std::pmr::polymorphic_allocator<> const& output_allocator,
             std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -298,8 +298,8 @@ namespace h::compiler
     }
 
     static std::pmr::vector<Soa_debug_member_info> get_soa_debug_member_infos(
-        h::Module const& core_module,
-        std::span<h::Type_reference const> const value_type,
+        iris::Module const& core_module,
+        std::span<iris::Type_reference const> const value_type,
         Debug_type_database const& debug_type_database
     )
     {
@@ -362,7 +362,7 @@ namespace h::compiler
     }
 
     std::pmr::string format_debug_primitive_type_name(
-        h::Fundamental_type const type,
+        iris::Fundamental_type const type,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
@@ -374,7 +374,7 @@ namespace h::compiler
     }
 
     std::pmr::string format_debug_primitive_type_name(
-        h::Integer_type const& type,
+        iris::Integer_type const& type,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
@@ -382,8 +382,8 @@ namespace h::compiler
     }
 
     std::pmr::string format_debug_type_name(
-        h::Module const& core_module,
-        h::Type_reference const& type_reference,
+        iris::Module const& core_module,
+        iris::Type_reference const& type_reference,
         Debug_type_database const& debug_type_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -399,8 +399,8 @@ namespace h::compiler
     }
 
     std::pmr::string create_soa_array_debug_type_name(
-        h::Module const& core_module,
-        h::Soa_array_type const& type,
+        iris::Module const& core_module,
+        iris::Soa_array_type const& type,
         Debug_type_database const& debug_type_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -417,7 +417,7 @@ namespace h::compiler
         {
             element_type_name = format_debug_type_name_internal(
                 core_module,
-                h::Type_reference{ .data = type.value_type[0].data },
+                iris::Type_reference{ .data = type.value_type[0].data },
                 debug_type_database,
                 output_allocator,
                 temporaries_allocator
@@ -435,8 +435,8 @@ namespace h::compiler
     }
 
     std::pmr::string create_soa_array_view_debug_type_name(
-        h::Module const& core_module,
-        h::Soa_array_view_type const& type,
+        iris::Module const& core_module,
+        iris::Soa_array_view_type const& type,
         Debug_type_database const& debug_type_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -453,7 +453,7 @@ namespace h::compiler
         {
             element_type_name = format_debug_type_name_internal(
                 core_module,
-                h::Type_reference{ .data = type.value_type[0].data },
+                iris::Type_reference{ .data = type.value_type[0].data },
                 debug_type_database,
                 output_allocator,
                 temporaries_allocator

@@ -1,6 +1,6 @@
 ---
 name: 'language-server'
-description: 'Describes the H Language Server and Language Client. Use this skill when you need to understand or make changes to the Language Server or Language Client.'
+description: 'Describes the Iris Language Server and Language Client. Use this skill when you need to understand or make changes to the Language Server or Language Client.'
 ---
 
 There are two components: the Language Server and the Language Client.
@@ -11,7 +11,7 @@ The Language Server code is located in `Source/Language_server`. It uses the Lan
 
 Components:
 - `Source/Language_server/Message_handler.cpp`: Handles LSP requests and notifications.
-- `Source/Language_server/Server.cpp`: Main logic. It reads the workspace for artifact and repository files that it can use to figure out dependencies between Core Modules. Parses H source files and caches them as Core Modules. Handles Text Document changes. Ties all components together.
+- `Source/Language_server/Server.cpp`: Main logic. It reads the workspace for artifact and repository files that it can use to figure out dependencies between Core Modules. Parses Iris source files and caches them as Core Modules. Handles Text Document changes. Ties all components together.
 - `Source/Language_server/Code_action.cpp`: Handles Code Action requests.
 - `Source/Language_server/Completion.cpp`: Handles Completion requests.
 - `Source/Language_server/Diagnostics.cpp`: Uses the Core Module Validation to create Diagnostic reports.
@@ -20,7 +20,7 @@ Components:
 
 ### Build the Language Server
 
-The Language Server is built using CMake. The CMake target is `H_language_server_app`.
+The Language Server is built using CMake. The CMake target is `Iris_language_server_app`.
 
 ## Language Client
 
@@ -43,10 +43,10 @@ Run the tests using PowerShell from the workspace root:
 
 ```powershell
 Enter-VsDevEnv
-cmake --build build --target H_language_server_app
+cmake --build build --target Iris_language_server_app
 cd Tools/vscode/iris-extension
 npm run compile
-$env:hlang_language_server = "${pwd}/../../../build/Source/Language_server/hlang_language_server.exe"
+$env:iris_language_server = "${pwd}/../../../build/Source/Language_server/iris_language_server.exe"
 npm run test
 ```
 

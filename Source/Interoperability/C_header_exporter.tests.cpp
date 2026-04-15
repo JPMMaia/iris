@@ -4,17 +4,17 @@
 #include <string>
 #include <string_view>
 
-import h.core;
-import h.core.declarations;
-import h.c_header_exporter;
-import h.json_serializer.operators;
-import h.parser.convertor;
+import iris.core;
+import iris.core.declarations;
+import iris.c_header_exporter;
+import iris.json_serializer.operators;
+import iris.parser.convertor;
 
-using h::json::operators::operator<<;
+using iris::json::operators::operator<<;
 
 #include <catch2/catch_all.hpp>
 
-namespace h::c
+namespace iris::c
 {
     static std::pmr::string get_module_namespace(
         std::string_view const core_module_name
@@ -64,24 +64,24 @@ namespace h::c
         std::string_view const expected_content
     )
     {
-        std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(source, std::nullopt, {}, {});
+        std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(source, std::nullopt, {}, {});
         REQUIRE(core_module.has_value());
 
-        std::pmr::unordered_map<std::pmr::string, h::Module> core_module_dependencies;
+        std::pmr::unordered_map<std::pmr::string, iris::Module> core_module_dependencies;
         core_module_dependencies.reserve(dependencies.size());
 
         for (std::pair<std::pmr::string const, std::string_view> const& dependency : dependencies)
         {
-            std::optional<h::Module> core_module_dependency = h::parser::parse_and_convert_to_module(dependency.second, std::nullopt, {}, {});
+            std::optional<iris::Module> core_module_dependency = iris::parser::parse_and_convert_to_module(dependency.second, std::nullopt, {}, {});
             REQUIRE(core_module_dependency.has_value());
 
             core_module_dependencies[dependency.first] = std::move(core_module_dependency.value());
         }
 
-        h::Declaration_database declaration_database = h::create_declaration_database();
-        for (std::pair<std::pmr::string const, h::Module> const& pair : core_module_dependencies)
-            h::add_declarations(declaration_database, pair.second);
-        h::add_declarations(declaration_database, core_module.value());
+        iris::Declaration_database declaration_database = iris::create_declaration_database();
+        for (std::pair<std::pmr::string const, iris::Module> const& pair : core_module_dependencies)
+            iris::add_declarations(declaration_database, pair.second);
+        iris::add_declarations(declaration_database, core_module.value());
 
         std::pmr::string const full_expected_content = create_expected_c_header_content(core_module->name, dependencies_c_file_paths, expected_content);
 
@@ -113,7 +113,7 @@ namespace h::c
         std::string_view const expected_content
     )
     {
-        std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(source, std::nullopt, {}, {});
+        std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(source, std::nullopt, {}, {});
         REQUIRE(core_module.has_value());
 
         std::pmr::string const full_expected_content = create_expected_cpp_header_content(core_module->name, c_header_file_path, expected_content);

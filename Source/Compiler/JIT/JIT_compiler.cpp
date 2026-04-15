@@ -2,19 +2,19 @@ module;
 
 #include <llvm/ExecutionEngine/Orc/LazyReexports.h>
 
-module h.compiler.jit_compiler;
+module iris.compiler.jit_compiler;
 
 import std;
 import llvm;
 
-import h.common;
-import h.common.filesystem;
-import h.compiler;
-import h.compiler.common;
-import h.compiler.core_module_layer;
-import h.compiler.recompile_module_layer;
+import iris.common;
+import iris.common.filesystem;
+import iris.compiler;
+import iris.compiler.common;
+import iris.compiler.core_module_layer;
+import iris.compiler.recompile_module_layer;
 
-namespace h::compiler
+namespace iris::compiler
 {
     JIT_data::~JIT_data()
     {
@@ -58,13 +58,13 @@ namespace h::compiler
         llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> llvm_jit_result = builder.create();
 
         if (llvm::Error error = llvm_jit_result.takeError())
-            h::common::print_message_and_exit(std::format("Error while creating LLJIT: {}", llvm::toString(std::move(error))));
+            iris::common::print_message_and_exit(std::format("Error while creating LLJIT: {}", llvm::toString(std::move(error))));
 
         std::unique_ptr<llvm::orc::LLJIT> llvm_jit = std::move(*llvm_jit_result);
 
         llvm::Expected<std::unique_ptr<llvm::orc::EPCIndirectionUtils>> epc_indirection_utils = llvm::orc::EPCIndirectionUtils::Create(llvm_jit->getExecutionSession());
         if (!epc_indirection_utils)
-            h::common::print_message_and_exit(std::format("Could not create EPC indirection utils: {}", llvm::toString(epc_indirection_utils.takeError())));
+            iris::common::print_message_and_exit(std::format("Could not create EPC indirection utils: {}", llvm::toString(epc_indirection_utils.takeError())));
 
         std::unique_ptr<llvm::orc::IndirectStubsManager> indirect_stubs_manager = epc_indirection_utils.get()->createIndirectStubsManager();
 
@@ -74,7 +74,7 @@ namespace h::compiler
             llvm::orc::ExecutorAddr()
         );
         if (!local_lazy_call_through_manager)
-            h::common::print_message_and_exit(std::format("Could not create local lazy call through manager: {}", llvm::toString(local_lazy_call_through_manager.takeError())));
+            iris::common::print_message_and_exit(std::format("Could not create local lazy call through manager: {}", llvm::toString(local_lazy_call_through_manager.takeError())));
 
         std::unique_ptr<llvm::orc::MangleAndInterner> mangle = std::make_unique<llvm::orc::MangleAndInterner>(llvm_jit->getExecutionSession(), llvm_jit->getDataLayout());
 
@@ -156,15 +156,15 @@ namespace h::compiler
         char const* const static_library_path
     )
     {
-        std::optional<std::filesystem::path> const path = h::common::search_file(static_library_path, jit_data.search_library_paths);
+        std::optional<std::filesystem::path> const path = iris::common::search_file(static_library_path, jit_data.search_library_paths);
         if (!path)
-            h::common::print_message_and_exit(std::format("Could not find '{}' in search library paths", static_library_path));
+            iris::common::print_message_and_exit(std::format("Could not find '{}' in search library paths", static_library_path));
 
         std::string const path_string = path->generic_string();
 
         llvm::Error error = jit_data.llvm_jit->linkStaticLibraryInto(jit_data.llvm_jit->getMainJITDylib(), path_string.c_str());
         if (error)
-            h::common::print_message_and_exit(std::format("Error while linking static library: {}", llvm::toString(std::move(error))));
+            iris::common::print_message_and_exit(std::format("Error while linking static library: {}", llvm::toString(std::move(error))));
     }
 
     void load_platform_dynamic_library(
@@ -174,7 +174,7 @@ namespace h::compiler
     {
         llvm::Expected<llvm::orc::JITDylib&> jit_dynamic_library = jit_data.llvm_jit->loadPlatformDynamicLibrary(dynamic_library_path);
         if (!jit_dynamic_library)
-            h::common::print_message_and_exit(std::format("Link error while loading dynamic library: {}", llvm::toString(jit_dynamic_library.takeError())));
+            iris::common::print_message_and_exit(std::format("Link error while loading dynamic library: {}", llvm::toString(jit_dynamic_library.takeError())));
     }
 
     std::optional<llvm::orc::ExecutorSymbolDef> get_function(
@@ -211,7 +211,7 @@ namespace h::compiler
     {
         llvm::Expected<llvm::orc::ExecutorAddr> function_address = jit_data.llvm_jit->lookup({ function_name.data(), function_name.size() });
         if (!function_address)
-            h::common::print_message_and_exit(std::format("Error while looking up function '{}': {}", function_name, llvm::toString(function_address.takeError())));
+            iris::common::print_message_and_exit(std::format("Error while looking up function '{}': {}", function_name, llvm::toString(function_address.takeError())));
 
         int(*function_pointer)() = function_address->toPtr<int(*)()>();
 
@@ -222,8 +222,8 @@ namespace h::compiler
     void run_jit(
         JIT_data& jit_data,
         LLVM_data& llvm_data,
-        std::span<h::Module> const core_modules,
-        std::span<h::Module const> const core_module_dependencies,
+        std::span<iris::Module> const core_modules,
+        std::span<iris::Module const> const core_module_dependencies,
         std::span<std::pmr::string const> const dynamic_libraries,
         std::span<std::pmr::string const> const static_libraries,
         std::string_view const entry_point

@@ -7,25 +7,25 @@ module;
 
 #include <lsp/types.h>
 
-export module h.language_server.core;
+export module iris.language_server.core;
 
-import h.core;
+import iris.core;
 
-namespace h::language_server
+namespace iris::language_server
 {
     export lsp::Position to_lsp_position(
-        h::Source_position const& input
+        iris::Source_position const& input
     );
 
     export lsp::Range to_lsp_range(
-        h::Source_range const& input
+        iris::Source_range const& input
     );
 
-    export h::Source_position to_source_position(
+    export iris::Source_position to_source_position(
         lsp::Position const& input
     );
 
-    export h::Source_range to_source_range(
+    export iris::Source_range to_source_range(
         lsp::Range const& input
     );
 

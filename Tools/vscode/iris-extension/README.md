@@ -1,1 +1,1 @@
-# H Editor vscode extension
+# Iris Editor vscode extension

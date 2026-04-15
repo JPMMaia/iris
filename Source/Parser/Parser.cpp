@@ -4,20 +4,20 @@ module;
 
 #include <tree_sitter/api.h>
 
-module h.parser.parser;
+module iris.parser.parser;
 
 import std;
 
-import h.common;
-import h.common.filesystem;
-import h.core;
+import iris.common;
+import iris.common.filesystem;
+import iris.core;
 
 extern "C"
 {
     TSLanguage const* tree_sitter_iris(void);
 }
 
-namespace h::parser
+namespace iris::parser
 {
     Parser create_parser()
     {
@@ -26,7 +26,7 @@ namespace h::parser
         TSParser* parser = ts_parser_new();
         bool const success = ts_parser_set_language(parser, language);
         if (!success)
-            h::common::print_message_and_exit("Failed to set tree sitter language!");
+            iris::common::print_message_and_exit("Failed to set tree sitter language!");
 
         return Parser
         {
@@ -131,7 +131,7 @@ namespace h::parser
     Parse_tree edit_tree(
         Parser const& parser,
         Parse_tree&& previous_parse_tree,
-        h::Source_range const range,
+        iris::Source_range const range,
         std::u8string_view const new_text
     )
     {

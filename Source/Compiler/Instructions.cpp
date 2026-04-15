@@ -1,11 +1,11 @@
-module h.compiler.instructions;
+module iris.compiler.instructions;
 
 import std;
 import llvm;
 
-import h.core.types;
+import iris.core.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
     llvm::AllocaInst* create_alloca_instruction(
         llvm::IRBuilder<>& llvm_builder,
@@ -189,7 +189,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::Value* const llvm_value,
-        std::optional<h::Type_reference> const& type
+        std::optional<iris::Type_reference> const& type
     )
     {
         return (type.has_value() && (is_bool(*type) || is_c_bool(*type))) ?

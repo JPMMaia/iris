@@ -2,16 +2,16 @@ module;
 
 #include <wtr/watcher.hpp>
 
-export module h.compiler.file_watcher;
+export module iris.compiler.file_watcher;
 
 import std;
 
-import h.compiler.artifact;
-import h.compiler.repository;
+import iris.compiler.artifact;
+import iris.compiler.repository;
 
 using namespace wtr::watcher;
 
-namespace h::compiler
+namespace iris::compiler
 {
     using Wtr_watcher_deleter = void(void*);
 

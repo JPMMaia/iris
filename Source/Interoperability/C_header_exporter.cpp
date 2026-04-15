@@ -1,20 +1,20 @@
-module h.c_header_exporter;
+module iris.c_header_exporter;
 
 import std;
 
-import h.core;
-import h.core.declarations;
-import h.core.formatter;
-import h.core.types;
+import iris.core;
+import iris.core.declarations;
+import iris.core.formatter;
+import iris.core.types;
 
-namespace h::c
+namespace iris::c
 {
     static bool contains_declaration(
-        std::span<h::Declaration const> const declarations,
-        h::Declaration const& declaration
+        std::span<iris::Declaration const> const declarations,
+        iris::Declaration const& declaration
     )
     {
-        for (h::Declaration const& element : declarations)
+        for (iris::Declaration const& element : declarations)
         {
             if (element.data == declaration.data)
                 return true;
@@ -24,38 +24,38 @@ namespace h::c
     }
 
     static void add_alias_type_declaration(
-        std::pmr::vector<h::Declaration>& sorted_declarations,
-        h::Module const& core_module,
-        h::Alias_type_declaration const& declaration
+        std::pmr::vector<iris::Declaration>& sorted_declarations,
+        iris::Module const& core_module,
+        iris::Alias_type_declaration const& declaration
     );
 
     static void add_struct_declaration(
-        std::pmr::vector<h::Declaration>& sorted_declarations,
-        h::Module const& core_module,
-        h::Struct_declaration const& declaration
+        std::pmr::vector<iris::Declaration>& sorted_declarations,
+        iris::Module const& core_module,
+        iris::Struct_declaration const& declaration
     );
 
     static void add_union_declaration(
-        std::pmr::vector<h::Declaration>& sorted_declarations,
-        h::Module const& core_module,
-        h::Union_declaration const& declaration
+        std::pmr::vector<iris::Declaration>& sorted_declarations,
+        iris::Module const& core_module,
+        iris::Union_declaration const& declaration
     );
 
     static void add_type_reference_declaration(
-        std::pmr::vector<h::Declaration>& sorted_declarations,
-        h::Module const& core_module,
-        h::Type_reference const& type_reference
+        std::pmr::vector<iris::Declaration>& sorted_declarations,
+        iris::Module const& core_module,
+        iris::Type_reference const& type_reference
     )
     {
-        if (std::holds_alternative<h::Constant_array_type>(type_reference.data))
+        if (std::holds_alternative<iris::Constant_array_type>(type_reference.data))
         {
-            h::Constant_array_type const& constant_array_type = std::get<h::Constant_array_type>(type_reference.data);
+            iris::Constant_array_type const& constant_array_type = std::get<iris::Constant_array_type>(type_reference.data);
             if (!constant_array_type.value_type.empty())
                 add_type_reference_declaration(sorted_declarations, core_module, constant_array_type.value_type[0]);
         }
-        else if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
+        else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
         {
-            h::Custom_type_reference const& custom_type_reference = std::get<h::Custom_type_reference>(type_reference.data);
+            iris::Custom_type_reference const& custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.data);
             if (custom_type_reference.module_reference.name == core_module.name)
             {
                 std::optional<Alias_type_declaration const*> const alias_type = find_alias_type_declaration(core_module, custom_type_reference.name);
@@ -80,110 +80,110 @@ namespace h::c
                 }
             }
         }
-        else if (std::holds_alternative<h::Function_pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Function_pointer_type>(type_reference.data))
         {
-            h::Function_pointer_type const& function_pointer_type = std::get<h::Function_pointer_type>(type_reference.data);
-            for (h::Type_reference const& type : function_pointer_type.type.input_parameter_types)
+            iris::Function_pointer_type const& function_pointer_type = std::get<iris::Function_pointer_type>(type_reference.data);
+            for (iris::Type_reference const& type : function_pointer_type.type.input_parameter_types)
                 add_type_reference_declaration(sorted_declarations, core_module, type);
-            for (h::Type_reference const& type : function_pointer_type.type.output_parameter_types)
+            for (iris::Type_reference const& type : function_pointer_type.type.output_parameter_types)
                 add_type_reference_declaration(sorted_declarations, core_module, type);
         }
     }
 
     static void add_alias_type_declaration(
-        std::pmr::vector<h::Declaration>& sorted_declarations,
-        h::Module const& core_module,
-        h::Alias_type_declaration const& declaration
+        std::pmr::vector<iris::Declaration>& sorted_declarations,
+        iris::Module const& core_module,
+        iris::Alias_type_declaration const& declaration
     )
     {
-        if (contains_declaration(sorted_declarations, h::Declaration{.data = &declaration}))
+        if (contains_declaration(sorted_declarations, iris::Declaration{.data = &declaration}))
             return;
 
         if (!declaration.type.empty())
             add_type_reference_declaration(sorted_declarations, core_module, declaration.type[0]);
         
-        sorted_declarations.push_back(h::Declaration{.data = &declaration});
+        sorted_declarations.push_back(iris::Declaration{.data = &declaration});
     }
 
     void add_struct_declaration(
-        std::pmr::vector<h::Declaration>& sorted_declarations,
-        h::Module const& core_module,
-        h::Struct_declaration const& declaration
+        std::pmr::vector<iris::Declaration>& sorted_declarations,
+        iris::Module const& core_module,
+        iris::Struct_declaration const& declaration
     )
     {
-        if (contains_declaration(sorted_declarations, h::Declaration{.data = &declaration}))
+        if (contains_declaration(sorted_declarations, iris::Declaration{.data = &declaration}))
             return;
 
-        for (h::Type_reference const& member_type : declaration.member_types)
+        for (iris::Type_reference const& member_type : declaration.member_types)
             add_type_reference_declaration(sorted_declarations, core_module, member_type);
 
-        sorted_declarations.push_back(h::Declaration{.data = &declaration});
+        sorted_declarations.push_back(iris::Declaration{.data = &declaration});
     }
 
     void add_union_declaration(
-        std::pmr::vector<h::Declaration>& sorted_declarations,
-        h::Module const& core_module,
-        h::Union_declaration const& declaration
+        std::pmr::vector<iris::Declaration>& sorted_declarations,
+        iris::Module const& core_module,
+        iris::Union_declaration const& declaration
     )
     {
-        if (contains_declaration(sorted_declarations, h::Declaration{.data = &declaration}))
+        if (contains_declaration(sorted_declarations, iris::Declaration{.data = &declaration}))
             return;
 
-        for (h::Type_reference const& member_type : declaration.member_types)
+        for (iris::Type_reference const& member_type : declaration.member_types)
             add_type_reference_declaration(sorted_declarations, core_module, member_type);
 
-        sorted_declarations.push_back(h::Declaration{.data = &declaration});
+        sorted_declarations.push_back(iris::Declaration{.data = &declaration});
     }
 
-    static std::pmr::vector<h::Declaration> sort_declarations(
-        h::Module const& core_module,
+    static std::pmr::vector<iris::Declaration> sort_declarations(
+        iris::Module const& core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::Declaration> sorted_declarations{temporaries_allocator};
+        std::pmr::vector<iris::Declaration> sorted_declarations{temporaries_allocator};
 
-        for (h::Enum_declaration const& declaration : core_module.export_declarations.enum_declarations)
+        for (iris::Enum_declaration const& declaration : core_module.export_declarations.enum_declarations)
         {
-            sorted_declarations.push_back(h::Declaration{.data = &declaration});
+            sorted_declarations.push_back(iris::Declaration{.data = &declaration});
         }
 
-        for (h::Enum_declaration const& declaration : core_module.internal_declarations.enum_declarations)
+        for (iris::Enum_declaration const& declaration : core_module.internal_declarations.enum_declarations)
         {
-            sorted_declarations.push_back(h::Declaration{.data = &declaration});
+            sorted_declarations.push_back(iris::Declaration{.data = &declaration});
         }
 
-        for (h::Alias_type_declaration const& declaration : core_module.export_declarations.alias_type_declarations)
-        {
-            add_alias_type_declaration(sorted_declarations, core_module, declaration);
-        }
-
-        for (h::Alias_type_declaration const& declaration : core_module.internal_declarations.alias_type_declarations)
+        for (iris::Alias_type_declaration const& declaration : core_module.export_declarations.alias_type_declarations)
         {
             add_alias_type_declaration(sorted_declarations, core_module, declaration);
         }
 
-        for (h::Struct_declaration const& declaration : core_module.export_declarations.struct_declarations)
+        for (iris::Alias_type_declaration const& declaration : core_module.internal_declarations.alias_type_declarations)
+        {
+            add_alias_type_declaration(sorted_declarations, core_module, declaration);
+        }
+
+        for (iris::Struct_declaration const& declaration : core_module.export_declarations.struct_declarations)
         {
             add_struct_declaration(sorted_declarations, core_module, declaration);
         }
 
-        for (h::Struct_declaration const& declaration : core_module.internal_declarations.struct_declarations)
+        for (iris::Struct_declaration const& declaration : core_module.internal_declarations.struct_declarations)
         {
             add_struct_declaration(sorted_declarations, core_module, declaration);
         }
 
-        for (h::Union_declaration const& declaration : core_module.export_declarations.union_declarations)
+        for (iris::Union_declaration const& declaration : core_module.export_declarations.union_declarations)
         {
             add_union_declaration(sorted_declarations, core_module, declaration);
         }
 
-        for (h::Union_declaration const& declaration : core_module.internal_declarations.union_declarations)
+        for (iris::Union_declaration const& declaration : core_module.internal_declarations.union_declarations)
         {
             add_union_declaration(sorted_declarations, core_module, declaration);
         }
 
-        return std::pmr::vector<h::Declaration>{sorted_declarations.begin(), sorted_declarations.end(), output_allocator};
+        return std::pmr::vector<iris::Declaration>{sorted_declarations.begin(), sorted_declarations.end(), output_allocator};
     }
 
     using String_stream = std::basic_stringstream<char, std::char_traits<char>, std::pmr::polymorphic_allocator<char>>;
@@ -226,13 +226,13 @@ namespace h::c
 
     static void write_includes(
         String_stream& stream,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& dependencies_c_file_paths
     )
     {
         stream << "#include <iris_builtin.h>\n\n";
 
-        for (h::Import_module_with_alias const& import_module : core_module.dependencies.alias_imports)
+        for (iris::Import_module_with_alias const& import_module : core_module.dependencies.alias_imports)
         {
             auto const location = dependencies_c_file_paths.find(import_module.module_name);
             if (location != dependencies_c_file_paths.end())
@@ -281,7 +281,7 @@ namespace h::c
         stream << declaration_name;
     }
 
-    static std::optional<std::string_view> get_declaration_type(h::Declaration const& declaration)
+    static std::optional<std::string_view> get_declaration_type(iris::Declaration const& declaration)
     {
         if (std::holds_alternative<Struct_declaration const*>(declaration.data))
             return "struct";
@@ -293,102 +293,102 @@ namespace h::c
 
     static void write_c_type_name(
         String_stream& stream,
-        h::Declaration_database const declaration_database,
-        h::Type_reference const& type_reference,
+        iris::Declaration_database const declaration_database,
+        iris::Type_reference const& type_reference,
         std::optional<std::string_view> const variable_name
     );
 
     static void write_c_type_name(
         String_stream& stream,
-        h::Declaration_database const declaration_database,
-        std::span<h::Type_reference const> const type_reference,
+        iris::Declaration_database const declaration_database,
+        std::span<iris::Type_reference const> const type_reference,
         std::optional<std::string_view> const variable_name
     );
 
     static void write_fundamental_type_name(
         String_stream& stream,
-        h::Fundamental_type const value
+        iris::Fundamental_type const value
     )
     {
         switch (value)
         {
-            case h::Fundamental_type::Bool: {
+            case iris::Fundamental_type::Bool: {
                 stream << "bool";
                 break;
             }
-            case h::Fundamental_type::Byte: {
+            case iris::Fundamental_type::Byte: {
                 stream << "uint8_t";
                 break;
             }
-            case h::Fundamental_type::Float16: {
+            case iris::Fundamental_type::Float16: {
                 stream << "_float16";
                 break;
             }
-            case h::Fundamental_type::Float32: {
+            case iris::Fundamental_type::Float32: {
                 stream << "float";
                 break;
             }
-            case h::Fundamental_type::Float64: {
+            case iris::Fundamental_type::Float64: {
                 stream << "double";
                 break;
             }
-            case h::Fundamental_type::String: {
+            case iris::Fundamental_type::String: {
                 stream << "String"; // TODO
                 break;
             }
-            case h::Fundamental_type::Any_type: {
+            case iris::Fundamental_type::Any_type: {
                 stream << "void*";
                 break;
             }
-            case h::Fundamental_type::C_bool: {
+            case iris::Fundamental_type::C_bool: {
                 stream << "bool";
                 break;
             }
-            case h::Fundamental_type::C_char: {
+            case iris::Fundamental_type::C_char: {
                 stream << "char";
                 break;
             }
-            case h::Fundamental_type::C_schar: {
+            case iris::Fundamental_type::C_schar: {
                 stream << "schar";
                 break;
             }
-            case h::Fundamental_type::C_uchar: {
+            case iris::Fundamental_type::C_uchar: {
                 stream << "uchar";
                 break;
             }
-            case h::Fundamental_type::C_short: {
+            case iris::Fundamental_type::C_short: {
                 stream << "short";
                 break;
             }
-            case h::Fundamental_type::C_ushort: {
+            case iris::Fundamental_type::C_ushort: {
                 stream << "ushort";
                 break;
             }
-            case h::Fundamental_type::C_int: {
+            case iris::Fundamental_type::C_int: {
                 stream << "int";
                 break;
             }
-            case h::Fundamental_type::C_uint: {
+            case iris::Fundamental_type::C_uint: {
                 stream << "unsigned int";
                 break;
             }
-            case h::Fundamental_type::C_long: {
+            case iris::Fundamental_type::C_long: {
                 stream << "long";
                 break;
             }
-            case h::Fundamental_type::C_ulong: {
+            case iris::Fundamental_type::C_ulong: {
                 stream << "unsigned long";
                 break;
             }
-            case h::Fundamental_type::C_longlong: {
+            case iris::Fundamental_type::C_longlong: {
                 stream << "long long";
                 break;
             }
-            case h::Fundamental_type::C_ulonglong: {
+            case iris::Fundamental_type::C_ulonglong: {
                 stream << "unsigned long long";
                 break;
             }
-            case h::Fundamental_type::C_longdouble: {
+            case iris::Fundamental_type::C_longdouble: {
                 stream << "long double";
                 break;
             }
@@ -397,7 +397,7 @@ namespace h::c
 
     static void write_integer_type_name(
         String_stream& stream,
-        h::Integer_type const& value
+        iris::Integer_type const& value
     )
     {
         if (!value.is_signed)
@@ -409,11 +409,11 @@ namespace h::c
 
     static void write_array_slice_type_name(
         String_stream& stream,
-        std::span<h::Type_reference const> const array_slice_element_type,
+        std::span<iris::Type_reference const> const array_slice_element_type,
         std::function<void(String_stream&, std::string_view, std::string_view)> const& write_declaration_name
     )
     {
-        auto const write_array_slice_element_type = [&](std::span<h::Type_reference const> const type_reference) -> void
+        auto const write_array_slice_element_type = [&](std::span<iris::Type_reference const> const type_reference) -> void
         {
             if (type_reference.empty())
             {
@@ -421,21 +421,21 @@ namespace h::c
                 return;
             }
 
-            if (std::holds_alternative<h::Custom_type_reference>(type_reference[0].data))
+            if (std::holds_alternative<iris::Custom_type_reference>(type_reference[0].data))
             {
-                h::Custom_type_reference const custom_type_reference = std::get<h::Custom_type_reference>(type_reference[0].data);
+                iris::Custom_type_reference const custom_type_reference = std::get<iris::Custom_type_reference>(type_reference[0].data);
                 write_declaration_name(stream, custom_type_reference.module_reference.name, custom_type_reference.name);
             }
-            else if (std::holds_alternative<h::Fundamental_type>(type_reference[0].data))
+            else if (std::holds_alternative<iris::Fundamental_type>(type_reference[0].data))
             {
-                h::Fundamental_type const fundamental_type = std::get<h::Fundamental_type>(type_reference[0].data);
+                iris::Fundamental_type const fundamental_type = std::get<iris::Fundamental_type>(type_reference[0].data);
                 std::string_view const type_name = format_fundamental_type(fundamental_type);
                 stream << type_name;
             }
-            else if (std::holds_alternative<h::Integer_type>(type_reference[0].data))
+            else if (std::holds_alternative<iris::Integer_type>(type_reference[0].data))
             {
-                h::Integer_type const integer_type = std::get<h::Integer_type>(type_reference[0].data);
-                std::pmr::string const type_name = h::format_integer_type(integer_type);
+                iris::Integer_type const integer_type = std::get<iris::Integer_type>(type_reference[0].data);
+                std::pmr::string const type_name = iris::format_integer_type(integer_type);
                 stream << type_name;
             }
             else
@@ -450,8 +450,8 @@ namespace h::c
 
     static void write_c_array_slice_type_name(
         String_stream& stream,
-        h::Declaration_database const& declaration_database,
-        std::span<h::Type_reference const> const array_slice_element_type
+        iris::Declaration_database const& declaration_database,
+        std::span<iris::Type_reference const> const array_slice_element_type
     )
     {
         auto const write_declaration_name = [&](String_stream& stream, std::string_view const module_name, std::string_view const declaration_name) -> void 
@@ -466,8 +466,8 @@ namespace h::c
 
     static void write_c_type_name(
         String_stream& stream,
-        h::Declaration_database const declaration_database,
-        std::span<h::Type_reference const> const type_reference,
+        iris::Declaration_database const declaration_database,
+        std::span<iris::Type_reference const> const type_reference,
         std::optional<std::string_view> const variable_name
     )
     {
@@ -482,28 +482,28 @@ namespace h::c
 
     static void write_c_type_name(
         String_stream& stream,
-        h::Declaration_database const declaration_database,
-        h::Type_reference const& type_reference,
+        iris::Declaration_database const declaration_database,
+        iris::Type_reference const& type_reference,
         std::optional<std::string_view> const variable_name
     )
     {
-        if (std::holds_alternative<h::Array_slice_type>(type_reference.data))
+        if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
         {
-            h::Array_slice_type const& data = std::get<h::Array_slice_type>(type_reference.data);
+            iris::Array_slice_type const& data = std::get<iris::Array_slice_type>(type_reference.data);
             stream << "struct ";
             write_c_array_slice_type_name(stream, declaration_database, data.element_type);
 
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
-        else if (std::holds_alternative<h::Builtin_type_reference>(type_reference.data))
+        else if (std::holds_alternative<iris::Builtin_type_reference>(type_reference.data))
         {
-            h::Builtin_type_reference const& data = std::get<h::Builtin_type_reference>(type_reference.data);
+            iris::Builtin_type_reference const& data = std::get<iris::Builtin_type_reference>(type_reference.data);
             // TODO
         }
-        else if (std::holds_alternative<h::Constant_array_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Constant_array_type>(type_reference.data))
         {
-            h::Constant_array_type const& data = std::get<h::Constant_array_type>(type_reference.data);
+            iris::Constant_array_type const& data = std::get<iris::Constant_array_type>(type_reference.data);
             write_c_type_name(stream, declaration_database, data.value_type, std::nullopt);
 
             if (variable_name.has_value())
@@ -511,9 +511,9 @@ namespace h::c
 
             stream << '[' << data.size << ']';
         }
-        else if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
+        else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
         {
-            h::Custom_type_reference const& data = std::get<h::Custom_type_reference>(type_reference.data);
+            iris::Custom_type_reference const& data = std::get<iris::Custom_type_reference>(type_reference.data);
             std::optional<Declaration> const declaration = find_declaration(declaration_database, data.module_reference.name, data.name);
 
             if (declaration.has_value())
@@ -529,17 +529,17 @@ namespace h::c
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
-        else if (std::holds_alternative<h::Fundamental_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Fundamental_type>(type_reference.data))
         {
-            h::Fundamental_type const& data = std::get<h::Fundamental_type>(type_reference.data);
+            iris::Fundamental_type const& data = std::get<iris::Fundamental_type>(type_reference.data);
             write_fundamental_type_name(stream, data);
 
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
-        else if (std::holds_alternative<h::Function_pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Function_pointer_type>(type_reference.data))
         {
-            h::Function_pointer_type const& data = std::get<h::Function_pointer_type>(type_reference.data);
+            iris::Function_pointer_type const& data = std::get<iris::Function_pointer_type>(type_reference.data);
             write_c_type_name(stream, declaration_database, data.type.output_parameter_types, std::nullopt);
             stream << "(*";
             if (variable_name.has_value())
@@ -548,7 +548,7 @@ namespace h::c
             for (std::size_t index = 0; index < data.input_parameter_names.size(); ++index)
             {
                 std::string_view const input_parameter_name = data.input_parameter_names[index];
-                h::Type_reference const& input_parameter_type = data.type.input_parameter_types[index];
+                iris::Type_reference const& input_parameter_type = data.type.input_parameter_types[index];
                 write_c_type_name(stream, declaration_database, input_parameter_type, input_parameter_name);
 
                 if (index + 1 < data.input_parameter_names.size())
@@ -556,27 +556,27 @@ namespace h::c
             }
             stream << ")";
         }
-        else if (std::holds_alternative<h::Integer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Integer_type>(type_reference.data))
         {
-            h::Integer_type const& data = std::get<h::Integer_type>(type_reference.data);
+            iris::Integer_type const& data = std::get<iris::Integer_type>(type_reference.data);
             write_integer_type_name(stream, data);
 
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
-        else if (std::holds_alternative<h::Null_pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Null_pointer_type>(type_reference.data))
         {
-            h::Null_pointer_type const& data = std::get<h::Null_pointer_type>(type_reference.data);
+            iris::Null_pointer_type const& data = std::get<iris::Null_pointer_type>(type_reference.data);
             // TODO
         }
-        else if (std::holds_alternative<h::Parameter_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Parameter_type>(type_reference.data))
         {
-            h::Parameter_type const& data = std::get<h::Parameter_type>(type_reference.data);
+            iris::Parameter_type const& data = std::get<iris::Parameter_type>(type_reference.data);
             // TODO
         }
-        else if (std::holds_alternative<h::Pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Pointer_type>(type_reference.data))
         {
-            h::Pointer_type const& data = std::get<h::Pointer_type>(type_reference.data);
+            iris::Pointer_type const& data = std::get<iris::Pointer_type>(type_reference.data);
             write_c_type_name(stream, declaration_database, data.element_type, std::nullopt);
             if (!data.is_mutable)
                 stream << " const";
@@ -585,9 +585,9 @@ namespace h::c
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
-        else if (std::holds_alternative<h::Type_instance>(type_reference.data))
+        else if (std::holds_alternative<iris::Type_instance>(type_reference.data))
         {
-            h::Type_instance const& data = std::get<h::Type_instance>(type_reference.data);
+            iris::Type_instance const& data = std::get<iris::Type_instance>(type_reference.data);
             // TODO
         }
 
@@ -596,14 +596,14 @@ namespace h::c
 
     void write_c_array_slice_struct(
         String_stream& stream,
-        h::Declaration_database const declaration_database,
+        iris::Declaration_database const declaration_database,
         std::string_view const declaration_type,
         std::string_view const core_module_name,
         std::string_view const declaration_name,
         std::optional<std::pmr::string> const unique_name
     )
     {
-        h::Type_reference const element_type = h::create_custom_type_reference(core_module_name, declaration_name);
+        iris::Type_reference const element_type = iris::create_custom_type_reference(core_module_name, declaration_name);
 
         stream << "struct ";
         
@@ -621,13 +621,13 @@ namespace h::c
 
     void write_c_struct_or_union_declaration(
         String_stream& stream,
-        h::Declaration_database const declaration_database,
+        iris::Declaration_database const declaration_database,
         std::string_view const declaration_type,
         std::string_view const core_module_name,
         std::string_view const declaration_name,
         std::optional<std::pmr::string> const unique_name,
         std::span<std::pmr::string const> const member_names,
-        std::span<h::Type_reference const> const member_types
+        std::span<iris::Type_reference const> const member_types
     )
     {
         stream << declaration_type << " ";
@@ -636,7 +636,7 @@ namespace h::c
         
         for (std::size_t member_index = 0; member_index < member_names.size(); ++member_index)
         {
-            h::Type_reference const& member_type = member_types[member_index];
+            iris::Type_reference const& member_type = member_types[member_index];
 
             stream << "    ";
             write_c_type_name(stream, declaration_database, member_type, member_names[member_index]);
@@ -650,19 +650,19 @@ namespace h::c
 
     void write_c_declaration(
         String_stream& stream,
-        h::Declaration_database const declaration_database,
+        iris::Declaration_database const declaration_database,
         std::string_view const core_module_name,
-        h::Declaration const& declaration
+        iris::Declaration const& declaration
     )
     {
-        if (std::holds_alternative<h::Alias_type_declaration const*>(declaration.data))
+        if (std::holds_alternative<iris::Alias_type_declaration const*>(declaration.data))
         {
-            h::Alias_type_declaration const& alias_type_declaration = *std::get<h::Alias_type_declaration const*>(declaration.data);
+            iris::Alias_type_declaration const& alias_type_declaration = *std::get<iris::Alias_type_declaration const*>(declaration.data);
             // TODO
         }
-        else if (std::holds_alternative<h::Struct_declaration const*>(declaration.data))
+        else if (std::holds_alternative<iris::Struct_declaration const*>(declaration.data))
         {
-            h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration.data);
+            iris::Struct_declaration const& struct_declaration = *std::get<iris::Struct_declaration const*>(declaration.data);
             write_c_struct_or_union_declaration(
                 stream, 
                 declaration_database,
@@ -674,9 +674,9 @@ namespace h::c
                 struct_declaration.member_types
             );
         }
-        else if (std::holds_alternative<h::Union_declaration const*>(declaration.data))
+        else if (std::holds_alternative<iris::Union_declaration const*>(declaration.data))
         {
-            h::Union_declaration const& union_declaration = *std::get<h::Union_declaration const*>(declaration.data);
+            iris::Union_declaration const& union_declaration = *std::get<iris::Union_declaration const*>(declaration.data);
             write_c_struct_or_union_declaration(
                 stream, 
                 declaration_database, 
@@ -692,9 +692,9 @@ namespace h::c
 
     void write_c_function_declaration(
         String_stream& stream,
-        h::Declaration_database const declaration_database,
+        iris::Declaration_database const declaration_database,
         std::string_view const core_module_name,
-        h::Function_declaration const& declaration
+        iris::Function_declaration const& declaration
     )
     {
         write_c_type_name(stream, declaration_database, declaration.type.output_parameter_types, std::nullopt);
@@ -713,14 +713,14 @@ namespace h::c
     }
 
     Exported_c_header export_module_as_c_header(
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& dependencies_c_file_paths,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::Declaration> const declarations = sort_declarations(core_module, temporaries_allocator, temporaries_allocator);
+        std::pmr::vector<iris::Declaration> const declarations = sort_declarations(core_module, temporaries_allocator, temporaries_allocator);
 
         String_stream stream{std::ios_base::in | std::ios_base::out, temporaries_allocator};
 
@@ -728,10 +728,10 @@ namespace h::c
         write_includes(stream, core_module, dependencies_c_file_paths);
         write_extern_c_begin(stream);
 
-        for (h::Declaration const& declaration : declarations)
+        for (iris::Declaration const& declaration : declarations)
             write_c_declaration(stream, declaration_database, core_module.name, declaration);
 
-        for (h::Function_declaration const& declaration : core_module.export_declarations.function_declarations)
+        for (iris::Function_declaration const& declaration : core_module.export_declarations.function_declarations)
             write_c_function_declaration(stream, declaration_database, core_module.name, declaration);
 
         if (!core_module.export_declarations.function_declarations.empty())
@@ -762,24 +762,24 @@ namespace h::c
 
     static void write_cpp_type(
         String_stream& stream,
-        h::Type_reference const& type_reference,
+        iris::Type_reference const& type_reference,
         std::optional<std::string_view> const variable_name
     );
 
     static void write_cpp_type(
         String_stream& stream,
-        std::span<h::Type_reference const> const type_reference,
+        std::span<iris::Type_reference const> const type_reference,
         std::optional<std::string_view> const variable_name
     );
 
     static void write_cpp_array_slice_type_name(
         String_stream& stream,
-        std::span<h::Type_reference const> const array_slice_element_type
+        std::span<iris::Type_reference const> const array_slice_element_type
     )
     {
         auto const write_declaration_name = [&](String_stream& stream, std::string_view const module_name, std::string_view const declaration_name) -> void 
         {
-            h::Type_reference const type_reference = h::create_custom_type_reference(module_name, declaration_name);
+            iris::Type_reference const type_reference = iris::create_custom_type_reference(module_name, declaration_name);
             write_cpp_type(stream, type_reference, std::nullopt);
         };
 
@@ -788,7 +788,7 @@ namespace h::c
 
     static void write_cpp_type(
         String_stream& stream,
-        std::span<h::Type_reference const> const type_reference,
+        std::span<iris::Type_reference const> const type_reference,
         std::optional<std::string_view> const variable_name
     )
     {
@@ -803,26 +803,26 @@ namespace h::c
 
     static void write_cpp_type(
         String_stream& stream,
-        h::Type_reference const& type_reference,
+        iris::Type_reference const& type_reference,
         std::optional<std::string_view> const variable_name
     )
     {
-        if (std::holds_alternative<h::Array_slice_type>(type_reference.data))
+        if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
         {
-            h::Array_slice_type const& data = std::get<h::Array_slice_type>(type_reference.data);
+            iris::Array_slice_type const& data = std::get<iris::Array_slice_type>(type_reference.data);
             write_cpp_array_slice_type_name(stream, data.element_type);
 
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
-        else if (std::holds_alternative<h::Builtin_type_reference>(type_reference.data))
+        else if (std::holds_alternative<iris::Builtin_type_reference>(type_reference.data))
         {
-            h::Builtin_type_reference const& data = std::get<h::Builtin_type_reference>(type_reference.data);
+            iris::Builtin_type_reference const& data = std::get<iris::Builtin_type_reference>(type_reference.data);
             // TODO
         }
-        else if (std::holds_alternative<h::Constant_array_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Constant_array_type>(type_reference.data))
         {
-            h::Constant_array_type const& data = std::get<h::Constant_array_type>(type_reference.data);
+            iris::Constant_array_type const& data = std::get<iris::Constant_array_type>(type_reference.data);
             write_cpp_type(stream, data.value_type, std::nullopt);
 
             if (variable_name.has_value())
@@ -830,25 +830,25 @@ namespace h::c
 
             stream << '[' << data.size << ']';
         }
-        else if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
+        else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
         {
-            h::Custom_type_reference const& data = std::get<h::Custom_type_reference>(type_reference.data);
+            iris::Custom_type_reference const& data = std::get<iris::Custom_type_reference>(type_reference.data);
             stream << data.name;
 
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
-        else if (std::holds_alternative<h::Fundamental_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Fundamental_type>(type_reference.data))
         {
-            h::Fundamental_type const& data = std::get<h::Fundamental_type>(type_reference.data);
+            iris::Fundamental_type const& data = std::get<iris::Fundamental_type>(type_reference.data);
             write_fundamental_type_name(stream, data);
 
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
-        else if (std::holds_alternative<h::Function_pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Function_pointer_type>(type_reference.data))
         {
-            h::Function_pointer_type const& data = std::get<h::Function_pointer_type>(type_reference.data);
+            iris::Function_pointer_type const& data = std::get<iris::Function_pointer_type>(type_reference.data);
             write_cpp_type(stream, data.type.output_parameter_types, std::nullopt);
             stream << "(*";
             if (variable_name.has_value())
@@ -857,7 +857,7 @@ namespace h::c
             for (std::size_t index = 0; index < data.input_parameter_names.size(); ++index)
             {
                 std::string_view const input_parameter_name = data.input_parameter_names[index];
-                h::Type_reference const& input_parameter_type = data.type.input_parameter_types[index];
+                iris::Type_reference const& input_parameter_type = data.type.input_parameter_types[index];
                 write_cpp_type(stream, input_parameter_type, input_parameter_name);
 
                 if (index + 1 < data.input_parameter_names.size())
@@ -865,27 +865,27 @@ namespace h::c
             }
             stream << ")";
         }
-        else if (std::holds_alternative<h::Integer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Integer_type>(type_reference.data))
         {
-            h::Integer_type const& data = std::get<h::Integer_type>(type_reference.data);
+            iris::Integer_type const& data = std::get<iris::Integer_type>(type_reference.data);
             write_integer_type_name(stream, data);
 
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
-        else if (std::holds_alternative<h::Null_pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Null_pointer_type>(type_reference.data))
         {
-            h::Null_pointer_type const& data = std::get<h::Null_pointer_type>(type_reference.data);
+            iris::Null_pointer_type const& data = std::get<iris::Null_pointer_type>(type_reference.data);
             // TODO
         }
-        else if (std::holds_alternative<h::Parameter_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Parameter_type>(type_reference.data))
         {
-            h::Parameter_type const& data = std::get<h::Parameter_type>(type_reference.data);
+            iris::Parameter_type const& data = std::get<iris::Parameter_type>(type_reference.data);
             // TODO
         }
-        else if (std::holds_alternative<h::Pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Pointer_type>(type_reference.data))
         {
-            h::Pointer_type const& data = std::get<h::Pointer_type>(type_reference.data);
+            iris::Pointer_type const& data = std::get<iris::Pointer_type>(type_reference.data);
             write_cpp_type(stream, data.element_type, std::nullopt);
             if (!data.is_mutable)
                 stream << " const";
@@ -894,9 +894,9 @@ namespace h::c
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
-        else if (std::holds_alternative<h::Type_instance>(type_reference.data))
+        else if (std::holds_alternative<iris::Type_instance>(type_reference.data))
         {
-            h::Type_instance const& data = std::get<h::Type_instance>(type_reference.data);
+            iris::Type_instance const& data = std::get<iris::Type_instance>(type_reference.data);
             // TODO
         }
 
@@ -910,7 +910,7 @@ namespace h::c
         std::optional<std::string_view> const unique_name
     )
     {
-        h::Type_reference const element_type = h::create_custom_type_reference(core_module_name, declaration_name);
+        iris::Type_reference const element_type = iris::create_custom_type_reference(core_module_name, declaration_name);
         
         stream << "    using ";
         write_cpp_array_slice_type_name(stream, {&element_type, 1});
@@ -946,7 +946,7 @@ namespace h::c
     void write_cpp_function_declaration(
         String_stream& stream,
         std::string_view const core_module_name,
-        h::Function_declaration const& declaration
+        iris::Function_declaration const& declaration
     )
     {
         stream << "    inline auto " << declaration.name << "(";
@@ -977,13 +977,13 @@ namespace h::c
     }
 
     Exported_cpp_header export_module_as_cpp_header(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::filesystem::path const& c_header_file_path,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::Declaration> const declarations = sort_declarations(core_module, temporaries_allocator, temporaries_allocator);
+        std::pmr::vector<iris::Declaration> const declarations = sort_declarations(core_module, temporaries_allocator, temporaries_allocator);
 
         String_stream stream{std::ios_base::in | std::ios_base::out, temporaries_allocator};
 
@@ -994,22 +994,22 @@ namespace h::c
         write_cpp_module_namespace(stream, core_module.name);
         stream << "\n{\n";
 
-        for (h::Alias_type_declaration const& declaration : core_module.export_declarations.alias_type_declarations)
+        for (iris::Alias_type_declaration const& declaration : core_module.export_declarations.alias_type_declarations)
             write_cpp_using_declaration(stream, core_module.name, declaration.name, declaration.unique_name, false);
 
-        for (h::Enum_declaration const& declaration : core_module.export_declarations.enum_declarations)
+        for (iris::Enum_declaration const& declaration : core_module.export_declarations.enum_declarations)
             write_cpp_using_declaration(stream, core_module.name, declaration.name, declaration.unique_name, true);
 
-        for (h::Struct_declaration const& declaration : core_module.export_declarations.struct_declarations)
+        for (iris::Struct_declaration const& declaration : core_module.export_declarations.struct_declarations)
             write_cpp_using_declaration(stream, core_module.name, declaration.name, declaration.unique_name, true);
 
-        for (h::Union_declaration const& declaration : core_module.export_declarations.union_declarations)
+        for (iris::Union_declaration const& declaration : core_module.export_declarations.union_declarations)
             write_cpp_using_declaration(stream, core_module.name, declaration.name, declaration.unique_name, true);
 
         if (!core_module.export_declarations.function_declarations.empty())
             stream << '\n';
 
-        for (h::Function_declaration const& declaration : core_module.export_declarations.function_declarations)
+        for (iris::Function_declaration const& declaration : core_module.export_declarations.function_declarations)
             write_cpp_function_declaration(stream, core_module.name, declaration);
 
         stream << "}\n\n";

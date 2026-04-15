@@ -1,10 +1,10 @@
-export module h.parser.type_name_parser;
+export module iris.parser.type_name_parser;
 
 import std;
 
-import h.core;
+import iris.core;
 
-namespace h::parser
+namespace iris::parser
 {
     export std::optional<Type_reference> parse_type_name(
         std::string_view const module_name,

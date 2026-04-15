@@ -1,12 +1,12 @@
-export module h.core.expressions_visitor;
+export module iris.core.expressions_visitor;
 
 import std;
-import h.core;
+import iris.core;
 
-namespace h
+namespace iris
 {
 
-    export void visit_expressions_recursively(h::Statement const& statement, h::Expression const& expression, std::function<void(h::Statement const& statement, h::Expression const& expression)> const& predicate)
+    export void visit_expressions_recursively(iris::Statement const& statement, iris::Expression const& expression, std::function<void(iris::Statement const& statement, iris::Expression const& expression)> const& predicate)
     {
         predicate(statement, expression);
 

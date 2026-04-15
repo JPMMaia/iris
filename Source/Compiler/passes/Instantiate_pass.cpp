@@ -2,25 +2,25 @@ module;
 
 #include <cassert>
 
-module h.compiler.instantiate_pass;
+module iris.compiler.instantiate_pass;
 
 import std;
 
-import h.core;
-import h.core.declarations;
-import h.core.expressions;
-import h.core.types;
-import h.compiler;
-import h.compiler.all_passes;
-import h.compiler.analysis;
-import h.compiler.clang_code_generation;
-import h.compiler.clang_data;
-import h.compiler.types;
+import iris.core;
+import iris.core.declarations;
+import iris.core.expressions;
+import iris.core.types;
+import iris.compiler;
+import iris.compiler.all_passes;
+import iris.compiler.analysis;
+import iris.compiler.clang_code_generation;
+import iris.compiler.clang_data;
+import iris.compiler.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
     static void add_instantiated_type_to_module(
-        h::Module& core_module,
+        iris::Module& core_module,
         Declaration_database& declaration_database,
         Type_instance const& type_instance
     )
@@ -47,32 +47,32 @@ namespace h::compiler
     }
 
     static void instantiate_type(
-        h::Module& core_module,
+        iris::Module& core_module,
         Declaration_database& declaration_database,
-        h::Type_reference& mutable_type_reference,
+        iris::Type_reference& mutable_type_reference,
         Type_instance const& type_instance
     )
     {
         add_instantiated_type_to_module(core_module, declaration_database, type_instance);
 
-        // Replace `h::Type_instance` by the actual type
+        // Replace `iris::Type_instance` by the actual type
         {
             std::pmr::string const mangled_name = mangle_type_instance_name(type_instance);
         
-            mutable_type_reference = h::create_custom_type_reference(type_instance.type_constructor.module_reference.name, mangled_name);
+            mutable_type_reference = iris::create_custom_type_reference(type_instance.type_constructor.module_reference.name, mangled_name);
         }
     }
 
     static void instantiate_all_types(
-        h::Module& core_module,
+        iris::Module& core_module,
         Declaration_database& declaration_database
     )
     {
-        auto const instantiate_all = [&](std::string_view const declaration_name, h::Type_reference const& type_reference) -> bool {
+        auto const instantiate_all = [&](std::string_view const declaration_name, iris::Type_reference const& type_reference) -> bool {
 
             if (std::holds_alternative<Type_instance>(type_reference.data))
             {
-                h::Type_reference& mutable_type_reference = const_cast<h::Type_reference&>(type_reference);
+                iris::Type_reference& mutable_type_reference = const_cast<iris::Type_reference&>(type_reference);
                 
                 Type_instance const& type_instance = std::get<Type_instance>(type_reference.data);
                 instantiate_type(core_module, declaration_database, mutable_type_reference, type_instance);
@@ -81,24 +81,24 @@ namespace h::compiler
             return false;
         };
 
-        h::visit_type_references_recursively_with_declaration_name(
+        iris::visit_type_references_recursively_with_declaration_name(
             core_module,
             instantiate_all
         );
     }
 
     static void instantiate_types_in_function(
-        h::Module& core_module,
+        iris::Module& core_module,
         Declaration_database& declaration_database,
-        h::Function_declaration& function_declaration,
-        h::Function_definition& function_definition
+        iris::Function_declaration& function_declaration,
+        iris::Function_definition& function_definition
     )
     {
-        auto const instantiate_all = [&](h::Type_reference const& type_reference) -> bool {
+        auto const instantiate_all = [&](iris::Type_reference const& type_reference) -> bool {
 
             if (std::holds_alternative<Type_instance>(type_reference.data))
             {
-                h::Type_reference& mutable_type_reference = const_cast<h::Type_reference&>(type_reference);
+                iris::Type_reference& mutable_type_reference = const_cast<iris::Type_reference&>(type_reference);
 
                 Type_instance const& type_instance = std::get<Type_instance>(type_reference.data);
                 instantiate_type(core_module, declaration_database, mutable_type_reference, type_instance);
@@ -107,26 +107,26 @@ namespace h::compiler
             return false;
         };
 
-        h::visit_type_references_recursively(
+        iris::visit_type_references_recursively(
             function_declaration,
             instantiate_all
         );
 
-        h::visit_type_references_recursively(
+        iris::visit_type_references_recursively(
             function_definition,
             instantiate_all
         );
     }
 
     static bool is_builtin_instance_call(
-        h::Statement const& statement,
+        iris::Statement const& statement,
         Instance_call_expression const& expression
     )
     {
-        h::Expression const& left_hand_side = statement.expressions[expression.left_hand_side.expression_index];
-        if (std::holds_alternative<h::Variable_expression>(left_hand_side.data))
+        iris::Expression const& left_hand_side = statement.expressions[expression.left_hand_side.expression_index];
+        if (std::holds_alternative<iris::Variable_expression>(left_hand_side.data))
         {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_hand_side.data);
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_hand_side.data);
             return is_builtin_function_name(variable_expression.name);
         }
 
@@ -134,9 +134,9 @@ namespace h::compiler
     }
 
     static void instantiate_function(
-        h::Module& core_module,
-        h::Statement& statement,
-        h::Expression const& expression,
+        iris::Module& core_module,
+        iris::Statement& statement,
+        iris::Expression const& expression,
         Instance_call_key const key,
         All_passes_parameters const& parameters
     )
@@ -151,7 +151,7 @@ namespace h::compiler
         if (existing.has_value())
             return;
         
-        h::Function_constructor const* function_constructor = get_function_constructor(
+        iris::Function_constructor const* function_constructor = get_function_constructor(
             parameters.declaration_database,
             key.module_name,
             key.function_constructor_name
@@ -159,7 +159,7 @@ namespace h::compiler
         if (function_constructor == nullptr)
             throw std::runtime_error{ "Could not find function constructor!" };
 
-        h::Function_expression function_expression = create_instance_call_expression_value(
+        iris::Function_expression function_expression = create_instance_call_expression_value(
             *function_constructor,
             key.arguments,
             key
@@ -180,23 +180,23 @@ namespace h::compiler
 
     struct Replace_instantiate_function_parameters
     {
-        h::Statement& statement;
+        iris::Statement& statement;
         std::size_t expression_index;
         Instance_call_key const key;
     };
 
     static std::optional<std::size_t> find_parent_call_expression_index(
-        h::Statement const& statement,
+        iris::Statement const& statement,
         std::size_t const callee_expression_index
     )
     {
         for (std::size_t index = 0; index < statement.expressions.size(); ++index)
         {
-            h::Expression const& expression = statement.expressions[index];
-            if (!std::holds_alternative<h::Call_expression>(expression.data))
+            iris::Expression const& expression = statement.expressions[index];
+            if (!std::holds_alternative<iris::Call_expression>(expression.data))
                 continue;
 
-            h::Call_expression const& call_expression = std::get<h::Call_expression>(expression.data);
+            iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
             if (call_expression.expression.expression_index == callee_expression_index)
                 return index;
         }
@@ -204,37 +204,37 @@ namespace h::compiler
         return std::nullopt;
     }
 
-    static std::optional<h::Expression_index> create_implicit_receiver_argument(
-        h::Statement& statement,
-        h::Expression const& callee_expression
+    static std::optional<iris::Expression_index> create_implicit_receiver_argument(
+        iris::Statement& statement,
+        iris::Expression const& callee_expression
     )
     {
-        if (std::holds_alternative<h::Access_expression>(callee_expression.data))
+        if (std::holds_alternative<iris::Access_expression>(callee_expression.data))
         {
-            h::Access_expression const& access_expression = std::get<h::Access_expression>(callee_expression.data);
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(callee_expression.data);
 
-            h::Expression_index const copied_receiver_expression = copy_expressions_to_new_statement(
+            iris::Expression_index const copied_receiver_expression = copy_expressions_to_new_statement(
                 statement,
                 statement,
                 access_expression.expression
             );
 
-            h::Expression receiver_expression = {
-                .data = h::Unary_expression{
+            iris::Expression receiver_expression = {
+                .data = iris::Unary_expression{
                     .expression = copied_receiver_expression,
-                    .operation = h::Unary_operation::Address_of
+                    .operation = iris::Unary_operation::Address_of
                 }
             };
 
             statement.expressions.push_back(std::move(receiver_expression));
-            return h::Expression_index{ .expression_index = statement.expressions.size() - 1 };
+            return iris::Expression_index{ .expression_index = statement.expressions.size() - 1 };
         }
 
-        if (std::holds_alternative<h::Dereference_and_access_expression>(callee_expression.data))
+        if (std::holds_alternative<iris::Dereference_and_access_expression>(callee_expression.data))
         {
-            h::Dereference_and_access_expression const& access_expression = std::get<h::Dereference_and_access_expression>(callee_expression.data);
+            iris::Dereference_and_access_expression const& access_expression = std::get<iris::Dereference_and_access_expression>(callee_expression.data);
 
-            h::Expression_index const copied_receiver_expression = copy_expressions_to_new_statement(
+            iris::Expression_index const copied_receiver_expression = copy_expressions_to_new_statement(
                 statement,
                 statement,
                 access_expression.expression
@@ -247,7 +247,7 @@ namespace h::compiler
     }
 
     static void replace_instantiate_function(
-        h::Module& core_module,
+        iris::Module& core_module,
         Replace_instantiate_function_parameters const& instantiate_parameters,
         All_passes_parameters const& parameters
     )
@@ -255,7 +255,7 @@ namespace h::compiler
         std::pmr::string const mangled_name = std::pmr::string{mangle_instance_call_name(instantiate_parameters.key)};
 
         std::size_t const callee_expression_index = instantiate_parameters.expression_index;
-        h::Expression const& callee_expression = instantiate_parameters.statement.expressions[callee_expression_index];
+        iris::Expression const& callee_expression = instantiate_parameters.statement.expressions[callee_expression_index];
 
         std::optional<std::size_t> const parent_call_expression_index = find_parent_call_expression_index(
             instantiate_parameters.statement,
@@ -264,27 +264,27 @@ namespace h::compiler
 
         if (parent_call_expression_index.has_value())
         {
-            std::optional<h::Expression_index> const receiver_argument = create_implicit_receiver_argument(
+            std::optional<iris::Expression_index> const receiver_argument = create_implicit_receiver_argument(
                 instantiate_parameters.statement,
                 callee_expression
             );
 
             if (receiver_argument.has_value())
             {
-                h::Expression& parent_call_expression = instantiate_parameters.statement.expressions[parent_call_expression_index.value()];
-                h::Call_expression& call_expression = std::get<h::Call_expression>(parent_call_expression.data);
+                iris::Expression& parent_call_expression = instantiate_parameters.statement.expressions[parent_call_expression_index.value()];
+                iris::Call_expression& call_expression = std::get<iris::Call_expression>(parent_call_expression.data);
                 call_expression.arguments.insert(call_expression.arguments.begin(), receiver_argument.value());
             }
         }
 
-        h::Expression const& expression_to_replace = instantiate_parameters.statement.expressions[callee_expression_index];
+        iris::Expression const& expression_to_replace = instantiate_parameters.statement.expressions[callee_expression_index];
 
-        std::pmr::vector<h::Expression> new_expressions
+        std::pmr::vector<iris::Expression> new_expressions
         {
-            h::create_variable_expression(mangled_name)
+            iris::create_variable_expression(mangled_name)
         };
 
-        h::Statement const new_statement = h::create_statement(std::move(new_expressions));
+        iris::Statement const new_statement = iris::create_statement(std::move(new_expressions));
 
         replace_expression(
             instantiate_parameters.statement,
@@ -295,20 +295,20 @@ namespace h::compiler
     }
 
     static void visit_deduced_instance_calls(
-        h::Module& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_definition& function_definition,
+        iris::Module& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_definition& function_definition,
         All_passes_parameters const& parameters,
-        std::function<void(h::Module&, h::Statement&, h::Expression const&, Instance_call_key const&, All_passes_parameters const&)> const& callback
+        std::function<void(iris::Module&, iris::Statement&, iris::Expression const&, Instance_call_key const&, All_passes_parameters const&)> const& callback
     )
     {
-        auto const scope_callback = [&](h::Statement const& statement, h::compiler::Scope const& scope) -> bool
+        auto const scope_callback = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> bool
         {
-            auto const instantiate_all = [&](h::Expression const& expression, h::Statement const& statement) -> bool
+            auto const instantiate_all = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
             {
-                if (std::holds_alternative<h::Call_expression>(expression.data))
+                if (std::holds_alternative<iris::Call_expression>(expression.data))
                 {
-                    h::Call_expression const& call_expression = std::get<h::Call_expression>(expression.data);
+                    iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
                     std::optional<Deduced_instance_call> const deduced_instance_call = deduce_instance_call_arguments(
                         parameters.declaration_database,
                         core_module,
@@ -325,7 +325,7 @@ namespace h::compiler
                             .arguments = deduced_instance_call->arguments
                         };
 
-                        h::Statement& mutable_statement = const_cast<h::Statement&>(statement);
+                        iris::Statement& mutable_statement = const_cast<iris::Statement&>(statement);
 
                         callback(
                             core_module,
@@ -350,7 +350,7 @@ namespace h::compiler
                         statement
                     );
 
-                    h::Statement& mutable_statement = const_cast<h::Statement&>(statement);
+                    iris::Statement& mutable_statement = const_cast<iris::Statement&>(statement);
 
                     callback(
                         core_module,
@@ -364,7 +364,7 @@ namespace h::compiler
                 return false;
             };
 
-            h::visit_expressions(
+            iris::visit_expressions(
                 statement,
                 instantiate_all
             );
@@ -386,9 +386,9 @@ namespace h::compiler
     }
 
     static void instantiate_functions_in_function(
-        h::Module& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_definition& function_definition,
+        iris::Module& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_definition& function_definition,
         All_passes_parameters const& parameters
     )
     {
@@ -406,7 +406,7 @@ namespace h::compiler
         }
 
         std::pmr::vector<Replace_instantiate_function_parameters> replace_parameters;
-        auto const gather_replacements = [&](h::Module& core_module, h::Statement& statement, h::Expression const& expression, Instance_call_key const key, All_passes_parameters const& parameters)
+        auto const gather_replacements = [&](iris::Module& core_module, iris::Statement& statement, iris::Expression const& expression, Instance_call_key const key, All_passes_parameters const& parameters)
         {
             replace_parameters.push_back({
                 statement,
@@ -430,11 +430,11 @@ namespace h::compiler
     }
 
     static void instantiate_all_functions(
-        h::Module& core_module,
+        iris::Module& core_module,
         All_passes_parameters const& parameters
     )
     {
-        for (h::Function_definition& function_definition : core_module.definitions.function_definitions)
+        for (iris::Function_definition& function_definition : core_module.definitions.function_definitions)
         {
             std::optional<Function_declaration const*> const function_declaration = find_function_declaration(core_module, function_definition.name);
 
@@ -448,19 +448,19 @@ namespace h::compiler
     }
 
     static void verify_no_instance_calls(
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Expression const& expression,
-        h::Declaration_database const& declaration_database
+        iris::Statement const& statement,
+        iris::Expression const& expression,
+        iris::Declaration_database const& declaration_database
     )
     {
-        if (std::holds_alternative<h::Access_expression>(expression.data))
+        if (std::holds_alternative<iris::Access_expression>(expression.data))
         {
-            h::Access_expression const& access_expression = std::get<h::Access_expression>(expression.data);
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
 
-            std::optional<h::Type_reference> const expression_type = get_expression_type(
+            std::optional<iris::Type_reference> const expression_type = get_expression_type(
                 core_module,
                 &function_declaration,
                 scope,
@@ -478,32 +478,32 @@ namespace h::compiler
                 }
             }
         }
-        else if (std::holds_alternative<h::Instance_call_expression>(expression.data))
+        else if (std::holds_alternative<iris::Instance_call_expression>(expression.data))
         {
-            h::Instance_call_expression const& instance_call_expression = std::get<h::Instance_call_expression>(expression.data);
-            h::Expression const& expression = statement.expressions[instance_call_expression.left_hand_side.expression_index];
-            assert(std::holds_alternative<h::Variable_expression>(expression.data));
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
-            assert(h::is_builtin_function_name(variable_expression.name));
+            iris::Instance_call_expression const& instance_call_expression = std::get<iris::Instance_call_expression>(expression.data);
+            iris::Expression const& expression = statement.expressions[instance_call_expression.left_hand_side.expression_index];
+            assert(std::holds_alternative<iris::Variable_expression>(expression.data));
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
+            assert(iris::is_builtin_function_name(variable_expression.name));
         }
     }
 
     static void verify_no_instance_calls_in_function(
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_definition const& function_definition,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_definition const& function_definition,
+        iris::Declaration_database const& declaration_database
     )
     {
-        auto const scope_callback = [&](h::Statement const& statement, h::compiler::Scope const& scope) -> bool
+        auto const scope_callback = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> bool
         {
-            auto const verify_all = [&](h::Expression const& expression, h::Statement const& statement) -> bool
+            auto const verify_all = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
             {
                 verify_no_instance_calls(core_module, function_declaration, scope, statement, expression, declaration_database);
                 return false;
             };
 
-            h::visit_expressions(
+            iris::visit_expressions(
                 statement,
                 verify_all
             );
@@ -525,11 +525,11 @@ namespace h::compiler
     }
 
     static void verify_no_instance_calls_in_module(
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database
     )
     {
-        for (h::Function_definition const& definition : core_module.definitions.function_definitions)
+        for (iris::Function_definition const& definition : core_module.definitions.function_definitions)
         {
             std::optional<Function_declaration const*> const declaration = find_function_declaration(core_module, definition.name);
             if (!declaration.has_value())
@@ -545,8 +545,8 @@ namespace h::compiler
     }
 
     static void verify_no_type_instances(
-        h::Type_reference const& type_reference,
-        h::Declaration_database const& declaration_database
+        iris::Type_reference const& type_reference,
+        iris::Declaration_database const& declaration_database
     )
     {
         assert(!std::holds_alternative<Type_instance>(type_reference.data));
@@ -568,50 +568,50 @@ namespace h::compiler
     }
 
     static void verify_no_type_instances_in_function(
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_definition const& function_definition,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_definition const& function_definition,
+        iris::Declaration_database const& declaration_database
     )
     {
-        auto const visitor = [&](h::Type_reference const& type_reference) -> bool
+        auto const visitor = [&](iris::Type_reference const& type_reference) -> bool
         {
             verify_no_type_instances(type_reference, declaration_database);
             return false;
         };
 
-        h::visit_type_references_recursively(
+        iris::visit_type_references_recursively(
             function_declaration,
             visitor
         );
 
-        h::visit_type_references_recursively(
+        iris::visit_type_references_recursively(
             function_definition,
             visitor
         );
     }
 
     static void verify_no_type_instances_in_module(
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database
     )
     {
-        auto const visitor = [&](std::string_view const declaration_name, h::Type_reference const& type_reference) -> bool
+        auto const visitor = [&](std::string_view const declaration_name, iris::Type_reference const& type_reference) -> bool
         {
             verify_no_type_instances(type_reference, declaration_database);
             return false;
         };
 
-        h::visit_type_references_recursively_with_declaration_name(
+        iris::visit_type_references_recursively_with_declaration_name(
             core_module,
             visitor
         );
     }
 
     void run_instantiate_pass_on_function(
-        h::Module& core_module,
-        h::Function_declaration& function_declaration,
-        h::Function_definition& function_definition,
+        iris::Module& core_module,
+        iris::Function_declaration& function_declaration,
+        iris::Function_definition& function_definition,
         All_passes_parameters const& parameters
     )
     {
@@ -623,7 +623,7 @@ namespace h::compiler
     }
 
     void run_instantiate_pass_on_module(
-        h::Module& core_module,
+        iris::Module& core_module,
         All_passes_parameters const& parameters
     )
     {

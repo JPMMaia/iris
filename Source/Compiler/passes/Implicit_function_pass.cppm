@@ -1,21 +1,21 @@
-export module h.compiler.implicit_function_pass;
+export module iris.compiler.implicit_function_pass;
 
 import std;
 
-import h.core;
-import h.core.declarations;
+import iris.core;
+import iris.core.declarations;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export void run_implicit_function_pass_on_module(
-        h::Module& core_module,
-        h::Declaration_database const& declaration_database
+        iris::Module& core_module,
+        iris::Declaration_database const& declaration_database
     );
 
     export void run_implicit_function_pass_on_function(
-        h::Module& core_module,
-        h::Declaration_database const& declaration_database,
-        h::Function_declaration const& function_declaration,
-        h::Function_definition& function_definition
+        iris::Module& core_module,
+        iris::Declaration_database const& declaration_database,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_definition& function_definition
     );
 }

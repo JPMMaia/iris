@@ -4,16 +4,16 @@ module;
 
 #include <memory_resource>
 
-module h.compiler.artifact;
+module iris.compiler.artifact;
 
 import std;
 
-import h.common;
-import h.compiler.common;
-import h.compiler.target;
-import h.core;
+import iris.common;
+import iris.compiler.common;
+import iris.compiler.target;
+import iris.core;
 
-namespace h::compiler
+namespace iris::compiler
 {
     Version parse_version(std::string_view const string)
     {
@@ -70,7 +70,7 @@ namespace h::compiler
         else if (string == "library")
             return Artifact_type::Library;
 
-        h::common::print_message_and_exit(std::format("Failed to parse artifact type '{}'", string));
+        iris::common::print_message_and_exit(std::format("Failed to parse artifact type '{}'", string));
         return Artifact_type{};
     }
 
@@ -271,9 +271,9 @@ namespace h::compiler
         {
             return Cpp_source_group{};
         }
-        else if (type == "hlang")
+        else if (type == "iris")
         {
-            return Hlang_source_group{};
+            return Iris_source_group{};
         }
         else
         {
@@ -333,9 +333,9 @@ namespace h::compiler
 
     Artifact get_artifact(std::filesystem::path const& artifact_file_path)
     {
-        std::optional<std::pmr::string> const json_data = h::common::get_file_contents(artifact_file_path.c_str());
+        std::optional<std::pmr::string> const json_data = iris::common::get_file_contents(artifact_file_path.c_str());
         if (!json_data.has_value())
-            h::common::print_message_and_exit(std::format("Failed to read contents of {}", artifact_file_path.generic_string()));
+            iris::common::print_message_and_exit(std::format("Failed to read contents of {}", artifact_file_path.generic_string()));
 
         nlohmann::json const json = nlohmann::json::parse(json_data.value());
 
@@ -391,7 +391,7 @@ namespace h::compiler
         else if (artifact.type == Artifact_type::Library)
             json["type"] = "library";
         else
-            h::common::print_message_and_exit("Did not handle artifact.type!");
+            iris::common::print_message_and_exit("Did not handle artifact.type!");
 
         if (!artifact.dependencies.empty())
         {
@@ -426,8 +426,8 @@ namespace h::compiler
                         group_json["type"] = "import_c_header";
                     else if (std::holds_alternative<Cpp_source_group>(*group.data))
                         group_json["type"] = "c++";
-                    else if (std::holds_alternative<Hlang_source_group>(*group.data))
-                        group_json["type"] = "hlang";
+                    else if (std::holds_alternative<Iris_source_group>(*group.data))
+                        group_json["type"] = "iris";
 
                     if (std::holds_alternative<Export_c_header_source_group>(*group.data))
                     {
@@ -533,7 +533,7 @@ namespace h::compiler
         }
 
         std::string const json_string = json.dump(4);
-        h::common::write_to_file(artifact_file_path, json_string);
+        iris::common::write_to_file(artifact_file_path, json_string);
     }
 
     std::pmr::vector<std::filesystem::path> get_public_include_directories(Artifact const& artifact, std::span<Artifact const> const artifacts, std::pmr::polymorphic_allocator<> const& output_allocator, std::pmr::polymorphic_allocator<> const& temporaries_allocator)
@@ -594,7 +594,7 @@ namespace h::compiler
         {
             if (group.data.has_value())
             {
-                if (std::holds_alternative<Cpp_source_group>(*group.data) || std::holds_alternative<Hlang_source_group>(*group.data))
+                if (std::holds_alternative<Cpp_source_group>(*group.data) || std::holds_alternative<Iris_source_group>(*group.data))
                     return true;
             }
         }
@@ -793,7 +793,7 @@ namespace h::compiler
     {
         for (Source_group const& group : artifact.sources)
         {
-            if (std::holds_alternative<Hlang_source_group>(*group.data))
+            if (std::holds_alternative<Iris_source_group>(*group.data))
             {
                 for (std::string_view const regular_expression : group.include)
                 {
@@ -872,7 +872,7 @@ namespace h::compiler
         return output;
     }
 
-    std::pmr::vector<std::filesystem::path> get_artifact_hlang_source_files(
+    std::pmr::vector<std::filesystem::path> get_artifact_iris_source_files(
         Artifact const& artifact,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -882,7 +882,7 @@ namespace h::compiler
 
         for (Source_group const& group : artifact.sources)
         {
-            if (std::holds_alternative<Hlang_source_group>(*group.data))
+            if (std::holds_alternative<Iris_source_group>(*group.data))
             {
                 std::pmr::vector<std::filesystem::path> included_files = find_included_files(artifact.file_path.parent_path(), group.include, temporaries_allocator);
                 all_included_files.insert(all_included_files.end(), included_files.begin(), included_files.end());
@@ -979,7 +979,7 @@ namespace h::compiler
 
         for (Source_group const& group : artifact.sources)
         {
-            if (std::holds_alternative<Hlang_source_group>(*group.data))
+            if (std::holds_alternative<Iris_source_group>(*group.data))
             {
                 std::pmr::vector<std::filesystem::path> included_files = find_root_include_directories(artifact.file_path.parent_path(), group.include, temporaries_allocator);
                 all_included_files.insert(all_included_files.end(), included_files.begin(), included_files.end());
@@ -999,7 +999,7 @@ namespace h::compiler
         {
             Artifact const& artifact = artifacts[index];
 
-            std::pmr::vector<std::filesystem::path> const source_files = get_artifact_hlang_source_files(artifact, temporaries_allocator, temporaries_allocator);
+            std::pmr::vector<std::filesystem::path> const source_files = get_artifact_iris_source_files(artifact, temporaries_allocator, temporaries_allocator);
             for (std::filesystem::path const& current_source_file : source_files)
             {
                 if (current_source_file == source_file_path)
@@ -1057,16 +1057,16 @@ namespace h::compiler
         return std::pmr::vector<Artifact const*>{dependencies, output_allocator};
     }
 
-    std::pmr::vector<h::Module const*> get_artifact_modules_and_dependencies(
+    std::pmr::vector<iris::Module const*> get_artifact_modules_and_dependencies(
         Artifact const& artifact,
         std::span<Artifact const> const all_artifacts,
-        std::span<h::Module const> const header_modules,
-        std::span<h::Module const> const core_modules,
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::Module const*> output{ temporaries_allocator };
+        std::pmr::vector<iris::Module const*> output{ temporaries_allocator };
 
         auto const add_modules = [&](std::span<std::filesystem::path const> const source_files) -> void
         {
@@ -1077,7 +1077,7 @@ namespace h::compiler
                 auto const location = std::find_if(
                     core_modules.begin(),
                     core_modules.end(),
-                    [&source_file](h::Module const& module) -> bool
+                    [&source_file](iris::Module const& module) -> bool
                     {
                         return module.source_file_path.has_value() && *module.source_file_path == source_file;
                     }
@@ -1097,7 +1097,7 @@ namespace h::compiler
                 auto const location = std::find_if(
                     header_modules.begin(),
                     header_modules.end(),
-                    [&header](h::Module const& module) -> bool
+                    [&header](iris::Module const& module) -> bool
                     {
                         return module.name == header.module_name;
                     }
@@ -1108,7 +1108,7 @@ namespace h::compiler
             }
         };
 
-        std::pmr::vector<std::filesystem::path> const source_files = get_artifact_hlang_source_files(artifact, temporaries_allocator, temporaries_allocator);
+        std::pmr::vector<std::filesystem::path> const source_files = get_artifact_iris_source_files(artifact, temporaries_allocator, temporaries_allocator);
         std::span<C_header const> const c_headers = get_c_headers(artifact, temporaries_allocator);
 
         add_modules(source_files);
@@ -1130,14 +1130,14 @@ namespace h::compiler
 
             Artifact const& dependency_artifact = *dependency_artifact_location;
 
-            std::pmr::vector<std::filesystem::path> const dependency_source_files = get_artifact_hlang_source_files(dependency_artifact, temporaries_allocator, temporaries_allocator);
+            std::pmr::vector<std::filesystem::path> const dependency_source_files = get_artifact_iris_source_files(dependency_artifact, temporaries_allocator, temporaries_allocator);
             std::pmr::vector<C_header> const dependency_c_headers = get_c_headers(dependency_artifact, temporaries_allocator);
             
             add_modules(dependency_source_files);
             add_headers(dependency_c_headers);
         }
 
-        return std::pmr::vector<h::Module const*>{std::move(output), output_allocator};
+        return std::pmr::vector<iris::Module const*>{std::move(output), output_allocator};
     }
 
     std::optional<External_library_info> get_external_library(

@@ -2,13 +2,13 @@ module;
 
 #include <tree_sitter/api.h>
 
-export module h.parser.parse_tree;
+export module iris.parser.parse_tree;
 
 import std;
 
-import h.core;
+import iris.core;
 
-namespace h::parser
+namespace iris::parser
 {
     export struct Parse_node
     {
@@ -129,7 +129,7 @@ namespace h::parser
 
     export Parse_node get_smallest_node_that_contains_position(
         Parse_node const& node,
-        h::Source_position const& position
+        iris::Source_position const& position
     );
 
     export std::uint32_t calculate_byte(
@@ -142,13 +142,13 @@ namespace h::parser
     export std::uint32_t calculate_byte(
         Parse_tree const& tree,
         Parse_node const& hint_node,
-        h::Source_position const& source_position
+        iris::Source_position const& source_position
     );
 
     export std::optional<Parse_node> find_node_before_source_position(
         Parse_tree const& tree,
         Parse_node const& hint_node,
-        h::Source_position const& source_position
+        iris::Source_position const& source_position
     );
 
     export bool is_utf_8_code_point(

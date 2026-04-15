@@ -3,21 +3,21 @@
 
 #include <catch2/catch_all.hpp>
 
-import h.compiler.implicit_function_pass;
-import h.compiler.pass_test_helpers;
-import h.core;
-import h.core.declarations;
-import h.core.formatter;
-import h.parser.convertor;
+import iris.compiler.implicit_function_pass;
+import iris.compiler.pass_test_helpers;
+import iris.core;
+import iris.core.declarations;
+import iris.core.formatter;
+import iris.parser.convertor;
 
-namespace h::compiler
+namespace iris::compiler
 {
-    static h::Function_definition* find_mutable_function_definition(
-        h::Module& core_module,
+    static iris::Function_definition* find_mutable_function_definition(
+        iris::Module& core_module,
         std::string_view const function_name
     )
     {
-        return h::compiler::tests::find_mutable_function_definition(core_module, function_name);
+        return iris::compiler::tests::find_mutable_function_definition(core_module, function_name);
     }
 
     static void test_implicit_function_pass_on_function(
@@ -27,12 +27,12 @@ namespace h::compiler
         std::string_view const expected
     )
     {
-        h::compiler::tests::Parsed_module_context context = h::compiler::tests::parse_module_context(input_text, input_dependencies_text);
+        iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input_text, input_dependencies_text);
 
         std::optional<Function_declaration const*> const function_declaration = find_function_declaration(context.core_module, function_name);
         REQUIRE(function_declaration.has_value());
 
-        h::Function_definition* function_definition = find_mutable_function_definition(context.core_module, function_name);
+        iris::Function_definition* function_definition = find_mutable_function_definition(context.core_module, function_name);
         REQUIRE(function_definition != nullptr);
 
         run_implicit_function_pass_on_function(
@@ -42,7 +42,7 @@ namespace h::compiler
             *function_definition
         );
 
-        std::pmr::string const actual = h::compiler::tests::format_core_module_to_text(context.core_module);
+        std::pmr::string const actual = iris::compiler::tests::format_core_module_to_text(context.core_module);
 
         CHECK(expected == actual);
     }

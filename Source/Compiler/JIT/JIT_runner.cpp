@@ -1,27 +1,27 @@
-module h.compiler.jit_runner;
+module iris.compiler.jit_runner;
 
 import std;
 import llvm;
 
-import h.common;
-import h.common.filesystem;
-import h.compiler;
-import h.compiler.artifact;
-import h.compiler.common;
-import h.compiler.core_module_layer;
-import h.compiler.file_watcher;
-import h.core.hash;
-import h.compiler.jit_compiler;
-import h.compiler.recompilation;
-import h.compiler.repository;
-import h.compiler.target;
-import h.core;
-import h.c_header_converter;
-import h.json_serializer;
-import h.parser.convertor;
-import h.parser.parser;
+import iris.common;
+import iris.common.filesystem;
+import iris.compiler;
+import iris.compiler.artifact;
+import iris.compiler.common;
+import iris.compiler.core_module_layer;
+import iris.compiler.file_watcher;
+import iris.core.hash;
+import iris.compiler.jit_compiler;
+import iris.compiler.recompilation;
+import iris.compiler.repository;
+import iris.compiler.target;
+import iris.core;
+import iris.c_header_converter;
+import iris.json_serializer;
+import iris.parser.convertor;
+import iris.parser.parser;
 
-namespace h::compiler
+namespace iris::compiler
 {
     JIT_runner::~JIT_runner()
     {
@@ -169,7 +169,7 @@ namespace h::compiler
         bool is_c_header;
     };
 
-    h::c::Options create_c_header_options_from_artifact(
+    iris::c::Options create_c_header_options_from_artifact(
         std::string_view const module_name,
         std::optional<Artifact> const& artifact
     )
@@ -234,7 +234,7 @@ namespace h::compiler
 
         if (module_source_file_path->extension() == ".iris")
         {
-            std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(
+            std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(
                 *module_source_file_path,
                 {},
                 {}
@@ -242,7 +242,7 @@ namespace h::compiler
             if (!core_module.has_value())
                 return std::nullopt;
             
-            h::json::write_module_to_file(parsed_file_path, core_module.value());
+            iris::json::write_module_to_file(parsed_file_path, core_module.value());
 
             return Parsed_module_info
             {
@@ -257,8 +257,8 @@ namespace h::compiler
                 protected_data
             );
 
-            h::c::Options const options = create_c_header_options_from_artifact(module_name, artifact);
-            std::optional<h::Module> const header_module = h::c::import_header_and_write_to_file(module_name, *module_source_file_path, parsed_file_path, options);
+            iris::c::Options const options = create_c_header_options_from_artifact(module_name, artifact);
+            std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(module_name, *module_source_file_path, parsed_file_path, options);
             if (!header_module.has_value())
                 return std::nullopt;
 
@@ -273,10 +273,10 @@ namespace h::compiler
     }
 
     bool find_and_parse_core_module_dependencies(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         JIT_runner_unprotected_data const& unprotected_data,
         JIT_runner_protected_data& protected_data,
-        std::pmr::unordered_map<std::pmr::string, h::Module>& core_module_dependecies
+        std::pmr::unordered_map<std::pmr::string, iris::Module>& core_module_dependecies
     )
     {
         for (Import_module_with_alias const& import_alias : core_module.dependencies.alias_imports)
@@ -300,7 +300,7 @@ namespace h::compiler
 
             std::filesystem::path const& module_file_path = parsed_module_info->parsed_file_path;
 
-            std::optional<h::Module> import_core_module = h::compiler::read_core_module_declarations(module_file_path);
+            std::optional<iris::Module> import_core_module = iris::compiler::read_core_module_declarations(module_file_path);
             if (!import_core_module.has_value())
             {
                 ::printf("Failed to read contents of %s (invalid module)\n", module_file_path.generic_string().c_str());
@@ -322,13 +322,13 @@ namespace h::compiler
         return true;
     }
 
-    std::optional<std::pmr::unordered_map<std::pmr::string, h::Module>> find_and_parse_core_module_dependencies(
-        h::Module const& core_module,
+    std::optional<std::pmr::unordered_map<std::pmr::string, iris::Module>> find_and_parse_core_module_dependencies(
+        iris::Module const& core_module,
         JIT_runner_unprotected_data const& unprotected_data,
         JIT_runner_protected_data& protected_data
     )
     {
-        std::pmr::unordered_map<std::pmr::string, h::Module> module_dependecies;
+        std::pmr::unordered_map<std::pmr::string, iris::Module> module_dependecies;
         module_dependecies.reserve(core_module.dependencies.alias_imports.size());
 
         bool const success = find_and_parse_core_module_dependencies(
@@ -344,12 +344,12 @@ namespace h::compiler
     }
 
     inline void insert_symbol_to_module_name_entries(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         llvm::orc::MangleAndInterner& mangle,
         llvm::DenseMap<llvm::orc::SymbolStringPtr, std::pmr::string>& symbol_to_module_name_map
     )
     {
-        for (h::Function_declaration const& declaration : core_module.export_declarations.function_declarations)
+        for (iris::Function_declaration const& declaration : core_module.export_declarations.function_declarations)
         {
             std::string const mangled_name = mangle_name(core_module, declaration.name, declaration.unique_name);
             llvm::orc::SymbolStringPtr const symbol = mangle(mangled_name);
@@ -359,14 +359,14 @@ namespace h::compiler
     }
 
     void insert_symbol_to_module_name_entries(
-        std::pmr::unordered_map<std::pmr::string, h::Module> const& core_modules,
+        std::pmr::unordered_map<std::pmr::string, iris::Module> const& core_modules,
         llvm::orc::MangleAndInterner& mangle,
         JIT_runner_protected_data& protected_data
     )
     {
         std::unique_lock<std::shared_mutex> lock{ protected_data.mutex };
 
-        for (std::pair<std::pmr::string const, h::Module> const& core_module : core_modules)
+        for (std::pair<std::pmr::string const, iris::Module> const& core_module : core_modules)
         {
             insert_symbol_to_module_name_entries(core_module.second, mangle, protected_data.symbol_to_module_name_map);
         }
@@ -380,7 +380,7 @@ namespace h::compiler
         bool const recompile_reverse_dependencies
     )
     {
-        std::optional<h::Module> const core_module = h::compiler::read_core_module(module_file_path);
+        std::optional<iris::Module> const core_module = iris::compiler::read_core_module(module_file_path);
         if (!core_module.has_value())
         {
             ::printf("Failed to read contents of module %s\n", module_file_path.generic_string().c_str());
@@ -392,7 +392,7 @@ namespace h::compiler
             insert_symbol_to_module_name_entries(*core_module, *unprotected_data.jit_data->mangle, protected_data.symbol_to_module_name_map);
         }
 
-        std::optional<std::pmr::unordered_map<std::pmr::string, h::Module>> core_module_dependencies =
+        std::optional<std::pmr::unordered_map<std::pmr::string, iris::Module>> core_module_dependencies =
             find_and_parse_core_module_dependencies(*core_module, unprotected_data, protected_data);
         if (!core_module_dependencies.has_value())
         {
@@ -407,7 +407,7 @@ namespace h::compiler
 
             // TODO remove all entries where pair.second == core_module->name
 
-            for (std::pair<std::pmr::string const, h::Module> const& core_module_dependency : *core_module_dependencies)
+            for (std::pair<std::pmr::string const, iris::Module> const& core_module_dependency : *core_module_dependencies)
             {
                 protected_data.module_name_to_reverse_dependencies.insert(std::make_pair(core_module_dependency.first, core_module->name));
             }
@@ -554,13 +554,13 @@ namespace h::compiler
 
                 std::filesystem::path const parsed_file_path = unprotected_data.build_directory_path / source_file_path.filename().replace_extension("hlb");
 
-                std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(
+                std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(
                     source_file_path,
                     {},
                     {}
                 );
                 if (core_module.has_value())
-                    h::json::write_module_to_file(parsed_file_path, core_module.value());
+                    iris::json::write_module_to_file(parsed_file_path, core_module.value());
 
                 {
                     std::optional<std::pmr::string> const module_name = read_module_name(source_file_path);
@@ -619,11 +619,11 @@ namespace h::compiler
         return module_name;
     }
 
-    class H_definition_generator : public llvm::orc::DefinitionGenerator
+    class Iris_definition_generator : public llvm::orc::DefinitionGenerator
     {
     public:
 
-        H_definition_generator(
+        Iris_definition_generator(
             JIT_runner_unprotected_data const& unprotected_data,
             JIT_runner_protected_data& protected_data
         ) :
@@ -632,7 +632,7 @@ namespace h::compiler
         {
         }
 
-        virtual ~H_definition_generator()
+        virtual ~Iris_definition_generator()
         {
         }
 
@@ -749,13 +749,13 @@ namespace h::compiler
                 std::chrono::high_resolution_clock::time_point const begin_parsing = std::chrono::high_resolution_clock::now();
 
                 std::filesystem::path const parsed_file_path = unprotected_data.build_directory_path / source_file_path.filename().replace_extension("hlb");
-                std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(
+                std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(
                     source_file_path,
                     {},
                     {}
                 );
                 if (core_module.has_value())
-                    h::json::write_module_to_file(parsed_file_path, core_module.value());
+                    iris::json::write_module_to_file(parsed_file_path, core_module.value());
 
                 {
                     std::optional<std::pmr::string> const module_name = read_module_name(source_file_path);
@@ -823,15 +823,15 @@ namespace h::compiler
 
         // Create readonly and protected data:
         {
-            std::unique_ptr<h::compiler::LLVM_data> llvm_data = std::make_unique<h::compiler::LLVM_data>(h::compiler::initialize_llvm(compilation_options));
-            std::unique_ptr<JIT_data> jit_data = create_jit_data(llvm_data->data_layout, h::common::get_default_library_directories(), compilation_options.debug);
+            std::unique_ptr<iris::compiler::LLVM_data> llvm_data = std::make_unique<iris::compiler::LLVM_data>(iris::compiler::initialize_llvm(compilation_options));
+            std::unique_ptr<JIT_data> jit_data = create_jit_data(llvm_data->data_layout, iris::common::get_default_library_directories(), compilation_options.debug);
 
             jit_runner->unprotected_data =
             {
                 .build_directory_path = build_directory_path,
                 .header_search_paths = { header_search_paths.begin(), header_search_paths.end() },
                 .target = target,
-                .parser = h::parser::create_parser(),
+                .parser = iris::parser::create_parser(),
                 .llvm_data = std::move(llvm_data),
                 .jit_data = std::move(jit_data),
                 .log_level = 1,
@@ -865,7 +865,7 @@ namespace h::compiler
             JIT_runner_unprotected_data const& unprotected_data = jit_runner->unprotected_data;
             JIT_runner_protected_data& protected_data = jit_runner->protected_data;
 
-            add_generator(*jit_runner->unprotected_data.jit_data, std::make_unique<H_definition_generator>(unprotected_data, protected_data));
+            add_generator(*jit_runner->unprotected_data.jit_data, std::make_unique<Iris_definition_generator>(unprotected_data, protected_data));
         }
 
         // Add entry point artifact:

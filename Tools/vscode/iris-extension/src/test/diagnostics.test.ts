@@ -88,7 +88,7 @@ async function test_diagnostics(document_uri: vscode.Uri, expected_diagnostics: 
 	const client = await activate(document_uri);
 
 	const parameters: language_client.WorkspaceDiagnosticParams = {
-		identifier: "hlang",
+		identifier: "iris",
 		previousResultIds: []
 	};
 

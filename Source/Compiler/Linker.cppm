@@ -1,8 +1,8 @@
-export module h.compiler.linker;
+export module iris.compiler.linker;
 
 import std;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export enum class Link_type
     {

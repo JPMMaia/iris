@@ -1,13 +1,13 @@
-module h.compiler.common;
+module iris.compiler.common;
 
 import std;
 import llvm;
 
-import h.core;
-import h.core.declarations;
-import h.core.hash;
+import iris.core;
+import iris.core.declarations;
+import iris.core.hash;
 
-namespace h::compiler
+namespace iris::compiler
 {
     std::string_view to_string_view(llvm::StringRef const string)
     {
@@ -30,12 +30,12 @@ namespace h::compiler
     }
 
     std::string mangle_name(
-        h::Declaration_database const& declaration_database,
+        iris::Declaration_database const& declaration_database,
         std::string_view const module_name,
         std::string_view const declaration_name
     )
     {
-        std::optional<h::Declaration> const declaration = find_declaration(declaration_database, module_name, declaration_name);
+        std::optional<iris::Declaration> const declaration = find_declaration(declaration_database, module_name, declaration_name);
 
         if (declaration.has_value())
         {
@@ -121,10 +121,10 @@ namespace h::compiler
         return get_llvm_function(core_module.name, llvm_module, name, unique_name);
     }
 
-    h::Module const* get_module(
+    iris::Module const* get_module(
         std::string_view const module_name,
-        h::Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, h::Module> const& core_module_dependencies
+        iris::Module const& core_module,
+        std::pmr::unordered_map<std::pmr::string, iris::Module> const& core_module_dependencies
     )
     {
         if (core_module.name == module_name)

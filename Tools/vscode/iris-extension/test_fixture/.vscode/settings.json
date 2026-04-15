@@ -1,5 +1,5 @@
 {
-    "hlang.hlang_executable": "hlang",
-    "hlang.trace.server": "verbose",
+    "iris.iris_executable": "iris",
+    "iris.trace.server": "verbose",
     "chat.disableAIFeatures": true
 }

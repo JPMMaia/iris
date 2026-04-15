@@ -4,12 +4,12 @@ module;
 
 #include <compare>
 
-export module h.json_serializer.generated;
+export module iris.json_serializer.generated;
 
-//import h.json_serializer.generics;
-import h.core;
+//import iris.json_serializer.generics;
+import iris.core;
 
-namespace h::json
+namespace iris::json
 {
     export template <typename T>
     JSON to_json(

@@ -2,17 +2,17 @@ module;
 
 #include <string>
 
-export module h.compiler.jit_compiler;
+export module iris.compiler.jit_compiler;
 
 import std;
 import llvm;
 
-import h.core;
-import h.compiler;
-import h.compiler.core_module_layer;
-import h.compiler.recompile_module_layer;
+import iris.core;
+import iris.compiler;
+import iris.compiler.core_module_layer;
+import iris.compiler.recompile_module_layer;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export struct JIT_data
     {
@@ -97,7 +97,7 @@ namespace h::compiler
     export void run_jit(
         JIT_data& jit_data,
         LLVM_data& llvm_data,
-        std::span<h::Module> core_modules,
+        std::span<iris::Module> core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         std::span<std::pmr::string const> const dynamic_libraries,
         std::span<std::pmr::string const> const static_libraries,

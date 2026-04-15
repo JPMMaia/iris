@@ -1,15 +1,15 @@
-module h.compiler.all_passes;
+module iris.compiler.all_passes;
 
 import std;
 
-import h.compiler.compile_time_pass;
-import h.compiler.implicit_function_pass;
-import h.compiler.instantiate_pass;
+import iris.compiler.compile_time_pass;
+import iris.compiler.implicit_function_pass;
+import iris.compiler.instantiate_pass;
 
-namespace h::compiler
+namespace iris::compiler
 {
     void run_all_passes_on_module(
-        h::Module& core_module,
+        iris::Module& core_module,
         All_passes_parameters const& parameters
     )
     {
@@ -30,9 +30,9 @@ namespace h::compiler
     }
 
     void run_all_passes_on_function(
-        h::Module& core_module,
-        h::Function_declaration& function_declaration,
-        h::Function_definition& function_definition,
+        iris::Module& core_module,
+        iris::Function_declaration& function_declaration,
+        iris::Function_definition& function_definition,
         All_passes_parameters const& parameters
     )
     {

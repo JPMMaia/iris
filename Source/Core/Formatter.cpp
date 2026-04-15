@@ -1,12 +1,12 @@
-module h.core.formatter;
+module iris.core.formatter;
 
 import std;
 
-import h.core;
-import h.core.declarations;
-import h.core.types;
+import iris.core;
+import iris.core.declarations;
+import iris.core.types;
 
-namespace h
+namespace iris
 {
     static std::pmr::vector<std::string_view> decode_comment(
         std::string_view const value,
@@ -162,9 +162,9 @@ namespace h
 
     static bool is_test_declaration(Declaration const& declaration)
     {
-        if (std::holds_alternative<h::Function_declaration const*>(declaration.data))
+        if (std::holds_alternative<iris::Function_declaration const*>(declaration.data))
         {
-            h::Function_declaration const& function_declaration = *std::get<h::Function_declaration const*>(declaration.data);
+            iris::Function_declaration const& function_declaration = *std::get<iris::Function_declaration const*>(declaration.data);
             return function_declaration.is_test;
         }
 
@@ -173,7 +173,7 @@ namespace h
 
     static void add_format_declaration(
         String_buffer& buffer,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Declaration const& declaration,
         std::optional<std::pmr::string> const& unique_name,
         bool const is_export,
@@ -277,17 +277,17 @@ namespace h
     );
 
     static bool statement_ends_with_semicolon(
-        h::Expression const& expression
+        iris::Expression const& expression
     )
     {
         bool const does_not_end_with_semicolon =
-            std::holds_alternative<h::Block_expression>(expression.data) ||
-            std::holds_alternative<h::Comment_expression>(expression.data) ||
-            std::holds_alternative<h::Compile_time_expression>(expression.data) ||
-            std::holds_alternative<h::For_loop_expression>(expression.data) ||
-            std::holds_alternative<h::If_expression>(expression.data) ||
-            std::holds_alternative<h::Switch_expression>(expression.data) ||
-            std::holds_alternative<h::While_loop_expression>(expression.data);
+            std::holds_alternative<iris::Block_expression>(expression.data) ||
+            std::holds_alternative<iris::Comment_expression>(expression.data) ||
+            std::holds_alternative<iris::Compile_time_expression>(expression.data) ||
+            std::holds_alternative<iris::For_loop_expression>(expression.data) ||
+            std::holds_alternative<iris::If_expression>(expression.data) ||
+            std::holds_alternative<iris::Switch_expression>(expression.data) ||
+            std::holds_alternative<iris::While_loop_expression>(expression.data);
         return !does_not_end_with_semicolon;
     }
 
@@ -301,7 +301,7 @@ namespace h
     {
         if (statement.expressions.size() > 0)
         {
-            h::Expression const& first_expression = statement.expressions[0];
+            iris::Expression const& first_expression = statement.expressions[0];
             add_format_expression(buffer, statement, first_expression, indentation, options);
 
             if (add_semicolon && statement_ends_with_semicolon(first_expression))
@@ -310,7 +310,7 @@ namespace h
     }
 
     std::pmr::string format_statement(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Statement const& statement,
         std::uint32_t indentation,
         bool const add_semicolon,
@@ -524,7 +524,7 @@ namespace h
     }
 
     std::pmr::string format_expression(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Statement const& statement,
         Expression const& expression,
         std::uint32_t indentation,
@@ -876,118 +876,118 @@ namespace h
         Format_options const& options
     )
     {
-        h::Type_reference const& type = expression.type;
+        iris::Type_reference const& type = expression.type;
 
-        if (std::holds_alternative<h::Fundamental_type>(type.data))
+        if (std::holds_alternative<iris::Fundamental_type>(type.data))
         {
-            h::Fundamental_type const fundamental_type = std::get<h::Fundamental_type>(type.data);
+            iris::Fundamental_type const fundamental_type = std::get<iris::Fundamental_type>(type.data);
 
             switch (fundamental_type)
             {
-            case h::Fundamental_type::Byte:
+            case iris::Fundamental_type::Byte:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "b");
                 break;
             }
-            case h::Fundamental_type::Float16:
+            case iris::Fundamental_type::Float16:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "f16");
                 break;
             }
-            case h::Fundamental_type::Float32:
+            case iris::Fundamental_type::Float32:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "f32");
                 break;
             }
-            case h::Fundamental_type::Float64:
+            case iris::Fundamental_type::Float64:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "f64");
                 break;
             }
-            case h::Fundamental_type::String:
+            case iris::Fundamental_type::String:
             {
                 add_text(buffer, "\"");
                 add_text(buffer, expression.data);
                 add_text(buffer, "\"");
                 break;
             }
-            case h::Fundamental_type::C_bool:
+            case iris::Fundamental_type::C_bool:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cb");
                 break;
             }
-            case h::Fundamental_type::C_char:
+            case iris::Fundamental_type::C_char:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cc");
                 break;
             }
-            case h::Fundamental_type::C_schar:
+            case iris::Fundamental_type::C_schar:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "csc");
                 break;
             }
-            case h::Fundamental_type::C_uchar:
+            case iris::Fundamental_type::C_uchar:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cuc");
                 break;
             }
-            case h::Fundamental_type::C_short:
+            case iris::Fundamental_type::C_short:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cs");
                 break;
             }
-            case h::Fundamental_type::C_ushort:
+            case iris::Fundamental_type::C_ushort:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cus");
                 break;
             }
-            case h::Fundamental_type::C_int:
+            case iris::Fundamental_type::C_int:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "ci");
                 break;
             }
-            case h::Fundamental_type::C_uint:
+            case iris::Fundamental_type::C_uint:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cui");
                 break;
             }
-            case h::Fundamental_type::C_long:
+            case iris::Fundamental_type::C_long:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cl");
                 break;
             }
-            case h::Fundamental_type::C_ulong:
+            case iris::Fundamental_type::C_ulong:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cul");
                 break;
             }
-            case h::Fundamental_type::C_longlong:
+            case iris::Fundamental_type::C_longlong:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cll");
                 break;
             }
-            case h::Fundamental_type::C_ulonglong:
+            case iris::Fundamental_type::C_ulonglong:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cull");
                 break;
             }
-            case h::Fundamental_type::C_longdouble:
+            case iris::Fundamental_type::C_longdouble:
             {
                 add_text(buffer, expression.data);
                 add_text(buffer, "cld");
@@ -1000,9 +1000,9 @@ namespace h
             }
             }
         }
-        else if (std::holds_alternative<h::Integer_type>(type.data))
+        else if (std::holds_alternative<iris::Integer_type>(type.data))
         {
-            h::Integer_type const integer_type = std::get<h::Integer_type>(type.data);
+            iris::Integer_type const integer_type = std::get<iris::Integer_type>(type.data);
             if (integer_type.number_of_bits == 32 && integer_type.is_signed == true)
             {
                 add_text(buffer, expression.data);
@@ -1015,14 +1015,14 @@ namespace h
             add_text(buffer, signed_suffix);
             add_integer_text(buffer, static_cast<std::uint64_t>(integer_type.number_of_bits));
         }
-        else if (std::holds_alternative<h::Decimal_type>(type.data))
+        else if (std::holds_alternative<iris::Decimal_type>(type.data))
         {
-            h::Decimal_type const decimal_type = std::get<h::Decimal_type>(type.data);
+            iris::Decimal_type const decimal_type = std::get<iris::Decimal_type>(type.data);
             add_text(buffer, expression.data);
             add_text(buffer, "d");
             add_integer_text(buffer, static_cast<std::uint64_t>(decimal_type.scale));
         }
-        else if (h::is_c_string(type))
+        else if (iris::is_c_string(type))
         {
             add_text(buffer, "\"");
             add_text(buffer, expression.data);
@@ -1122,9 +1122,9 @@ namespace h
     }
 
     bool place_instantiate_members_on_the_same_line(
-        h::Statement const& statement,
+        iris::Statement const& statement,
         Instantiate_expression const& expression,
-        std::optional<h::Source_position> const source_position
+        std::optional<iris::Source_position> const source_position
     )
     {
         if (!source_position.has_value())
@@ -1135,7 +1135,7 @@ namespace h
 
         Instantiate_member_value_pair const& pair = expression.members[0];
         
-        h::Expression const& first_expression = statement.expressions[pair.value.expression_index];
+        iris::Expression const& first_expression = statement.expressions[pair.value.expression_index];
         if (!first_expression.source_range.has_value())
             return true;
 
@@ -1148,7 +1148,7 @@ namespace h
         String_buffer& buffer,
         Statement const& statement,
         Instance_call_expression const& expression,
-        std::optional<h::Source_range> const source_range,
+        std::optional<iris::Source_range> const source_range,
         std::uint32_t outside_indentation,
         Format_options const& options
     )
@@ -1164,7 +1164,7 @@ namespace h
                 add_text(buffer, ", ");
             }
 
-            h::Statement const& statement = expression.arguments[index];
+            iris::Statement const& statement = expression.arguments[index];
             add_format_statement(buffer, statement, outside_indentation + 4, options, false);
         }
 
@@ -1175,7 +1175,7 @@ namespace h
         String_buffer& buffer,
         Statement const& statement,
         Instantiate_expression const& expression,
-        std::optional<h::Source_range> const source_range,
+        std::optional<iris::Source_range> const source_range,
         std::uint32_t outside_indentation,
         Format_options const& options
     )
@@ -1272,7 +1272,7 @@ namespace h
             add_format_expression(buffer, statement, get_expression(statement, expression.step_by.value()), outside_indentation, options);
         }
 
-        if (expression.range_comparison_operation == h::Binary_operation::Greater_than)
+        if (expression.range_comparison_operation == iris::Binary_operation::Greater_than)
         {
             add_text(buffer, " reverse");
         }
@@ -1609,7 +1609,7 @@ namespace h
     }
 
     std::pmr::string format_integer_type(
-        h::Integer_type const value
+        iris::Integer_type const value
     )
     {
         String_buffer buffer;
@@ -1787,7 +1787,7 @@ namespace h
                     add_text(buffer, ", ");
                 }
 
-                h::Statement const& statement = value.arguments[index];
+                iris::Statement const& statement = value.arguments[index];
                 add_format_statement(buffer, statement, 0, options, false);
             }
 
@@ -1834,7 +1834,7 @@ namespace h
     void add_format_function_parameters(
         String_buffer& buffer,
         std::span<std::pmr::string const> const parameter_names,
-        std::span<h::Type_reference const> const parameter_types,
+        std::span<iris::Type_reference const> const parameter_types,
         std::optional<std::pmr::vector<Source_position>> const parameter_source_positions,
         bool const is_variadic,
         bool const same_line,
@@ -1905,7 +1905,7 @@ namespace h
         String_buffer& buffer,
         Function_declaration const& function_declaration,
         std::span<std::pmr::string const> const parameter_names,
-        std::span<h::Type_reference const> const parameter_types,
+        std::span<iris::Type_reference const> const parameter_types,
         std::optional<std::pmr::vector<Source_position>> const parameter_source_positions,
         bool const is_variadic,
         std::uint32_t const indentation,
@@ -2100,11 +2100,11 @@ namespace h
         Format_options const& options
     )
     {
-        if (declaration.global_type == h::Global_variable_type::Constant)
+        if (declaration.global_type == iris::Global_variable_type::Constant)
             add_text(buffer, "var");
-        else if (declaration.global_type == h::Global_variable_type::Mutable)
+        else if (declaration.global_type == iris::Global_variable_type::Mutable)
             add_text(buffer, "mutable");
-        else if (declaration.global_type == h::Global_variable_type::Macro)
+        else if (declaration.global_type == iris::Global_variable_type::Macro)
             add_text(buffer, "macro");
 
         add_text(buffer, " ");
@@ -2373,7 +2373,7 @@ namespace h
     }
 
     std::pmr::vector<Declaration_info> get_declaration_infos(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::pmr::polymorphic_allocator<> const& allocator
     )
     {
@@ -2395,7 +2395,7 @@ namespace h
     }
 
     std::pmr::string format_module(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Format_options const& options
     )
     {
@@ -2447,8 +2447,8 @@ namespace h
     }
 
     std::pmr::string format_type_reference(
-        h::Module const& core_module,
-        std::optional<h::Type_reference> const& type_reference,
+        iris::Module const& core_module,
+        std::optional<iris::Type_reference> const& type_reference,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -2481,8 +2481,8 @@ namespace h
     {
         if (expression_index.expression_index == static_cast<std::uint64_t>(-1) || expression_index.expression_index >= statement.expressions.size())
         {
-            static h::Expression invalid_expression = {
-                .data = h::Invalid_expression{ .value = "" }
+            static iris::Expression invalid_expression = {
+                .data = iris::Invalid_expression{ .value = "" }
             };
             return invalid_expression;
         }

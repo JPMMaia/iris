@@ -1,8 +1,8 @@
-export module h.core.string_hash;
+export module iris.core.string_hash;
 
 import std;
 
-namespace h
+namespace iris
 {
     export struct String_hash
     {

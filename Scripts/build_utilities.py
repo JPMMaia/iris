@@ -54,7 +54,7 @@ def build_and_test() -> bool:
     if not run_command(root_directory.joinpath("build").as_posix(), "ctest -j 8"):
         return False
     
-    install_hlang("debug", root_directory.joinpath("debug", "../Hlang_install"))
+    install_iris("debug", root_directory.joinpath("debug", "../Iris_install"))
     if not test_language_server():
         return False
     
@@ -76,13 +76,13 @@ def generate_builtin() -> None:
     destination_file = builtin_directory.joinpath("builtin.irisb")
     parse_file(builtin_directory, source_file, destination_file)
 
-def install_hlang(destination_directory: Path) -> None:
+def install_iris(destination_directory: Path) -> None:
     run_command(root_directory.as_posix(), "cmake --install build --prefix " + destination_directory.as_posix())
         
 # Execute commands
 def main() -> None:
 
-    parser = argparse.ArgumentParser(description="Helper scripts for building Hlang.")
+    parser = argparse.ArgumentParser(description="Helper scripts for building Iris.")
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands")
 
     build_and_test_command = subparsers.add_parser("build_and_test", help="Build and test all")
@@ -93,8 +93,8 @@ def main() -> None:
     
     generate_examples_command = subparsers.add_parser("generate_examples", help="Generate examples")
 
-    install_hlang_command = subparsers.add_parser("install_hlang", help="Install Hlang")
-    install_hlang_command.add_argument("destination_directory")
+    install_iris_command = subparsers.add_parser("install_iris", help="Install Iris")
+    install_iris_command.add_argument("destination_directory")
 
     test_language_server_command = subparsers.add_parser("test_language_server", help="Tests the language server")
 
@@ -104,8 +104,8 @@ def main() -> None:
         build_and_test()
     elif args.command == "generate_builtin":
         generate_builtin()
-    elif args.command == "install_hlang":
-        install_hlang(Path(args.destination_directory))
+    elif args.command == "install_iris":
+        install_iris(Path(args.destination_directory))
     elif args.command == "test_language_server":
         if not test_language_server():
             exit(-1)

@@ -12,67 +12,67 @@ module;
 
 #include <lsp/types.h>
 
-module h.language_server.diagnostics;
+module iris.language_server.diagnostics;
 
-import h.compiler;
-import h.compiler.analysis;
-import h.compiler.diagnostic;
-import h.core;
-import h.core.declarations;
-import h.language_server.core;
-import h.parser.parse_tree;
+import iris.compiler;
+import iris.compiler.analysis;
+import iris.compiler.diagnostic;
+import iris.core;
+import iris.core.declarations;
+import iris.language_server.core;
+import iris.parser.parse_tree;
 
-namespace h::language_server
+namespace iris::language_server
 {
     static std::pmr::string create_parser_diagnostic_message(
-        h::parser::Parse_tree const& tree,
-        h::parser::Parse_node const& node,
+        iris::parser::Parse_tree const& tree,
+        iris::parser::Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
-        if (h::parser::is_error_node(node))
+        if (iris::parser::is_error_node(node))
         {
             return std::pmr::string{"Unexpected token.", output_allocator};
         }
         else
         {
-            std::string_view const node_value = h::parser::get_node_value(tree, node);
+            std::string_view const node_value = iris::parser::get_node_value(tree, node);
             return std::pmr::string{std::format("Missing '{}'.", node_value), output_allocator};
         }
     }
 
-    std::pmr::vector<h::compiler::Diagnostic> create_parser_diagnostics(
+    std::pmr::vector<iris::compiler::Diagnostic> create_parser_diagnostics(
         std::filesystem::path const& source_file_path,
-        h::parser::Parse_tree const& parse_tree,
+        iris::parser::Parse_tree const& parse_tree,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::parser::Parse_node const& root_node = h::parser::get_root_node(parse_tree);
+        iris::parser::Parse_node const& root_node = iris::parser::get_root_node(parse_tree);
 
-        if (h::parser::has_errors(root_node))
+        if (iris::parser::has_errors(root_node))
         {
-            std::pmr::vector<h::parser::Parse_node> const error_or_missing_nodes = h::parser::get_error_or_missing_nodes(
+            std::pmr::vector<iris::parser::Parse_node> const error_or_missing_nodes = iris::parser::get_error_or_missing_nodes(
                 parse_tree,
                 root_node,
                 temporaries_allocator,
                 temporaries_allocator
             );
 
-            std::pmr::vector<h::compiler::Diagnostic> diagnostics{output_allocator};
+            std::pmr::vector<iris::compiler::Diagnostic> diagnostics{output_allocator};
             diagnostics.reserve(error_or_missing_nodes.size());
 
-            for (h::parser::Parse_node const& node : error_or_missing_nodes)
+            for (iris::parser::Parse_node const& node : error_or_missing_nodes)
             {
-                h::Source_range const range = h::parser::get_node_source_range(node);
+                iris::Source_range const range = iris::parser::get_node_source_range(node);
                 std::pmr::string message = create_parser_diagnostic_message(parse_tree, node, output_allocator);
 
-                h::compiler::Diagnostic diagnostic
+                iris::compiler::Diagnostic diagnostic
                 {
                     .file_path = source_file_path,
                     .range = range,
-                    .source = h::compiler::Diagnostic_source::Parser,
-                    .severity = h::compiler::Diagnostic_severity::Error,
+                    .source = iris::compiler::Diagnostic_source::Parser,
+                    .severity = iris::compiler::Diagnostic_severity::Error,
                     .message = std::move(message),
                     .related_information = {},
                 };
@@ -90,7 +90,7 @@ namespace h::language_server
         std::filesystem::path const& source_file_path,
         std::optional<int> const version,
         std::string_view const result_id,
-        std::span<h::compiler::Diagnostic const> const diagnostics
+        std::span<iris::compiler::Diagnostic const> const diagnostics
     )
     {
         lsp::WorkspaceFullDocumentDiagnosticReport document_report = {};
@@ -102,7 +102,7 @@ namespace h::language_server
 
         document_report.items = {};
 
-        for (h::compiler::Diagnostic const& core_diagnostic : diagnostics)
+        for (iris::compiler::Diagnostic const& core_diagnostic : diagnostics)
         {
             if (!core_diagnostic.file_path.has_value())
                 continue;
@@ -135,16 +135,16 @@ namespace h::language_server
 
     static bool is_any_dependency_dirty(
         std::pmr::vector<bool> const& dirty_diagnostics,
-        std::span<h::Module const* const> sorted_core_modules,
-        h::Module const& core_module,
+        std::span<iris::Module const* const> sorted_core_modules,
+        iris::Module const& core_module,
         std::size_t const& core_module_index
     )
     {
-        for (h::Import_module_with_alias const& alias : core_module.dependencies.alias_imports)
+        for (iris::Import_module_with_alias const& alias : core_module.dependencies.alias_imports)
         {
             for (std::size_t index = 0; index < core_module_index; ++index)
             {
-                h::Module const* const core_module = sorted_core_modules[index];
+                iris::Module const* const core_module = sorted_core_modules[index];
 
                 if (alias.module_name == core_module->name)
                 {
@@ -158,17 +158,17 @@ namespace h::language_server
     }
 
     static std::size_t find_sorted_index(
-        std::span<h::Module const* const> const sorted_modules,
-        std::span<h::Module const> const unsorted_modules,
+        std::span<iris::Module const* const> const sorted_modules,
+        std::span<iris::Module const> const unsorted_modules,
         std::size_t const unsorted_index
     )
     {
-        h::Module const* const module_to_find = &unsorted_modules[unsorted_index];
+        iris::Module const* const module_to_find = &unsorted_modules[unsorted_index];
 
         auto const location = std::find_if(
             sorted_modules.begin(),
             sorted_modules.end(),
-            [&](h::Module const* const sorted_module) -> bool { return sorted_module == module_to_find; }
+            [&](iris::Module const* const sorted_module) -> bool { return sorted_module == module_to_find; }
         );
 
         return std::distance(sorted_modules.begin(), location);
@@ -187,13 +187,13 @@ namespace h::language_server
     std::pmr::vector<lsp::WorkspaceDocumentDiagnosticReport> create_all_diagnostics(
         std::span<std::filesystem::path const> const core_module_source_file_paths,
         std::span<std::optional<int> const> const core_module_versions,
-        std::pmr::vector<std::pmr::vector<h::compiler::Diagnostic>>& core_module_diagnostics,
+        std::pmr::vector<std::pmr::vector<iris::compiler::Diagnostic>>& core_module_diagnostics,
         std::span<lsp::PreviousResultId const> const previous_result_ids,
         std::span<std::pmr::string> const core_module_diagnostic_result_ids,
         std::pmr::vector<bool>& core_module_diagnostic_dirty_flags,
-        std::span<h::parser::Parse_tree const> const core_module_parse_trees,
-        std::span<h::Module const> const header_modules,
-        std::span<h::Module> const core_modules,
+        std::span<iris::parser::Parse_tree const> const core_module_parse_trees,
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -201,13 +201,13 @@ namespace h::language_server
         std::pmr::vector<lsp::WorkspaceDocumentDiagnosticReport> items{output_allocator};
         items.reserve(core_module_source_file_paths.size());
 
-        std::pmr::vector<h::Module const*> sorted_core_modules = h::compiler::sort_core_modules(
+        std::pmr::vector<iris::Module const*> sorted_core_modules = iris::compiler::sort_core_modules(
             core_modules,
             temporaries_allocator,
             temporaries_allocator
         );
 
-        h::Declaration_database declaration_database = h::compiler::create_declaration_database_and_add_modules(
+        iris::Declaration_database declaration_database = iris::compiler::create_declaration_database_and_add_modules(
             header_modules,
             sorted_core_modules
         );
@@ -260,7 +260,7 @@ namespace h::language_server
             core_module_diagnostic_result_ids[core_module_index] = generate_new_result_id(core_module_diagnostic_result_ids[core_module_index]);
             core_module_diagnostic_dirty_flags[core_module_index] = true;
 
-            std::pmr::vector<h::compiler::Diagnostic> const parser_diagnostics = create_parser_diagnostics(
+            std::pmr::vector<iris::compiler::Diagnostic> const parser_diagnostics = create_parser_diagnostics(
                 source_file_path,
                 core_module_parse_trees[core_module_index],
                 temporaries_allocator,
@@ -281,21 +281,21 @@ namespace h::language_server
             }
             else
             {
-                h::Module& core_module = core_modules[core_module_index];
+                iris::Module& core_module = core_modules[core_module_index];
 
-                h::compiler::Analysis_options const options
+                iris::compiler::Analysis_options const options
                 {
                     .validate = true,
                 };
 
-                h::compiler::Analysis_result const result = h::compiler::process_module(
+                iris::compiler::Analysis_result const result = iris::compiler::process_module(
                     core_module,
                     declaration_database,
                     options,
                     temporaries_allocator
                 );
 
-                std::span<h::compiler::Diagnostic const> const compiler_diagnostics = result.diagnostics;
+                std::span<iris::compiler::Diagnostic const> const compiler_diagnostics = result.diagnostics;
 
                 lsp::WorkspaceFullDocumentDiagnosticReport item = create_full_document_diagnostics_report(
                     source_file_path,
@@ -313,18 +313,18 @@ namespace h::language_server
     }
 
     lsp::DiagnosticSeverity to_lsp_diagnostic_severity(
-        h::compiler::Diagnostic_severity const input
+        iris::compiler::Diagnostic_severity const input
     )
     {
         switch (input)
         {
-            case h::compiler::Diagnostic_severity::Warning:
+            case iris::compiler::Diagnostic_severity::Warning:
                 return lsp::DiagnosticSeverity::Warning;
-            case h::compiler::Diagnostic_severity::Error:
+            case iris::compiler::Diagnostic_severity::Error:
                 return lsp::DiagnosticSeverity::Error;
-            case h::compiler::Diagnostic_severity::Information:
+            case iris::compiler::Diagnostic_severity::Information:
                 return lsp::DiagnosticSeverity::Information;
-            case h::compiler::Diagnostic_severity::Hint:
+            case iris::compiler::Diagnostic_severity::Hint:
                 return lsp::DiagnosticSeverity::Hint;
             default:
                 return lsp::DiagnosticSeverity::Error;
@@ -332,7 +332,7 @@ namespace h::language_server
     }
 
     lsp::Opt<lsp::OneOf<int, lsp::String>> to_lsp_diagnostic_code(
-        std::optional<h::compiler::Diagnostic_code> const code
+        std::optional<iris::compiler::Diagnostic_code> const code
     )
     {
         if (!code.has_value())
@@ -342,21 +342,21 @@ namespace h::language_server
     }
 
     lsp::String diagnostic_source_to_string(
-        h::compiler::Diagnostic_source const source
+        iris::compiler::Diagnostic_source const source
     )
     {
         switch (source)
         {
-            case h::compiler::Diagnostic_source::Parser:
+            case iris::compiler::Diagnostic_source::Parser:
                 return "Parser";
-            case h::compiler::Diagnostic_source::Compiler:
+            case iris::compiler::Diagnostic_source::Compiler:
             default:
                 return "Compiler";
         }
     }
 
     lsp::Diagnostic to_lsp_diagnostic(
-        h::compiler::Diagnostic const& input
+        iris::compiler::Diagnostic const& input
     )
     {
         return lsp::Diagnostic

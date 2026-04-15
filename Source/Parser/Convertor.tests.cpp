@@ -5,14 +5,14 @@
 
 #include <catch2/catch_all.hpp>
 
-import h.common;
-import h.core;
-import h.core.formatter;
-import h.parser.convertor;
-import h.parser.parse_tree;
-import h.parser.parser;
+import iris.common;
+import iris.core;
+import iris.core.formatter;
+import iris.parser.convertor;
+import iris.parser.parse_tree;
+import iris.parser.parser;
 
-namespace h::parser
+namespace iris::parser
 {
     static std::filesystem::path const g_test_source_files_path = std::filesystem::path{ TEST_SOURCE_FILES_PATH };
 
@@ -21,7 +21,7 @@ namespace h::parser
     )
     {
         std::filesystem::path const input_file_path = g_test_source_files_path / input_file;
-        std::optional<std::pmr::u8string> const file_contents = h::common::get_file_utf8_contents(input_file_path);
+        std::optional<std::pmr::u8string> const file_contents = iris::common::get_file_utf8_contents(input_file_path);
         REQUIRE(file_contents.has_value());
         
         std::pmr::u8string const& source = file_contents.value();
@@ -30,7 +30,7 @@ namespace h::parser
         Parse_tree tree = parse(parser, source);
         Parse_node const root = get_root_node(tree);
 
-        std::optional<h::Module> const converted_module = parse_node_to_module(
+        std::optional<iris::Module> const converted_module = parse_node_to_module(
             tree,
             root,
             input_file_path,
@@ -50,7 +50,7 @@ namespace h::parser
                 .temporaries_allocator = temporaries_allocator,
             };
 
-            std::pmr::string const converted_text = h::format_module(
+            std::pmr::string const converted_text = iris::format_module(
                 converted_module.value(),
                 format_options
             );

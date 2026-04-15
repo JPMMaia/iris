@@ -21,54 +21,54 @@
 
 #include <iostream>
 
-import h.common;
-import h.common.filesystem;
-import h.compiler;
-import h.compiler.artifact;
-import h.compiler.jit_runner;
-import h.compiler.target;
+import iris.common;
+import iris.common.filesystem;
+import iris.compiler;
+import iris.compiler.artifact;
+import iris.compiler.jit_runner;
+import iris.compiler.target;
 
-namespace h
+namespace iris
 {
     static std::filesystem::path const g_standard_repository_file_path = std::filesystem::path{ STANDARD_REPOSITORY_FILE_PATH };
 
     void write_to_file_and_wait(
-        h::compiler::JIT_runner& jit_runner,
+        iris::compiler::JIT_runner& jit_runner,
         std::filesystem::path const& file_path,
         std::string_view const content
     )
     {
-        std::uint64_t const fence = h::compiler::get_processed_files(jit_runner);
-        h::common::write_to_file(file_path, content);
-        h::compiler::wait_for(jit_runner, fence + 1);
+        std::uint64_t const fence = iris::compiler::get_processed_files(jit_runner);
+        iris::common::write_to_file(file_path, content);
+        iris::compiler::wait_for(jit_runner, fence + 1);
     }
 
     void remove_file_and_wait(
-        h::compiler::JIT_runner& jit_runner,
+        iris::compiler::JIT_runner& jit_runner,
         std::filesystem::path const& file_path
     )
     {
-        std::uint64_t const fence = h::compiler::get_processed_files(jit_runner);
+        std::uint64_t const fence = iris::compiler::get_processed_files(jit_runner);
         std::filesystem::remove(file_path);
-        h::compiler::wait_for(jit_runner, fence + 1);
+        iris::compiler::wait_for(jit_runner, fence + 1);
     }
 
     void rename_file_and_wait(
-        h::compiler::JIT_runner& jit_runner,
+        iris::compiler::JIT_runner& jit_runner,
         std::filesystem::path const& file_path,
         std::filesystem::path const& new_file_path
     )
     {
-        std::uint64_t const fence = h::compiler::get_processed_files(jit_runner);
+        std::uint64_t const fence = iris::compiler::get_processed_files(jit_runner);
         std::filesystem::rename(file_path, new_file_path);
-        h::compiler::wait_for(jit_runner, fence + 2);
+        iris::compiler::wait_for(jit_runner, fence + 2);
     }
 
     TEST_CASE("Run JIT and modify code", "[JIT]")
     {
         SKIP();
 
-        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "hlang_test" / "jit_modify_code";
+        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "iris_test" / "jit_modify_code";
 
         if (std::filesystem::exists(root_directory))
             std::filesystem::remove_all(root_directory);
@@ -79,7 +79,7 @@ namespace h
         std::filesystem::create_directories(build_directory_path);
 
         std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
-        h::compiler::Artifact const artifact
+        iris::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
             .name = "iris_artifact.json",
@@ -88,23 +88,23 @@ namespace h
                 .minor = 1,
                 .patch = 0
             },
-            .type = h::compiler::Artifact_type::Executable,
+            .type = iris::compiler::Artifact_type::Executable,
             .dependencies = {},
             .sources = {
-                h::compiler::Source_group
+                iris::compiler::Source_group
                 {
-                    .data = h::compiler::Hlang_source_group{},
+                    .data = iris::compiler::Iris_source_group{},
                     .include = {"./**/*.iris"}
                 }
             },
-            .info = h::compiler::Executable_info
+            .info = iris::compiler::Executable_info
             {
                 .source = "main.iris",
                 .entry_point = "main",    
             }
         };
 
-        h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
+        iris::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
         std::filesystem::path const main_file_path = root_directory / "main.iris";
 
@@ -122,18 +122,18 @@ namespace h
                 return get_result();
             }
         )";
-        h::common::write_to_file(main_file_path, initial_code);
+        iris::common::write_to_file(main_file_path, initial_code);
 
-        h::compiler::Target const target = h::compiler::get_default_target();
-        h::compiler::Compilation_options const compilation_options =
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        iris::compiler::Compilation_options const compilation_options =
         {
             .target_triple = std::nullopt,
             .is_optimized = false,
             .debug = false,
         };
-        std::unique_ptr<h::compiler::JIT_runner> jit_runner = h::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
+        std::unique_ptr<iris::compiler::JIT_runner> jit_runner = iris::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
 
-        int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "test_main");
+        int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "test_main");
         REQUIRE(function_pointer != nullptr);
 
         int const first_result = function_pointer();
@@ -162,7 +162,7 @@ namespace h
     {
         SKIP();
 
-        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "hlang_test" / "jit_multiple_modules";
+        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "iris_test" / "jit_multiple_modules";
 
         if (std::filesystem::exists(root_directory))
             std::filesystem::remove_all(root_directory);
@@ -173,7 +173,7 @@ namespace h
         std::filesystem::create_directories(build_directory_path);
 
         std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
-        h::compiler::Artifact const artifact
+        iris::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
             .name = "iris_artifact.json",
@@ -182,23 +182,23 @@ namespace h
                 .minor = 1,
                 .patch = 0
             },
-            .type = h::compiler::Artifact_type::Executable,
+            .type = iris::compiler::Artifact_type::Executable,
             .dependencies = {},
             .sources = {
-                h::compiler::Source_group
+                iris::compiler::Source_group
                 {
-                    .data = h::compiler::Hlang_source_group{},
+                    .data = iris::compiler::Iris_source_group{},
                     .include = {"./**/*.iris"}
                 }
             },
-            .info = h::compiler::Executable_info
+            .info = iris::compiler::Executable_info
             {
                 .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
-        h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
+        iris::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
         std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(    
@@ -211,7 +211,7 @@ namespace h
                 return m1.get_result();
             }
         )";
-        h::common::write_to_file(m0_file_path, m0_code);
+        iris::common::write_to_file(m0_file_path, m0_code);
 
         std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(    
@@ -222,18 +222,18 @@ namespace h
                 return 5;
             }
         )";
-        h::common::write_to_file(m1_file_path, m1_code);
+        iris::common::write_to_file(m1_file_path, m1_code);
 
-        h::compiler::Target const target = h::compiler::get_default_target();
-        h::compiler::Compilation_options const compilation_options =
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        iris::compiler::Compilation_options const compilation_options =
         {
             .target_triple = std::nullopt,
             .is_optimized = false,
             .debug = false,
         };
-        std::unique_ptr<h::compiler::JIT_runner> jit_runner = h::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
+        std::unique_ptr<iris::compiler::JIT_runner> jit_runner = iris::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
 
-        int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+        int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
         REQUIRE(function_pointer != nullptr);
 
         int const result = function_pointer();
@@ -244,7 +244,7 @@ namespace h
     {
         SKIP();
 
-        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "hlang_test" / "jit_repository_modules";
+        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "iris_test" / "jit_repository_modules";
 
         if (std::filesystem::exists(root_directory))
             std::filesystem::remove_all(root_directory);
@@ -255,7 +255,7 @@ namespace h
         std::filesystem::create_directories(build_directory_path);
 
         std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
-        h::compiler::Artifact const artifact
+        iris::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
             .name = "iris_artifact.json",
@@ -264,7 +264,7 @@ namespace h
                 .minor = 1,
                 .patch = 0
             },
-            .type = h::compiler::Artifact_type::Executable,
+            .type = iris::compiler::Artifact_type::Executable,
             .dependencies =
             {
                 {
@@ -272,20 +272,20 @@ namespace h
                 }
             },
             .sources = {
-                h::compiler::Source_group
+                iris::compiler::Source_group
                 {
-                    .data = h::compiler::Hlang_source_group{},
+                    .data = iris::compiler::Iris_source_group{},
                     .include = {"./**/*.iris"}
                 }
             },
-            .info = h::compiler::Executable_info
+            .info = iris::compiler::Executable_info
             {
                 .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
-        h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
+        iris::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
         std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(    
@@ -299,7 +299,7 @@ namespace h
                 return 0;
             }
         )";
-        h::common::write_to_file(m0_file_path, m0_code);
+        iris::common::write_to_file(m0_file_path, m0_code);
 
         std::array<std::filesystem::path, 1> repositories =
         {
@@ -307,18 +307,18 @@ namespace h
         };
 
         std::pmr::vector<std::filesystem::path> header_search_paths =
-            h::common::get_default_header_search_directories();
+            iris::common::get_default_header_search_directories();
 
-        h::compiler::Target const target = h::compiler::get_default_target();
-        h::compiler::Compilation_options const compilation_options =
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        iris::compiler::Compilation_options const compilation_options =
         {
             .target_triple = std::nullopt,
             .is_optimized = false,
             .debug = false,
         };
-        std::unique_ptr<h::compiler::JIT_runner> jit_runner = h::compiler::setup_jit_and_watch(artifact_configuration_file_path, repositories, build_directory_path, header_search_paths, target, compilation_options);
+        std::unique_ptr<iris::compiler::JIT_runner> jit_runner = iris::compiler::setup_jit_and_watch(artifact_configuration_file_path, repositories, build_directory_path, header_search_paths, target, compilation_options);
 
-        int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+        int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
         REQUIRE(function_pointer != nullptr);
 
         int const result = function_pointer();
@@ -329,7 +329,7 @@ namespace h
     {
         SKIP();
 
-        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "hlang_test" / "jit_errors";
+        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "iris_test" / "jit_errors";
 
         if (std::filesystem::exists(root_directory))
             std::filesystem::remove_all(root_directory);
@@ -340,7 +340,7 @@ namespace h
         std::filesystem::create_directories(build_directory_path);
 
         std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
-        h::compiler::Artifact const artifact
+        iris::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
             .name = "iris_artifact.json",
@@ -349,23 +349,23 @@ namespace h
                 .minor = 1,
                 .patch = 0
             },
-            .type = h::compiler::Artifact_type::Executable,
+            .type = iris::compiler::Artifact_type::Executable,
             .dependencies = {},
             .sources = {
-                h::compiler::Source_group
+                iris::compiler::Source_group
                 {
-                    .data = h::compiler::Hlang_source_group{},
+                    .data = iris::compiler::Iris_source_group{},
                     .include = {"./**/*.iris"}
                 }
             },
-            .info = h::compiler::Executable_info
+            .info = iris::compiler::Executable_info
             {
                 .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
-        h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
+        iris::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
         std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code_with_errors = R"(
@@ -376,19 +376,19 @@ namespace h
                 ret
             }
         )";
-        h::common::write_to_file(m0_file_path, m0_code_with_errors);
+        iris::common::write_to_file(m0_file_path, m0_code_with_errors);
 
-        h::compiler::Target const target = h::compiler::get_default_target();
-        h::compiler::Compilation_options const compilation_options =
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        iris::compiler::Compilation_options const compilation_options =
         {
             .target_triple = std::nullopt,
             .is_optimized = false,
             .debug = false,
         };
-        std::unique_ptr<h::compiler::JIT_runner> jit_runner = h::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
+        std::unique_ptr<iris::compiler::JIT_runner> jit_runner = iris::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             CHECK(function_pointer == nullptr);
         }
 
@@ -403,7 +403,7 @@ namespace h
         write_to_file_and_wait(*jit_runner, m0_file_path, m0_code_without_errors);
 
 
-        int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+        int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
         REQUIRE(function_pointer != nullptr);
 
         {
@@ -446,7 +446,7 @@ namespace h
     {
         SKIP();
 
-        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "hlang_test" / "jit_structs";
+        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "iris_test" / "jit_structs";
 
         if (std::filesystem::exists(root_directory))
             std::filesystem::remove_all(root_directory);
@@ -457,7 +457,7 @@ namespace h
         std::filesystem::create_directories(build_directory_path);
 
         std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
-        h::compiler::Artifact const artifact
+        iris::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
             .name = "iris_artifact.json",
@@ -466,23 +466,23 @@ namespace h
                 .minor = 1,
                 .patch = 0
             },
-            .type = h::compiler::Artifact_type::Executable,
+            .type = iris::compiler::Artifact_type::Executable,
             .dependencies = {},
             .sources = {
-                h::compiler::Source_group
+                iris::compiler::Source_group
                 {
-                    .data = h::compiler::Hlang_source_group{},
+                    .data = iris::compiler::Iris_source_group{},
                     .include = {"./**/*.iris"}
                 }
             },
-            .info = h::compiler::Executable_info
+            .info = iris::compiler::Executable_info
             {
                 .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
-        h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
+        iris::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
         std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(
@@ -496,7 +496,7 @@ namespace h
                 return foo.a;
             }
         )";
-        h::common::write_to_file(m0_file_path, m0_code);
+        iris::common::write_to_file(m0_file_path, m0_code);
 
         std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(
@@ -507,19 +507,19 @@ namespace h
                 a: Int32 = 3;
             }
         )";
-        h::common::write_to_file(m1_file_path, m1_code);
+        iris::common::write_to_file(m1_file_path, m1_code);
 
-        h::compiler::Target const target = h::compiler::get_default_target();
-        h::compiler::Compilation_options const compilation_options =
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        iris::compiler::Compilation_options const compilation_options =
         {
             .target_triple = std::nullopt,
             .is_optimized = false,
             .debug = false,
         };
-        std::unique_ptr<h::compiler::JIT_runner> jit_runner = h::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
+        std::unique_ptr<iris::compiler::JIT_runner> jit_runner = iris::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             REQUIRE(function_pointer != nullptr);
 
             int const result = function_pointer();
@@ -531,7 +531,7 @@ namespace h
     {
         SKIP();
 
-        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "hlang_test" / "jit_update_structs";
+        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "iris_test" / "jit_update_structs";
 
         if (std::filesystem::exists(root_directory))
             std::filesystem::remove_all(root_directory);
@@ -542,7 +542,7 @@ namespace h
         std::filesystem::create_directories(build_directory_path);
 
         std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
-        h::compiler::Artifact const artifact
+        iris::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
             .name = "iris_artifact.json",
@@ -551,23 +551,23 @@ namespace h
                 .minor = 1,
                 .patch = 0
             },
-            .type = h::compiler::Artifact_type::Executable,
+            .type = iris::compiler::Artifact_type::Executable,
             .dependencies = {},
             .sources = {
-                h::compiler::Source_group
+                iris::compiler::Source_group
                 {
-                    .data = h::compiler::Hlang_source_group{},
+                    .data = iris::compiler::Iris_source_group{},
                     .include = {"./**/*.iris"}
                 }
             },
-            .info = h::compiler::Executable_info
+            .info = iris::compiler::Executable_info
             {
                 .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
-        h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
+        iris::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
         std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(
@@ -581,7 +581,7 @@ namespace h
                 return foo.a;
             }
         )";
-        h::common::write_to_file(m0_file_path, m0_code);
+        iris::common::write_to_file(m0_file_path, m0_code);
 
         std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(
@@ -592,19 +592,19 @@ namespace h
                 a: Int32 = 3;
             }
         )";
-        h::common::write_to_file(m1_file_path, m1_code);
+        iris::common::write_to_file(m1_file_path, m1_code);
 
-        h::compiler::Target const target = h::compiler::get_default_target();
-        h::compiler::Compilation_options const compilation_options =
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        iris::compiler::Compilation_options const compilation_options =
         {
             .target_triple = std::nullopt,
             .is_optimized = false,
             .debug = false,
         };
-        std::unique_ptr<h::compiler::JIT_runner> jit_runner = h::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
+        std::unique_ptr<iris::compiler::JIT_runner> jit_runner = iris::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             REQUIRE(function_pointer != nullptr);
 
             int const result = function_pointer();
@@ -622,7 +622,7 @@ namespace h
         write_to_file_and_wait(*jit_runner, m1_file_path, m1_new_code);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             REQUIRE(function_pointer != nullptr);
 
             int const result = function_pointer();
@@ -634,7 +634,7 @@ namespace h
     {
         SKIP();
 
-        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "hlang_test" / "jit_create_files";
+        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "iris_test" / "jit_create_files";
 
         if (std::filesystem::exists(root_directory))
             std::filesystem::remove_all(root_directory);
@@ -645,7 +645,7 @@ namespace h
         std::filesystem::create_directories(build_directory_path);
 
         std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
-        h::compiler::Artifact const artifact
+        iris::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
             .name = "iris_artifact.json",
@@ -654,23 +654,23 @@ namespace h
                 .minor = 1,
                 .patch = 0
             },
-            .type = h::compiler::Artifact_type::Executable,
+            .type = iris::compiler::Artifact_type::Executable,
             .dependencies = {},
             .sources = {
-                h::compiler::Source_group
+                iris::compiler::Source_group
                 {
-                    .data = h::compiler::Hlang_source_group{},
+                    .data = iris::compiler::Iris_source_group{},
                     .include = {"./**/*.iris"}
                 }
             },
-            .info = h::compiler::Executable_info
+            .info = iris::compiler::Executable_info
             {
                 .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
-        h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
+        iris::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
         std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(
@@ -684,19 +684,19 @@ namespace h
                 return m1.get_a(foo);
             }
         )";
-        h::common::write_to_file(m0_file_path, m0_code);
+        iris::common::write_to_file(m0_file_path, m0_code);
 
-        h::compiler::Target const target = h::compiler::get_default_target();
-        h::compiler::Compilation_options const compilation_options =
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        iris::compiler::Compilation_options const compilation_options =
         {
             .target_triple = std::nullopt,
             .is_optimized = false,
             .debug = false,
         };
-        std::unique_ptr<h::compiler::JIT_runner> jit_runner = h::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
+        std::unique_ptr<iris::compiler::JIT_runner> jit_runner = iris::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             CHECK(function_pointer == nullptr);
         }
 
@@ -717,7 +717,7 @@ namespace h
         write_to_file_and_wait(*jit_runner, m1_file_path, m1_code);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             REQUIRE(function_pointer != nullptr);
 
             int const result = function_pointer();
@@ -729,7 +729,7 @@ namespace h
     {
         SKIP();
 
-        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "hlang_test" / "jit_remove_files";
+        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "iris_test" / "jit_remove_files";
 
         if (std::filesystem::exists(root_directory))
             std::filesystem::remove_all(root_directory);
@@ -740,7 +740,7 @@ namespace h
         std::filesystem::create_directories(build_directory_path);
 
         std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
-        h::compiler::Artifact const artifact
+        iris::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
             .name = "iris_artifact.json",
@@ -749,23 +749,23 @@ namespace h
                 .minor = 1,
                 .patch = 0
             },
-            .type = h::compiler::Artifact_type::Executable,
+            .type = iris::compiler::Artifact_type::Executable,
             .dependencies = {},
             .sources = {
-                h::compiler::Source_group
+                iris::compiler::Source_group
                 {
-                    .data = h::compiler::Hlang_source_group{},
+                    .data = iris::compiler::Iris_source_group{},
                     .include = {"./**/*.iris"}
                 }
             },
-            .info = h::compiler::Executable_info
+            .info = iris::compiler::Executable_info
             {
                 .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
-        h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
+        iris::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
         std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(
@@ -778,7 +778,7 @@ namespace h
                 return m1.get_result();
             }
         )";
-        h::common::write_to_file(m0_file_path, m0_code);
+        iris::common::write_to_file(m0_file_path, m0_code);
 
         std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(
@@ -789,19 +789,19 @@ namespace h
                 return 3;
             }
         )";
-        h::common::write_to_file(m1_file_path, m1_code);
+        iris::common::write_to_file(m1_file_path, m1_code);
 
-        h::compiler::Target const target = h::compiler::get_default_target();
-        h::compiler::Compilation_options const compilation_options =
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        iris::compiler::Compilation_options const compilation_options =
         {
             .target_triple = std::nullopt,
             .is_optimized = false,
             .debug = false,
         };
-        std::unique_ptr<h::compiler::JIT_runner> jit_runner = h::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
+        std::unique_ptr<iris::compiler::JIT_runner> jit_runner = iris::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             REQUIRE(function_pointer != nullptr);
 
             int const result = function_pointer();
@@ -811,7 +811,7 @@ namespace h
         remove_file_and_wait(*jit_runner, m1_file_path);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             REQUIRE(function_pointer != nullptr);
 
             int const result = function_pointer();
@@ -829,7 +829,7 @@ namespace h
         write_to_file_and_wait(*jit_runner, m1_file_path, m1_new_code);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             REQUIRE(function_pointer != nullptr);
 
             int const result = function_pointer();
@@ -841,7 +841,7 @@ namespace h
     {
         SKIP();
 
-        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "hlang_test" / "jit_rename_files";
+        std::filesystem::path const root_directory = std::filesystem::temp_directory_path() / "iris_test" / "jit_rename_files";
 
         if (std::filesystem::exists(root_directory))
             std::filesystem::remove_all(root_directory);
@@ -852,7 +852,7 @@ namespace h
         std::filesystem::create_directories(build_directory_path);
 
         std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
-        h::compiler::Artifact const artifact
+        iris::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
             .name = "iris_artifact.json",
@@ -861,23 +861,23 @@ namespace h
                 .minor = 1,
                 .patch = 0
             },
-            .type = h::compiler::Artifact_type::Executable,
+            .type = iris::compiler::Artifact_type::Executable,
             .dependencies = {},
             .sources = {
-                h::compiler::Source_group
+                iris::compiler::Source_group
                 {
-                    .data = h::compiler::Hlang_source_group{},
+                    .data = iris::compiler::Iris_source_group{},
                     .include = {"./**/*.iris"}
                 }
             },
-            .info = h::compiler::Executable_info
+            .info = iris::compiler::Executable_info
             {
                 .source = "m0.iris",
                 .entry_point = "m0_main",
             }
         };
 
-        h::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
+        iris::compiler::write_artifact_to_file(artifact, artifact_configuration_file_path);
 
         std::filesystem::path const m0_file_path = root_directory / "m0.iris";
         std::string_view const m0_code = R"(
@@ -890,7 +890,7 @@ namespace h
                 return m1.get_result();
             }
         )";
-        h::common::write_to_file(m0_file_path, m0_code);
+        iris::common::write_to_file(m0_file_path, m0_code);
 
         std::filesystem::path const m1_file_path = root_directory / "m1.iris";
         std::string_view const m1_code = R"(
@@ -901,19 +901,19 @@ namespace h
                 return 3;
             }
         )";
-        h::common::write_to_file(m1_file_path, m1_code);
+        iris::common::write_to_file(m1_file_path, m1_code);
 
-        h::compiler::Target const target = h::compiler::get_default_target();
-        h::compiler::Compilation_options const compilation_options =
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        iris::compiler::Compilation_options const compilation_options =
         {
             .target_triple = std::nullopt,
             .is_optimized = false,
             .debug = false,
         };
-        std::unique_ptr<h::compiler::JIT_runner> jit_runner = h::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
+        std::unique_ptr<iris::compiler::JIT_runner> jit_runner = iris::compiler::setup_jit_and_watch(artifact_configuration_file_path, {}, build_directory_path, {}, target, compilation_options);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             REQUIRE(function_pointer != nullptr);
 
             int const result = function_pointer();
@@ -924,7 +924,7 @@ namespace h
         rename_file_and_wait(*jit_runner, m1_file_path, m1_new_file_path);
 
         {
-            int(*function_pointer)() = h::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
+            int(*function_pointer)() = iris::compiler::get_function<int(*)()>(*jit_runner, "m0_main");
             REQUIRE(function_pointer != nullptr);
 
             int const result = function_pointer();

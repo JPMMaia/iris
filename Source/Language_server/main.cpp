@@ -7,14 +7,14 @@
 #include <string>
 #include <vector>
 
-import h.common;
+import iris.common;
 
-import h.compiler.artifact;
-import h.compiler.repository;
+import iris.compiler.artifact;
+import iris.compiler.repository;
 
-import h.language_server.breakpoint;
-import h.language_server.message_handler;
-import h.language_server.server;
+import iris.language_server.breakpoint;
+import iris.language_server.message_handler;
+import iris.language_server.server;
 
 struct Source_file_info
 {
@@ -25,8 +25,8 @@ struct Source_file_info
 struct Project
 {
     std::filesystem::path project_directory;
-    std::pmr::vector<h::compiler::Repository> repositories;
-    std::pmr::unordered_map<std::filesystem::path, h::compiler::Artifact> artifacts;
+    std::pmr::vector<iris::compiler::Repository> repositories;
+    std::pmr::unordered_map<std::filesystem::path, iris::compiler::Artifact> artifacts;
     std::pmr::unordered_map<std::filesystem::path, Source_file_info> artifact_to_source_files_map;
 };
 
@@ -43,11 +43,11 @@ std::pmr::vector<std::filesystem::path> convert_to_path(std::span<std::string co
     return output;
 }
 
-using namespace h::language_server;
+using namespace iris::language_server;
 
 int main(int const argc, char const* const* argv)
 {
-    h::common::install_abort_handlers();
+    iris::common::install_abort_handlers();
 
     Message_handler message_handler = create_message_handler();
     process_messages(message_handler);

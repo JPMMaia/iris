@@ -5,7 +5,7 @@
     "dependencies": [],
     "sources": [
         {
-            "type": "hlang",
+            "type": "iris",
             "include": [
                 "./**/*.iris"
             ]

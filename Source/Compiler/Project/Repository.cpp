@@ -2,20 +2,20 @@ module;
 
 #include <nlohmann/json.hpp>
 
-module h.compiler.repository;
+module iris.compiler.repository;
 
 import std;
 
-import h.common;
-import h.compiler.common;
+import iris.common;
+import iris.compiler.common;
 
-namespace h::compiler
+namespace iris::compiler
 {
     Repository get_repository(std::filesystem::path const& repository_file_path)
     {
-        std::optional<std::pmr::string> const json_data = h::common::get_file_contents(repository_file_path.c_str());
+        std::optional<std::pmr::string> const json_data = iris::common::get_file_contents(repository_file_path.c_str());
         if (!json_data.has_value())
-            h::common::print_message_and_exit(std::format("Failed to read contents of {}", repository_file_path.generic_string()));
+            iris::common::print_message_and_exit(std::format("Failed to read contents of {}", repository_file_path.generic_string()));
 
         nlohmann::json const json = nlohmann::json::parse(json_data.value());
 

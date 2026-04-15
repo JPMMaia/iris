@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
   <!--
-    DecimalN debug visualization for Hlang values represented as signed integers.
+    DecimalN debug visualization for Iris values represented as signed integers.
     Decimal1..Decimal6 are 32-bit backing values.
     Decimal7..Decimal18 are 64-bit backing values.
   -->
 
-  <Type Name="h::Decimal1"><DisplayString>Decimal1 {raw/10}.{raw > 0 ? raw%10 : - raw%10}</DisplayString></Type>
-  <Type Name="h::Decimal2"><DisplayString>Decimal2 {raw/100}.{raw > 0 ? raw%100 : - raw%100}</DisplayString></Type>
-  <Type Name="h::Decimal3"><DisplayString>Decimal3 {raw/1000}.{raw > 0 ? raw%1000 : - raw%1000}</DisplayString></Type>
-  <Type Name="h::Decimal4"><DisplayString>Decimal4 {raw/10000}.{raw > 0 ? raw%10000 : - raw%10000}</DisplayString></Type>
-  <Type Name="h::Decimal5"><DisplayString>Decimal5 {raw/100000}.{raw > 0 ? raw%100000 : - raw%100000}</DisplayString></Type>
-  <Type Name="h::Decimal6"><DisplayString>Decimal6 {raw/1000000}.{raw > 0 ? raw%1000000 : - raw%1000000}</DisplayString></Type>
+  <Type Name="iris::Decimal1"><DisplayString>Decimal1 {raw/10}.{raw > 0 ? raw%10 : - raw%10}</DisplayString></Type>
+  <Type Name="iris::Decimal2"><DisplayString>Decimal2 {raw/100}.{raw > 0 ? raw%100 : - raw%100}</DisplayString></Type>
+  <Type Name="iris::Decimal3"><DisplayString>Decimal3 {raw/1000}.{raw > 0 ? raw%1000 : - raw%1000}</DisplayString></Type>
+  <Type Name="iris::Decimal4"><DisplayString>Decimal4 {raw/10000}.{raw > 0 ? raw%10000 : - raw%10000}</DisplayString></Type>
+  <Type Name="iris::Decimal5"><DisplayString>Decimal5 {raw/100000}.{raw > 0 ? raw%100000 : - raw%100000}</DisplayString></Type>
+  <Type Name="iris::Decimal6"><DisplayString>Decimal6 {raw/1000000}.{raw > 0 ? raw%1000000 : - raw%1000000}</DisplayString></Type>
 
-  <Type Name="h::Decimal7"><DisplayString>Decimal7 {raw/10000000}.{raw > 0 ? raw%10000000 : - raw%10000000}</DisplayString></Type>
-  <Type Name="h::Decimal8"><DisplayString>Decimal8 {raw/100000000}.{raw > 0 ? raw%100000000 : - raw%100000000}</DisplayString></Type>
-  <Type Name="h::Decimal9"><DisplayString>Decimal9 {raw/1000000000}.{raw > 0 ? raw%1000000000 : - raw%1000000000}</DisplayString></Type>
-  <Type Name="h::Decimal10"><DisplayString>Decimal10 {raw/10000000000}.{raw > 0 ? raw%10000000000 : - raw%10000000000}</DisplayString></Type>
-  <Type Name="h::Decimal11"><DisplayString>Decimal11 {raw/100000000000}.{raw > 0 ? raw%100000000000 : - raw%100000000000}</DisplayString></Type>
-  <Type Name="h::Decimal12"><DisplayString>Decimal12 {raw/1000000000000}.{raw > 0 ? raw%1000000000000 : - raw%1000000000000}</DisplayString></Type>
-  <Type Name="h::Decimal13"><DisplayString>Decimal13 {raw/10000000000000}.{raw > 0 ? raw%10000000000000 : - raw%10000000000000}</DisplayString></Type>
-  <Type Name="h::Decimal14"><DisplayString>Decimal14 {raw/100000000000000}.{raw > 0 ? raw%100000000000000 : - raw%100000000000000}</DisplayString></Type>
-  <Type Name="h::Decimal15"><DisplayString>Decimal15 {raw/1000000000000000}.{raw > 0 ? raw%1000000000000000 : - raw%1000000000000000}</DisplayString></Type>
-  <Type Name="h::Decimal16"><DisplayString>Decimal16 {raw/10000000000000000}.{raw > 0 ? raw%10000000000000000 : - raw%10000000000000000}</DisplayString></Type>
-  <Type Name="h::Decimal17"><DisplayString>Decimal17 {raw/100000000000000000}.{raw > 0 ? raw%100000000000000000 : - raw%100000000000000000}</DisplayString></Type>
-  <Type Name="h::Decimal18"><DisplayString>Decimal18 {raw/1000000000000000000}.{raw > 0 ? raw%1000000000000000000 : - raw%1000000000000000000}</DisplayString></Type>
+  <Type Name="iris::Decimal7"><DisplayString>Decimal7 {raw/10000000}.{raw > 0 ? raw%10000000 : - raw%10000000}</DisplayString></Type>
+  <Type Name="iris::Decimal8"><DisplayString>Decimal8 {raw/100000000}.{raw > 0 ? raw%100000000 : - raw%100000000}</DisplayString></Type>
+  <Type Name="iris::Decimal9"><DisplayString>Decimal9 {raw/1000000000}.{raw > 0 ? raw%1000000000 : - raw%1000000000}</DisplayString></Type>
+  <Type Name="iris::Decimal10"><DisplayString>Decimal10 {raw/10000000000}.{raw > 0 ? raw%10000000000 : - raw%10000000000}</DisplayString></Type>
+  <Type Name="iris::Decimal11"><DisplayString>Decimal11 {raw/100000000000}.{raw > 0 ? raw%100000000000 : - raw%100000000000}</DisplayString></Type>
+  <Type Name="iris::Decimal12"><DisplayString>Decimal12 {raw/1000000000000}.{raw > 0 ? raw%1000000000000 : - raw%1000000000000}</DisplayString></Type>
+  <Type Name="iris::Decimal13"><DisplayString>Decimal13 {raw/10000000000000}.{raw > 0 ? raw%10000000000000 : - raw%10000000000000}</DisplayString></Type>
+  <Type Name="iris::Decimal14"><DisplayString>Decimal14 {raw/100000000000000}.{raw > 0 ? raw%100000000000000 : - raw%100000000000000}</DisplayString></Type>
+  <Type Name="iris::Decimal15"><DisplayString>Decimal15 {raw/1000000000000000}.{raw > 0 ? raw%1000000000000000 : - raw%1000000000000000}</DisplayString></Type>
+  <Type Name="iris::Decimal16"><DisplayString>Decimal16 {raw/10000000000000000}.{raw > 0 ? raw%10000000000000000 : - raw%10000000000000000}</DisplayString></Type>
+  <Type Name="iris::Decimal17"><DisplayString>Decimal17 {raw/100000000000000000}.{raw > 0 ? raw%100000000000000000 : - raw%100000000000000000}</DisplayString></Type>
+  <Type Name="iris::Decimal18"><DisplayString>Decimal18 {raw/1000000000000000000}.{raw > 0 ? raw%1000000000000000000 : - raw%1000000000000000000}</DisplayString></Type>
 </AutoVisualizer>

@@ -2,22 +2,22 @@ module;
 
 #include <assert.h>
 
-module h.compiler.types;
+module iris.compiler.types;
 
 import std;
 import llvm;
 
-import h.common;
-import h.compiler.clang_code_generation;
-import h.compiler.clang_data;
-import h.compiler.common;
-import h.compiler.debug_info_formatter;
-import h.core.hash;
-import h.core;
-import h.core.declarations;
-import h.core.types;
+import iris.common;
+import iris.compiler.clang_code_generation;
+import iris.compiler.clang_data;
+import iris.compiler.common;
+import iris.compiler.debug_info_formatter;
+import iris.core.hash;
+import iris.core;
+import iris.core.declarations;
+import iris.core.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
     static std::uint64_t align_to(
         std::uint64_t const value,
@@ -93,7 +93,7 @@ namespace h::compiler
 
         llvm::DIType* string_type = llvm_debug_builder.createStructType(
             &llvm_scope,
-            "h::String",
+            "iris::String",
             nullptr,
             0,
             size_in_bits,
@@ -340,7 +340,7 @@ namespace h::compiler
                 llvm::Constant* const enum_constant = constants[index];
                 llvm::ConstantInt* const constant_int = llvm::dyn_cast<llvm::ConstantInt>(enum_constant);
                 if (constant_int == nullptr)
-                    h::common::print_message_and_exit(std::format("In enum '{}', value '{}' is not a constant integer!", key, enum_value.name));
+                    iris::common::print_message_and_exit(std::format("In enum '{}', value '{}' is not a constant integer!", key, enum_value.name));
 
                 std::uint64_t const integer_value = constant_int->getZExtValue();
 
@@ -697,9 +697,9 @@ namespace h::compiler
 
         add_struct_declarations(clang_module_data, core_module.name, core_module.export_declarations.struct_declarations, llvm_type_map);
         add_struct_declarations(clang_module_data, core_module.name, core_module.internal_declarations.struct_declarations, llvm_type_map);
-        for (h::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
+        for (iris::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
         {
-            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
+            std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
             assert(instance_custom_type_reference.has_value());
 
             std::pmr::string const& instance_module_name = instance_custom_type_reference->module_reference.name;
@@ -715,9 +715,9 @@ namespace h::compiler
 
         add_union_declarations(clang_module_data, core_module.name, core_module.export_declarations.union_declarations, llvm_type_map);
         add_union_declarations(clang_module_data, core_module.name, core_module.internal_declarations.union_declarations, llvm_type_map);
-        for (h::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
+        for (iris::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
         {
-            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
+            std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
             assert(instance_custom_type_reference.has_value());
 
             std::pmr::string const& instance_module_name = instance_custom_type_reference->module_reference.name;
@@ -819,7 +819,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Array_slice_type const& type,
         Debug_type_database const& debug_type_database
     )
@@ -867,7 +867,7 @@ namespace h::compiler
 
         std::pmr::string const array_slice_name = format_debug_type_name(
             core_module,
-            h::Type_reference{ .data = type },
+            iris::Type_reference{ .data = type },
             debug_type_database,
             {},
             {}
@@ -892,7 +892,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Constant_array_type const& type,
         Debug_type_database const& debug_type_database
     )
@@ -939,7 +939,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Soa_array_type const& type,
         Debug_type_database const& debug_type_database
     )
@@ -989,7 +989,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Soa_array_view_type const& type,
         Debug_type_database const& debug_type_database
     )
@@ -1182,7 +1182,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Function_pointer_type const& type,
         Debug_type_database const& debug_type_database
     )
@@ -1247,7 +1247,7 @@ namespace h::compiler
         static llvm::DINamespace* scope = llvm_debug_builder.createNameSpace(nullptr, "h", false);
 
         std::uint32_t const bits = type.scale <= 6 ? 32 : 64;
-        std::string const name = std::format("h::Decimal{}", type.scale);
+        std::string const name = std::format("iris::Decimal{}", type.scale);
         llvm::DIType* const storage_type = llvm_debug_builder.createBasicType(std::format("{}_storage", name), bits, llvm::dwarf::DW_ATE_signed);
 
         std::array<llvm::Metadata*, 1> const elements
@@ -1295,7 +1295,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Pointer_type const type,
         Debug_type_database const& debug_type_database
     )
@@ -1527,7 +1527,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Type_reference const& type_reference,
         Debug_type_database const& debug_type_database
     )
@@ -1603,7 +1603,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::span<Type_reference const> const type_reference,
         Debug_type_database const& debug_type_database
     )
@@ -1618,7 +1618,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::span<Type_reference const> const type_references,
         Debug_type_database const& debug_type_database,
         std::pmr::polymorphic_allocator<> const& output_allocator
@@ -1647,14 +1647,14 @@ namespace h::compiler
         LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at(module_name.data());
         auto const llvm_type_location = llvm_type_map.find(struct_name.data());
         if (llvm_type_location == llvm_type_map.end())
-            h::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. Could not find it!", module_name, struct_name));
+            iris::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. Could not find it!", module_name, struct_name));
 
         llvm::Type* const llvm_type = llvm_type_location->second;
         if (llvm_type == nullptr)
-            h::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. llvm::Type is null!", module_name, struct_name));
+            iris::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. llvm::Type is null!", module_name, struct_name));
 
         if (!llvm::StructType::classof(llvm_type))
-            h::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. llvm::Type is not llvm::StructType!", module_name, struct_name));
+            iris::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. llvm::Type is not llvm::StructType!", module_name, struct_name));
 
 
         llvm::StructType* const llvm_struct_type = static_cast<llvm::StructType*>(llvm_type);

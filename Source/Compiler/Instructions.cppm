@@ -1,17 +1,17 @@
-export module h.compiler.instructions;
+export module iris.compiler.instructions;
 
 import std;
 import llvm;
 
-import h.core;
+import iris.core;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Value_and_type
     {
         std::pmr::string name;
         llvm::Value* value;
-        std::optional<h::Type_reference> type;
+        std::optional<iris::Type_reference> type;
     };
 
     export llvm::AllocaInst* create_alloca_instruction(
@@ -81,7 +81,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::Value* const llvm_value,
-        std::optional<h::Type_reference> const& type
+        std::optional<iris::Type_reference> const& type
     );
 
     export llvm::Value* create_null_terminated_string_value(

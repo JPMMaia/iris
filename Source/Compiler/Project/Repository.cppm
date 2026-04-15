@@ -1,8 +1,8 @@
-export module h.compiler.repository;
+export module iris.compiler.repository;
 
 import std;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Repository
     {

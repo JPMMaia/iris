@@ -2,7 +2,7 @@ module;
 
 #include <compare>
 
-export module h.core;
+export module iris.core;
 
 import std;
 
@@ -12,7 +12,7 @@ import std;
 #define HACK_SPACESHIP_OPERATOR 0
 #endif
 
-namespace h
+namespace iris
 {
     export struct Source_location
     {
@@ -58,20 +58,20 @@ namespace h
         std::uint32_t const end_column
     );
 
-    export std::optional<h::Source_range> create_sub_source_range(
-        std::optional<h::Source_range> const& source_range,
+    export std::optional<iris::Source_range> create_sub_source_range(
+        std::optional<iris::Source_range> const& source_range,
         std::uint32_t const start_index,
         std::uint32_t const count
     );
 
     export bool range_contains_position(
-        h::Source_range const& range,
-        h::Source_position const& position
+        iris::Source_range const& range,
+        iris::Source_position const& position
     );
 
     export bool range_contains_position_inclusive(
-        h::Source_range const& range,
-        h::Source_position const& position
+        iris::Source_range const& range,
+        iris::Source_position const& position
     );
 
     export struct Source_range_location
@@ -615,12 +615,12 @@ namespace h
         Has
     };
 
-    export bool is_bit_shift_binary_operation(h::Binary_operation const operation);
-    export bool is_bitwise_binary_operation(h::Binary_operation const operation);
-    export bool is_equality_binary_operation(h::Binary_operation const operation);
-    export bool is_comparison_binary_operation(h::Binary_operation const operation);
-    export bool is_logical_binary_operation(h::Binary_operation const operation);
-    export bool is_numeric_binary_operation(h::Binary_operation const operation);
+    export bool is_bit_shift_binary_operation(iris::Binary_operation const operation);
+    export bool is_bitwise_binary_operation(iris::Binary_operation const operation);
+    export bool is_equality_binary_operation(iris::Binary_operation const operation);
+    export bool is_comparison_binary_operation(iris::Binary_operation const operation);
+    export bool is_logical_binary_operation(iris::Binary_operation const operation);
+    export bool is_numeric_binary_operation(iris::Binary_operation const operation);
 
     export struct Access_expression
     {
@@ -1356,24 +1356,24 @@ namespace h
     export std::optional<Union_declaration const*> find_union_declaration(Module const& module, std::string_view name);
 
     export Import_module_with_alias const* find_import_module_with_alias(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::string_view const alias_name
     );
 
     export Import_module_with_alias* find_import_module_with_alias(
-        h::Module& core_module,
+        iris::Module& core_module,
         std::string_view const alias_name
     );
 
     export Import_module_with_alias const* find_import_module_with_module_name(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::string_view const module_name
     );
 
-    export h::Expression_index copy_expressions_to_new_statement(
-        h::Statement& destination_statement,
-        h::Statement const& source_statement,
-        h::Expression_index const source_expression_index
+    export iris::Expression_index copy_expressions_to_new_statement(
+        iris::Statement& destination_statement,
+        iris::Statement const& source_statement,
+        iris::Expression_index const source_expression_index
     );
 
     export bool is_builtin_function_name(
@@ -1381,15 +1381,15 @@ namespace h
     );
     
     export bool is_expression_address_of(
-        h::Expression const& expression
+        iris::Expression const& expression
     );
 
     export bool is_offset_pointer(
-        h::Statement const& statement,
-        h::Expression const& expression
+        iris::Statement const& statement,
+        iris::Expression const& expression
     );
 
     export bool is_add_scope_expression(
-        h::Expression const& expression
+        iris::Expression const& expression
     );
 }

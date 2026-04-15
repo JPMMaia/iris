@@ -2,13 +2,13 @@ module;
 
 #include <windows.h>
 
-module h.common.filesystem;
+module iris.common.filesystem;
 
 import std;
 
-import h.common;
+import iris.common;
 
-namespace h::common
+namespace iris::common
 {
     std::filesystem::path get_executable_directory()
     {
@@ -29,7 +29,7 @@ namespace h::common
         std::filesystem::path const library_path = windows_kit_root / subdirectory;
 
         if (!std::filesystem::exists(library_path))
-            h::common::print_message_and_exit(std::format("{} does not exist! Is Windows 10 Kit installed?", library_path.generic_string()));
+            iris::common::print_message_and_exit(std::format("{} does not exist! Is Windows 10 Kit installed?", library_path.generic_string()));
 
         std::optional<std::filesystem::path> best_match = std::nullopt;
         for (std::filesystem::directory_entry const& entry : std::filesystem::directory_iterator{ library_path })
@@ -46,7 +46,7 @@ namespace h::common
         }
 
         if (!best_match)
-            h::common::print_message_and_exit(std::format("Could not find an Windows 10 Kit version in {}! Is Windows 10 Kit installed?", library_path.generic_string()));
+            iris::common::print_message_and_exit(std::format("Could not find an Windows 10 Kit version in {}! Is Windows 10 Kit installed?", library_path.generic_string()));
 
         return *best_match / "ucrt";
     }

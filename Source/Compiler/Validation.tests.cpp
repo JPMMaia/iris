@@ -1,6 +1,6 @@
 #include <iosfwd>
 
-namespace h::compiler
+namespace iris::compiler
 {
     struct Diagnostic;
     std::ostream& operator<<(
@@ -9,20 +9,20 @@ namespace h::compiler
     );
 }
 
-using h::compiler::operator<<;
+using iris::compiler::operator<<;
 #include <catch2/catch_test_macros.hpp>
 
 import std;
-import h.compiler;
-import h.compiler.analysis;
-import h.compiler.diagnostic;
-import h.core;
-import h.core.declarations;
-import h.core.types;
-import h.parser.convertor;
-import h.parser.parser;
+import iris.compiler;
+import iris.compiler.analysis;
+import iris.compiler.diagnostic;
+import iris.core;
+import iris.core.declarations;
+import iris.core.types;
+import iris.parser.convertor;
+import iris.parser.parser;
 
-namespace h::compiler
+namespace iris::compiler
 {
     void print_diagnostics(std::span<Diagnostic const> const diagnostics)
     {
@@ -39,7 +39,7 @@ namespace h::compiler
     void test_validate_module(
         std::string_view const input_text,
         std::span<std::string_view const> const input_dependencies_text,
-        std::span<h::compiler::Diagnostic const> const expected_diagnostics
+        std::span<iris::compiler::Diagnostic const> const expected_diagnostics
     )
     {
         Declaration_database declaration_database = create_declaration_database();
@@ -49,14 +49,14 @@ namespace h::compiler
             .validate = true,
         };
 
-        std::pmr::vector<h::Module> dependency_core_modules;
+        std::pmr::vector<iris::Module> dependency_core_modules;
         dependency_core_modules.reserve(input_dependencies_text.size());
 
         for (std::size_t index = 0; index < input_dependencies_text.size(); ++index)
         {
             std::string_view const dependency_text = input_dependencies_text[index];
 
-            std::optional<h::Module> dependency_module = h::parser::parse_and_convert_to_module(
+            std::optional<iris::Module> dependency_module = iris::parser::parse_and_convert_to_module(
                 dependency_text,
                 std::nullopt,
                 {},
@@ -77,7 +77,7 @@ namespace h::compiler
             dependency_core_modules.push_back(std::move(dependency_module.value()));
         }
 
-        std::optional<h::Module> core_module = h::parser::parse_and_convert_to_module(
+        std::optional<iris::Module> core_module = iris::parser::parse_and_convert_to_module(
             input_text,
             std::nullopt,
             {},
@@ -94,7 +94,7 @@ namespace h::compiler
             {}
         );
 
-        std::span<h::compiler::Diagnostic const> const actual_diagnostics = result.diagnostics;
+        std::span<iris::compiler::Diagnostic const> const actual_diagnostics = result.diagnostics;
 
         if (actual_diagnostics.size() != expected_diagnostics.size())
         {
@@ -111,8 +111,8 @@ namespace h::compiler
 
         for (std::size_t index = 0; index < actual_diagnostics.size(); ++index)
         {
-            h::compiler::Diagnostic const& actual_diagnostic = actual_diagnostics[index];
-            h::compiler::Diagnostic const& expected_diagnostic = expected_diagnostics[index];
+            iris::compiler::Diagnostic const& actual_diagnostic = actual_diagnostics[index];
+            iris::compiler::Diagnostic const& expected_diagnostic = expected_diagnostics[index];
             CHECK(actual_diagnostic == expected_diagnostic);
         }
     }
@@ -131,9 +131,9 @@ import module_b as module_a;
         
         std::pmr::vector<std::string_view> const dependencies = { module_a_input, module_b_input };
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(4, 20, 4, 28),
                 .source = Diagnostic_source::Compiler,
@@ -153,9 +153,9 @@ import module_b as module_a;
 import my.module_a as my_module;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 8, 3, 19),
                 .source = Diagnostic_source::Compiler,
@@ -182,7 +182,7 @@ union My_type
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
             {
                 .range = create_source_range(7, 7, 7, 14),
@@ -211,9 +211,9 @@ union Float32
 using true = Float32;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 8, 3, 13),
                 .source = Diagnostic_source::Compiler,
@@ -253,9 +253,9 @@ enum My_enum
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 5, 7, 6),
                 .source = Diagnostic_source::Compiler,
@@ -280,9 +280,9 @@ enum My_enum
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 9, 6, 13),
                 .source = Diagnostic_source::Compiler,
@@ -321,9 +321,9 @@ enum My_enum
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(13, 9, 13, 20),
                 .source = Diagnostic_source::Compiler,
@@ -349,7 +349,7 @@ enum My_enum
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
 
         test_validate_module(input, {}, expected_diagnostics);
     }
@@ -367,9 +367,9 @@ enum My_enum
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 9, 7, 10),
                 .source = Diagnostic_source::Compiler,
@@ -398,9 +398,9 @@ var my_global_0: Float32 = 2.0f32;
 var my_global_1: Int32 = 2.0f32;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(4, 26, 4, 32),
                 .source = Diagnostic_source::Compiler,
@@ -429,9 +429,9 @@ var my_global_2 = get_value;
 var my_global_3 = [0, 1, 2];
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(9, 19, 9, 30),
                 .source = Diagnostic_source::Compiler,
@@ -460,9 +460,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(11, 13, 11, 14),
                 .source = Diagnostic_source::Compiler,
@@ -488,9 +488,9 @@ struct Particle
 var particles: Soa_array::<Int32, 4> = {};
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(8, 28, 8, 33),
                 .source = Diagnostic_source::Compiler,
@@ -511,9 +511,9 @@ var particles: Soa_array::<Int32, 4> = {};
 var particles: Soa_array::<Unknown_particle, 4> = {};
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 28, 3, 44),
                 .source = Diagnostic_source::Compiler,
@@ -538,7 +538,7 @@ struct Particle
 using Particle_array = Soa_array::<Particle, 4>;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
 
         test_validate_module(input, {}, expected_diagnostics);
     }
@@ -565,9 +565,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(17, 18, 17, 34),
                 .source = Diagnostic_source::Compiler,
@@ -598,9 +598,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(13, 13, 13, 30),
                 .source = Diagnostic_source::Compiler,
@@ -620,9 +620,9 @@ function run() -> ()
 using Particle_view = Soa_array_view::<Int32>;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 40, 3, 45),
                 .source = Diagnostic_source::Compiler,
@@ -643,9 +643,9 @@ using Particle_view = Soa_array_view::<Int32>;
 using Particle_view = Soa_array_view::<Unknown_particle>;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 40, 3, 56),
                 .source = Diagnostic_source::Compiler,
@@ -670,7 +670,7 @@ struct Particle
 using Particle_view = Soa_array_view::<Particle>;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
 
         test_validate_module(input, {}, expected_diagnostics);
     }
@@ -695,9 +695,9 @@ function run(view: Soa_array_view::<Particle>) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(15, 18, 15, 29),
                 .source = Diagnostic_source::Compiler,
@@ -725,7 +725,7 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
 
         test_validate_module(input, {}, expected_diagnostics);
     }
@@ -753,7 +753,7 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics = {};
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
 
         test_validate_module(input, {}, expected_diagnostics);
     }
@@ -780,9 +780,9 @@ function run(view: Soa_array_view::<Particle>, mutable_view: Soa_array_view::<mu
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(15, 49, 15, 53),
                 .source = Diagnostic_source::Compiler,
@@ -809,9 +809,9 @@ struct My_struct
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 5, 7, 6),
                 .source = Diagnostic_source::Compiler,
@@ -835,9 +835,9 @@ struct My_struct
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 16, 6, 22),
                 .source = Diagnostic_source::Compiler,
@@ -878,9 +878,9 @@ mutable g_non_constant = 0;
 
         std::pmr::vector<std::string_view> const dependencies = { module_a };
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(13, 16, 13, 27),
                 .source = Diagnostic_source::Compiler,
@@ -910,9 +910,9 @@ struct My_struct
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 16, 5, 21),
                 .source = Diagnostic_source::Compiler,
@@ -953,9 +953,9 @@ struct My_struct_1
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(23, 16, 23, 18),
                 .source = Diagnostic_source::Compiler,
@@ -982,9 +982,9 @@ union My_union
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 5, 7, 6),
                 .source = Diagnostic_source::Compiler,
@@ -1012,9 +1012,9 @@ function add(first: Int32, second: Int32) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 28, 5, 33),
                 .source = Diagnostic_source::Compiler,
@@ -1063,9 +1063,9 @@ function add(first: Int32, second: Int32) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(19, 64, 19, 76),
                 .source = Diagnostic_source::Compiler,
@@ -1121,9 +1121,9 @@ function add(first: Int32, second: Int32) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(19, 66, 19, 78),
                 .source = Diagnostic_source::Compiler,
@@ -1157,7 +1157,7 @@ function foo() -> (result: My_alias)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -1237,9 +1237,9 @@ export union My_union
 
         std::pmr::vector<std::string_view> const dependencies = { test_2_input };
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(26, 19, 26, 28),
                 .source = Diagnostic_source::Compiler,
@@ -1310,9 +1310,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(24, 19, 24, 28),
                 .source = Diagnostic_source::Compiler,
@@ -1383,9 +1383,9 @@ export union My_union
 
         std::pmr::vector<std::string_view> const dependencies = { test_2_input };
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(8, 19, 8, 38),
                 .source = Diagnostic_source::Compiler,
@@ -1438,7 +1438,7 @@ function run() -> ()
 
         std::pmr::vector<std::string_view> const dependencies = { module_a };
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
             {
                 .range = create_source_range(8, 5, 8, 20),
@@ -1464,9 +1464,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 31, 6, 36),
                 .source = Diagnostic_source::Compiler,
@@ -1492,9 +1492,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 15, 7, 21),
                 .source = Diagnostic_source::Compiler,
@@ -1526,9 +1526,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(14, 5, 14, 23),
                 .source = Diagnostic_source::Compiler,
@@ -1560,9 +1560,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 13, 6, 27),
                 .source = Diagnostic_source::Compiler,
@@ -1604,9 +1604,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 13, 7, 25),
                 .source = Diagnostic_source::Compiler,
@@ -1638,9 +1638,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(14, 13, 14, 36),
                 .source = Diagnostic_source::Compiler,
@@ -1665,7 +1665,7 @@ function run(first: My_uint, second: My_uint) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -1683,9 +1683,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 13, 6, 23),
                 .source = Diagnostic_source::Compiler,
@@ -1716,9 +1716,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(12, 13, 12, 28),
                 .source = Diagnostic_source::Compiler,
@@ -1742,9 +1742,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 13, 6, 29),
                 .source = Diagnostic_source::Compiler,
@@ -1774,9 +1774,9 @@ function run(value: My_enum) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(12, 13, 12, 20),
                 .source = Diagnostic_source::Compiler,
@@ -1856,9 +1856,9 @@ function run(input: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(22, 5, 22, 10),
                 .source = Diagnostic_source::Compiler,
@@ -1911,9 +1911,9 @@ function run(input: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(20, 15, 20, 16),
                 .source = Diagnostic_source::Compiler,
@@ -1944,9 +1944,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(12, 5, 12, 16),
                 .source = Diagnostic_source::Compiler,
@@ -1990,9 +1990,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(18, 5, 18, 13),
                 .source = Diagnostic_source::Compiler,
@@ -2049,9 +2049,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(11, 5, 11, 13),
                 .source = Diagnostic_source::Compiler,
@@ -2088,9 +2088,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(14, 11, 14, 17),
                 .source = Diagnostic_source::Compiler,
@@ -2145,9 +2145,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(9, 11, 9, 16),
                 .source = Diagnostic_source::Compiler,
@@ -2184,9 +2184,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(19, 17, 19, 23),
                 .source = Diagnostic_source::Compiler,
@@ -2224,9 +2224,9 @@ function run(int_input: Int32, enum_input: My_enum) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(19, 19, 19, 36),
                 .source = Diagnostic_source::Compiler,
@@ -2261,9 +2261,9 @@ function run(int_input: Int32, enum_input: My_enum) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(17, 19, 17, 41),
                 .source = Diagnostic_source::Compiler,
@@ -2296,9 +2296,9 @@ function run(int_input: Int32, enum_input: My_enum) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(14, 19, 14, 37),
                 .source = Diagnostic_source::Compiler,
@@ -2350,9 +2350,9 @@ function run(int_input: Int32, enum_input: dependency.My_enum) -> ()
 
         std::pmr::vector<std::string_view> const dependencies = { dependency };
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(9, 19, 9, 52),
                 .source = Diagnostic_source::Compiler,
@@ -2389,7 +2389,7 @@ function run() -> ()
 
         std::pmr::vector<std::string_view> const dependencies = { dependency };
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -2480,9 +2480,9 @@ function run(input: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(15, 5, 15, 13),
                 .source = Diagnostic_source::Compiler,
@@ -2525,9 +2525,9 @@ using My_int = Int32;
 using My_type = My_struct;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(4, 17, 4, 26),
                 .source = Diagnostic_source::Compiler,
@@ -2561,9 +2561,9 @@ struct My_struct
 
         std::pmr::vector<std::string_view> const dependencies = { test_b_input };
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 19, 7, 32),
                 .source = Diagnostic_source::Compiler,
@@ -2583,9 +2583,9 @@ struct My_struct
 using My_type = B.My_struct;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 17, 3, 28),
                 .source = Diagnostic_source::Compiler,
@@ -2620,9 +2620,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(8, 28, 8, 33),
                 .source = Diagnostic_source::Compiler,
@@ -2675,9 +2675,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(13, 18, 13, 22),
                 .source = Diagnostic_source::Compiler,
@@ -2714,9 +2714,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 25, 5, 30),
                 .source = Diagnostic_source::Compiler,
@@ -2754,7 +2754,7 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -2784,7 +2784,7 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
             {
                 .range = create_source_range(12, 8, 12, 13),
@@ -2831,9 +2831,9 @@ function run(value: Int32) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 8, 5, 13),
                 .source = Diagnostic_source::Compiler,
@@ -2874,7 +2874,7 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
             {
                 .range = create_source_range(14, 9, 14, 10),
@@ -2913,9 +2913,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(17, 33, 20, 6),
                 .source = Diagnostic_source::Compiler,
@@ -2953,9 +2953,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(17, 33, 20, 6),
                 .source = Diagnostic_source::Compiler,
@@ -2992,9 +2992,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(18, 9, 18, 10),
                 .source = Diagnostic_source::Compiler,
@@ -3024,9 +3024,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(11, 12, 11, 18),
                 .source = Diagnostic_source::Compiler,
@@ -3069,7 +3069,7 @@ function run() -> ()
 
         std::pmr::vector<std::string_view> const dependencies = { dependency };
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -3103,9 +3103,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(16, 12, 16, 14),
                 .source = Diagnostic_source::Compiler,
@@ -3148,9 +3148,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(22, 13, 22, 28),
                 .source = Diagnostic_source::Compiler,
@@ -3189,7 +3189,7 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -3238,7 +3238,7 @@ export function foo(a: *My_struct, b: My_struct) -> ()
         
         std::pmr::vector<std::string_view> const dependencies = { module_a_input };
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -3256,9 +3256,9 @@ function run() -> ()
     value = 1;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 5, 6, 14),
                 .source = Diagnostic_source::Compiler,
@@ -3286,9 +3286,9 @@ function run() -> ()
     *pointer_1 = 2;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(11, 5, 11, 19),
                 .source = Diagnostic_source::Compiler,
@@ -3321,9 +3321,9 @@ function run() -> ()
     pointer_1->member_0 = 2;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(16, 5, 16, 28),
                 .source = Diagnostic_source::Compiler,
@@ -3354,9 +3354,9 @@ function run() -> ()
     value.member_0 = 2;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(14, 5, 14, 23),
                 .source = Diagnostic_source::Compiler,
@@ -3398,9 +3398,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(16, 37, 16, 47),
                 .source = Diagnostic_source::Compiler,
@@ -3443,9 +3443,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(16, 37, 16, 59),
                 .source = Diagnostic_source::Compiler,
@@ -3471,9 +3471,9 @@ struct My_struct
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 16, 6, 20),
                 .source = Diagnostic_source::Compiler,
@@ -3514,7 +3514,7 @@ function run(value: Int32) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
             {
                 .range = create_source_range(16, 15, 16, 19),
@@ -3553,7 +3553,7 @@ struct My_struct
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -3577,7 +3577,7 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -3596,9 +3596,9 @@ export function run(external_pointer: *Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 47, 6, 51),
                 .source = Diagnostic_source::Compiler,
@@ -3622,9 +3622,9 @@ export function run(external_pointer: *mutable Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 14, 5, 46),
                 .source = Diagnostic_source::Compiler,
@@ -3647,9 +3647,9 @@ export function run(external_pointer: *mutable Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 14, 5, 48),
                 .source = Diagnostic_source::Compiler,
@@ -3674,9 +3674,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 31, 6, 37),
                 .source = Diagnostic_source::Compiler,
@@ -3718,9 +3718,9 @@ function run_int32(value: Int32) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(9, 9, 9, 17),
                 .source = Diagnostic_source::Compiler,
@@ -3751,9 +3751,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 12, 5, 17),
                 .source = Diagnostic_source::Compiler,
@@ -3779,9 +3779,9 @@ function run_2() -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 10, 7, 36),
                 .source = Diagnostic_source::Compiler,
@@ -3804,9 +3804,9 @@ function run() -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 10, 3, 34),
                 .source = Diagnostic_source::Compiler,
@@ -3842,9 +3842,9 @@ function run(value: Int32) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 10, 3, 46),
                 .source = Diagnostic_source::Compiler,
@@ -3870,9 +3870,9 @@ function run(value: Int32) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 10, 3, 46),
                 .source = Diagnostic_source::Compiler,
@@ -3903,9 +3903,9 @@ function run(value: Int32) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 10, 3, 46),
                 .source = Diagnostic_source::Compiler,
@@ -3930,7 +3930,7 @@ function run(value: Int32) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -3955,9 +3955,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(12, 30, 12, 33),
                 .source = Diagnostic_source::Compiler,
@@ -3982,9 +3982,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 14, 6, 24),
                 .source = Diagnostic_source::Compiler,
@@ -4057,9 +4057,9 @@ function run(int_value: Int32, enum_value: My_enum) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(30, 12, 30, 20),
                 .source = Diagnostic_source::Compiler,
@@ -4121,9 +4121,9 @@ function run(int_value: Int32, enum_value: My_enum) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(16, 14, 16, 20),
                 .source = Diagnostic_source::Compiler,
@@ -4176,9 +4176,9 @@ function run(int_value: Int32, enum_value: My_enum) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(20, 14, 20, 23),
                 .source = Diagnostic_source::Compiler,
@@ -4232,9 +4232,9 @@ function run(enum_value: My_enum) -> (result: Int32)
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(14, 14, 14, 26),
                 .source = Diagnostic_source::Compiler,
@@ -4263,9 +4263,9 @@ function run(int_value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(9, 21, 9, 26),
                 .source = Diagnostic_source::Compiler,
@@ -4290,9 +4290,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 20, 6, 25),
                 .source = Diagnostic_source::Compiler,
@@ -4316,9 +4316,9 @@ function run(condition: Bool) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 20, 6, 42),
                 .source = Diagnostic_source::Compiler,
@@ -4341,9 +4341,9 @@ function run(condition: Bool) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 32, 5, 39),
                 .source = Diagnostic_source::Compiler,
@@ -4389,9 +4389,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(16, 20, 16, 21),
                 .source = Diagnostic_source::Compiler,
@@ -4432,9 +4432,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(9, 20, 9, 21),
                 .source = Diagnostic_source::Compiler,
@@ -4463,9 +4463,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 20, 7, 21),
                 .source = Diagnostic_source::Compiler,
@@ -4504,9 +4504,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 13, 6, 14),
                 .source = Diagnostic_source::Compiler,
@@ -4533,9 +4533,9 @@ function run(c: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 9, 7, 10),
                 .source = Diagnostic_source::Compiler,
@@ -4575,9 +4575,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(15, 13, 15, 29),
                 .source = Diagnostic_source::Compiler,
@@ -4604,9 +4604,9 @@ function run(c: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 9, 7, 10),
                 .source = Diagnostic_source::Compiler,
@@ -4643,9 +4643,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(11, 20, 11, 26),
                 .source = Diagnostic_source::Compiler,
@@ -4677,9 +4677,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 20, 5, 25),
                 .source = Diagnostic_source::Compiler,
@@ -4721,9 +4721,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(21, 33, 21, 39),
                 .source = Diagnostic_source::Compiler,
@@ -4760,9 +4760,9 @@ function run(a: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 17, 7, 18),
                 .source = Diagnostic_source::Compiler,
@@ -4806,9 +4806,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 21, 7, 23),
                 .source = Diagnostic_source::Compiler,
@@ -4845,9 +4845,9 @@ function run(value: Int32) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(8, 11, 8, 16),
                 .source = Diagnostic_source::Compiler,
@@ -4877,9 +4877,9 @@ function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 11, 5, 16),
                 .source = Diagnostic_source::Compiler,
@@ -4908,9 +4908,9 @@ using My_int = Int31;
 using My_uint = Uint65;
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(3, 16, 3, 21),
                 .source = Diagnostic_source::Compiler,
@@ -4948,9 +4948,9 @@ export function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 5, 6, 13),
                 .source = Diagnostic_source::Compiler,
@@ -5011,9 +5011,9 @@ export function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(18, 35, 18, 36),
                 .source = Diagnostic_source::Compiler,
@@ -5059,9 +5059,9 @@ export function run(integers: Array_slice::<Int32>, mutable_integers: Array_slic
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 20, 6, 31),
                 .source = Diagnostic_source::Compiler,
@@ -5093,7 +5093,7 @@ struct My_struct
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 
@@ -5115,9 +5115,9 @@ export function run(integers: Array_slice::<Int32>, mutable_integers: Array_slic
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(7, 18, 7, 33),
                 .source = Diagnostic_source::Compiler,
@@ -5153,9 +5153,9 @@ export function run(integers: Array_slice::<Int32>, mutable_integers: Array_slic
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 43, 6, 51),
                 .source = Diagnostic_source::Compiler,
@@ -5189,9 +5189,9 @@ export function run(data: *Int32, length: Uint64) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 35, 6, 80),
                 .source = Diagnostic_source::Compiler,
@@ -5229,9 +5229,9 @@ export function run() -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(5, 45, 5, 49),
                 .source = Diagnostic_source::Compiler,
@@ -5257,9 +5257,9 @@ export function foo(length: Uint64) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 91, 6, 92),
                 .source = Diagnostic_source::Compiler,
@@ -5299,9 +5299,9 @@ export function foo(length: Uint64) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
-            h::compiler::Diagnostic
+            iris::compiler::Diagnostic
             {
                 .range = create_source_range(6, 19, 6, 59),
                 .source = Diagnostic_source::Compiler,
@@ -5351,7 +5351,7 @@ function run(a: module_a.My_unique_type, b: module_b.My_unique_type) -> ()
 }
 )";
 
-        std::pmr::vector<h::compiler::Diagnostic> expected_diagnostics =
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
         };
 

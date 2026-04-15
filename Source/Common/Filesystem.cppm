@@ -1,10 +1,10 @@
-export module h.common.filesystem;
+export module iris.common.filesystem;
 
 import std;
 
-export import h.common.filesystem_common;
+export import iris.common.filesystem_common;
 
-namespace h::common
+namespace iris::common
 {
     export std::filesystem::path get_executable_directory();
     

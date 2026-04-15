@@ -1,18 +1,18 @@
-module h.parser.convertor;
+module iris.parser.convertor;
 
 import std;
 
-import h.common;
-import h.core;
-import h.core.types;
-import h.parser.parse_tree;
-import h.parser.parser;
-import h.parser.type_name_parser;
+import iris.common;
+import iris.core;
+import iris.core.types;
+import iris.parser.parse_tree;
+import iris.parser.parser;
+import iris.parser.type_name_parser;
 
-namespace h::parser
+namespace iris::parser
 {
     Module_info create_module_info(
-        h::Module const& core_module
+        iris::Module const& core_module
     )
     {
         return
@@ -62,8 +62,8 @@ namespace h::parser
         std::optional<Parse_node> const& name_node
     )
     {
-        h::Source_range const range = get_node_source_range(declaration_node);
-        h::Source_position const start =
+        iris::Source_range const range = get_node_source_range(declaration_node);
+        iris::Source_position const start =
             name_node.has_value() ?
             get_node_start_source_position(name_node.value()) :
             range.start;
@@ -211,11 +211,11 @@ namespace h::parser
         std::span<Parameter_t const> const parameters
     )
     {
-        auto const replace_by_parameter_type = [&](h::Type_reference const& type_reference) -> bool
+        auto const replace_by_parameter_type = [&](iris::Type_reference const& type_reference) -> bool
         {
-            if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
+            if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
             {
-                h::Custom_type_reference const& value = std::get<h::Custom_type_reference>(type_reference.data);
+                iris::Custom_type_reference const& value = std::get<iris::Custom_type_reference>(type_reference.data);
                 if (value.module_reference.name == module_info.module_name)
                 {
                     auto const location = std::find_if(
@@ -228,8 +228,8 @@ namespace h::parser
                     );
                     if (location != parameters.end())
                     {
-                        h::Type_reference* mutable_type_reference = const_cast<h::Type_reference*>(&type_reference);
-                        mutable_type_reference->data = h::Parameter_type{ .name = value.name };
+                        iris::Type_reference* mutable_type_reference = const_cast<iris::Type_reference*>(&type_reference);
+                        mutable_type_reference->data = iris::Parameter_type{ .name = value.name };
                     }
                 }
             }
@@ -237,10 +237,10 @@ namespace h::parser
             return false;
         };
 
-        h::visit_type_references_recursively(statements, replace_by_parameter_type);
+        iris::visit_type_references_recursively(statements, replace_by_parameter_type);
     }
 
-    std::optional<h::Module> parse_and_convert_to_module(
+    std::optional<iris::Module> parse_and_convert_to_module(
         std::string_view const source,
         std::optional<std::filesystem::path> const& source_file_path,
         std::pmr::polymorphic_allocator<> const& output_allocator,
@@ -254,7 +254,7 @@ namespace h::parser
         
         Parse_node const root = get_root_node(tree);
 
-        std::optional<h::Module> const converted_module = parse_node_to_module(
+        std::optional<iris::Module> const converted_module = parse_node_to_module(
             tree,
             root,
             source_file_path,
@@ -268,13 +268,13 @@ namespace h::parser
         return converted_module;
     }
 
-    std::optional<h::Module> parse_and_convert_to_module(
+    std::optional<iris::Module> parse_and_convert_to_module(
         std::filesystem::path const& source_file_path,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::optional<std::pmr::string> const file_contents = h::common::get_file_contents(source_file_path);
+        std::optional<std::pmr::string> const file_contents = iris::common::get_file_contents(source_file_path);
         if (!file_contents.has_value())
             return std::nullopt;
         
@@ -283,7 +283,7 @@ namespace h::parser
         return parse_and_convert_to_module(source, source_file_path, output_allocator, temporaries_allocator);
     }
 
-    std::optional<h::Module> parse_node_to_module(
+    std::optional<iris::Module> parse_node_to_module(
         Parse_tree const& tree,
         Parse_node const& node,
         std::optional<std::filesystem::path> const& source_file_path,
@@ -303,7 +303,7 @@ namespace h::parser
         if (!module_name.has_value())
             return std::nullopt;
 
-        h::Module output = {};
+        iris::Module output = {};
         output.name = module_name.value();
         output.source_file_path = source_file_path;
 
@@ -456,7 +456,7 @@ namespace h::parser
     }
 
     void node_to_declaration(
-        h::Module& core_module,
+        iris::Module& core_module,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -509,7 +509,7 @@ namespace h::parser
                 module_info,
                 tree,
                 function_declaration_node.value(),
-                is_export ? h::Linkage::External : h::Linkage::Private,
+                is_export ? iris::Linkage::External : iris::Linkage::Private,
                 declaration_attributes.unique_name,
                 declaration_attributes.is_test,
                 comment,
@@ -584,7 +584,7 @@ namespace h::parser
         }
     }
 
-    std::pmr::vector<h::Type_reference> parameter_nodes_to_type_references(
+    std::pmr::vector<iris::Type_reference> parameter_nodes_to_type_references(
         Module_info const& module_info,
         Parse_tree const& tree,
         std::span<Parse_node const> const nodes,
@@ -593,7 +593,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::Type_reference> output{output_allocator};
+        std::pmr::vector<iris::Type_reference> output{output_allocator};
 
         if (nodes.empty())
             return output;
@@ -606,7 +606,7 @@ namespace h::parser
         if (count == 0)
             return output;
 
-        output.resize(count, h::Type_reference{});
+        output.resize(count, iris::Type_reference{});
 
         for (std::size_t index = 0; index < count; ++index)
         {
@@ -618,7 +618,7 @@ namespace h::parser
                 std::optional<Parse_node> const type_node = get_child_node(tree, parameter_type_node.value(), 0);
                 if (type_node.has_value())
                 {
-                    std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+                    std::optional<iris::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
                     if (type.has_value())
                         output[index] = std::move(type.value());
                 }
@@ -665,7 +665,7 @@ namespace h::parser
         return output;
     }
 
-    std::optional<h::Type_reference> node_to_type_reference(
+    std::optional<iris::Type_reference> node_to_type_reference(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& child,
@@ -674,7 +674,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Source_range const source_range = get_node_source_range(child);
+        iris::Source_range const source_range = get_node_source_range(child);
 
         if (type_choice == "Type_name")
         {
@@ -690,7 +690,7 @@ namespace h::parser
             if (type_name == "Type")
                 return create_builtin_type_reference(create_string("Type", output_allocator));
 
-            std::optional<h::Type_reference> type_reference = parse_type_name(
+            std::optional<iris::Type_reference> type_reference = parse_type_name(
                 module_info.module_name,
                 type_name,
                 output_allocator
@@ -703,7 +703,7 @@ namespace h::parser
         }
         else if (type_choice == "Module_type")
         {
-            h::Custom_type_reference type;
+            iris::Custom_type_reference type;
 
             std::optional<Parse_node> const alias_name_node = get_child_node(tree, child, "Module_type_module_name");
             if (alias_name_node.has_value())
@@ -734,23 +734,23 @@ namespace h::parser
                 type.name = create_string(get_node_value(tree, type_name_node.value()), output_allocator);
             }
 
-            return h::Type_reference{ .data = std::move(type), .source_range = source_range };
+            return iris::Type_reference{ .data = std::move(type), .source_range = source_range };
         }
         else if (type_choice == "Pointer_type")
         {
             std::optional<Parse_node> const mutable_node = get_child_node(tree, child, "mutable");
             bool const is_mutable = mutable_node.has_value();
             
-            h::Pointer_type output =
+            iris::Pointer_type output =
             {
-                .element_type = std::pmr::vector<h::Type_reference>{output_allocator},
+                .element_type = std::pmr::vector<iris::Type_reference>{output_allocator},
                 .is_mutable = is_mutable,
             };
 
             std::optional<Parse_node> const type_node = get_child_node(tree, child, "Type");
             if (type_node.has_value())
             {
-                std::optional<h::Type_reference> type = node_to_type_reference(
+                std::optional<iris::Type_reference> type = node_to_type_reference(
                     module_info,
                     tree,
                     type_node.value(),
@@ -764,11 +764,11 @@ namespace h::parser
                 }
             }
 
-            return h::Type_reference{ .data = std::move(output), .source_range = source_range };
+            return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
         }
         else if (type_choice == "Array_slice_type")
         {
-            h::Array_slice_type output = {};
+            iris::Array_slice_type output = {};
 
             std::optional<Parse_node> const mutable_node = get_child_node(tree, child, "mutable");
             output.is_mutable = mutable_node.has_value();
@@ -776,7 +776,7 @@ namespace h::parser
             std::optional<Parse_node> const element_type_node = get_child_node(tree, child, "Type");
             if (element_type_node.has_value())
             {
-                std::optional<h::Type_reference> element_type = node_to_type_reference(
+                std::optional<iris::Type_reference> element_type = node_to_type_reference(
                     module_info,
                     tree,
                     element_type_node.value(),
@@ -786,21 +786,21 @@ namespace h::parser
 
                 if (element_type.has_value())
                 {
-                    output.element_type = std::pmr::vector<h::Type_reference>{output_allocator};
+                    output.element_type = std::pmr::vector<iris::Type_reference>{output_allocator};
                     output.element_type.emplace_back(std::move(element_type.value()));
                 }
             }
 
-            return h::Type_reference{ .data = std::move(output), .source_range = source_range };
+            return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
         }
         else if (type_choice == "Constant_array_type")
         {
-            h::Constant_array_type output = {};
+            iris::Constant_array_type output = {};
 
             std::optional<Parse_node> const value_type_node = get_child_node(tree, child, 2);
             if (value_type_node.has_value())
             {
-                std::optional<h::Type_reference> value_type = node_to_type_reference(
+                std::optional<iris::Type_reference> value_type = node_to_type_reference(
                     module_info,
                     tree,
                     value_type_node.value(),
@@ -810,7 +810,7 @@ namespace h::parser
 
                 if (value_type.has_value())
                 {
-                    output.value_type = std::pmr::vector<h::Type_reference>{output_allocator};
+                    output.value_type = std::pmr::vector<iris::Type_reference>{output_allocator};
                     output.value_type.emplace_back(std::move(value_type.value()));
                 }
             }
@@ -823,16 +823,16 @@ namespace h::parser
                 output.size = length;
             }
 
-            return h::Type_reference{ .data = std::move(output), .source_range = source_range };
+            return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
         }
         else if (type_choice == "Soa_array_type")
         {
-            h::Soa_array_type output = {};
+            iris::Soa_array_type output = {};
 
             std::optional<Parse_node> const value_type_node = get_child_node(tree, child, 2);
             if (value_type_node.has_value())
             {
-                std::optional<h::Type_reference> value_type = node_to_type_reference(
+                std::optional<iris::Type_reference> value_type = node_to_type_reference(
                     module_info,
                     tree,
                     value_type_node.value(),
@@ -842,7 +842,7 @@ namespace h::parser
 
                 if (value_type.has_value())
                 {
-                    output.value_type = std::pmr::vector<h::Type_reference>{output_allocator};
+                    output.value_type = std::pmr::vector<iris::Type_reference>{output_allocator};
                     output.value_type.emplace_back(std::move(value_type.value()));
                 }
             }
@@ -855,11 +855,11 @@ namespace h::parser
                 output.size = length;
             }
 
-            return h::Type_reference{ .data = std::move(output), .source_range = source_range };
+            return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
         }
         else if (type_choice == "Soa_array_view_type")
         {
-            h::Soa_array_view_type output = {};
+            iris::Soa_array_view_type output = {};
 
             std::optional<Parse_node> const mutable_node = get_child_node(tree, child, "mutable");
             output.is_mutable = mutable_node.has_value();
@@ -867,7 +867,7 @@ namespace h::parser
             std::optional<Parse_node> const value_type_node = get_child_node(tree, child, "Type");
             if (value_type_node.has_value())
             {
-                std::optional<h::Type_reference> value_type = node_to_type_reference(
+                std::optional<iris::Type_reference> value_type = node_to_type_reference(
                     module_info,
                     tree,
                     value_type_node.value(),
@@ -877,12 +877,12 @@ namespace h::parser
 
                 if (value_type.has_value())
                 {
-                    output.value_type = std::pmr::vector<h::Type_reference>{output_allocator};
+                    output.value_type = std::pmr::vector<iris::Type_reference>{output_allocator};
                     output.value_type.emplace_back(std::move(value_type.value()));
                 }
             }
 
-            return h::Type_reference{ .data = std::move(output), .source_range = source_range };
+            return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
         }
         else if (type_choice == "Function_pointer_type")
         {
@@ -926,18 +926,18 @@ namespace h::parser
                 temporaries_allocator
             );
 
-            return h::Type_reference{ .data = std::move(output), .source_range = source_range };
+            return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
         }
         else if (type_choice == "Type_instance_type")
         {
-            h::Type_instance output = {};
+            iris::Type_instance output = {};
 
             std::optional<Parse_node> const left_hand_side_node = get_child_node(tree, child, 0);
             if (left_hand_side_node.has_value())
             {
                 std::string_view const left_hand_side_type_choice = get_node_symbol(left_hand_side_node.value());
 
-                std::optional<h::Type_reference> left_hand_side = node_to_type_reference(
+                std::optional<iris::Type_reference> left_hand_side = node_to_type_reference(
                     module_info,
                     tree,
                     left_hand_side_node.value(),
@@ -946,22 +946,22 @@ namespace h::parser
                     temporaries_allocator
                 );
 
-                if (left_hand_side.has_value() && std::holds_alternative<h::Custom_type_reference>(left_hand_side.value().data))
+                if (left_hand_side.has_value() && std::holds_alternative<iris::Custom_type_reference>(left_hand_side.value().data))
                 {
-                    output.type_constructor = std::move(std::get<h::Custom_type_reference>(left_hand_side.value().data));
+                    output.type_constructor = std::move(std::get<iris::Custom_type_reference>(left_hand_side.value().data));
                 }
             }
             
             std::pmr::vector<Parse_node> const argument_nodes = get_child_nodes_of_parent(tree, child, "Type_instance_type_parameters", "Expression_instance_call_parameter", temporaries_allocator);
             output.arguments = node_to_block(module_info, tree, argument_nodes, output_allocator, temporaries_allocator);
             
-            return h::Type_reference{ .data = std::move(output), .source_range = source_range };
+            return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
         }
 
         return std::nullopt;
     }
 
-    std::optional<h::Type_reference> node_to_type_reference(
+    std::optional<iris::Type_reference> node_to_type_reference(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -985,7 +985,7 @@ namespace h::parser
         );
     }
 
-    h::Alias_type_declaration node_to_alias_type_declaration(
+    iris::Alias_type_declaration node_to_alias_type_declaration(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -995,7 +995,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Alias_type_declaration output;
+        iris::Alias_type_declaration output;
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, 1);
         if (name_node.has_value())
@@ -1019,10 +1019,10 @@ namespace h::parser
             std::optional<Parse_node> const type_node = get_child_node(tree, alias_type_node.value(), 0);
             if (type_node.has_value())
             {
-                std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+                std::optional<iris::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
                 if (type.has_value())
                 {
-                    output.type = std::pmr::vector<h::Type_reference>{{std::move(type.value())}, output_allocator};
+                    output.type = std::pmr::vector<iris::Type_reference>{{std::move(type.value())}, output_allocator};
                 }
             }
         }
@@ -1030,7 +1030,7 @@ namespace h::parser
         return output;
     }
 
-    h::Enum_declaration node_to_enum_declaration(
+    iris::Enum_declaration node_to_enum_declaration(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -1040,7 +1040,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Enum_declaration output;
+        iris::Enum_declaration output;
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, 1);
         if (name_node.has_value())
@@ -1063,13 +1063,13 @@ namespace h::parser
         {
             std::pmr::vector<Parse_node> const value_nodes = get_child_nodes(tree, values_node.value(), temporaries_allocator);
 
-            output.values.resize(value_nodes.size() - 2, h::Enum_value{});
+            output.values.resize(value_nodes.size() - 2, iris::Enum_value{});
 
             for (std::size_t index = 2; index < value_nodes.size(); ++index)
             {
                 Parse_node const& value_node = value_nodes[index - 1];
                 
-                h::Enum_value enum_value{};
+                iris::Enum_value enum_value{};
                 
                 std::optional<Parse_node> const value_name_node = get_child_node(tree, value_node, "Enum_value_name");
                 if (value_name_node.has_value())
@@ -1107,7 +1107,7 @@ namespace h::parser
         return output;
     }
 
-    h::Global_variable_declaration node_to_global_variable_declaration(
+    iris::Global_variable_declaration node_to_global_variable_declaration(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -1117,18 +1117,18 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Global_variable_declaration output = {};
+        iris::Global_variable_declaration output = {};
 
         std::optional<Parse_node> const global_type_node = get_child_node(tree, node, 0);
         if (global_type_node.has_value())
         {
             std::string_view const type_value = get_node_value(tree, global_type_node.value());
             if (type_value == "mutable")
-                output.global_type = h::Global_variable_type::Mutable;
+                output.global_type = iris::Global_variable_type::Mutable;
             else if (type_value == "macro")
-                output.global_type = h::Global_variable_type::Macro;
+                output.global_type = iris::Global_variable_type::Macro;
             else
-                output.global_type = h::Global_variable_type::Constant;
+                output.global_type = iris::Global_variable_type::Constant;
         }
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, 1);
@@ -1162,7 +1162,7 @@ namespace h::parser
         return output;
     }
 
-    h::Function_condition node_to_function_condition(
+    iris::Function_condition node_to_function_condition(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -1170,7 +1170,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Function_condition output{};
+        iris::Function_condition output{};
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, 1);
         if (name_node.has_value())
@@ -1245,11 +1245,11 @@ namespace h::parser
         return last_node_value == "...";
     }
 
-    h::Function_declaration node_to_function_declaration(
+    iris::Function_declaration node_to_function_declaration(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
-        h::Linkage const linkage,
+        iris::Linkage const linkage,
         std::optional<std::string_view> const& unique_name,
         bool const is_test,
         std::optional<std::pmr::string> const& comment,
@@ -1257,7 +1257,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Function_declaration output = {};
+        iris::Function_declaration output = {};
         output.is_test = is_test;
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, "Function_name");
@@ -1310,8 +1310,8 @@ namespace h::parser
         );
         
         std::pmr::vector<Parse_node> const preconditions_node = get_child_nodes(tree, node, "Function_precondition", temporaries_allocator);
-        output.preconditions = std::pmr::vector<h::Function_condition>{output_allocator};
-        output.preconditions.resize(preconditions_node.size(), h::Function_condition{});
+        output.preconditions = std::pmr::vector<iris::Function_condition>{output_allocator};
+        output.preconditions.resize(preconditions_node.size(), iris::Function_condition{});
         for (std::size_t index = 0; index < preconditions_node.size(); ++index)
         {
             Parse_node const& condition_node = preconditions_node[index];
@@ -1319,8 +1319,8 @@ namespace h::parser
         }
 
         std::pmr::vector<Parse_node> const postconditions_node = get_child_nodes(tree, node, "Function_postcondition", temporaries_allocator);
-        output.postconditions = std::pmr::vector<h::Function_condition>{output_allocator};
-        output.postconditions.resize(postconditions_node.size(), h::Function_condition{});
+        output.postconditions = std::pmr::vector<iris::Function_condition>{output_allocator};
+        output.postconditions.resize(postconditions_node.size(), iris::Function_condition{});
         for (std::size_t index = 0; index < postconditions_node.size(); ++index)
         {
             Parse_node const& condition_node = postconditions_node[index];
@@ -1330,7 +1330,7 @@ namespace h::parser
         return output;
     }
 
-    h::Function_definition node_to_function_definition(
+    iris::Function_definition node_to_function_definition(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -1339,7 +1339,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Function_definition output;
+        iris::Function_definition output;
         output.name = create_string(function_name, output_allocator);
 
         output.source_location = get_declaration_source_range(module_info.source_file_path, node, std::nullopt);
@@ -1359,7 +1359,7 @@ namespace h::parser
         return output;
     }
 
-    h::Function_constructor node_to_function_constructor_declaration(
+    iris::Function_constructor node_to_function_constructor_declaration(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -1368,7 +1368,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Function_constructor output = {};
+        iris::Function_constructor output = {};
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, 1);
         if (name_node.has_value())
@@ -1401,7 +1401,7 @@ namespace h::parser
                 std::optional<Parse_node> const type_node = get_child_node(tree, parameter_type_node.value(), 0);
                 if (type_node.has_value())
                 {
-                    std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+                    std::optional<iris::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
                     if (type.has_value())
                         output.parameters[index].type = std::move(type.value());
                 }
@@ -1429,7 +1429,7 @@ namespace h::parser
         return output;
     }
 
-    h::Struct_declaration node_to_struct_declaration(
+    iris::Struct_declaration node_to_struct_declaration(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -1439,7 +1439,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Struct_declaration output;
+        iris::Struct_declaration output;
         output.is_packed = false;
         output.is_literal = false;
         
@@ -1472,17 +1472,17 @@ namespace h::parser
                 output.member_names = std::pmr::vector<std::pmr::string>{output_allocator};
                 output.member_names.resize(member_count, std::pmr::string{});
 
-                output.member_types = std::pmr::vector<h::Type_reference>{output_allocator};
-                output.member_types.resize(member_count, h::Type_reference{});
+                output.member_types = std::pmr::vector<iris::Type_reference>{output_allocator};
+                output.member_types.resize(member_count, iris::Type_reference{});
 
                 output.member_bit_fields = std::pmr::vector<std::optional<std::uint32_t>>{output_allocator};
                 output.member_bit_fields.resize(member_count, std::nullopt);
 
-                output.member_default_values = std::pmr::vector<h::Statement>{output_allocator};
-                output.member_default_values.resize(member_count, h::Statement{});
+                output.member_default_values = std::pmr::vector<iris::Statement>{output_allocator};
+                output.member_default_values.resize(member_count, iris::Statement{});
 
                 output.member_source_positions = std::pmr::vector<Source_position>{output_allocator};
-                output.member_source_positions->resize(member_count, h::Source_position{output.source_location->range.start.line, output.source_location->range.start.column});
+                output.member_source_positions->resize(member_count, iris::Source_position{output.source_location->range.start.line, output.source_location->range.start.column});
 
                 for (std::size_t index = 2; index < member_nodes.size(); ++index)
                 {
@@ -1551,7 +1551,7 @@ namespace h::parser
         return output;
     }
 
-    h::Type_constructor node_to_type_constructor_declaration(
+    iris::Type_constructor node_to_type_constructor_declaration(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -1560,7 +1560,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Type_constructor output = {};
+        iris::Type_constructor output = {};
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, 1);
         if (name_node.has_value())
@@ -1593,7 +1593,7 @@ namespace h::parser
                 std::optional<Parse_node> const type_node = get_child_node(tree, parameter_type_node.value(), 0);
                 if (type_node.has_value())
                 {
-                    std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+                    std::optional<iris::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
                     if (type.has_value())
                         output.parameters[index].type = std::move(type.value());
                 }
@@ -1621,7 +1621,7 @@ namespace h::parser
         return output;
     }
 
-    h::Union_declaration node_to_union_declaration(
+    iris::Union_declaration node_to_union_declaration(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -1631,7 +1631,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Union_declaration output = {};
+        iris::Union_declaration output = {};
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, 1);
         if (name_node.has_value())
@@ -1662,11 +1662,11 @@ namespace h::parser
                 output.member_names = std::pmr::vector<std::pmr::string>{output_allocator};
                 output.member_names.resize(member_count, std::pmr::string{});
 
-                output.member_types = std::pmr::vector<h::Type_reference>{output_allocator};
-                output.member_types.resize(member_count, h::Type_reference{});
+                output.member_types = std::pmr::vector<iris::Type_reference>{output_allocator};
+                output.member_types.resize(member_count, iris::Type_reference{});
 
                 output.member_source_positions = std::pmr::vector<Source_position>{output_allocator};
-                output.member_source_positions->resize(member_count, h::Source_position{output.source_location->range.start.line, output.source_location->range.start.column});
+                output.member_source_positions->resize(member_count, iris::Source_position{output.source_location->range.start.line, output.source_location->range.start.column});
 
                 for (std::size_t index = 2; index < member_nodes.size(); ++index)
                 {
@@ -1720,7 +1720,7 @@ namespace h::parser
         return output;
     }
 
-    h::Statement node_to_statement(
+    iris::Statement node_to_statement(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -1728,8 +1728,8 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Statement output;
-        output.expressions = std::pmr::vector<h::Expression>{temporaries_allocator};
+        iris::Statement output;
+        output.expressions = std::pmr::vector<iris::Expression>{temporaries_allocator};
         
         std::optional<Parse_node> const expression_node = get_child_node(tree, node, 0);
         if (expression_node.has_value())
@@ -1737,7 +1737,7 @@ namespace h::parser
             node_to_expression(output, module_info, tree, expression_node.value(), output_allocator, temporaries_allocator);
         }
 
-        std::pmr::vector<h::Expression> final_expressions{std::move(output.expressions), output_allocator};
+        std::pmr::vector<iris::Expression> final_expressions{std::move(output.expressions), output_allocator};
         output.expressions = std::move(final_expressions);
         
         return output;
@@ -1772,8 +1772,8 @@ namespace h::parser
         }
     }
 
-    h::Expression_index node_to_expression(
-        h::Statement& statement,
+    iris::Expression_index node_to_expression(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -1781,7 +1781,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Expression expression;
+        iris::Expression expression;
 
         expression.source_range = get_node_source_range(node);
             
@@ -1942,62 +1942,62 @@ namespace h::parser
         return {.expression_index = expression_index };
     }
 
-    std::optional<h::Binary_operation> get_assignment_operation(std::string_view const operation)
+    std::optional<iris::Binary_operation> get_assignment_operation(std::string_view const operation)
     {
         if (operation == "=") return std::nullopt;
-        if (operation == "+=") return h::Binary_operation::Add;
-        if (operation == "-=") return h::Binary_operation::Subtract;
-        if (operation == "*=") return h::Binary_operation::Multiply;
-        if (operation == "/=") return h::Binary_operation::Divide;
-        if (operation == "%=") return h::Binary_operation::Modulus;
-        if (operation == "&=") return h::Binary_operation::Bitwise_and;
-        if (operation == "|=") return h::Binary_operation::Bitwise_or;
-        if (operation == "^=") return h::Binary_operation::Bitwise_xor;
-        if (operation == "<<=") return h::Binary_operation::Bit_shift_left;
-        if (operation == ">>=") return h::Binary_operation::Bit_shift_right;
+        if (operation == "+=") return iris::Binary_operation::Add;
+        if (operation == "-=") return iris::Binary_operation::Subtract;
+        if (operation == "*=") return iris::Binary_operation::Multiply;
+        if (operation == "/=") return iris::Binary_operation::Divide;
+        if (operation == "%=") return iris::Binary_operation::Modulus;
+        if (operation == "&=") return iris::Binary_operation::Bitwise_and;
+        if (operation == "|=") return iris::Binary_operation::Bitwise_or;
+        if (operation == "^=") return iris::Binary_operation::Bitwise_xor;
+        if (operation == "<<=") return iris::Binary_operation::Bit_shift_left;
+        if (operation == ">>=") return iris::Binary_operation::Bit_shift_right;
         
         return std::nullopt;
     }
 
-    h::Binary_operation get_binary_operation(std::string_view const operation)
+    iris::Binary_operation get_binary_operation(std::string_view const operation)
     {
-        if (operation == "+") return h::Binary_operation::Add;
-        if (operation == "-") return h::Binary_operation::Subtract;
-        if (operation == "*") return h::Binary_operation::Multiply;
-        if (operation == "/") return h::Binary_operation::Divide;
-        if (operation == "%") return h::Binary_operation::Modulus;
-        if (operation == "==") return h::Binary_operation::Equal;
-        if (operation == "!=") return h::Binary_operation::Not_equal;
-        if (operation == "<") return h::Binary_operation::Less_than;
-        if (operation == "<=") return h::Binary_operation::Less_than_or_equal_to;
-        if (operation == ">") return h::Binary_operation::Greater_than;
-        if (operation == ">=") return h::Binary_operation::Greater_than_or_equal_to;
-        if (operation == "&&") return h::Binary_operation::Logical_and;
-        if (operation == "||") return h::Binary_operation::Logical_or;
-        if (operation == "&") return h::Binary_operation::Bitwise_and;
-        if (operation == "|") return h::Binary_operation::Bitwise_or;
-        if (operation == "^") return h::Binary_operation::Bitwise_xor;
-        if (operation == "<<") return h::Binary_operation::Bit_shift_left;
-        if (operation == ">>") return h::Binary_operation::Bit_shift_right;
-        if (operation == "has") return h::Binary_operation::Has;
+        if (operation == "+") return iris::Binary_operation::Add;
+        if (operation == "-") return iris::Binary_operation::Subtract;
+        if (operation == "*") return iris::Binary_operation::Multiply;
+        if (operation == "/") return iris::Binary_operation::Divide;
+        if (operation == "%") return iris::Binary_operation::Modulus;
+        if (operation == "==") return iris::Binary_operation::Equal;
+        if (operation == "!=") return iris::Binary_operation::Not_equal;
+        if (operation == "<") return iris::Binary_operation::Less_than;
+        if (operation == "<=") return iris::Binary_operation::Less_than_or_equal_to;
+        if (operation == ">") return iris::Binary_operation::Greater_than;
+        if (operation == ">=") return iris::Binary_operation::Greater_than_or_equal_to;
+        if (operation == "&&") return iris::Binary_operation::Logical_and;
+        if (operation == "||") return iris::Binary_operation::Logical_or;
+        if (operation == "&") return iris::Binary_operation::Bitwise_and;
+        if (operation == "|") return iris::Binary_operation::Bitwise_or;
+        if (operation == "^") return iris::Binary_operation::Bitwise_xor;
+        if (operation == "<<") return iris::Binary_operation::Bit_shift_left;
+        if (operation == ">>") return iris::Binary_operation::Bit_shift_right;
+        if (operation == "has") return iris::Binary_operation::Has;
 
-        return h::Binary_operation::Add;
+        return iris::Binary_operation::Add;
     }
 
-    h::Unary_operation get_unary_operation(std::string_view const operation)
+    iris::Unary_operation get_unary_operation(std::string_view const operation)
     {
-        if (operation == "!") return h::Unary_operation::Not;
-        if (operation == "~") return h::Unary_operation::Bitwise_not;
-        if (operation == "-") return h::Unary_operation::Minus;
-        if (operation == "++") return h::Unary_operation::Pre_increment;
-        if (operation == "--") return h::Unary_operation::Pre_decrement;
-        if (operation == "*") return h::Unary_operation::Indirection;
-        if (operation == "&") return h::Unary_operation::Address_of;
+        if (operation == "!") return iris::Unary_operation::Not;
+        if (operation == "~") return iris::Unary_operation::Bitwise_not;
+        if (operation == "-") return iris::Unary_operation::Minus;
+        if (operation == "++") return iris::Unary_operation::Pre_increment;
+        if (operation == "--") return iris::Unary_operation::Pre_decrement;
+        if (operation == "*") return iris::Unary_operation::Indirection;
+        if (operation == "&") return iris::Unary_operation::Address_of;
 
-        return h::Unary_operation::Not;
+        return iris::Unary_operation::Not;
     }
 
-    std::pmr::vector<h::Statement> node_to_block(
+    std::pmr::vector<iris::Statement> node_to_block(
         Module_info const& module_info,
         Parse_tree const& tree,
         std::span<Parse_node const> const statement_nodes,
@@ -2007,7 +2007,7 @@ namespace h::parser
     {
         std::size_t const statement_count = statement_nodes.size();
         
-        std::pmr::vector<h::Statement> output{output_allocator};
+        std::pmr::vector<iris::Statement> output{output_allocator};
         output.resize(statement_count);
 
         for (std::size_t statement_index = 0; statement_index < statement_count; ++statement_index)
@@ -2021,7 +2021,7 @@ namespace h::parser
         return output;
     }
 
-    std::pmr::vector<h::Statement> node_to_block(
+    std::pmr::vector<iris::Statement> node_to_block(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2029,7 +2029,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<h::Statement> output;
+        std::pmr::vector<iris::Statement> output;
 
         std::pmr::vector<Parse_node> const child_nodes = get_named_child_nodes(tree, node, temporaries_allocator);
 
@@ -2042,8 +2042,8 @@ namespace h::parser
         );
     }
 
-    h::Access_expression node_to_expression_access(
-        h::Statement& statement,
+    iris::Access_expression node_to_expression_access(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2051,7 +2051,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Access_expression output = {};
+        iris::Access_expression output = {};
 
         std::optional<Parse_node> const left_hand_side = get_child_node(tree, node, "Generic_expression");
         if (left_hand_side.has_value())
@@ -2073,8 +2073,8 @@ namespace h::parser
         return output;
     }
 
-    h::Access_array_expression node_to_expression_access_array(
-        h::Statement& statement,
+    iris::Access_array_expression node_to_expression_access_array(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2082,7 +2082,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Access_array_expression output = {};
+        iris::Access_array_expression output = {};
         
         std::optional<Parse_node> const array_node = get_child_node(tree, node, 0);
         if (array_node.has_value())
@@ -2099,8 +2099,8 @@ namespace h::parser
         return output;
     }
 
-    h::Assert_expression node_to_expression_assert(
-        h::Statement& statement,
+    iris::Assert_expression node_to_expression_assert(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2108,7 +2108,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Assert_expression output;
+        iris::Assert_expression output;
         
         std::optional<Parse_node> const message_node = get_child_node(tree, node, "String");
         if (message_node.has_value())
@@ -2126,8 +2126,8 @@ namespace h::parser
         return output;
     }
 
-    h::Assignment_expression node_to_expression_assignment(
-        h::Statement& statement,
+    iris::Assignment_expression node_to_expression_assignment(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2135,7 +2135,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Assignment_expression output;
+        iris::Assignment_expression output;
         
         std::optional<Parse_node> const left_hand_side = get_child_node(tree, node, 0);
         if (left_hand_side.has_value())
@@ -2158,8 +2158,8 @@ namespace h::parser
         return output;
     }
 
-    h::Binary_expression node_to_expression_binary(
-        h::Statement& statement,
+    iris::Binary_expression node_to_expression_binary(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2167,7 +2167,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Binary_expression output;
+        iris::Binary_expression output;
         
         std::optional<Parse_node> const left_node = get_child_node(tree, node, 0);
         if (left_node.has_value())
@@ -2190,7 +2190,7 @@ namespace h::parser
         return output;
     }
 
-    h::Block_expression node_to_expression_block(
+    iris::Block_expression node_to_expression_block(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2198,7 +2198,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Block_expression output;
+        iris::Block_expression output;
 
         output.statements = node_to_block(
             module_info,
@@ -2211,12 +2211,12 @@ namespace h::parser
         return output;
     }
 
-    h::Break_expression node_to_expression_break(
+    iris::Break_expression node_to_expression_break(
         Parse_tree const& tree,
         Parse_node const& node
     )
     {
-        h::Break_expression output = {};
+        iris::Break_expression output = {};
         
         std::optional<Parse_node> const count_node = get_child_node(tree, node, "Expression_break_loop_count");
         if (count_node.has_value())
@@ -2229,8 +2229,8 @@ namespace h::parser
         return output;
     }
 
-    h::Call_expression node_to_expression_call(
-        h::Statement& statement,
+    iris::Call_expression node_to_expression_call(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2238,7 +2238,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Call_expression output = {};
+        iris::Call_expression output = {};
         
         std::optional<Parse_node> const function = get_child_node(tree, node, 0);
         if (function.has_value())
@@ -2259,8 +2259,8 @@ namespace h::parser
         return output;
     }
 
-    h::Cast_expression node_to_expression_cast(
-        h::Statement& statement,
+    iris::Cast_expression node_to_expression_cast(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2268,7 +2268,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Cast_expression output;
+        iris::Cast_expression output;
         
         std::optional<Parse_node> const source_node = get_child_node(tree, node, 0);
         if (source_node.has_value())
@@ -2282,7 +2282,7 @@ namespace h::parser
             std::optional<Parse_node> const type_node = get_child_node(tree, destination_type_node.value(), 0);
             if (type_node.has_value())
             {
-                std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+                std::optional<iris::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
                 if (type.has_value())
                 {
                     output.destination_type = std::move(type.value());
@@ -2290,19 +2290,19 @@ namespace h::parser
             }
         }
 
-        output.cast_type = h::Cast_type::Numeric;
+        output.cast_type = iris::Cast_type::Numeric;
         
         return output;
     }
 
-    h::Comment_expression node_to_expression_comment(
+    iris::Comment_expression node_to_expression_comment(
         Parse_tree const& tree,
         Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Comment_expression output;
+        iris::Comment_expression output;
         
         std::optional<Parse_node> const comment_node = get_child_node(tree, node, 0);
         if (comment_node.has_value())
@@ -2323,8 +2323,8 @@ namespace h::parser
         return output;
     }
 
-    h::Compile_time_expression node_to_expression_compile_time(
-        h::Statement& statement,
+    iris::Compile_time_expression node_to_expression_compile_time(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2340,7 +2340,7 @@ namespace h::parser
         if (!expression_node.has_value())
             return {};
 
-        h::Compile_time_expression output = {};
+        iris::Compile_time_expression output = {};
         output.expression = node_to_expression(
             statement,
             module_info,
@@ -2353,7 +2353,7 @@ namespace h::parser
         return output;
     }
 
-    h::Constant_expression node_to_expression_constant(
+    iris::Constant_expression node_to_expression_constant(
         Parse_tree const& tree,
         Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator
@@ -2370,7 +2370,7 @@ namespace h::parser
         {
             return 
             {
-                .type = create_fundamental_type_type_reference(h::Fundamental_type::Bool),
+                .type = create_fundamental_type_type_reference(iris::Fundamental_type::Bool),
                 .data = create_string(value, output_allocator),
             };
         }
@@ -2409,7 +2409,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::Float16),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::Float16),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2417,7 +2417,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::Float64),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::Float64),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2425,7 +2425,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::Float32),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::Float32),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2458,7 +2458,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_char),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_char),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2466,7 +2466,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_short),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_short),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2474,7 +2474,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_int),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_int),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2482,7 +2482,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_long),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_long),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2490,7 +2490,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_longlong),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_longlong),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2498,7 +2498,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_uchar),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_uchar),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2506,7 +2506,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_ushort),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_ushort),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2514,7 +2514,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_uint),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_uint),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2522,7 +2522,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_ulong),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_ulong),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2530,7 +2530,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_ulonglong),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_ulonglong),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2538,7 +2538,7 @@ namespace h::parser
                 {
                     return 
                     {
-                        .type = create_fundamental_type_type_reference(h::Fundamental_type::C_bool),
+                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_bool),
                         .data = create_string(value_without_suffix, output_allocator),
                     };
                 }
@@ -2563,7 +2563,7 @@ namespace h::parser
             {
                 return 
                 {
-                    .type = create_fundamental_type_type_reference(h::Fundamental_type::String),
+                    .type = create_fundamental_type_type_reference(iris::Fundamental_type::String),
                     .data = create_string(value_without_quotes, output_allocator),
                 };
             }
@@ -2572,8 +2572,8 @@ namespace h::parser
         return {};
     }
 
-    h::Constant_array_expression node_to_expression_constant_array(
-        h::Statement& statement,
+    iris::Constant_array_expression node_to_expression_constant_array(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2581,12 +2581,12 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Constant_array_expression output = {};
+        iris::Constant_array_expression output = {};
         
         std::pmr::vector<Parse_node> const elements = get_child_nodes(tree, node, "Generic_expression_or_instantiate", temporaries_allocator);
 
         output.array_data = std::pmr::vector<Statement>{output_allocator};
-        output.array_data.resize(elements.size(), h::Statement{});
+        output.array_data.resize(elements.size(), iris::Statement{});
 
         for (std::size_t index = 0; index < elements.size(); ++index)
         {
@@ -2597,16 +2597,16 @@ namespace h::parser
         return output;
     }
 
-    h::Continue_expression node_to_expression_continue(
+    iris::Continue_expression node_to_expression_continue(
         Parse_tree const& tree,
         Parse_node const& node
     )
     {
-        return h::Continue_expression{};
+        return iris::Continue_expression{};
     }
 
-    h::Defer_expression node_to_expression_defer(
-        h::Statement& statement,
+    iris::Defer_expression node_to_expression_defer(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2614,7 +2614,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Defer_expression output{};
+        iris::Defer_expression output{};
         
         std::optional<Parse_node> const expression_node = get_child_node(tree, node, 1);
         if (expression_node.has_value())
@@ -2625,8 +2625,8 @@ namespace h::parser
         return output;
     }
 
-    h::Dereference_and_access_expression node_to_expression_dereference_and_access(
-        h::Statement& statement,
+    iris::Dereference_and_access_expression node_to_expression_dereference_and_access(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2634,7 +2634,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Dereference_and_access_expression output{};
+        iris::Dereference_and_access_expression output{};
         
         std::optional<Parse_node> const expression_node = get_child_node(tree, node, 0);
         if (expression_node.has_value())
@@ -2651,8 +2651,8 @@ namespace h::parser
         return output;
     }
 
-    h::For_loop_expression node_to_expression_for_loop(
-        h::Statement& statement,
+    iris::For_loop_expression node_to_expression_for_loop(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2660,7 +2660,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::For_loop_expression output;
+        iris::For_loop_expression output;
 
         std::optional<Parse_node> const head_node = get_child_node(tree, node, 0);
         if (head_node.has_value())
@@ -2711,7 +2711,7 @@ namespace h::parser
 
             std::optional<Parse_node> const reverse_node = get_child_node(tree, head_node.value(), "Expression_for_loop_reverse");
             bool const is_reverse = reverse_node.has_value();
-            output.range_comparison_operation = is_reverse ? h::Binary_operation::Greater_than : h::Binary_operation::Less_than;
+            output.range_comparison_operation = is_reverse ? iris::Binary_operation::Greater_than : iris::Binary_operation::Less_than;
         }
 
         std::optional<Parse_node> const block_node = get_child_node(tree, node, 1);
@@ -2723,8 +2723,8 @@ namespace h::parser
         return output;
     }
 
-    h::Function_expression node_to_expression_function(
-        h::Statement& statement,
+    iris::Function_expression node_to_expression_function(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2732,13 +2732,13 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Function_expression output = {};
+        iris::Function_expression output = {};
 
         output.declaration = node_to_function_declaration(
             module_info,
             tree,
             node,
-            h::Linkage::Private,
+            iris::Linkage::Private,
             std::nullopt,
             false,
             std::nullopt,
@@ -2758,8 +2758,8 @@ namespace h::parser
         return output;
     }
 
-    h::If_expression node_to_expression_if(
-        h::Statement& statement,
+    iris::If_expression node_to_expression_if(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2772,7 +2772,7 @@ namespace h::parser
         std::optional<Parse_node> current_node = node;
         while (current_node.has_value())
         {
-            h::Condition_statement_pair serie;
+            iris::Condition_statement_pair serie;
 
             std::string_view const current_node_value = get_node_symbol(current_node.value());
 
@@ -2807,15 +2807,15 @@ namespace h::parser
             );
         }
 
-        h::If_expression output
+        iris::If_expression output
         {
             .series = std::pmr::vector<Condition_statement_pair>{std::move(series), output_allocator},
         };
         return output;
     }
 
-    h::Instance_call_expression node_to_expression_instance_call(
-        h::Statement& statement,
+    iris::Instance_call_expression node_to_expression_instance_call(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2823,7 +2823,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Instance_call_expression output = {};
+        iris::Instance_call_expression output = {};
         
         std::optional<Parse_node> const left_hand_side_node = get_child_node(tree, node, 0);
         if (left_hand_side_node.has_value())
@@ -2837,7 +2837,7 @@ namespace h::parser
         return output;
     }
 
-    h::Instantiate_expression_type calculate_instantiate_expression_type(
+    iris::Instantiate_expression_type calculate_instantiate_expression_type(
         Parse_tree const& tree,
         Parse_node const& node
     )
@@ -2845,22 +2845,22 @@ namespace h::parser
         std::optional<Parse_node> const mode_node = get_child_node(tree, node, 0);
 
         if (!mode_node.has_value())
-            return h::Instantiate_expression_type::Default;
+            return iris::Instantiate_expression_type::Default;
 
         std::string_view const mode_value = get_node_value(tree, mode_node.value());
 
         if (mode_value == "explicit")
-            return h::Instantiate_expression_type::Explicit;
+            return iris::Instantiate_expression_type::Explicit;
         else if (mode_value == "uninitialized")
-            return h::Instantiate_expression_type::Uninitialized;
+            return iris::Instantiate_expression_type::Uninitialized;
         else if (mode_value == "zero_initialized")
-            return h::Instantiate_expression_type::Zero_initialized;
+            return iris::Instantiate_expression_type::Zero_initialized;
         else
-            return h::Instantiate_expression_type::Default;
+            return iris::Instantiate_expression_type::Default;
     }
 
-    h::Instantiate_expression node_to_expression_instantiate(
-        h::Statement& statement,
+    iris::Instantiate_expression node_to_expression_instantiate(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2868,14 +2868,14 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Instantiate_expression output;
+        iris::Instantiate_expression output;
 
         output.type = calculate_instantiate_expression_type(tree, node);
         
         std::pmr::vector<Parse_node> const member_nodes = get_child_nodes_of_parent(tree, node, "Expression_instantiate_members", "Expression_instantiate_member", temporaries_allocator);
         for (Parse_node const& member_node : member_nodes)
         {
-            h::Instantiate_member_value_pair pair{};
+            iris::Instantiate_member_value_pair pair{};
             
             std::optional<Parse_node> const name_node = get_child_node(tree, member_node, "Expression_instantiate_member_name");
             if (name_node.has_value())
@@ -2897,13 +2897,13 @@ namespace h::parser
         return output;
     }
 
-    h::Null_pointer_expression node_to_expression_null_pointer()
+    iris::Null_pointer_expression node_to_expression_null_pointer()
     {
-        return h::Null_pointer_expression{};
+        return iris::Null_pointer_expression{};
     }
 
-    h::Parenthesis_expression node_to_expression_parenthesis(
-        h::Statement& statement,
+    iris::Parenthesis_expression node_to_expression_parenthesis(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2911,7 +2911,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Parenthesis_expression output;
+        iris::Parenthesis_expression output;
         
         std::optional<Parse_node> const expression_node = get_child_node(tree, node, "Generic_expression");
         if (expression_node.has_value())
@@ -2922,8 +2922,8 @@ namespace h::parser
         return output;
     }
 
-    h::Reflection_expression node_to_expression_reflection(
-        h::Statement& statement,
+    iris::Reflection_expression node_to_expression_reflection(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2931,7 +2931,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Reflection_expression output = {};
+        iris::Reflection_expression output = {};
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, 0);
         if (name_node.has_value())
@@ -2950,7 +2950,7 @@ namespace h::parser
 
             for (std::size_t index = 0; index < argument_type_nodes.size(); ++index)
             {
-                std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, argument_type_nodes[index], output_allocator, temporaries_allocator);
+                std::optional<iris::Type_reference> type = node_to_type_reference(module_info, tree, argument_type_nodes[index], output_allocator, temporaries_allocator);
                 if (type.has_value())
                 {
                     output.type_arguments[index] = std::move(type.value());
@@ -2973,8 +2973,8 @@ namespace h::parser
         return output;
     }
 
-    h::Return_expression node_to_expression_return(
-        h::Statement& statement,
+    iris::Return_expression node_to_expression_return(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -2986,13 +2986,13 @@ namespace h::parser
         if (!value_node.has_value())
             return {};
 
-        h::Return_expression output;
+        iris::Return_expression output;
         output.expression = node_to_expression(statement, module_info, tree, value_node.value(), output_allocator, temporaries_allocator);
         return output;
     }
 
-    h::Struct_expression node_to_expression_struct(
-        h::Statement& statement,
+    iris::Struct_expression node_to_expression_struct(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -3000,7 +3000,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Struct_expression output = {};
+        iris::Struct_expression output = {};
 
         output.declaration = node_to_struct_declaration(
             module_info,
@@ -3015,8 +3015,8 @@ namespace h::parser
         return output;
     }
 
-    h::Switch_case_expression_pair node_to_expression_switch_case(
-        h::Statement& statement,
+    iris::Switch_case_expression_pair node_to_expression_switch_case(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -3024,7 +3024,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Switch_case_expression_pair output{};
+        iris::Switch_case_expression_pair output{};
 
         std::optional<Parse_node> const case_value = get_child_node(tree, node, "Expression_switch_case_value");
         if (case_value.has_value())
@@ -3044,8 +3044,8 @@ namespace h::parser
 
         if (!statement_nodes.empty())
         {
-            output.statements = std::pmr::vector<h::Statement>{output_allocator};
-            output.statements.resize(statement_nodes.size(), h::Statement{});
+            output.statements = std::pmr::vector<iris::Statement>{output_allocator};
+            output.statements.resize(statement_nodes.size(), iris::Statement{});
 
             for (std::size_t index = 0; index < statement_nodes.size(); ++index)
             {
@@ -3056,8 +3056,8 @@ namespace h::parser
         return output;
     }
 
-    h::Switch_expression node_to_expression_switch(
-        h::Statement& statement,
+    iris::Switch_expression node_to_expression_switch(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -3065,7 +3065,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Switch_expression output{};
+        iris::Switch_expression output{};
 
         std::optional<Parse_node> const value_node = get_child_node(tree, node, 1);
         if (value_node.has_value())
@@ -3081,14 +3081,14 @@ namespace h::parser
             {
                 std::span<Parse_node const> const case_nodes{ child_nodes.begin() + 1, child_nodes.end() - 1 };
 
-                output.cases = std::pmr::vector<h::Switch_case_expression_pair>{output_allocator};
-                output.cases.resize(case_nodes.size(), h::Switch_case_expression_pair{});
+                output.cases = std::pmr::vector<iris::Switch_case_expression_pair>{output_allocator};
+                output.cases.resize(case_nodes.size(), iris::Switch_case_expression_pair{});
 
                 for (std::size_t index = 0; index < case_nodes.size(); ++index)
                 {
                     Parse_node const& case_node = case_nodes[index];
                     
-                    h::Switch_case_expression_pair case_pair = node_to_expression_switch_case(statement, module_info, tree, case_node, output_allocator, temporaries_allocator);
+                    iris::Switch_case_expression_pair case_pair = node_to_expression_switch_case(statement, module_info, tree, case_node, output_allocator, temporaries_allocator);
                     output.cases[index] = std::move(case_pair);
                 }
             }
@@ -3097,8 +3097,8 @@ namespace h::parser
         return output;
     }
 
-    h::Ternary_condition_expression node_to_expression_ternary_condition(
-        h::Statement& statement,
+    iris::Ternary_condition_expression node_to_expression_ternary_condition(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -3106,7 +3106,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Ternary_condition_expression output{};
+        iris::Ternary_condition_expression output{};
         
         std::optional<Parse_node> const condition = get_child_node(tree, node, 0);
         if (condition.has_value())
@@ -3129,8 +3129,8 @@ namespace h::parser
         return output;
     }
 
-    h::Type_expression node_to_expression_type(
-        h::Statement& statement,
+    iris::Type_expression node_to_expression_type(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -3138,12 +3138,12 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Type_expression output = {};
+        iris::Type_expression output = {};
         
         std::optional<Parse_node> const type_node = get_child_node(tree, node, 0);
         if (type_node.has_value())
         {
-            std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+            std::optional<iris::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
             if (type.has_value())
             {
                 output.type = std::move(type.value());
@@ -3153,8 +3153,8 @@ namespace h::parser
         return output;
     }
 
-    h::Unary_expression node_to_expression_unary(
-        h::Statement& statement,
+    iris::Unary_expression node_to_expression_unary(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -3162,7 +3162,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Unary_expression output;
+        iris::Unary_expression output;
         
         std::optional<Parse_node> const operand_node = get_child_node(tree, node, "Generic_expression");
         if (operand_node.has_value())
@@ -3179,13 +3179,13 @@ namespace h::parser
         return output;
     }
 
-    h::Variable_expression node_to_expression_variable(
+    iris::Variable_expression node_to_expression_variable(
         Parse_tree const& tree,
         Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
-        h::Variable_expression output;
+        iris::Variable_expression output;
         
         std::optional<Parse_node> const name_node = get_child_node(tree, node, "Variable_name");
         if (name_node.has_value())
@@ -3197,8 +3197,8 @@ namespace h::parser
         return output;
     }
 
-    h::Variable_declaration_expression node_to_expression_variable_declaration(
-        h::Statement& statement,
+    iris::Variable_declaration_expression node_to_expression_variable_declaration(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -3206,7 +3206,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Variable_declaration_expression output;
+        iris::Variable_declaration_expression output;
         
         std::optional<Parse_node> const name = get_child_node(tree, node, "Variable_name");
         if (name.has_value())
@@ -3229,8 +3229,8 @@ namespace h::parser
         return output;
     }
 
-    h::Variable_declaration_with_type_expression node_to_expression_variable_declaration_with_type(
-        h::Statement& statement,
+    iris::Variable_declaration_with_type_expression node_to_expression_variable_declaration_with_type(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -3238,7 +3238,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Variable_declaration_with_type_expression output = {};
+        iris::Variable_declaration_with_type_expression output = {};
         
         std::optional<Parse_node> const name = get_child_node(tree, node, "Variable_name");
         if (name.has_value())
@@ -3258,24 +3258,24 @@ namespace h::parser
             std::optional<Parse_node> const type_node = get_child_node(tree, declaration_type_node.value(), 0);
             if (type_node.has_value())
             {
-                h::Expression type_expression = {};
+                iris::Expression type_expression = {};
                 type_expression.source_range = get_node_source_range(declaration_type_node.value());
 
                 std::string_view const declaration_type_symbol = get_node_symbol(type_node.value());
                 if (declaration_type_symbol == "Type")
                 {
-                    std::optional<h::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
+                    std::optional<iris::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
                     if (type.has_value())
                     {
-                        type_expression.data = h::Type_expression{ .type = std::move(type.value()) };
-                        output.type = h::Expression_index{ .expression_index = statement.expressions.size() };
+                        type_expression.data = iris::Type_expression{ .type = std::move(type.value()) };
+                        output.type = iris::Expression_index{ .expression_index = statement.expressions.size() };
                         statement.expressions.push_back(std::move(type_expression));
                     }
                 }
                 else if (declaration_type_symbol == "Expression_reflection_call")
                 {
                     type_expression.data = node_to_expression_reflection(statement, module_info, tree, type_node.value(), output_allocator, temporaries_allocator);
-                    output.type = h::Expression_index{ .expression_index = statement.expressions.size() };
+                    output.type = iris::Expression_index{ .expression_index = statement.expressions.size() };
                     statement.expressions.push_back(std::move(type_expression));
                 }
             }
@@ -3290,8 +3290,8 @@ namespace h::parser
         return output;
     }
 
-    h::While_loop_expression node_to_expression_while_loop(
-        h::Statement& statement,
+    iris::While_loop_expression node_to_expression_while_loop(
+        iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,
@@ -3299,7 +3299,7 @@ namespace h::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::While_loop_expression output;
+        iris::While_loop_expression output;
 
         std::optional<Parse_node> const condition = get_child_node(tree, node, 1);
         if (condition.has_value())

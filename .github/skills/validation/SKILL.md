@@ -16,5 +16,5 @@ Validation is performed in `Source/Compiler/Validation.cpp`. Diagnostics created
 
 ## Building and running Validation tests
 
-Run `cmake --build build --target H_compiler_tests` to build the tests.
-Run `build/Source/Compiler/H_compiler_tests.exe [Validation]` to run all Validation tests.
+Run `cmake --build build --target Iris_compiler_tests` to build the tests.
+Run `build/Source/Compiler/Iris_compiler_tests.exe [Validation]` to run all Validation tests.

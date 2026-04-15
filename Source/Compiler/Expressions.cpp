@@ -2,25 +2,25 @@ module;
 
 #include <assert.h>
 
-module h.compiler.expressions;
+module iris.compiler.expressions;
 
 import std;
 import llvm;
 
-import h.core;
-import h.core.declarations;
-import h.core.execution_engine;
-import h.core.types;
-import h.compiler.analysis;
-import h.compiler.clang_data;
-import h.compiler.clang_code_generation;
-import h.compiler.common;
-import h.compiler.debug_info;
-import h.compiler.instructions;
-import h.compiler.test_framework;
-import h.compiler.types;
+import iris.core;
+import iris.core.declarations;
+import iris.core.execution_engine;
+import iris.core.types;
+import iris.compiler.analysis;
+import iris.compiler.clang_data;
+import iris.compiler.clang_code_generation;
+import iris.compiler.common;
+import iris.compiler.debug_info;
+import iris.compiler.instructions;
+import iris.compiler.test_framework;
+import iris.compiler.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
     template <typename T1, typename T2>
     inline size_t constexpr offset_of(T1 T2::*member) {
@@ -28,7 +28,7 @@ namespace h::compiler
         return size_t(&(object.*member)) - size_t(&object);
     }
 
-    Expression_parameters set_core_module(Expression_parameters const& parameters, h::Module const& core_module)
+    Expression_parameters set_core_module(Expression_parameters const& parameters, iris::Module const& core_module)
     {
         if (&parameters.core_module == &core_module)
             return parameters;
@@ -78,8 +78,8 @@ namespace h::compiler
     }
 
     std::optional<Value_and_type> get_global_variable_value_and_type(
-        h::Module const& global_variable_module,
-        h::Global_variable_declaration const& global_variable_declaration,
+        iris::Module const& global_variable_module,
+        iris::Global_variable_declaration const& global_variable_declaration,
         Expression_parameters const& parameters
     )
     {
@@ -110,8 +110,8 @@ namespace h::compiler
                 return std::nullopt;
             }
 
-            h::compiler::Scope scope{};
-            std::optional<h::Type_reference> type = get_expression_type(
+            iris::compiler::Scope scope{};
+            std::optional<iris::Type_reference> type = get_expression_type(
                 global_variable_module,
                 parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
                 scope,
@@ -788,11 +788,11 @@ namespace h::compiler
             }
         }
 
-        if (left_hand_side.type.has_value() && h::is_array_slice_type_reference(left_hand_side.type.value()))
+        if (left_hand_side.type.has_value() && iris::is_array_slice_type_reference(left_hand_side.type.value()))
         {
-            h::Array_slice_type const& array_slice_type = std::get<h::Array_slice_type>(left_hand_side.type->data);
+            iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(left_hand_side.type->data);
 
-            h::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
+            iris::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
 
             return create_access_struct_member(
                 left_hand_side,
@@ -803,9 +803,9 @@ namespace h::compiler
             );
         }
 
-        if (left_hand_side.type.has_value() && h::is_soa_array_type_reference(left_hand_side.type.value()))
+        if (left_hand_side.type.has_value() && iris::is_soa_array_type_reference(left_hand_side.type.value()))
         {
-            h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(left_hand_side.type->data);
+            iris::Soa_array_type const& soa_array_type = std::get<iris::Soa_array_type>(left_hand_side.type->data);
 
             if (expression.member_name == "length")
             {
@@ -827,7 +827,7 @@ namespace h::compiler
             }
         }
 
-        if (left_hand_side.type.has_value() && h::is_soa_array_view_type_reference(left_hand_side.type.value()))
+        if (left_hand_side.type.has_value() && iris::is_soa_array_view_type_reference(left_hand_side.type.value()))
         {
             if (expression.member_name == "start_index")
             {
@@ -984,7 +984,7 @@ namespace h::compiler
         Value_and_type const index_value = create_loaded_expression_value(expression.index.expression_index, statement, parameters);
         llvm::Value* const index_llvm_value = index_value.value;
 
-        h::Expression const& indexed_expression = statement.expressions[expression.expression.expression_index];
+        iris::Expression const& indexed_expression = statement.expressions[expression.expression.expression_index];
         if (std::holds_alternative<Dereference_and_access_expression>(indexed_expression.data))
         {
             Dereference_and_access_expression const& access_expression = std::get<Dereference_and_access_expression>(indexed_expression.data);
@@ -1193,7 +1193,7 @@ namespace h::compiler
         if (!element_type.has_value())
             throw std::runtime_error{"Cannot find element type of array access."};
 
-        if (h::is_array_slice_type_reference(*left_hand_side_expression_value.type))
+        if (iris::is_array_slice_type_reference(*left_hand_side_expression_value.type))
         {
             llvm::Type* const array_slice_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, left_hand_side_expression_value.type.value(), type_database);
             llvm::Value* const pointer_to_data_pointer = llvm_builder.CreateStructGEP(
@@ -1297,7 +1297,7 @@ namespace h::compiler
         Expression_parameters const& parameters
     )
     {
-        h::Function_condition const condition = {
+        iris::Function_condition const condition = {
             .description = expression.message.value_or(""),
             .condition = expression.statement
         };
@@ -2663,7 +2663,7 @@ namespace h::compiler
         Expression_parameters const& parameters
     )
     {
-        h::Module const& struct_core_module =
+        iris::Module const& struct_core_module =
             soa_info.module_name == parameters.core_module.name ?
             parameters.core_module :
             parameters.core_module_dependencies.at(soa_info.module_name.data());
@@ -2734,18 +2734,18 @@ namespace h::compiler
     }
 
     Value_and_type instantiate_array_slice(
-        std::pmr::vector<h::Type_reference> const& element_type,
+        std::pmr::vector<iris::Type_reference> const& element_type,
         Value_and_type const& data_value,
         Value_and_type const& length_value,
         Expression_parameters const& parameters
     )
     {
-        h::Type_reference const array_slice_type_reference = h::create_array_slice_type_reference(element_type, true);
+        iris::Type_reference const array_slice_type_reference = iris::create_array_slice_type_reference(element_type, true);
         llvm::Type* const llvm_array_slice_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, array_slice_type_reference, parameters.type_database);
 
         llvm::AllocaInst* const struct_alloca = create_alloca_instruction(parameters.llvm_builder, parameters.llvm_data_layout, *parameters.llvm_parent_function, llvm_array_slice_type);
 
-        h::Struct_declaration const struct_declaration = h::create_array_slice_type_struct_declaration(element_type);
+        iris::Struct_declaration const struct_declaration = iris::create_array_slice_type_struct_declaration(element_type);
 
         generate_store_struct_member_instructions(
             parameters.clang_module_data,
@@ -2783,7 +2783,7 @@ namespace h::compiler
 
     Value_and_type allocate_stack_array(
         Call_expression const& call_expression,
-        h::Instance_call_expression const& instance_call_expression,
+        iris::Instance_call_expression const& instance_call_expression,
         Statement const& statement,
         Expression_parameters const& parameters
     )
@@ -2817,11 +2817,11 @@ namespace h::compiler
         Expression_parameters const& parameters
     )
     {
-        h::Expression const& left_hand_side = statement.expressions[expression.expression.expression_index];
+        iris::Expression const& left_hand_side = statement.expressions[expression.expression.expression_index];
 
-        if (std::holds_alternative<h::Access_expression>(left_hand_side.data))
+        if (std::holds_alternative<iris::Access_expression>(left_hand_side.data))
         {
-            h::Access_expression const& access_expression = std::get<h::Access_expression>(left_hand_side.data);
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(left_hand_side.data);
 
             if (access_expression.member_name == "view")
             {
@@ -2913,14 +2913,14 @@ namespace h::compiler
             }
         }
 
-        if (std::holds_alternative<h::Instance_call_expression>(left_hand_side.data))
+        if (std::holds_alternative<iris::Instance_call_expression>(left_hand_side.data))
         {
-            h::Instance_call_expression const& instance_call_expression = std::get<h::Instance_call_expression>(left_hand_side.data);
+            iris::Instance_call_expression const& instance_call_expression = std::get<iris::Instance_call_expression>(left_hand_side.data);
 
-            h::Expression const& instance_call_left_expression = statement.expressions[instance_call_expression.left_hand_side.expression_index];
-            if (std::holds_alternative<h::Variable_expression>(instance_call_left_expression.data))
+            iris::Expression const& instance_call_left_expression = statement.expressions[instance_call_expression.left_hand_side.expression_index];
+            if (std::holds_alternative<iris::Variable_expression>(instance_call_left_expression.data))
             {
-                h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(instance_call_left_expression.data);
+                iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(instance_call_left_expression.data);
                 
                 if (variable_expression.name == "create_stack_array_uninitialized")
                 {
@@ -2945,9 +2945,9 @@ namespace h::compiler
                 }
             }
         }
-        else if (std::holds_alternative<h::Variable_expression>(left_hand_side.data))
+        else if (std::holds_alternative<iris::Variable_expression>(left_hand_side.data))
         {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_hand_side.data);
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_hand_side.data);
             
             if (variable_expression.name == "check")
             {
@@ -2961,7 +2961,7 @@ namespace h::compiler
 
                 std::uint64_t const line = parameters.source_position.has_value() ? parameters.source_position->line : 0;
                 
-                h::Function_pointer_type const function_pointer_type = create_test_check_function_pointer_type();
+                iris::Function_pointer_type const function_pointer_type = create_test_check_function_pointer_type();
                 
                 llvm::FunctionType* const llvm_function_type = convert_to_llvm_function_type(
                     parameters.clang_module_data,
@@ -2970,19 +2970,19 @@ namespace h::compiler
                 );
 
                 std::pmr::vector<bool> const is_expression_address_of{false, false, false};
-                llvm::Function* const llvm_function_callee = parameters.llvm_module.getFunction("hlang_test_check");
+                llvm::Function* const llvm_function_callee = parameters.llvm_module.getFunction("iris_test_check");
 
                 std::pmr::vector<llvm::Value*> llvm_arguments{parameters.temporaries_allocator};
                 llvm_arguments.resize(3);
 
                 {
                     Expression_parameters new_parameters = parameters;
-                    new_parameters.expression_type = h::create_bool_type_reference();
+                    new_parameters.expression_type = iris::create_bool_type_reference();
                     Value_and_type const condition_value = create_expression_value(expression.arguments[0].expression_index, statement, new_parameters);
                     llvm_arguments[0] = condition_value.value;
                 }
                                 
-                llvm_arguments[1] = create_c_string_constant(parameters.llvm_context, parameters.llvm_module, source_file_path, "hlang_test_source_file_path");
+                llvm_arguments[1] = create_c_string_constant(parameters.llvm_context, parameters.llvm_module, source_file_path, "iris_test_source_file_path");
                 llvm_arguments[2] = llvm::ConstantInt::get(llvm::Type::getIntNTy(parameters.llvm_context, 64), line);
 
                 Value_and_type result = create_call_expression_value_common(
@@ -3005,8 +3005,8 @@ namespace h::compiler
                 if (!data_value.type.has_value())
                     throw std::runtime_error{"Cannot find deduce argument 0 type of create_array_slice_from_pointer()"};
 
-                std::optional<h::Type_reference> element_type_optional = remove_pointer(data_value.type.value());
-                std::pmr::vector<h::Type_reference> const element_type = element_type_optional.has_value() ? std::pmr::vector<h::Type_reference>{element_type_optional.value()} : std::pmr::vector<h::Type_reference>{};
+                std::optional<iris::Type_reference> element_type_optional = remove_pointer(data_value.type.value());
+                std::pmr::vector<iris::Type_reference> const element_type = element_type_optional.has_value() ? std::pmr::vector<iris::Type_reference>{element_type_optional.value()} : std::pmr::vector<iris::Type_reference>{};
 
                 Value_and_type const length_value = create_loaded_expression_value(expression.arguments[1].expression_index, statement, parameters);
 
@@ -3026,12 +3026,12 @@ namespace h::compiler
                 if (!pointer_value.type.has_value())
                     throw std::runtime_error{"Cannot find deduce argument 0 type of offset_pointer()"};
 
-                if (!h::is_pointer(pointer_value.type.value()))
+                if (!iris::is_pointer(pointer_value.type.value()))
                     throw std::runtime_error{"Argument 0 type of offset_pointer() must be a pointer!"};
 
                 auto const get_type_alloc_size = [&]() -> std::uint64_t
                 {
-                    std::optional<h::Type_reference> const value_type = remove_pointer(pointer_value.type.value());
+                    std::optional<iris::Type_reference> const value_type = remove_pointer(pointer_value.type.value());
 
                     // For *Void assume 1 byte offsets:
                     if (!value_type.has_value())
@@ -3064,10 +3064,10 @@ namespace h::compiler
 
     bool is_taking_address_of_expression(
         Statement const& statement,
-        h::Expression const& expression
+        iris::Expression const& expression
     )
     {
-        return h::is_expression_address_of(expression) || h::is_offset_pointer(statement, expression);
+        return iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression);
     }
 
     std::pmr::vector<bool> create_is_taking_address_of_expressions_array(
@@ -3080,7 +3080,7 @@ namespace h::compiler
         
         for (unsigned i = 0; i < expression.arguments.size(); ++i)
         {
-            h::Expression const& argument_expression = statement.expressions[expression.arguments[i].expression_index];
+            iris::Expression const& argument_expression = statement.expressions[expression.arguments[i].expression_index];
             bool const is_taking_address_of = is_taking_address_of_expression(statement, argument_expression);
             output.push_back(is_taking_address_of);
         }
@@ -4394,7 +4394,7 @@ namespace h::compiler
                 }
                 else
                 {
-                    h::Module const& struct_core_module =
+                    iris::Module const& struct_core_module =
                         module_name == parameters.core_module.name ?
                         parameters.core_module :
                         parameters.core_module_dependencies.at(module_name.data());
@@ -4741,7 +4741,7 @@ namespace h::compiler
             throw std::runtime_error{ "Could not find type to instantiate!" };
         Type_reference const& type_reference = type_reference_optional.value();
 
-        if (std::holds_alternative<h::Soa_array_type>(type_reference.data))
+        if (std::holds_alternative<iris::Soa_array_type>(type_reference.data))
         {
             Soa_array_type_info const soa_info = get_soa_array_type_info(type_reference, parameters);
             auto const [soa_alloca, data_pointer] = create_soa_array_storage(
@@ -4777,7 +4777,7 @@ namespace h::compiler
             };
         }
 
-        if (std::holds_alternative<h::Soa_array_view_type>(type_reference.data))
+        if (std::holds_alternative<iris::Soa_array_view_type>(type_reference.data))
         {
             if (parameters.llvm_parent_function == nullptr)
                 throw std::runtime_error{ "Soa_array_view local storage requires a parent function." };
@@ -4820,10 +4820,10 @@ namespace h::compiler
             };
         }
 
-        if (std::holds_alternative<h::Array_slice_type>(type_reference.data))
+        if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
         {
-            h::Array_slice_type const& array_slice_type = std::get<h::Array_slice_type>(type_reference.data);
-            h::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
+            iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(type_reference.data);
+            iris::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
 
             return create_instantiate_struct_expression_value(statement, expression, parameters, "iris.builtin", struct_declaration, type_reference);
         }
@@ -4918,7 +4918,7 @@ namespace h::compiler
             std::pmr::vector<Value_and_type> return_values;
             return_values.reserve(1);
 
-            h::Function_declaration const& function_declaration = *parameters.function_declaration.value();
+            iris::Function_declaration const& function_declaration = *parameters.function_declaration.value();
             if (!function_declaration.output_parameter_names.empty())
             {
                 if (function_declaration.output_parameter_names.size() > 1)
@@ -4946,7 +4946,7 @@ namespace h::compiler
         if (parameters.debug_info != nullptr)
             set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
 
-        h::Expression const& expression_to_return = statement.expressions[expression.expression->expression_index];
+        iris::Expression const& expression_to_return = statement.expressions[expression.expression->expression_index];
         bool const is_taking_address_of = is_taking_address_of_expression(statement, expression_to_return);
 
         llvm::Value* const instruction = generate_function_return_instruction(
@@ -5322,9 +5322,9 @@ namespace h::compiler
 
             // Try access expressions:
             {
-                h::Expression const& expression_to_get_address_of = statement.expressions[expression.expression.expression_index];
+                iris::Expression const& expression_to_get_address_of = statement.expressions[expression.expression.expression_index];
 
-                if (std::holds_alternative<h::Access_expression>(expression_to_get_address_of.data) || std::holds_alternative<h::Access_array_expression>(expression_to_get_address_of.data) || std::holds_alternative<h::Dereference_and_access_expression>(expression_to_get_address_of.data))
+                if (std::holds_alternative<iris::Access_expression>(expression_to_get_address_of.data) || std::holds_alternative<iris::Access_array_expression>(expression_to_get_address_of.data) || std::holds_alternative<iris::Dereference_and_access_expression>(expression_to_get_address_of.data))
                 {
                     std::pmr::vector<Type_reference> element_type;
                     if (value_expression.type.has_value())
@@ -5388,7 +5388,7 @@ namespace h::compiler
 
     Value_and_type create_variable_declaration_with_type_expression_value(
         Variable_declaration_with_type_expression const& expression,
-        h::Statement const& statement,
+        iris::Statement const& statement,
         Expression_parameters const& parameters
     )
     {
@@ -5400,7 +5400,7 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
         Type_database& type_database = parameters.type_database;
 
-        std::optional<Type_reference> const core_type_optional = h::get_variable_declaration_with_type_expression_type(statement, expression);
+        std::optional<Type_reference> const core_type_optional = iris::get_variable_declaration_with_type_expression_type(statement, expression);
         if (!core_type_optional.has_value())
             throw std::runtime_error{"Variable declaration with type has invalid type expression!"};
 
@@ -5408,8 +5408,8 @@ namespace h::compiler
 
         llvm::Type* const llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, core_type, type_database);
 
-        h::Expression const& right_hand_side_expression = statement.expressions[expression.right_hand_side.expression_index];
-        bool const is_right_side_instantiate_expression = std::holds_alternative<h::Instantiate_expression>(right_hand_side_expression.data);
+        iris::Expression const& right_hand_side_expression = statement.expressions[expression.right_hand_side.expression_index];
+        bool const is_right_side_instantiate_expression = std::holds_alternative<iris::Instantiate_expression>(right_hand_side_expression.data);
         if (is_right_side_instantiate_expression)
         {
             if (parameters.debug_info != nullptr)
@@ -5499,7 +5499,7 @@ namespace h::compiler
                     };
 
                     std::optional<Type_reference> const expected_element_type = get_element_or_pointee_type(expected_type);
-                    std::pmr::vector<h::Type_reference> const element_type{expected_element_type.value()};
+                    std::pmr::vector<iris::Type_reference> const element_type{expected_element_type.value()};
 
                     Value_and_type const array_slice = instantiate_array_slice(
                         element_type,
@@ -5513,7 +5513,7 @@ namespace h::compiler
 
                 std::optional<Type_reference> const expected_element_type = get_element_or_pointee_type(expected_type);
 
-                std::pmr::vector<h::Type_reference> const element_type{expected_element_type.value()};
+                std::pmr::vector<iris::Type_reference> const element_type{expected_element_type.value()};
 
                 llvm::Type* const constant_array_llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, value.type.value(), parameters.type_database);
 
@@ -5667,15 +5667,15 @@ namespace h::compiler
         throw std::runtime_error{ std::format("Undefined variable '{}'", variable_name) };
     }
 
-    bool is_true_constant(h::Statement const& statement)
+    bool is_true_constant(iris::Statement const& statement)
     {
         if (statement.expressions.size() != 1)
             return false;
 
-        h::Expression const& expression = statement.expressions[0];
-        if (std::holds_alternative<h::Constant_expression>(expression.data))
+        iris::Expression const& expression = statement.expressions[0];
+        if (std::holds_alternative<iris::Constant_expression>(expression.data))
         {
-            h::Constant_expression const& constant_expression = std::get<h::Constant_expression>(expression.data);
+            iris::Constant_expression const& constant_expression = std::get<iris::Constant_expression>(expression.data);
             if (is_bool(constant_expression.type))
             {
                 return constant_expression.data == "true";
@@ -5720,7 +5720,7 @@ namespace h::compiler
         );
         if (!ends_with_terminator_statement(expression.then_statements))
         {
-            h::Expression const& condition_expression = expression.condition.expressions[0];
+            iris::Expression const& condition_expression = expression.condition.expressions[0];
             if (parameters.debug_info != nullptr && condition_expression.source_range.has_value())
                 set_debug_location(parameters.llvm_builder, *parameters.debug_info, condition_expression.source_range->start.line, condition_expression.source_range->start.column);
 
@@ -5759,7 +5759,7 @@ namespace h::compiler
                 }
             );
 
-            h::Expression const& condition_expression = expression.condition.expressions[0];
+            iris::Expression const& condition_expression = expression.condition.expressions[0];
             if (parameters.debug_info != nullptr && condition_expression.source_range.has_value())
                 set_debug_location(parameters.llvm_builder, *parameters.debug_info, condition_expression.source_range->start.line, condition_expression.source_range->start.column);
 
@@ -6019,11 +6019,11 @@ namespace h::compiler
             if (std::holds_alternative<Null_pointer_type>(value.type->data))
                 return value;
 
-            h::Expression const& expression = statement.expressions[expression_index];
+            iris::Expression const& expression = statement.expressions[expression_index];
 
             if (llvm::AllocaInst::classof(value.value) || llvm::GetElementPtrInst::classof(value.value))
             {
-                if (h::is_expression_address_of(expression) || h::is_offset_pointer(statement, expression))
+                if (iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression))
                 {
                     return value;
                 }
@@ -6230,9 +6230,9 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_condition const& function_condition,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_condition const& function_condition,
         Condition_type const condition_type,
         Expression_parameters const& expression_parameters
     )
@@ -6267,8 +6267,8 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         Expression_parameters const& expression_parameters
     )
     {
@@ -6293,8 +6293,8 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         Expression_parameters const& expression_parameters
     )
     {

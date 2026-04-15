@@ -1,11 +1,11 @@
 ---
 name: 'structure-of-arrays'
-description: 'Describe the Structure of Arrays (SoA) feature in the H programming language.'
+description: 'Describe the Structure of Arrays (SoA) feature in the Iris programming language.'
 ---
 
 # Overview
 
-In the H programming language `Soa_array` implements a **Structure of Arrays (SoA)** memory layout for arrays of structures.
+In the Iris programming language `Soa_array` implements a **Structure of Arrays (SoA)** memory layout for arrays of structures.
 
 Given a structure type `T`, a `Soa_array::<T, N>` stores **each member of `T` in its own contiguous memory region**, instead of storing complete instances sequentially.
 
@@ -157,7 +157,7 @@ Semantics:
 Example iteration:
 
 ```
-for index in 0u64 to h.length(particles) {
+for index in 0u64 to particles.length {
     particles->velocity[index] += 1.0f32;
 }
 ```

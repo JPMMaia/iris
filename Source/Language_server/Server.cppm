@@ -7,32 +7,32 @@ module;
 
 #include <lsp/types.h>
 
-export module h.language_server.server;
+export module iris.language_server.server;
 
-import h.compiler.artifact;
-import h.compiler.builder;
-import h.compiler.diagnostic;
-import h.compiler.target;
-import h.core;
-import h.core.declarations;
-import h.parser.parse_tree;
-import h.parser.parser;
+import iris.compiler.artifact;
+import iris.compiler.builder;
+import iris.compiler.diagnostic;
+import iris.compiler.target;
+import iris.core;
+import iris.core.declarations;
+import iris.parser.parse_tree;
+import iris.parser.parser;
 
-namespace h::language_server
+namespace iris::language_server
 {
     struct Workspace_data
     {
-        h::compiler::Builder builder;
-        std::pmr::vector<h::compiler::Artifact> artifacts;
-        std::pmr::vector<h::Module> header_modules;
+        iris::compiler::Builder builder;
+        std::pmr::vector<iris::compiler::Artifact> artifacts;
+        std::pmr::vector<iris::Module> header_modules;
         std::pmr::vector<std::filesystem::path> core_module_source_file_paths;
         std::pmr::vector<std::optional<int>> core_module_versions;
-        std::pmr::vector<std::pmr::vector<h::compiler::Diagnostic>> core_module_diagnostics;
+        std::pmr::vector<std::pmr::vector<iris::compiler::Diagnostic>> core_module_diagnostics;
         std::pmr::vector<std::pmr::string> core_module_diagnostic_result_ids;
         std::pmr::vector<bool> core_module_diagnostic_dirty_flags;
-        std::pmr::vector<h::parser::Parse_tree> core_module_parse_trees;
-        std::pmr::vector<h::Module> core_modules;
-        h::Declaration_database declaration_database;
+        std::pmr::vector<iris::parser::Parse_tree> core_module_parse_trees;
+        std::pmr::vector<iris::Module> core_modules;
+        iris::Declaration_database declaration_database;
     };
 
     export struct Server_logger
@@ -45,7 +45,7 @@ namespace h::language_server
     {
         std::pmr::vector<lsp::WorkspaceFolder> workspace_folders;
         std::pmr::vector<Workspace_data> workspaces_data;
-        h::parser::Parser parser;
+        iris::parser::Parser parser;
         Server_logger logger;
     };
 
@@ -131,11 +131,11 @@ namespace h::language_server
     );
 
     std::filesystem::path to_filesystem_path(
-        h::compiler::Target const& target,
+        iris::compiler::Target const& target,
         lsp::Uri const& uri
     );
 
-    h::Source_range utf_16_lsp_range_to_utf_8_source_range(
+    iris::Source_range utf_16_lsp_range_to_utf_8_source_range(
         lsp::Range const& range
     );
 }

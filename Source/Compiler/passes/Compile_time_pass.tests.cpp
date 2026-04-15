@@ -19,44 +19,44 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/Support/VirtualFileSystem.h>
 
-import h.compiler;
-import h.compiler.clang_code_generation;
-import h.compiler.compile_time_pass;
-import h.compiler.pass_test_helpers;
-import h.core;
-import h.core.declarations;
-import h.core.formatter;
-import h.parser.convertor;
+import iris.compiler;
+import iris.compiler.clang_code_generation;
+import iris.compiler.compile_time_pass;
+import iris.compiler.pass_test_helpers;
+import iris.core;
+import iris.core.declarations;
+import iris.core.formatter;
+import iris.parser.convertor;
 
 #include <catch2/catch_test_macros.hpp>
 
 import std;
 
-namespace h::compiler
+namespace iris::compiler
 {
     struct Compile_time_runtime_context
     {
-        h::compiler::LLVM_data llvm_data;
-        h::compiler::Clang_context clang_context;
+        iris::compiler::LLVM_data llvm_data;
+        iris::compiler::Clang_context clang_context;
     };
 
     static Compile_time_runtime_context create_compile_time_runtime_context(
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database
     )
     {
-        h::compiler::Compilation_options const options =
+        iris::compiler::Compilation_options const options =
         {
             .is_optimized = false,
             .debug = true,
         };
 
-        h::compiler::LLVM_data llvm_data = h::compiler::initialize_llvm(options);
+        iris::compiler::LLVM_data llvm_data = iris::compiler::initialize_llvm(options);
 
-        h::compiler::Clang_context clang_context = h::compiler::create_clang_context(
+        iris::compiler::Clang_context clang_context = iris::compiler::create_clang_context(
             *llvm_data.context,
             llvm_data.clang_data,
-            "Hl_clang_module"
+            "Iris_clang_module"
         );
 
         return Compile_time_runtime_context
@@ -71,12 +71,12 @@ namespace h::compiler
         std::string_view const function_name
     )
     {
-        h::compiler::tests::Parsed_module_context context = h::compiler::tests::parse_module_context(input_text, {});
+        iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input_text, {});
 
-        h::Function_declaration* function_declaration = h::compiler::tests::find_mutable_function_declaration(context.core_module, function_name);
+        iris::Function_declaration* function_declaration = iris::compiler::tests::find_mutable_function_declaration(context.core_module, function_name);
         REQUIRE(function_declaration != nullptr);
 
-        h::Function_definition* function_definition = h::compiler::tests::find_mutable_function_definition(context.core_module, function_name);
+        iris::Function_definition* function_definition = iris::compiler::tests::find_mutable_function_definition(context.core_module, function_name);
         REQUIRE(function_definition != nullptr);
 
         Compile_time_runtime_context runtime_context = create_compile_time_runtime_context(context.core_module, context.declaration_database);
@@ -101,18 +101,18 @@ namespace h::compiler
             parameters
         );
 
-        return h::compiler::tests::format_core_module_to_text(context.core_module);
+        return iris::compiler::tests::format_core_module_to_text(context.core_module);
     }
 
     static void run_compile_time_pass(
-        h::compiler::tests::Parsed_module_context& context,
+        iris::compiler::tests::Parsed_module_context& context,
         std::string_view const function_name
     )
     {
-        h::Function_declaration* function_declaration = h::compiler::tests::find_mutable_function_declaration(context.core_module, function_name);
+        iris::Function_declaration* function_declaration = iris::compiler::tests::find_mutable_function_declaration(context.core_module, function_name);
         REQUIRE(function_declaration != nullptr);
 
-        h::Function_definition* function_definition = h::compiler::tests::find_mutable_function_definition(context.core_module, function_name);
+        iris::Function_definition* function_definition = iris::compiler::tests::find_mutable_function_definition(context.core_module, function_name);
         REQUIRE(function_definition != nullptr);
 
         Compile_time_runtime_context runtime_context = create_compile_time_runtime_context(context.core_module, context.declaration_database);
@@ -428,7 +428,7 @@ export function run_member_type_usage() -> ()
 }
 )";
 
-        h::compiler::tests::Parsed_module_context context = h::compiler::tests::parse_module_context(input, {});
+        iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input, {});
         run_compile_time_pass(context, "run_member_type_usage");
 
         Import_module_with_alias const* const builtin_import = find_import_module_with_alias(context.core_module, "Builtin");

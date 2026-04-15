@@ -1,8 +1,8 @@
-export module h.common.filesystem_common;
+export module iris.common.filesystem_common;
 
 import std;
 
-namespace h::common
+namespace iris::common
 {
     export std::optional<std::filesystem::path> search_file(
         std::string_view const filename,

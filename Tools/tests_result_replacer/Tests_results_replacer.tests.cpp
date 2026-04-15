@@ -6,9 +6,9 @@
 #include <string>
 #include <vector>
 
-import h.tools.tests_results_replacer;
+import iris.tools.tests_results_replacer;
 
-namespace h::tools::tests_results_replacer
+namespace iris::tools::tests_results_replacer
 {
     TEST_CASE("Extract expected and actual results")
     {

@@ -2,13 +2,13 @@ module;
 
 #include <assert.h>
 
-export module h.binary_serializer.generics;
+export module iris.binary_serializer.generics;
 
 import std;
 
-import h.core;
+import iris.core;
 
-namespace h::binary_serializer
+namespace iris::binary_serializer
 {
     export struct Serializer
     {

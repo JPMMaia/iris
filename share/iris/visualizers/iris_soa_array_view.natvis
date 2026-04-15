@@ -9,11 +9,11 @@
   </Intrinsic>
 
   <!-- 0 elements -->
-  <Type Name="h::Soa_array_view&lt;0,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;0,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
   </Type>
   <!-- 1 elements -->
-  <Type Name="h::Soa_array_view&lt;1,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;1,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -29,7 +29,7 @@
     </Expand>
   </Type>
   <!-- 2 elements -->
-  <Type Name="h::Soa_array_view&lt;2,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;2,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -55,7 +55,7 @@
     </Expand>
   </Type>
   <!-- 3 elements -->
-  <Type Name="h::Soa_array_view&lt;3,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;3,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -91,7 +91,7 @@
     </Expand>
   </Type>
   <!-- 4 elements -->
-  <Type Name="h::Soa_array_view&lt;4,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;4,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -137,7 +137,7 @@
     </Expand>
   </Type>
   <!-- 5 elements -->
-  <Type Name="h::Soa_array_view&lt;5,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;5,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -193,7 +193,7 @@
     </Expand>
   </Type>
   <!-- 6 elements -->
-  <Type Name="h::Soa_array_view&lt;6,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;6,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -259,7 +259,7 @@
     </Expand>
   </Type>
   <!-- 7 elements -->
-  <Type Name="h::Soa_array_view&lt;7,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;7,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -335,7 +335,7 @@
     </Expand>
   </Type>
   <!-- 8 elements -->
-  <Type Name="h::Soa_array_view&lt;8,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;8,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -421,7 +421,7 @@
     </Expand>
   </Type>
   <!-- 9 elements -->
-  <Type Name="h::Soa_array_view&lt;9,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;9,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -517,7 +517,7 @@
     </Expand>
   </Type>
   <!-- 10 elements -->
-  <Type Name="h::Soa_array_view&lt;10,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;10,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -623,7 +623,7 @@
     </Expand>
   </Type>
   <!-- 11 elements -->
-  <Type Name="h::Soa_array_view&lt;11,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;11,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -739,7 +739,7 @@
     </Expand>
   </Type>
   <!-- 12 elements -->
-  <Type Name="h::Soa_array_view&lt;12,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;12,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -865,7 +865,7 @@
     </Expand>
   </Type>
   <!-- 13 elements -->
-  <Type Name="h::Soa_array_view&lt;13,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;13,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -1001,7 +1001,7 @@
     </Expand>
   </Type>
   <!-- 14 elements -->
-  <Type Name="h::Soa_array_view&lt;14,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;14,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -1147,7 +1147,7 @@
     </Expand>
   </Type>
   <!-- 15 elements -->
-  <Type Name="h::Soa_array_view&lt;15,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;15,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -1303,7 +1303,7 @@
     </Expand>
   </Type>
   <!-- 16 elements -->
-  <Type Name="h::Soa_array_view&lt;16,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;16,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -1469,7 +1469,7 @@
     </Expand>
   </Type>
   <!-- 17 elements -->
-  <Type Name="h::Soa_array_view&lt;17,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;17,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">
@@ -1645,7 +1645,7 @@
     </Expand>
   </Type>
   <!-- 18 elements -->
-  <Type Name="h::Soa_array_view&lt;18,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
+  <Type Name="iris::Soa_array_view&lt;18,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*&gt;">
     <DisplayString>Soa_array_view::&lt;{"$T1",sb}&gt;</DisplayString>
     <Expand>
       <Synthetic Name="0">

@@ -6,9 +6,9 @@
 #include <string>
 #include <unordered_set>
 
-import h.tools.code_generator;
+import iris.tools.code_generator;
 
-namespace h::tools::code_generator
+namespace iris::tools::code_generator
 {
     TEST_CASE("Print generate_read_enum_json_code")
     {
