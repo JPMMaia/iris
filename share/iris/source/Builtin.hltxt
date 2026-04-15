@@ -1,4 +1,4 @@
-module H.Builtin;
+module iris.builtin;
 
 export enum Type_kind
 {

@@ -3058,7 +3058,7 @@ namespace h::compiler
         {
             h::Array_slice_type const& array_slice = std::get<h::Array_slice_type>(type_to_instantiate.data);
             temporary_storage.push_back(create_array_slice_type_struct_declaration(array_slice.element_type));
-            return Declaration{ .data = &temporary_storage[0], .module_name = "H.Builtin", .is_export = true };
+            return Declaration{ .data = &temporary_storage[0], .module_name = "iris.builtin", .is_export = true };
         }
 
         if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate.data))

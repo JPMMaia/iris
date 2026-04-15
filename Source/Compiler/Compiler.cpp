@@ -805,7 +805,7 @@ namespace h::compiler
         std::pmr::unordered_map<std::pmr::string, h::Module> core_module_dependencies;
         core_module_dependencies.reserve(module_name_to_file_path_map.size() + 1);
 
-        if (core_module.name != "H.Builtin")
+        if (core_module.name != "iris.builtin")
         {
             std::filesystem::path const builtin_file_path = h::common::get_builtin_module_file_path();
             std::optional<h::Module> builtin_module = parse_and_convert(builtin_file_path);

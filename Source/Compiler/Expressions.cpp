@@ -797,7 +797,7 @@ namespace h::compiler
             return create_access_struct_member(
                 left_hand_side,
                 expression.member_name,
-                "H.Builtin",
+                "iris.builtin",
                 struct_declaration,
                 parameters
             );
@@ -2754,7 +2754,7 @@ namespace h::compiler
             parameters.llvm_data_layout,
             struct_alloca,
             "data",
-            "H.Builtin",
+            "iris.builtin",
             struct_declaration,
             data_value,
             parameters.type_database
@@ -2767,7 +2767,7 @@ namespace h::compiler
             parameters.llvm_data_layout,
             struct_alloca,
             "length",
-            "H.Builtin",
+            "iris.builtin",
             struct_declaration,
             length_value,
             parameters.type_database
@@ -4825,7 +4825,7 @@ namespace h::compiler
             h::Array_slice_type const& array_slice_type = std::get<h::Array_slice_type>(type_reference.data);
             h::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
 
-            return create_instantiate_struct_expression_value(statement, expression, parameters, "H.Builtin", struct_declaration, type_reference);
+            return create_instantiate_struct_expression_value(statement, expression, parameters, "iris.builtin", struct_declaration, type_reference);
         }
 
         std::optional<Declaration_to_instantiate> const found_instance = get_declaration_type_to_instantiate(

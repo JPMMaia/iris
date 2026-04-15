@@ -24,7 +24,7 @@ import h.core.types;
 
 namespace h::compiler
 {
-    static constexpr std::string_view c_builtin_module_name = "H.Builtin";
+    static constexpr std::string_view c_builtin_module_name = "iris.builtin";
 
     clang::QualType get_opaque_forward_declaration(
         clang::ASTContext& clang_ast_context
@@ -2457,7 +2457,7 @@ namespace h::compiler
     {
         if (std::holds_alternative<h::Array_slice_type>(type_reference.data))
         {
-            auto const module_declarations_location = clang_declaration_database.map.find("H.Builtin");
+            auto const module_declarations_location = clang_declaration_database.map.find("iris.builtin");
             if (module_declarations_location == clang_declaration_database.map.end())
                 throw std::runtime_error{"Cannot find Builtin module!"};
             Clang_module_declarations const& module_declarations = module_declarations_location->second;

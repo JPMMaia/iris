@@ -411,11 +411,11 @@ export function run_member_type() -> ()
         CHECK(expected == actual);
     }
 
-    TEST_CASE("member_type records H.Builtin Type_kind import usage", "[Compile_time_pass][Passes]")
+    TEST_CASE("member_type records iris.builtin Type_kind import usage", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_reflection;
 
-import H.Builtin as Builtin;
+import iris.builtin as Builtin;
 
 struct Metadata
 {

@@ -1313,7 +1313,7 @@ namespace h::compiler
     {
         if (std::holds_alternative<Array_slice_type>(type_reference.data))
         {
-            LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at("H.Builtin");
+            LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at("iris.builtin");
             auto const location = llvm_type_map.find("Generic_array_slice");
             if (location == llvm_type_map.end())
                 throw std::runtime_error{ "Could not find Generic_array_slice LLVM type!" };

@@ -231,12 +231,12 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     };
 
     std::string const expected_llvm_ir = std::format(R"(
-%struct.H_Builtin_Generic_array_slice = type {{ ptr, i64 }}
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
 
 ; Function Attrs: convergent
 define void @Array_slices_take(ptr %"arguments[0].integers_0", i64 %"arguments[0].integers_1") #0 !dbg !3 {{
 entry:
-  %integers = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %integers = alloca %struct.iris_builtin_Generic_array_slice, align 8
   call void @llvm.dbg.declare(metadata ptr %integers, metadata !14, metadata !DIExpression()), !dbg !19
   %data = alloca ptr, align 8, !dbg !20
   %length = alloca i64, align 8, !dbg !21
@@ -249,27 +249,27 @@ entry:
   store ptr %"arguments[0].integers_0", ptr %0, align 8
   %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %integers, i32 0, i32 1
   store i64 %"arguments[0].integers_1", ptr %1, align 8
-  %2 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !20
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !20
   %3 = load ptr, ptr %2, align 8, !dbg !20
   call void @llvm.dbg.declare(metadata ptr %data, metadata !25, metadata !DIExpression()), !dbg !26
   store ptr %3, ptr %data, align 8, !dbg !26
-  %4 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 1, !dbg !26
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 1, !dbg !26
   %5 = load i64, ptr %4, align 8, !dbg !26
   call void @llvm.dbg.declare(metadata ptr %length, metadata !27, metadata !DIExpression()), !dbg !21
   store i64 %5, ptr %length, align 8, !dbg !21
-  %6 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !21
+  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !21
   %7 = load ptr, ptr %6, align 8, !dbg !21
   %array_slice_element_pointer = getelementptr i32, ptr %7, i32 0, !dbg !21
   %8 = load i32, ptr %array_slice_element_pointer, align 4, !dbg !21
   call void @llvm.dbg.declare(metadata ptr %v0, metadata !28, metadata !DIExpression()), !dbg !22
   store i32 %8, ptr %v0, align 4, !dbg !22
-  %9 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !22
+  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !22
   %10 = load ptr, ptr %9, align 8, !dbg !22
   %array_slice_element_pointer1 = getelementptr i32, ptr %10, i32 1, !dbg !22
   %11 = load i32, ptr %array_slice_element_pointer1, align 4, !dbg !22
   call void @llvm.dbg.declare(metadata ptr %v1, metadata !29, metadata !DIExpression()), !dbg !23
   store i32 %11, ptr %v1, align 4, !dbg !23
-  %12 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !23
+  %12 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !23
   %13 = load ptr, ptr %12, align 8, !dbg !23
   %array_slice_element_pointer2 = getelementptr i32, ptr %13, i32 2, !dbg !23
   %14 = load i32, ptr %array_slice_element_pointer2, align 4, !dbg !23
@@ -278,7 +278,7 @@ entry:
   call void @llvm.dbg.declare(metadata ptr %index, metadata !32, metadata !DIExpression()), !dbg !24
   store i32 3, ptr %index, align 4, !dbg !24
   %15 = load i32, ptr %index, align 4, !dbg !24
-  %16 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !24
+  %16 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !24
   %17 = load ptr, ptr %16, align 8, !dbg !24
   %array_slice_element_pointer3 = getelementptr i32, ptr %17, i32 %15, !dbg !24
   %18 = load i32, ptr %array_slice_element_pointer3, align 4, !dbg !24
@@ -292,18 +292,18 @@ define void @Array_slices_run() #0 !dbg !35 {{
 entry:
   %array = alloca [4 x i32], i64 4, align 4, !dbg !39
   %a = alloca [4 x i32], align 4, !dbg !39
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !40
-  %1 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !41
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !40
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !41
   %array4 = alloca [1 x i32], i64 1, align 4, !dbg !42
-  %2 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !42
+  %2 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !42
   %b = alloca i32, align 4, !dbg !43
   %c = alloca ptr, align 8, !dbg !43
-  %3 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !44
-  %d = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !45
+  %3 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !44
+  %d = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !45
   %f = alloca i32, align 4, !dbg !46
   %g = alloca ptr, align 8, !dbg !46
-  %4 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !47
-  %h = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !47
+  %4 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !47
+  %h = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !47
   %i = alloca ptr, align 8, !dbg !48
   %j = alloca ptr, align 8, !dbg !49
   %array_element_pointer = getelementptr [4 x i32], ptr %array, i32 0, i32 0, !dbg !39
@@ -318,18 +318,18 @@ entry:
   call void @llvm.dbg.declare(metadata ptr %a, metadata !50, metadata !DIExpression()), !dbg !40
   store [4 x i32] %5, ptr %a, align 4, !dbg !40
   %data_pointer = getelementptr [4 x i32], ptr %a, i32 0, i32 0, !dbg !40
-  %6 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !40
+  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !40
   store ptr %data_pointer, ptr %6, align 8, !dbg !40
-  %7 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !40
+  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !40
   store i64 4, ptr %7, align 8, !dbg !40
   %8 = getelementptr inbounds {{ ptr, i64 }}, ptr %0, i32 0, i32 0, !dbg !41
   %9 = load ptr, ptr %8, align 8, !dbg !41
   %10 = getelementptr inbounds {{ ptr, i64 }}, ptr %0, i32 0, i32 1, !dbg !41
   %11 = load i64, ptr %10, align 8, !dbg !41
   call void @Array_slices_take(ptr %9, i64 %11), !dbg !41
-  %12 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !41
+  %12 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !41
   store ptr null, ptr %12, align 8, !dbg !41
-  %13 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !41
+  %13 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !41
   store i64 0, ptr %13, align 8, !dbg !41
   %14 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 0, !dbg !42
   %15 = load ptr, ptr %14, align 8, !dbg !42
@@ -339,9 +339,9 @@ entry:
   %array_element_pointer5 = getelementptr [1 x i32], ptr %array4, i32 0, i32 0, !dbg !42
   store i32 4, ptr %array_element_pointer5, align 4, !dbg !42
   %data_pointer6 = getelementptr [1 x i32], ptr %array4, i32 0, i32 0, !dbg !42
-  %18 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %2, i32 0, i32 0, !dbg !42
+  %18 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 0, !dbg !42
   store ptr %data_pointer6, ptr %18, align 8, !dbg !42
-  %19 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %2, i32 0, i32 1, !dbg !42
+  %19 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 1, !dbg !42
   store i64 1, ptr %19, align 8, !dbg !42
   %20 = getelementptr inbounds {{ ptr, i64 }}, ptr %2, i32 0, i32 0, !dbg !52
   %21 = load ptr, ptr %20, align 8, !dbg !52
@@ -353,13 +353,13 @@ entry:
   call void @llvm.dbg.declare(metadata ptr %c, metadata !54, metadata !DIExpression()), !dbg !44
   store ptr %b, ptr %c, align 8, !dbg !44
   %24 = load ptr, ptr %c, align 8, !dbg !44
-  %25 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %3, i32 0, i32 0, !dbg !44
+  %25 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 0, !dbg !44
   store ptr %24, ptr %25, align 8, !dbg !44
-  %26 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %3, i32 0, i32 1, !dbg !44
+  %26 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 1, !dbg !44
   store i64 1, ptr %26, align 8, !dbg !44
-  %27 = load %struct.H_Builtin_Generic_array_slice, ptr %3, align 8, !dbg !44
+  %27 = load %struct.iris_builtin_Generic_array_slice, ptr %3, align 8, !dbg !44
   call void @llvm.dbg.declare(metadata ptr %d, metadata !55, metadata !DIExpression()), !dbg !45
-  store %struct.H_Builtin_Generic_array_slice %27, ptr %d, align 8, !dbg !45
+  store %struct.iris_builtin_Generic_array_slice %27, ptr %d, align 8, !dbg !45
   %28 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 0, !dbg !60
   %29 = load ptr, ptr %28, align 8, !dbg !60
   %30 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 1, !dbg !60
@@ -370,18 +370,18 @@ entry:
   call void @llvm.dbg.declare(metadata ptr %g, metadata !62, metadata !DIExpression()), !dbg !47
   store ptr %f, ptr %g, align 8, !dbg !47
   %32 = load ptr, ptr %g, align 8, !dbg !47
-  %33 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !47
+  %33 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !47
   store ptr %32, ptr %33, align 8, !dbg !47
-  %34 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !47
+  %34 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !47
   store i64 1, ptr %34, align 8, !dbg !47
-  %35 = load %struct.H_Builtin_Generic_array_slice, ptr %4, align 8, !dbg !47
+  %35 = load %struct.iris_builtin_Generic_array_slice, ptr %4, align 8, !dbg !47
   call void @llvm.dbg.declare(metadata ptr %h, metadata !63, metadata !DIExpression()), !dbg !48
-  store %struct.H_Builtin_Generic_array_slice %35, ptr %h, align 8, !dbg !48
-  %36 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
+  store %struct.iris_builtin_Generic_array_slice %35, ptr %h, align 8, !dbg !48
+  %36 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
   %37 = load ptr, ptr %36, align 8, !dbg !48
   call void @llvm.dbg.declare(metadata ptr %i, metadata !64, metadata !DIExpression()), !dbg !49
   store ptr %37, ptr %i, align 8, !dbg !49
-  %38 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !49
+  %38 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !49
   %39 = load ptr, ptr %38, align 8, !dbg !49
   %array_element_pointer7 = getelementptr i32, ptr %39, i32 0, !dbg !49
   call void @llvm.dbg.declare(metadata ptr %j, metadata !65, metadata !DIExpression()), !dbg !66
@@ -479,29 +479,29 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
     };
 
     std::string const expected_llvm_ir = std::format(R"(
-%struct.Array_slices_instantiate_My_struct = type {{ %struct.H_Builtin_Generic_array_slice }}
-%struct.H_Builtin_Generic_array_slice = type {{ ptr, i64 }}
+%struct.Array_slices_instantiate_My_struct = type {{ %struct.iris_builtin_Generic_array_slice }}
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
 
 ; Function Attrs: convergent
 define void @Array_slices_instantiate_run() #0 !dbg !3 {{
 entry:
   %v0 = alloca %struct.Array_slices_instantiate_My_struct, align 8, !dbg !7
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !7
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !7
   %value = alloca i32, align 4, !dbg !8
-  %s0 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !9
-  %1 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !7
+  %s0 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !9
+  %1 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !7
   store ptr null, ptr %1, align 8, !dbg !7
-  %2 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !7
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !7
   store i64 0, ptr %2, align 8, !dbg !7
-  %3 = load %struct.H_Builtin_Generic_array_slice, ptr %0, align 8, !dbg !7
+  %3 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8, !dbg !7
   %4 = getelementptr inbounds %struct.Array_slices_instantiate_My_struct, ptr %v0, i32 0, i32 0, !dbg !7
-  store %struct.H_Builtin_Generic_array_slice %3, ptr %4, align 8, !dbg !7
+  store %struct.iris_builtin_Generic_array_slice %3, ptr %4, align 8, !dbg !7
   call void @llvm.dbg.declare(metadata ptr %v0, metadata !10, metadata !DIExpression()), !dbg !7
   call void @llvm.dbg.declare(metadata ptr %value, metadata !21, metadata !DIExpression()), !dbg !8
   store i32 0, ptr %value, align 4, !dbg !8
-  %5 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %s0, i32 0, i32 0, !dbg !9
+  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 0, !dbg !9
   store ptr %value, ptr %5, align 8, !dbg !9
-  %6 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %s0, i32 0, i32 1, !dbg !9
+  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 1, !dbg !9
   store i64 1, ptr %6, align 8, !dbg !9
   call void @llvm.dbg.declare(metadata ptr %s0, metadata !22, metadata !DIExpression()), !dbg !9
   ret void, !dbg !9
@@ -2399,7 +2399,7 @@ Vector2i add(Vector2i lhs, Vector2i rhs);
     };
 
     std::string const expected_llvm_ir = std::format(R"(
-%struct.H_Builtin_Generic_array_slice = type {{ ptr, i64 }}
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
 
 ; Function Attrs: convergent
 define void @Debug_information_run(ptr noundef %"arguments[0].integers", ptr noundef %"arguments[1].vectors", i64 noundef %"arguments[2].length") #0 !dbg !3 {{
@@ -2407,10 +2407,10 @@ entry:
   %integers = alloca ptr, align 8
   %vectors = alloca ptr, align 8
   %length = alloca i64, align 8
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !20
-  %a = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !20
-  %1 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !21
-  %b = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !21
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !20
+  %a = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !20
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !21
+  %b = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !21
   store ptr %"arguments[0].integers", ptr %integers, align 8
   call void @llvm.dbg.declare(metadata ptr %integers, metadata !17, metadata !DIExpression()), !dbg !22
   store ptr %"arguments[1].vectors", ptr %vectors, align 8
@@ -2419,22 +2419,22 @@ entry:
   call void @llvm.dbg.declare(metadata ptr %length, metadata !19, metadata !DIExpression()), !dbg !24
   %2 = load ptr, ptr %integers, align 8, !dbg !20
   %3 = load i64, ptr %length, align 8, !dbg !20
-  %4 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !20
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !20
   store ptr %2, ptr %4, align 8, !dbg !20
-  %5 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !20
+  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !20
   store i64 %3, ptr %5, align 8, !dbg !20
-  %6 = load %struct.H_Builtin_Generic_array_slice, ptr %0, align 8, !dbg !20
+  %6 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8, !dbg !20
   call void @llvm.dbg.declare(metadata ptr %a, metadata !25, metadata !DIExpression()), !dbg !21
-  store %struct.H_Builtin_Generic_array_slice %6, ptr %a, align 8, !dbg !21
+  store %struct.iris_builtin_Generic_array_slice %6, ptr %a, align 8, !dbg !21
   %7 = load ptr, ptr %vectors, align 8, !dbg !21
   %8 = load i64, ptr %length, align 8, !dbg !21
-  %9 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !21
+  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !21
   store ptr %7, ptr %9, align 8, !dbg !21
-  %10 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !21
+  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !21
   store i64 %8, ptr %10, align 8, !dbg !21
-  %11 = load %struct.H_Builtin_Generic_array_slice, ptr %1, align 8, !dbg !21
+  %11 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8, !dbg !21
   call void @llvm.dbg.declare(metadata ptr %b, metadata !30, metadata !DIExpression()), !dbg !34
-  store %struct.H_Builtin_Generic_array_slice %11, ptr %b, align 8, !dbg !34
+  store %struct.iris_builtin_Generic_array_slice %11, ptr %b, align 8, !dbg !34
   ret void, !dbg !34
 }}
 
@@ -5142,34 +5142,34 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     };
 
     char const* const expected_llvm_ir = R"(
-%struct.H_Builtin_Generic_array_slice = type { ptr, i64 }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define void @Stack_array_entry_foo(i64 noundef %"arguments[0].length") #0 {
 entry:
   %length = alloca i64, align 8
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %array_0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %1 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %array_1 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %array_0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %array_1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   store i64 %"arguments[0].length", ptr %length, align 8
   %2 = load i64, ptr %length, align 8
   %stack_save_pointer = call ptr @llvm.stacksave.p0()
   %stack_array = alloca i32, i64 %2, align 16
-  %3 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
   store ptr %stack_array, ptr %3, align 8
-  %4 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 %2, ptr %4, align 8
-  %5 = load %struct.H_Builtin_Generic_array_slice, ptr %0, align 8
-  store %struct.H_Builtin_Generic_array_slice %5, ptr %array_0, align 8
+  %5 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8
+  store %struct.iris_builtin_Generic_array_slice %5, ptr %array_0, align 8
   %6 = load i64, ptr %length, align 8
   %stack_array1 = alloca i32, i64 %6, align 16
-  %7 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
   store ptr %stack_array1, ptr %7, align 8
-  %8 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
   store i64 %6, ptr %8, align 8
-  %9 = load %struct.H_Builtin_Generic_array_slice, ptr %1, align 8
-  store %struct.H_Builtin_Generic_array_slice %9, ptr %array_1, align 8
+  %9 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8
+  store %struct.iris_builtin_Generic_array_slice %9, ptr %array_1, align 8
   call void @llvm.stackrestore.p0(ptr %stack_save_pointer)
   ret void
 }
@@ -5196,27 +5196,27 @@ attributes #1 = { nocallback nofree nosync nounwind willreturn }
     };
 
     char const* const expected_llvm_ir = R"(
-%struct.H_Builtin_Generic_array_slice = type { ptr, i64 }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define void @Stack_array_loop_foo(i64 noundef %"arguments[0].length") #0 {
 entry:
   %length = alloca i64, align 8
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %array_0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %array_0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   %index = alloca i64, align 8
-  %1 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %array_1 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %array_1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   store i64 %"arguments[0].length", ptr %length, align 8
   %2 = load i64, ptr %length, align 8
   %stack_save_pointer = call ptr @llvm.stacksave.p0()
   %stack_array = alloca i32, i64 %2, align 16
-  %3 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
   store ptr %stack_array, ptr %3, align 8
-  %4 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 %2, ptr %4, align 8
-  %5 = load %struct.H_Builtin_Generic_array_slice, ptr %0, align 8
-  store %struct.H_Builtin_Generic_array_slice %5, ptr %array_0, align 8
+  %5 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8
+  store %struct.iris_builtin_Generic_array_slice %5, ptr %array_0, align 8
   store i64 1, ptr %index, align 8
   br label %for_loop_condition
 
@@ -5230,13 +5230,13 @@ for_loop_then:                                    ; preds = %for_loop_condition
   %9 = load i64, ptr %index, align 8
   %stack_save_pointer1 = call ptr @llvm.stacksave.p0()
   %stack_array2 = alloca i32, i64 %9, align 16
-  %10 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
   store ptr %stack_array2, ptr %10, align 8
-  %11 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  %11 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
   store i64 %9, ptr %11, align 8
-  %12 = load %struct.H_Builtin_Generic_array_slice, ptr %1, align 8
-  store %struct.H_Builtin_Generic_array_slice %12, ptr %array_1, align 8
-  %13 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %array_1, i32 0, i32 0
+  %12 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8
+  store %struct.iris_builtin_Generic_array_slice %12, ptr %array_1, align 8
+  %13 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %array_1, i32 0, i32 0
   %14 = load ptr, ptr %13, align 8
   %array_slice_element_pointer = getelementptr i32, ptr %14, i32 0
   %15 = load i64, ptr %index, align 8
@@ -7624,12 +7624,12 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
   TEST_CASE("C Interoperability - function_with_array_slice x86_64-pc-linux-gnu", "[LLVM_IR]")
   {
     char const* const expected_llvm_ir = R"(
-%struct.H_Builtin_Generic_array_slice = type { ptr, i64 }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define private void @c_interoperability_take(ptr %"arguments[0].a0_0", i64 %"arguments[0].a0_1") #0 {
 entry:
-  %a0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %a0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   %0 = getelementptr inbounds { ptr, i64 }, ptr %a0, i32 0, i32 0
   store ptr %"arguments[0].a0_0", ptr %0, align 8
   %1 = getelementptr inbounds { ptr, i64 }, ptr %a0, i32 0, i32 1
@@ -7643,16 +7643,16 @@ entry:
   %v0 = alloca i32, align 4
   %array = alloca [1 x ptr], i64 1, align 8
   %array1 = alloca [1 x ptr], align 8
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   store i32 0, ptr %v0, align 4
   %array_element_pointer = getelementptr [1 x ptr], ptr %array, i32 0, i32 0
   store ptr %v0, ptr %array_element_pointer, align 8
   %1 = load [1 x ptr], ptr %array, align 8
   store [1 x ptr] %1, ptr %array1, align 8
   %data_pointer = getelementptr [1 x ptr], ptr %array1, i32 0, i32 0
-  %2 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
   store ptr %data_pointer, ptr %2, align 8
-  %3 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 1, ptr %3, align 8
   %4 = getelementptr inbounds { ptr, i64 }, ptr %0, i32 0, i32 0
   %5 = load ptr, ptr %4, align 8
@@ -7671,7 +7671,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
   TEST_CASE("C Interoperability - function_with_array_slice x86_64-pc-windows-msvc", "[LLVM_IR]")
   {
     char const* const expected_llvm_ir = R"(
-%struct.H_Builtin_Generic_array_slice = type { ptr, i64 }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define private void @c_interoperability_take(ptr noundef %"arguments[0].a0") #0 {
@@ -7685,17 +7685,17 @@ entry:
   %v0 = alloca i32, align 4
   %array = alloca [1 x ptr], i64 1, align 8
   %array1 = alloca [1 x ptr], align 8
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %1 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   store i32 0, ptr %v0, align 4
   %array_element_pointer = getelementptr [1 x ptr], ptr %array, i32 0, i32 0
   store ptr %v0, ptr %array_element_pointer, align 8
   %2 = load [1 x ptr], ptr %array, align 8
   store [1 x ptr] %2, ptr %array1, align 8
   %data_pointer = getelementptr [1 x ptr], ptr %array1, i32 0, i32 0
-  %3 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
   store ptr %data_pointer, ptr %3, align 8
-  %4 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 1, ptr %4, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %1, ptr align 8 %0, i64 16, i1 false)
   call void @c_interoperability_take(ptr noundef %1)

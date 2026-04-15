@@ -685,7 +685,7 @@ namespace h::compiler
                 throw std::runtime_error{ "member_type() requires a struct or union type argument!" };
             }
 
-            add_import_usage_for_module(parameters.core_module, "H.Builtin", "Type_kind", parameters.output_allocator);
+            add_import_usage_for_module(parameters.core_module, "iris.builtin", "Type_kind", parameters.output_allocator);
 
             return create_value_and_type(create_type_expression_statement(output_type.value()));
         }
