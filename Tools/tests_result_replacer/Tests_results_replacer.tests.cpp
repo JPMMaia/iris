@@ -112,7 +112,7 @@ entry:
         std::string_view const input_text = R"INPUT(
 TEST_CASE("First test")
 {
-    char const* const input_file = "first.hl";
+    char const* const input_file = "first.hlb";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -128,7 +128,7 @@ First expected result
 
 TEST_CASE("Second test")
 {
-    char const* const input_file = "second.hl";
+    char const* const input_file = "second.hlb";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -148,7 +148,7 @@ Second expected result
         std::string_view const expected_output_text = R"INPUT(
 TEST_CASE("First test")
 {
-    char const* const input_file = "first.hl";
+    char const* const input_file = "first.hlb";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -164,7 +164,7 @@ First actual result
 
 TEST_CASE("Second test")
 {
-    char const* const input_file = "second.hl";
+    char const* const input_file = "second.hlb";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {

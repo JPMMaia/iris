@@ -61,7 +61,7 @@ namespace h
     std::lock_guard<std::mutex> lock{mutex};
 
     std::filesystem::path const input_file_path = find_c_header_path(filename);
-    std::filesystem::path const output_file_path = (g_standard_library_path / filename).replace_extension(".hl");
+    std::filesystem::path const output_file_path = (g_standard_library_path / filename).replace_extension(".hlb");
 
     if (std::filesystem::exists(output_file_path))
       return output_file_path;

@@ -230,7 +230,7 @@ namespace h::compiler
             protected_data.module_name_to_source_file_path.insert(std::make_pair(std::pmr::string{ module_name }, *module_source_file_path));
         }
 
-        std::filesystem::path const parsed_file_path = unprotected_data.build_directory_path / module_source_file_path->filename().replace_extension("hl");
+        std::filesystem::path const parsed_file_path = unprotected_data.build_directory_path / module_source_file_path->filename().replace_extension("hlb");
 
         if (module_source_file_path->extension() == ".iris")
         {
@@ -552,7 +552,7 @@ namespace h::compiler
 
                 std::filesystem::path const source_file_path = artifact.file_path.parent_path() / executable_info.source;
 
-                std::filesystem::path const parsed_file_path = unprotected_data.build_directory_path / source_file_path.filename().replace_extension("hl");
+                std::filesystem::path const parsed_file_path = unprotected_data.build_directory_path / source_file_path.filename().replace_extension("hlb");
 
                 std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(
                     source_file_path,
@@ -748,7 +748,7 @@ namespace h::compiler
 
                 std::chrono::high_resolution_clock::time_point const begin_parsing = std::chrono::high_resolution_clock::now();
 
-                std::filesystem::path const parsed_file_path = unprotected_data.build_directory_path / source_file_path.filename().replace_extension("hl");
+                std::filesystem::path const parsed_file_path = unprotected_data.build_directory_path / source_file_path.filename().replace_extension("hlb");
                 std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(
                     source_file_path,
                     {},

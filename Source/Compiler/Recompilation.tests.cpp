@@ -47,7 +47,7 @@ namespace h
         std::filesystem::path const& file_path
     )
     {
-        std::filesystem::path const parsed_file_path = build_directory / file_path.filename().replace_extension("hl");
+        std::filesystem::path const parsed_file_path = build_directory / file_path.filename().replace_extension("hlb");
 
         std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(
             file_path,

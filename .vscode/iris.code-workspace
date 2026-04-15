@@ -75,20 +75,6 @@
 				"cwd": "${workspaceFolder}",
 			},
 			{
-				"name": "hlang build-executable",
-				"type": "lldb-dap",
-				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
-				"args": [
-					"build-executable",
-					"${workspaceFolder}/Examples/hl/hello_world.hl",
-					"--entry=main",
-					"--output=${workspaceFolder}/build/tmp/hello_world.exe",
-					"--build-directory=${workspaceFolder}/build/tmp/build",
-				],
-				"cwd": "${workspaceFolder}/build/tmp",
-			},
-			{
 				"name": "hlang build-artifact",
 				"type": "lldb-dap",
 				"request": "launch",
@@ -185,11 +171,7 @@
 					"import-c-header",
 					"c.complex",
 					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/projects/complex/complex.h",
-					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/Complex/c.complex.h",
-					/*"SDL3.SDL",
-					"${workspaceFolder}/../SDL/include/SDL3/SDL.h",
-					"${workspaceFolder}/SDL3.hl",
-					"--header-search-path=${workspaceFolder}/../SDL/include"*/
+					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/Complex/c.complex.h"
 				],
 				"cwd": "${workspaceFolder}/build",
 			},
@@ -200,7 +182,7 @@
 				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"print-struct-layout",
-					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/no_artifact/code_lens_0.generated.hl",
+					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/no_artifact/code_lens_0.generated.hlb",
 					"My_struct"
 				],
 				"cwd": "${workspaceFolder}/build",
@@ -269,17 +251,6 @@
 					"mode": "debug",
 					"hlang_language_server": "${workspaceFolder}/build/Source/Language_server/hlang_language_server.exe"
 				}
-			},
-			{
-				"name": "Parser",
-				"type": "lldb-dap",
-				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Parser/hlang_parser.exe",
-				"args": [
-					"${workspaceFolder}/Examples/txt/hello_world.iris",
-					"${workspaceFolder}/build/tmp/hello_world.hl",
-				],
-				"cwd": "${workspaceFolder}/build/tmp",
 			},
 			{
 				"name": "Compiler Tests",

@@ -51,7 +51,6 @@ def build_and_test() -> bool:
     
     build_compiler("debug")
     generate_builtin()
-    generate_examples()
     if not run_command(root_directory.joinpath("build").as_posix(), "ctest -j 8"):
         return False
     
@@ -74,16 +73,8 @@ def parse_file(directory: Path, source: Path, destination: Path) -> None:
 def generate_builtin() -> None:
     builtin_directory = root_directory.joinpath("Source/Compiler/Builtin")
     source_file = builtin_directory.joinpath("builtin.iris")
-    destination_file = builtin_directory.joinpath("builtin.hl")
+    destination_file = builtin_directory.joinpath("builtin.hlb")
     parse_file(builtin_directory, source_file, destination_file)
-
-def generate_examples() -> None:
-    text_directory = examples_directory.joinpath("txt")
-    source_files = list(text_directory.glob(f"*.iris"))
-
-    for source_file in source_files:
-        destination_file = examples_directory.joinpath("hl").joinpath(source_file.stem + ".hl")
-        parse_file(examples_directory, source_file, destination_file)
 
 def install_hlang(destination_directory: Path) -> None:
     run_command(root_directory.as_posix(), "cmake --install build --prefix " + destination_directory.as_posix())
@@ -113,8 +104,6 @@ def main() -> None:
         build_and_test()
     elif args.command == "generate_builtin":
         generate_builtin()
-    elif args.command == "generate_examples":
-        generate_examples()
     elif args.command == "install_hlang":
         install_hlang(Path(args.destination_directory))
     elif args.command == "test_language_server":

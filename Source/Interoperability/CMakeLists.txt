@@ -99,7 +99,7 @@ macro(Import_c_header)
 
    foreach(header IN LISTS ARGUMENT_HEADERS)
       cmake_path(GET header STEM header_without_extension)
-      set(output_path "${ARGUMENT_OUTPUT_DIRECTORY}/C_${header_without_extension}.hl")
+      set(output_path "${ARGUMENT_OUTPUT_DIRECTORY}/C_${header_without_extension}.hlb")
 
       list(APPEND dependencies "${output_path}")
 
