@@ -45,7 +45,7 @@ namespace h::c
             "#endif\n";
 
         std::stringstream include_stream;
-        include_stream << "#include <hlang_builtin.h>\n\n";
+        include_stream << "#include <iris_builtin.h>\n\n";
         for (std::pair<std::pmr::string const, std::filesystem::path> const& pair : dependencies_c_file_paths)
             include_stream << "#include <" << pair.second.generic_string() << ">\n";
         if (!dependencies_c_file_paths.empty())

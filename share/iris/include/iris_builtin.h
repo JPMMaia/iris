@@ -1,5 +1,5 @@
-#ifndef HLANG_BUILTIN
-#define HLANG_BUILTIN
+#ifndef IRIS_BUILTIN
+#define IRIS_BUILTIN
 
 #include <stdint.h>
 

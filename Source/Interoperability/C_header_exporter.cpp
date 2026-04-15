@@ -230,7 +230,7 @@ namespace h::c
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& dependencies_c_file_paths
     )
     {
-        stream << "#include <hlang_builtin.h>\n\n";
+        stream << "#include <iris_builtin.h>\n\n";
 
         for (h::Import_module_with_alias const& import_module : core_module.dependencies.alias_imports)
         {
