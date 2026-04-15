@@ -95,25 +95,25 @@ add_custom_command(
 add_custom_target(Generate_h_core_expressions_visitor DEPENDS "${H_ROOT_DIR}/Source/Core/Expressions_visitor.cppm")
 
 add_custom_command(
-    OUTPUT "${H_ROOT_DIR}/share/iris/visualizers/hlang_soa_array.natvis"
+    OUTPUT "${H_ROOT_DIR}/share/iris/visualizers/iris_soa_array.natvis"
     COMMAND H_Tools_Generate_JSON
                 ARGS
                 "natvis_soa_array"
                 "${H_ROOT_DIR}/Source/Core/Core.cppm"
-                "${H_ROOT_DIR}/share/iris/visualizers/hlang_soa_array.natvis"
+                "${H_ROOT_DIR}/share/iris/visualizers/iris_soa_array.natvis"
     DEPENDS H_Tools_Generate_JSON "${H_ROOT_DIR}/Source/Core/Core.cppm"
     VERBATIM
 )
-add_custom_target(Generate_h_natvis_soa_array DEPENDS "${H_ROOT_DIR}/share/iris/visualizers/hlang_soa_array.natvis")
+add_custom_target(Generate_h_natvis_soa_array DEPENDS "${H_ROOT_DIR}/share/iris/visualizers/iris_soa_array.natvis")
 
 add_custom_command(
-    OUTPUT "${H_ROOT_DIR}/share/iris/visualizers/hlang_soa_array_view.natvis"
+    OUTPUT "${H_ROOT_DIR}/share/iris/visualizers/iris_soa_array_view.natvis"
     COMMAND H_Tools_Generate_JSON
                 ARGS
                 "natvis_soa_array_view"
                 "${H_ROOT_DIR}/Source/Core/Core.cppm"
-                "${H_ROOT_DIR}/share/iris/visualizers/hlang_soa_array_view.natvis"
+                "${H_ROOT_DIR}/share/iris/visualizers/iris_soa_array_view.natvis"
     DEPENDS H_Tools_Generate_JSON "${H_ROOT_DIR}/Source/Core/Core.cppm"
     VERBATIM
 )
-add_custom_target(Generate_h_natvis_soa_array_view DEPENDS "${H_ROOT_DIR}/share/iris/visualizers/hlang_soa_array_view.natvis")
+add_custom_target(Generate_h_natvis_soa_array_view DEPENDS "${H_ROOT_DIR}/share/iris/visualizers/iris_soa_array_view.natvis")
