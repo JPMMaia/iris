@@ -14,14 +14,14 @@ import h.core;
 
 extern "C"
 {
-    TSLanguage const* tree_sitter_hlang(void);
+    TSLanguage const* tree_sitter_iris(void);
 }
 
 namespace h::parser
 {
     Parser create_parser()
     {
-        TSLanguage const* language = tree_sitter_hlang();
+        TSLanguage const* language = tree_sitter_iris();
 
         TSParser* parser = ts_parser_new();
         bool const success = ts_parser_set_language(parser, language);

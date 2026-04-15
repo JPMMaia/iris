@@ -1,5 +1,5 @@
 /**
- * @file Hlang grammar for tree-sitter
+ * @file Iris grammar for tree-sitter
  * @author João Maia <jpmmaia@gmail.com>
  * @license MIT
  */
@@ -8,7 +8,7 @@
 // @ts-check
 
 module.exports = grammar({
-  name: "hlang",
+  name: "iris",
 
   conflicts: $ => [
     //[$.Expression_binary, $.Expression_instance_call],

@@ -1,4 +1,4 @@
-add_subdirectory("tree-sitter-hlang")
+add_subdirectory("tree-sitter-iris")
 
 add_library(H_parser)
 add_library(H::Parser ALIAS H_parser)
@@ -7,7 +7,7 @@ target_compile_features(H_parser PRIVATE cxx_std_23)
 
 target_link_libraries(H_parser PUBLIC H::Common H::Core)
 
-target_link_libraries(H_parser PRIVATE tree-sitter-hlang)
+target_link_libraries(H_parser PRIVATE tree-sitter-iris)
 
 if (WIN32)
    find_package(unofficial-tree-sitter CONFIG REQUIRED)

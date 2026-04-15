@@ -46,7 +46,7 @@ It also contains a Builder component that orchestrates the entire build pipeline
 - **`Parser/`** - tree-sitter parsing and CST conversion
   - `Parser.cppm` - Uses tree-sitter to parse `.hltxt` source files into the tree-sitter Concrete Syntax Tree (CST).
   - `Convertor.cpp` - tree-sitter CST to Core Module conversion
-  - `tree-sitter-hlang/` - Grammar definition
+  - `tree-sitter-iris/` - Grammar definition
 
 - **`Interoperability/`** - C header import/export
   - `C_header_importer.cppm` - Convert C headers to Core Module

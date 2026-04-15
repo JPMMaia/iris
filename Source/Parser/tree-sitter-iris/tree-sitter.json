@@ -2,21 +2,21 @@
   "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
   "grammars": [
     {
-      "name": "hlang",
-      "camelcase": "Hlang",
-      "title": "Hlang",
-      "scope": "source.hlang",
+      "name": "iris",
+      "camelcase": "Iris",
+      "title": "Iris",
+      "scope": "source.iris",
       "file-types": [
         "hltxt"
       ],
-      "injection-regex": "^hlang$",
-      "class-name": "TreeSitterHlang"
+      "injection-regex": "^iris$",
+      "class-name": "TreeSitterIris"
     }
   ],
   "metadata": {
     "version": "0.1.0",
     "license": "MIT",
-    "description": "Hlang grammar for tree-sitter",
+    "description": "Iris grammar for tree-sitter",
     "authors": [
       {
         "name": "João Maia",

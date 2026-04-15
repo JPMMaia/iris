@@ -9,8 +9,8 @@ We use the tree-sitter library to define the grammar and do the parsing.
 ## Step-by-step
 
 You need to:
-1. Add a new test file to `Source/Parser/tree-sitter-hlang/test/corpus` or edit an existing one is appropriate. If you are not sure, use #tool:vscode/askQuestions.
-2. Edit the grammar file `Source/Parser/tree-sitter-hlang/grammar.js` to add the new rule. Use the #tool:vscode/askQuestions to ask any questions about this.
+1. Add a new test file to `Source/Parser/tree-sitter-iris/test/corpus` or edit an existing one is appropriate. If you are not sure, use #tool:vscode/askQuestions.
+2. Edit the grammar file `Source/Parser/tree-sitter-iris/grammar.js` to add the new rule. Use the #tool:vscode/askQuestions to ask any questions about this.
 3. Generate the parser
 4. Run the tree-sitter tests to confirm that everything is working as intended. If any test fails, edit the grammar again and so-on.
 
@@ -36,7 +36,7 @@ module <test-name>;
 After making changes to grammar.js, you need to generate the parser:
 
 ```
-cd Source/Parser/tree-sitter-hlang
+cd Source/Parser/tree-sitter-iris
 npm run generate
 ```
 
@@ -45,7 +45,7 @@ npm run generate
 After generating the parser, you need to run the tests and update the results after `---`. This is done automatically using the following command:
 
 ```
-cd Source/Parser/tree-sitter-hlang
+cd Source/Parser/tree-sitter-iris
 npm run test_tree_sitter_update
 ````
 

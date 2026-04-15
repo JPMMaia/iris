@@ -1,7 +1,7 @@
 {
-  "name": "tree-sitter-hlang",
+  "name": "tree-sitter-iris",
   "version": "0.1.0",
-  "description": "Hlang grammar for tree-sitter",
+  "description": "Iris grammar for tree-sitter",
   "repository": "https://github.com/jpmmaia/h",
   "license": "MIT",
   "author": {
@@ -14,7 +14,7 @@
     "incremental",
     "parsing",
     "tree-sitter",
-    "hlang"
+    "iris"
   ],
   "files": [
     "grammar.js",
