@@ -3416,7 +3416,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
 !1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_decimal_expressions.hltxt", directory: "{{}}")
+!2 = !DIFile(filename: "debug_information_decimal_expressions.hltxt", directory: "{}")
 !3 = distinct !DISubprogram(name: "decimal_constants", linkageName: "Debug_information_decimal_expressions_decimal_constants", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null}}
@@ -5538,8 +5538,10 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     {
     };
 
+    std::string const test_source_file_path = (g_test_source_files_path / input_file).generic_string();
+
     std::string const expected_llvm_ir = std::format(R"(
-@hlang_test_source_file_path = internal constant [66 x i8] c"{}\00"
+@hlang_test_source_file_path = internal constant [{} x i8] c"{}\00"
 
 ; Function Attrs: convergent
 define private i32 @Test_framework_add(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b") #0 {{
@@ -5570,7 +5572,7 @@ entry:
 declare void @hlang_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-)", (g_test_source_files_path / input_file).generic_string());
+)", test_source_file_path.size() + 1, test_source_file_path);
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.is_test_mode = true});
   }
