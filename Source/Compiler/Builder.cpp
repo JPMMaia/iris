@@ -1795,7 +1795,7 @@ namespace h::compiler
     {
         return h::common::search_files(
             path,
-            "hlang_artifact.json",
+            "iris_artifact.json",
             temporaries_allocator,
             output_allocator
         );

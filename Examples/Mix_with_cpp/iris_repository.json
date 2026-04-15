@@ -3,11 +3,11 @@
     "artifacts": [
         {
             "name": "external_library",
-            "location": "external_library/hlang_artifact.json"
+            "location": "external_library/iris_artifact.json"
         },
         {
             "name": "my_app",
-            "location": "my_app/hlang_artifact.json"
+            "location": "my_app/iris_artifact.json"
         }
     ]
 }

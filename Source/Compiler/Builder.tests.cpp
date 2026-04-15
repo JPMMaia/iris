@@ -162,7 +162,7 @@ namespace h::compiler
             std::filesystem::path{"bin"} / get_binary_name("Hello_world", target)
         };
 
-        test_builder("Hello_world", {"hlang_artifact.json"}, target, {}, expected_output_paths);
+        test_builder("Hello_world", {"iris_artifact.json"}, target, {}, expected_output_paths);
     }
 
     TEST_CASE("Build Link_with_library", "[Builder]")
@@ -171,7 +171,7 @@ namespace h::compiler
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
-            g_examples_directory / "Link_with_library" / "hlang_repository.json"
+            g_examples_directory / "Link_with_library" / "iris_repository.json"
         };
 
         std::pmr::vector<std::filesystem::path> const expected_output_paths
@@ -180,7 +180,7 @@ namespace h::compiler
             std::filesystem::path{"bin"} / get_binary_name("my_app", target),
         };
 
-        test_builder("Link_with_library", {"my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths);
+        test_builder("Link_with_library", {"my_app/iris_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
     TEST_CASE("Build Mix_with_cpp", "[Builder]")
@@ -189,7 +189,7 @@ namespace h::compiler
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
-            g_examples_directory / "Mix_with_cpp" / "hlang_repository.json"
+            g_examples_directory / "Mix_with_cpp" / "iris_repository.json"
         };
 
         std::pmr::vector<std::filesystem::path> const expected_output_paths
@@ -200,7 +200,7 @@ namespace h::compiler
             std::filesystem::path{"bin"} / get_binary_name("my_app", target)
         };
 
-        test_builder("Mix_with_cpp", {"my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths);
+        test_builder("Mix_with_cpp", {"my_app/iris_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
     TEST_CASE("Build Mix_with_cpp compile commands", "[Builder]")
@@ -210,10 +210,10 @@ namespace h::compiler
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
-            g_examples_directory / project_name / "hlang_repository.json"
+            g_examples_directory / project_name / "iris_repository.json"
         };
 
-        std::filesystem::path const artifact_file_path = g_examples_directory / project_name / "my_app" / "hlang_artifact.json";
+        std::filesystem::path const artifact_file_path = g_examples_directory / project_name / "my_app" / "iris_artifact.json";
         
         std::filesystem::path const temporary_directory_path = std::filesystem::temp_directory_path();
         std::filesystem::path const build_directory_path = temporary_directory_path / project_name / "build";
@@ -268,7 +268,7 @@ namespace h::compiler
             std::filesystem::path{"include"} / "my_library" / "module_a.hpp",
         };
 
-        test_builder("Export_c_header", {"hlang_artifact.json"}, target, repository_paths, expected_output_paths);
+        test_builder("Export_c_header", {"iris_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
     TEST_CASE("Build Export_and_import_c_header", "[Builder]")
@@ -288,7 +288,7 @@ namespace h::compiler
             std::filesystem::path{"include"} / "my_library" / "module_a.hpp",
         };
 
-        test_builder("Export_and_import_c_header", {"hlang_artifact.json"}, target, repository_paths, expected_output_paths);
+        test_builder("Export_and_import_c_header", {"iris_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
     TEST_CASE("Build Test_framework my_app in non-test mode", "[Builder]")
@@ -297,7 +297,7 @@ namespace h::compiler
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
-            g_examples_directory / "Test_framework" / "hlang_repository.json"
+            g_examples_directory / "Test_framework" / "iris_repository.json"
         };
 
         std::pmr::vector<std::filesystem::path> const expected_output_paths
@@ -307,7 +307,7 @@ namespace h::compiler
             std::filesystem::path{"bin"} / get_binary_name("my_app", target)
         };
 
-        test_builder("Test_framework", {"my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths);
+        test_builder("Test_framework", {"my_app/iris_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
     TEST_CASE("Build Test_framework my_library in test mode", "[Builder]")
@@ -316,7 +316,7 @@ namespace h::compiler
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
-            g_examples_directory / "Test_framework" / "hlang_repository.json"
+            g_examples_directory / "Test_framework" / "iris_repository.json"
         };
 
         std::pmr::vector<std::filesystem::path> const expected_output_paths
@@ -326,7 +326,7 @@ namespace h::compiler
             std::filesystem::path{"bin"} / get_binary_name("my_library.hlang.test", target)
         };
 
-        test_builder("Test_framework", {"my_library/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_0", {.is_test_mode = true});
+        test_builder("Test_framework", {"my_library/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_0", {.is_test_mode = true});
     }
 
     TEST_CASE("Build Test_framework my_app in test mode", "[Builder]")
@@ -335,7 +335,7 @@ namespace h::compiler
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
-            g_examples_directory / "Test_framework" / "hlang_repository.json"
+            g_examples_directory / "Test_framework" / "iris_repository.json"
         };
 
         std::pmr::vector<std::filesystem::path> const expected_output_paths
@@ -346,7 +346,7 @@ namespace h::compiler
             std::filesystem::path{"bin"} / get_binary_name("my_app.hlang.test", target)
         };
 
-        test_builder("Test_framework", {"my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_1", {.is_test_mode = true});
+        test_builder("Test_framework", {"my_app/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_1", {.is_test_mode = true});
     }
 
     TEST_CASE("Build Test_framework my_library and my_app in test mode", "[Builder]")
@@ -355,7 +355,7 @@ namespace h::compiler
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
-            g_examples_directory / "Test_framework" / "hlang_repository.json"
+            g_examples_directory / "Test_framework" / "iris_repository.json"
         };
 
         std::pmr::vector<std::filesystem::path> const expected_output_paths
@@ -369,7 +369,7 @@ namespace h::compiler
             std::filesystem::path{"bin"} / get_binary_name("my_app.hlang.test", target)
         };
 
-        test_builder("Test_framework", {"my_library/hlang_artifact.json", "my_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_2", {.is_test_mode = true});
+        test_builder("Test_framework", {"my_library/iris_artifact.json", "my_app/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_2", {.is_test_mode = true});
     }
 
     TEST_CASE("Build Test_framework empty_app in test mode", "[Builder]")
@@ -378,7 +378,7 @@ namespace h::compiler
 
         std::pmr::vector<std::filesystem::path> const repository_paths
         {
-            g_examples_directory / "Test_framework" / "hlang_repository.json"
+            g_examples_directory / "Test_framework" / "iris_repository.json"
         };
 
         std::pmr::vector<std::filesystem::path> const expected_output_paths
@@ -386,7 +386,7 @@ namespace h::compiler
             std::filesystem::path{"artifacts"} / "empty_app.bc"
         };
 
-        test_builder("Test_framework", {"empty_app/hlang_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_3", {.is_test_mode = true});
+        test_builder("Test_framework", {"empty_app/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_3", {.is_test_mode = true});
     }
 
     TEST_CASE("Locate artifacts in a directory", "[Builder]")
@@ -395,8 +395,8 @@ namespace h::compiler
         std::filesystem::remove_all(root);
         std::filesystem::create_directories(root / "subdir");
         {
-            std::ofstream{ root / "hlang_artifact.json" };
-            std::ofstream{ root / "subdir" / "hlang_artifact.json" };
+            std::ofstream{ root / "iris_artifact.json" };
+            std::ofstream{ root / "subdir" / "iris_artifact.json" };
         }
 
         std::pmr::vector<std::filesystem::path> const found = h::compiler::find_artifact_file_paths(root, {}, {});
@@ -404,7 +404,7 @@ namespace h::compiler
         CHECK(found.size() == 2);
         for (std::filesystem::path const& artifact_file_path : found)
         {
-            CHECK(artifact_file_path.filename() == "hlang_artifact.json");
+            CHECK(artifact_file_path.filename() == "iris_artifact.json");
         }
     }
 }

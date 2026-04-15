@@ -47,7 +47,7 @@ argparse::Argument& add_artifact_file_argument(argparse::ArgumentParser& command
 {
     return command.add_argument("--artifact-file")
         .help("Path to the artifact file")
-        .default_value("hlang_artifact.json");
+        .default_value("iris_artifact.json");
 }
 
 argparse::Argument& add_build_directory_argument(argparse::ArgumentParser& command)
@@ -194,7 +194,7 @@ int main(int const argc, char const* const* argv)
     
     // hlang build-tests [--artifact-file=<artifact_file>]... [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
     argparse::ArgumentParser build_tests_command("build-tests");
-    build_tests_command.add_description("Build one or more artifacts in test mode. If no artifacts are specified the current working directory is searched for hlang_artifact.json files.");
+    build_tests_command.add_description("Build one or more artifacts in test mode. If no artifacts are specified the current working directory is searched for iris_artifact.json files.");
     build_tests_command.add_argument("--artifact-file")
         .help("Path to an artifact file")
         .default_value<std::vector<std::string>>({})

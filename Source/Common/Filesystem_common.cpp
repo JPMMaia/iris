@@ -83,7 +83,7 @@ namespace h::common
 
     std::filesystem::path get_standard_repository_file_path()
     {
-        return get_share_path("libraries/hlang_repository.json");
+        return get_share_path("libraries/iris_repository.json");
     }
 
     std::filesystem::path get_visualizers_file_path()

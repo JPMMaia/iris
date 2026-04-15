@@ -95,10 +95,10 @@
 				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"build-artifact",
-					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/hlang_artifact.json",
+					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/iris_artifact.json",
 					"--build-directory=${workspaceFolder}/../MythologyEngine/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/Libraries/hlang_repository.json"
+					"--repository=${workspaceFolder}/Libraries/iris_repository.json"
 				],
 				"cwd": "${workspaceFolder}/build",
 			},
@@ -110,12 +110,12 @@
 				"args": [
 					"build-artifact",
 					"--output-llvm-ir",
-					"--artifact-file=${workspaceFolder}/../rts-game/source/game/hlang_artifact.json",
+					"--artifact-file=${workspaceFolder}/../rts-game/source/game/iris_artifact.json",
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
-					"--repository=${workspaceFolder}/../iris_local_repository/hlang_repository.json",
-					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
+					"--repository=${workspaceFolder}/share/hlang/libraries/iris_repository.json",
+					"--repository=${workspaceFolder}/../iris_local_repository/iris_repository.json",
+					"--repository=${workspaceFolder}/../rts-game/source/iris_repository.json"
 				],
 				"cwd": "${workspaceFolder}/build",
 			},
@@ -127,12 +127,12 @@
 				"args": [
 					"build-tests",
 					"--output-llvm-ir",
-					"--artifact-file=${workspaceFolder}/../rts-game/source/game/hlang_artifact.json",
+					"--artifact-file=${workspaceFolder}/../rts-game/source/game/iris_artifact.json",
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
-					"--repository=${workspaceFolder}/../iris_local_repository/hlang_repository.json",
-					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
+					"--repository=${workspaceFolder}/share/hlang/libraries/iris_repository.json",
+					"--repository=${workspaceFolder}/../iris_local_repository/iris_repository.json",
+					"--repository=${workspaceFolder}/../rts-game/source/iris_repository.json"
 				],
 				"cwd": "${workspaceFolder}/build",
 			},
@@ -154,10 +154,10 @@
 				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"run-with-jit",
-					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/hlang_artifact.json",
+					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/iris_artifact.json",
 					"--build-directory=${workspaceFolder}/build/tmp",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/share/libraries/hlang_repository.json"
+					"--repository=${workspaceFolder}/share/libraries/iris_repository.json"
 				],
 				"cwd": "${workspaceFolder}/build/tmp",
 			},
@@ -168,11 +168,11 @@
 				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"run-with-jit",
-					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/hlang_artifact.json",
+					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/iris_artifact.json",
 					"--build-directory=${workspaceFolder}/../MythologyEngine/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/share/libraries/hlang_repository.json",
-					"--repository=${workspaceFolder}/../iris_local_repository/hlang_repository.json"
+					"--repository=${workspaceFolder}/share/libraries/iris_repository.json",
+					"--repository=${workspaceFolder}/../iris_local_repository/iris_repository.json"
 				],
 				"cwd": "${workspaceFolder}/../MythologyEngine",
 			},
@@ -212,13 +212,13 @@
 				"program": "${workspaceFolder}/build/Source/Builder/hlang.exe",
 				"args": [
 					"generate-compile-commands",
-					"--artifact-file=${workspaceFolder}/../rts-game/source/game/hlang_artifact.json",
+					"--artifact-file=${workspaceFolder}/../rts-game/source/game/iris_artifact.json",
 					"--output-file=${workspaceFolder}/../rts-game/build/compile_commands.json",
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/share/hlang/libraries/hlang_repository.json",
-					"--repository=${workspaceFolder}/../iris_local_repository/hlang_repository.json",
-					"--repository=${workspaceFolder}/../rts-game/source/hlang_repository.json"
+					"--repository=${workspaceFolder}/share/hlang/libraries/iris_repository.json",
+					"--repository=${workspaceFolder}/../iris_local_repository/iris_repository.json",
+					"--repository=${workspaceFolder}/../rts-game/source/iris_repository.json"
 				],
 				"cwd": "${workspaceFolder}/../rts-game",
 			},

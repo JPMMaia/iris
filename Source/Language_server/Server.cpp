@@ -485,7 +485,7 @@ namespace h::language_server
 
             std::pmr::vector<std::filesystem::path> const artifact_file_paths = h::common::search_files(
                 workspace_folder_path,
-                "hlang_artifact.json",
+                "iris_artifact.json",
                 temporaries_allocator,
                 temporaries_allocator
             );

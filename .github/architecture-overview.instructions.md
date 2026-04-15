@@ -38,7 +38,7 @@ It also contains a Builder component that orchestrates the entire build pipeline
   - `Linker.cppm` - Linking logic
   - `JIT/` - Just-In-Time execution support. Not fully implemented yet and it's not being used at the moment.
   - `Passes/` - Core Module transformation passes. For example, processing compile-time expressions. In the future, we want to move template instantiation, reflection processing into here as well.
-  - `Project/` - Defines Artifact and Repository data structures which are used to configure the Builder's behavior. The Builder reads `hlang_artifact.json` and `hlang_repository.json` files to determine how to organize the build pipeline.
+  - `Project/` - Defines Artifact and Repository data structures which are used to configure the Builder's behavior. The Builder reads `iris_artifact.json` and `iris_repository.json` files to determine how to organize the build pipeline.
 
 - **`Builder/`** - Build pipeline orchestration
   - For now this is only contains a `main.cpp` file which is used to create the `hlang` executable. This might be moved into `Compiler/` in the future, as most of the work is done in the `Compiler/Builder.cpp` file.
@@ -106,13 +106,13 @@ It also contains a Builder component that orchestrates the entire build pipeline
 
 ## Builder Project Files
 
-### `hlang_repository.json`
+### `iris_repository.json`
 Defines the structure of an H language repository:
 - Lists artifacts (libraries, executables)
 - Specifies source file groups
 - Indicates import/export/compile targets
 
-### `hlang_artifact.json`
+### `iris_artifact.json`
 Defines an artifact (library or executable):
 - Artifact type (library/executable)
 - Source groups (imports, exports, compilations)

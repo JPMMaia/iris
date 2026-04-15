@@ -78,11 +78,11 @@ namespace h
         std::filesystem::path const build_directory_path = root_directory / "build";
         std::filesystem::create_directories(build_directory_path);
 
-        std::filesystem::path const artifact_configuration_file_path = root_directory / "hlang_artifact.json";
+        std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
         h::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
-            .name = "hlang_artifact.json",
+            .name = "iris_artifact.json",
             .version = {
                 .major = 0,
                 .minor = 1,
@@ -172,11 +172,11 @@ namespace h
         std::filesystem::path const build_directory_path = root_directory / "build";
         std::filesystem::create_directories(build_directory_path);
 
-        std::filesystem::path const artifact_configuration_file_path = root_directory / "hlang_artifact.json";
+        std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
         h::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
-            .name = "hlang_artifact.json",
+            .name = "iris_artifact.json",
             .version = {
                 .major = 0,
                 .minor = 1,
@@ -254,11 +254,11 @@ namespace h
         std::filesystem::path const build_directory_path = root_directory / "build";
         std::filesystem::create_directories(build_directory_path);
 
-        std::filesystem::path const artifact_configuration_file_path = root_directory / "hlang_artifact.json";
+        std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
         h::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
-            .name = "hlang_artifact.json",
+            .name = "iris_artifact.json",
             .version = {
                 .major = 0,
                 .minor = 1,
@@ -339,11 +339,11 @@ namespace h
         std::filesystem::path const build_directory_path = root_directory / "build";
         std::filesystem::create_directories(build_directory_path);
 
-        std::filesystem::path const artifact_configuration_file_path = root_directory / "hlang_artifact.json";
+        std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
         h::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
-            .name = "hlang_artifact.json",
+            .name = "iris_artifact.json",
             .version = {
                 .major = 0,
                 .minor = 1,
@@ -456,11 +456,11 @@ namespace h
         std::filesystem::path const build_directory_path = root_directory / "build";
         std::filesystem::create_directories(build_directory_path);
 
-        std::filesystem::path const artifact_configuration_file_path = root_directory / "hlang_artifact.json";
+        std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
         h::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
-            .name = "hlang_artifact.json",
+            .name = "iris_artifact.json",
             .version = {
                 .major = 0,
                 .minor = 1,
@@ -541,11 +541,11 @@ namespace h
         std::filesystem::path const build_directory_path = root_directory / "build";
         std::filesystem::create_directories(build_directory_path);
 
-        std::filesystem::path const artifact_configuration_file_path = root_directory / "hlang_artifact.json";
+        std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
         h::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
-            .name = "hlang_artifact.json",
+            .name = "iris_artifact.json",
             .version = {
                 .major = 0,
                 .minor = 1,
@@ -644,11 +644,11 @@ namespace h
         std::filesystem::path const build_directory_path = root_directory / "build";
         std::filesystem::create_directories(build_directory_path);
 
-        std::filesystem::path const artifact_configuration_file_path = root_directory / "hlang_artifact.json";
+        std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
         h::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
-            .name = "hlang_artifact.json",
+            .name = "iris_artifact.json",
             .version = {
                 .major = 0,
                 .minor = 1,
@@ -739,11 +739,11 @@ namespace h
         std::filesystem::path const build_directory_path = root_directory / "build";
         std::filesystem::create_directories(build_directory_path);
 
-        std::filesystem::path const artifact_configuration_file_path = root_directory / "hlang_artifact.json";
+        std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
         h::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
-            .name = "hlang_artifact.json",
+            .name = "iris_artifact.json",
             .version = {
                 .major = 0,
                 .minor = 1,
@@ -851,11 +851,11 @@ namespace h
         std::filesystem::path const build_directory_path = root_directory / "build";
         std::filesystem::create_directories(build_directory_path);
 
-        std::filesystem::path const artifact_configuration_file_path = root_directory / "hlang_artifact.json";
+        std::filesystem::path const artifact_configuration_file_path = root_directory / "iris_artifact.json";
         h::compiler::Artifact const artifact
         {
             .file_path = artifact_configuration_file_path,
-            .name = "hlang_artifact.json",
+            .name = "iris_artifact.json",
             .version = {
                 .major = 0,
                 .minor = 1,
