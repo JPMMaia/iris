@@ -3,8 +3,6 @@ name: 'decimal'
 description: 'Describes Decimals and how they should be implemented.'
 ---
 
-NOTE: This feature has not been implemented yet.
-
 A DecimalN is a signed fixed point numeric type where N is the exponent of 10 in the divisor:
 
 integer_value / 10^N

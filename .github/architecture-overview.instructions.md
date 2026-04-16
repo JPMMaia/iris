@@ -96,7 +96,6 @@ It also contains a Builder component that orchestrates the entire build pipeline
 - Not implemented yet (or partially implemented):
   - Compile-time expressions.
   - Reflections.
-  - Fixed-point decimal types.
   - Higher-level functional programming features (lambdas, map/filter, etc).
   - Structure of Arrays (SoA) type.
   - SIMD vector types and operations.

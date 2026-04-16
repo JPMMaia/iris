@@ -1,0 +1,27 @@
+/**
+ * Iris documentation — custom CSS overrides.
+ * Docusaurus provides sensible defaults; only tweak what's needed.
+ */
+
+:root {
+  --ifm-color-primary: #4a6cf7;
+  --ifm-color-primary-dark: #2a50f5;
+  --ifm-color-primary-darker: #1943f4;
+  --ifm-color-primary-darkest: #0a30d6;
+  --ifm-color-primary-light: #6a88f9;
+  --ifm-color-primary-lighter: #7b96fa;
+  --ifm-color-primary-lightest: #a8bcfc;
+
+  --ifm-code-font-size: 90%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #6a88f9;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+/* Give Iris code blocks a subtle background tint */
+.language-iris .token-line {
+  font-size: 0.9rem;
+}
