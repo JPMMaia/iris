@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_MODULE_STD OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+include(InstallRequiredSystemLibraries)
+
 include("Scripts/compile_cxx_header_unit.cmake")
 
 include(CTest)

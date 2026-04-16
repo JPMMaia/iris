@@ -438,7 +438,7 @@
 				"args": [
 					"${workspaceFolder}/Scripts/build_utilities.py",
 					"install_iris",
-					"${workspaceFolder}/../Iris_install",
+					"${workspaceFolder}/../iris_install",
 					"--configuration",
 					"debug"
 				],
@@ -457,7 +457,7 @@
 				"args": [
 					"${workspaceFolder}/Scripts/build_utilities.py",
 					"install_iris",
-					"${workspaceFolder}/../Iris_install"
+					"${workspaceFolder}/../iris_install"
 				],
 				"presentation": {
 					"reveal": "always"

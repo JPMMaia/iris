@@ -33,11 +33,6 @@ else()
 endif()
 
 if (WIN32)
-   find_program(LIBCLANG_DLL_LOCATION "libclang.dll" REQUIRED)
-   install(FILES ${LIBCLANG_DLL_LOCATION} TYPE BIN CONFIGURATIONS Debug Release)
-endif ()
-
-if (WIN32)
    find_program(PROGRAM_CLANG_CL "clang-cl.exe" REQUIRED)
    install(FILES ${PROGRAM_CLANG_CL} TYPE BIN CONFIGURATIONS Debug Release)
 

@@ -54,7 +54,7 @@ def build_and_test() -> bool:
     if not run_command(root_directory.joinpath("build").as_posix(), "ctest -j 8"):
         return False
     
-    install_iris("debug", root_directory.joinpath("debug", "../Iris_install"))
+    install_iris("debug", root_directory.joinpath("debug", "../iris_install"))
     if not test_language_server():
         return False
     
