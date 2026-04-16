@@ -418,10 +418,19 @@ namespace iris::parser
         {
             char8_t const character = text[current_byte];
 
+            // Columns are counted in UTF-8 code points; advance by full code point bytes.
             if (is_utf_8_code_point(character))
+            {
                 current_point.column += 1;
-            
-            current_byte += 1;
+                current_byte += 1;
+
+                while (current_byte < text.size() && !is_utf_8_code_point(text[current_byte]))
+                    current_byte += 1;
+            }
+            else
+            {
+                current_byte += 1;
+            }
         }
         assert(current_point.column == target_point.column);
         

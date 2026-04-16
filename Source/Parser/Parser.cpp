@@ -82,35 +82,30 @@ namespace iris::parser
         return new_end_byte;    
     }
 
-    static TSPoint calculate_point(
+    static TSPoint calculate_byte_point(
         std::u8string_view const text,
-        TSPoint const start_point,
-        std::uint32_t const start_byte,
         std::uint32_t const target_byte
     )
     {
-        TSPoint current_point = start_point;
-        std::uint32_t current_byte = start_byte;
+        assert(target_byte <= text.size());
 
-        while (current_byte < target_byte)
+        TSPoint point{};
+
+        for (std::uint32_t current_byte = 0; current_byte < target_byte; ++current_byte)
         {
             char8_t const character = text[current_byte];
-
             if (character == '\n')
             {
-                current_point.row += 1;
-                current_point.column = 0;
+                point.row += 1;
+                point.column = 0;
             }
-            else if (is_utf_8_code_point(character))
+            else
             {
-                current_point.column += 1;
+                point.column += 1;
             }
-
-            current_byte += 1;
         }
-        assert(current_byte == target_byte);
 
-        return current_point;
+        return point;
     }
 
     static void edit_text(
@@ -135,23 +130,30 @@ namespace iris::parser
         std::u8string_view const new_text
     )
     {
-        TSNode const root = ts_tree_root_node(previous_parse_tree.ts_tree);
+        TSPoint const start_code_point{range.start.line - 1, range.start.column - 1};
+        TSPoint const end_code_point{range.end.line - 1, range.end.column - 1};
 
-        TSPoint const start_point{range.start.line - 1, range.start.column - 1};
-        TSPoint const old_end_point{range.end.line - 1, range.end.column - 1};
+        std::uint32_t const start_byte = calculate_byte(
+            previous_parse_tree.text,
+            TSPoint{},
+            0,
+            start_code_point
+        );
+        std::uint32_t const old_end_byte = calculate_byte(
+            previous_parse_tree.text,
+            start_code_point,
+            start_byte,
+            end_code_point
+        );
 
-        TSNode const node = ts_node_descendant_for_point_range(root, start_point, start_point);
-        TSPoint const node_start_point = ts_node_start_point(node);
-        std::uint32_t const node_start_byte = ts_node_start_byte(node);
-
-        std::uint32_t const start_byte = calculate_byte(previous_parse_tree.text, node_start_point, node_start_byte, start_point);
-        std::uint32_t const old_end_byte = calculate_byte(previous_parse_tree.text, start_point, start_byte, old_end_point);
+        TSPoint const start_point = calculate_byte_point(previous_parse_tree.text, start_byte);
+        TSPoint const old_end_point = calculate_byte_point(previous_parse_tree.text, old_end_byte);
 
         edit_text(previous_parse_tree.text, start_byte, old_end_byte, new_text);
         std::pmr::u8string& text_after_edit = previous_parse_tree.text;
 
         std::uint32_t const new_end_byte = calculate_new_end_byte(start_byte, old_end_byte, new_text.size());
-        TSPoint const new_end_point = calculate_point(text_after_edit, start_point, start_byte, new_end_byte);
+        TSPoint const new_end_point = calculate_byte_point(text_after_edit, new_end_byte);
 
         TSInputEdit const edit
         {

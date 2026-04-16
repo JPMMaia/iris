@@ -69,6 +69,7 @@ if(BUILD_TESTING)
    target_sources(Iris_parser_tests
       PRIVATE
          "Convertor.tests.cpp"
+         "Parser.tests.cpp"
    )
 
    include(Catch)
