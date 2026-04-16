@@ -61,8 +61,11 @@
         "language": "iris",
         "scopeName": "source.iris",
         "path": "./syntaxes/iris.tmGrammar.json"
-
-,
+      }
+    ],
+    "languages": [
+      {
+        "id": "iris",
         "extensions": [
           ".iris"
         ],
