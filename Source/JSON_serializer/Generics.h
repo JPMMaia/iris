@@ -57,7 +57,7 @@ namespace iris::json
     );
 
     template <>
-    JSON to_json(
+    inline JSON to_json(
         std::filesystem::path const& value
     )
     {
@@ -65,7 +65,7 @@ namespace iris::json
     }
 
     template <>
-    void from_json(
+    inline void from_json(
         JSON const& data,
         std::filesystem::path& output
     )
@@ -74,7 +74,7 @@ namespace iris::json
     }
 
     template <>
-    JSON to_json(
+    inline JSON to_json(
         std::pmr::string const& value
     )
     {
@@ -82,7 +82,7 @@ namespace iris::json
     }
 
     template <>
-    void from_json(
+    inline void from_json(
         JSON const& data,
         std::pmr::string& output
     )
@@ -91,7 +91,7 @@ namespace iris::json
     }
 
     template <>
-    JSON to_json(
+    inline JSON to_json(
         std::uint32_t const& value
     )
     {
@@ -99,7 +99,7 @@ namespace iris::json
     }
 
     template <>
-    void from_json(
+    inline void from_json(
         JSON const& data,
         std::uint32_t& output
     )
@@ -108,7 +108,7 @@ namespace iris::json
     }
 
     template <>
-    JSON to_json(
+    inline JSON to_json(
         std::uint64_t const& value
     )
     {
@@ -116,7 +116,7 @@ namespace iris::json
     }
 
     template <>
-    void from_json(
+    inline void from_json(
         JSON const& data,
         std::uint64_t& output
     )
@@ -125,7 +125,7 @@ namespace iris::json
     }
 
     template <>
-    JSON to_json(
+    inline JSON to_json(
         bool const& value
     )
     {
@@ -133,7 +133,7 @@ namespace iris::json
     }
 
     template <>
-    void from_json(
+    inline void from_json(
         JSON const& data,
         bool& output
     )
