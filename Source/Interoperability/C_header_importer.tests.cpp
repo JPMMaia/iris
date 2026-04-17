@@ -105,7 +105,7 @@ namespace iris::c
             .is_signed = true
         };
 
-        CHECK(expression == iris::Constant_expression{ .type = int32_type, .data = std::pmr::string{value_expected_data} });
+        CHECK(expression == iris::Constant_expression{ .type = {.data = int32_type}, .data = std::pmr::string{value_expected_data} });
     }
 
     static iris::Statement create_cast_constant_statement(
