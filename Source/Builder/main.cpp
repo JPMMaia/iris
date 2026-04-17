@@ -10,7 +10,6 @@ import iris.common;
 import iris.compiler;
 import iris.compiler.builder;
 import iris.compiler.expressions;
-import iris.compiler.jit_runner;
 import iris.compiler.linker;
 import iris.compiler.repository;
 import iris.compiler.target;
@@ -206,17 +205,6 @@ int main(int const argc, char const* const* argv)
     add_output_llvm_ir_argument(build_tests_command);
     add_function_contract_options_argument(build_tests_command);
     program.add_subparser(build_tests_command);
-    
-    // iris run-with-jit [--artifact-file=<artifact_file>] [--build-directory=<build_directory>] [--header-search-path=<header_search_path>]... [--repository=<repository_path>]...
-    argparse::ArgumentParser run_with_jit_command("run-with-jit");
-    run_with_jit_command.add_description("Use Just-in-time (JIT) compilation and run the program. Any changes detected during runtime will be applied.");
-    add_artifact_file_argument(run_with_jit_command);
-    add_build_directory_argument(run_with_jit_command);
-    add_header_search_path_argument(run_with_jit_command);
-    add_repository_argument(run_with_jit_command);
-    add_no_debug_argument(run_with_jit_command);
-    add_function_contract_options_argument(run_with_jit_command);
-    program.add_subparser(run_with_jit_command);
 
     // iris import-c-header <module_name> <header> <output>
     argparse::ArgumentParser import_c_header_command("import-c-header");
@@ -356,34 +344,6 @@ int main(int const argc, char const* const* argv)
             std::cerr << program;
             std::exit(1);
         }
-    }
-    else if (program.is_subcommand_used("run-with-jit"))
-    {
-        print_arguments(argc, argv);
-
-        argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("run-with-jit");
-
-        std::filesystem::path const artifact_file_path = subprogram.get<std::string>("--artifact-file");
-        std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
-        std::pmr::vector<std::filesystem::path> const header_search_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--header-search-path"));
-        std::pmr::vector<std::filesystem::path> const repository_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
-        std::pmr::vector<iris::compiler::Repository> const repositories = iris::compiler::get_repositories(repository_paths);
-        bool const no_debug = subprogram.get<bool>("--no-debug");
-        iris::compiler::Contract_options const contract_options = get_function_contract_options_argument(subprogram);
-
-        iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options);
-
-        std::unique_ptr<iris::compiler::JIT_runner> const jit_runner = iris::compiler::setup_jit_and_watch(artifact_file_path, repository_paths, build_directory_path, header_search_paths, target, compilation_options);
-
-        void(*function_pointer)() = iris::compiler::get_entry_point_function<void(*)()>(*jit_runner, artifact_file_path);
-        if (function_pointer == nullptr)
-        {
-            std::cerr << std::format("Could not find entry point of artifact '{}'\n", artifact_file_path.generic_string());
-            return -1;
-        }
-
-        function_pointer();
     }
     else if (program.is_subcommand_used("import-c-header"))
     {
