@@ -5,9 +5,6 @@ target_link_libraries(Iris_Tools_Code_generator PUBLIC std_module)
 
 target_compile_features(Iris_Tools_Code_generator PUBLIC cxx_std_23)
 
-find_package(RapidJSON CONFIG REQUIRED)
-target_link_libraries(Iris_Tools_Code_generator PRIVATE rapidjson)
-
 target_sources(Iris_Tools_Code_generator 
     PUBLIC
         FILE_SET CXX_MODULES

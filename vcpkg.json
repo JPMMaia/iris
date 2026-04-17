@@ -5,7 +5,6 @@
     "argparse",
     "catch2",
     "nlohmann-json",
-    "rapidjson",
     "tree-sitter",
     "xxhash",
     "zlib",
