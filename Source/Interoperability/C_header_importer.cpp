@@ -9,8 +9,6 @@ module iris.c_header_converter;
 
 import std;
 
-import iris.c_header_hash;
-
 import iris.binary_serializer;
 import iris.core;
 import iris.core.declarations;
@@ -2754,22 +2752,6 @@ namespace iris::c
 
     std::optional<iris::Module> import_header_and_write_to_file(std::string_view const header_name, std::filesystem::path const& header_path, std::filesystem::path const& output_path, Options const& options)
     {
-        /*std::optional<std::uint64_t> current_header_hash = calculate_header_file_hash(header_path, options.target_triple, options.include_directories);
-
-        if (current_header_hash.has_value() && std::filesystem::exists(output_path))
-        {
-            std::optional<iris::json::Header> const core_header = iris::json::read_header(output_path);
-            if (core_header.has_value())
-            {
-                std::optional<std::uint64_t> const cached_header_hash = core_header->content_hash;
-                if (cached_header_hash.has_value())
-                {
-                    if (current_header_hash.value() == cached_header_hash.value())
-                        return;
-                }
-            }
-        }*/
-
         std::optional<iris::Module> header_module = import_header(header_name, header_path, options);
         if (!header_module.has_value())
             return std::nullopt;

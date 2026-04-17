@@ -34,10 +34,8 @@ endif()
 target_sources(Iris_C_header_importer
    PUBLIC FILE_SET modules TYPE CXX_MODULES
       FILES
-         "C_header_hash.cppm"
          "C_header_importer.cppm"
    PRIVATE
-      "C_header_hash.cpp"
       "C_header_importer.cpp"
 )
 
@@ -60,7 +58,7 @@ if(BUILD_TESTING)
          VULKAN_HEADERS_LOCATION="${vulkan_headers_location}"
    )
 
-   target_sources(Iris_C_header_importer_tests PRIVATE "C_header_hash.tests.cpp" "C_header_importer.tests.cpp")
+   target_sources(Iris_C_header_importer_tests PRIVATE "C_header_importer.tests.cpp")
 
    include(Catch)
    catch_discover_tests(Iris_C_header_importer_tests)
