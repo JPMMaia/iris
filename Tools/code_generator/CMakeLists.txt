@@ -3,6 +3,9 @@ add_library(Iris::Tools::Code_generator ALIAS Iris_Tools_Code_generator)
 
 target_link_libraries(Iris_Tools_Code_generator PUBLIC std_module)
 
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(Iris_Tools_Code_generator PRIVATE nlohmann_json::nlohmann_json)
+
 target_compile_features(Iris_Tools_Code_generator PUBLIC cxx_std_23)
 
 target_sources(Iris_Tools_Code_generator 
