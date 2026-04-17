@@ -24,6 +24,4 @@ else()
    )
 endif()
 
-if (MSVC)
-   target_link_libraries(Iris_common PUBLIC std_module)
-endif ()
+target_link_libraries(Iris_common PUBLIC std_module)

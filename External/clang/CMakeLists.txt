@@ -9,7 +9,9 @@ target_sources(clang_target PUBLIC FILE_SET modules TYPE CXX_MODULES
 find_package(Clang CONFIG REQUIRED)
 target_include_directories(clang_target PRIVATE ${CLANG_INCLUDE_DIRS})
 
-target_compile_options(clang_target PUBLIC "/D_SCL_SECURE_NO_WARNINGS")
+if (MSVC)
+   target_compile_options(clang_target PUBLIC "/D_SCL_SECURE_NO_WARNINGS")
+endif ()
 
 if(WIN32)
    target_link_libraries(

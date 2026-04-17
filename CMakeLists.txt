@@ -6,18 +6,16 @@ project(Iris LANGUAGES C CXX)
 
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_MODULE_STD OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(InstallRequiredSystemLibraries)
 
 include("Scripts/compile_cxx_header_unit.cmake")
+include("Scripts/compile_cpp_std_module.cmake")
 
 include(CTest)
-
-if (MSVC)
-    include("Scripts/compile_cpp_std_module.cmake")
-endif ()
 
 if (MSVC)
     add_compile_options("/EHsc")
