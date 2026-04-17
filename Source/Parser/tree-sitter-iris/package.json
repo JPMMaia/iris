@@ -8,8 +8,6 @@
     "name": "João Maia",
     "email": "jpmmaia@gmail.com"
   },
-  "main": "bindings/node",
-  "types": "bindings/node",
   "keywords": [
     "incremental",
     "parsing",
@@ -19,21 +17,14 @@
   "files": [
     "grammar.js",
     "tree-sitter.json",
-    "binding.gyp",
-    "prebuilds/**",
-    "bindings/node/*",
     "queries/*",
     "src/**",
     "*.wasm"
   ],
   "dependencies": {
-    "node-addon-api": "^8.2.2",
-    "node-gyp-build": "^4.8.2",
     "tree-sitter": "^0.22.4"
   },
   "devDependencies": {
-    "node-gyp": "^11.1.0",
-    "prebuildify": "^6.0.1",
     "tree-sitter-cli": "^0.24.4"
   },
   "peerDependenciesMeta": {
@@ -45,11 +36,8 @@
     "generate": "tree-sitter generate",
     "test_tree_sitter": "tree-sitter test",
     "test_tree_sitter_update": "tree-sitter test --update",
-    "prebuild": "prebuildify --napi",
-    "install_debug": "node-gyp build --debug",
-    "install_release": "node-gyp build",
     "prestart": "tree-sitter build --wasm",
     "start": "tree-sitter playground",
-    "test": "node --test bindings/node/*_test.js"
+    "test": "npm run test_tree_sitter"
   }
 }
