@@ -2610,17 +2610,6 @@ import iris.core;
 
 namespace iris::json
 {
-    export template <typename T>
-    JSON to_json(
-        T const& value
-    );
-
-    export template <typename T>
-    void from_json(
-        JSON const& data,
-        T& output
-    );
-
 )";
 
         std::string_view const enum_template = R"(    export template <>
