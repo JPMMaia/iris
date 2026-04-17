@@ -50,7 +50,9 @@ if(BUILD_TESTING)
    find_package(Catch2 CONFIG REQUIRED)
    target_link_libraries(Iris_C_header_importer_tests PRIVATE Catch2::Catch2 Catch2::Catch2WithMain)
 
-   target_link_libraries(Iris_C_header_importer_tests PRIVATE clangTooling)
+   if (MSVC)
+      target_link_libraries(Iris_C_header_importer_tests PRIVATE clangTooling)
+   endif ()
 
    target_compile_definitions(
       Iris_C_header_importer_tests
