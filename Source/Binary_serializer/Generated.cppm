@@ -9,18 +9,6 @@ import iris.core;
 
 namespace iris::binary_serializer
 {
-    export template <typename T>
-    void serialize(
-        Serializer& serializer,
-        T const& data
-    );
-
-    export template <typename T>
-    void deserialize(
-        Serializer& serializer,
-        T& data
-    );
-
     export template <>
     void serialize(Serializer& serializer, Source_location const& value)
     {
