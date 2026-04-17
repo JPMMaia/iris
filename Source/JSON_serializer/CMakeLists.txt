@@ -3,7 +3,7 @@ add_library(Iris::JSON_serializer ALIAS Iris_JSON_serializer)
 
 target_compile_features(Iris_JSON_serializer PUBLIC cxx_std_23)
 
-target_link_libraries(Iris_JSON_serializer PUBLIC Iris::Core)
+target_link_libraries(Iris_JSON_serializer PUBLIC Iris::Common Iris::Core)
 
 find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(Iris_JSON_serializer PRIVATE nlohmann_json::nlohmann_json)

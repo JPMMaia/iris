@@ -23,11 +23,9 @@ namespace iris::json
     }
 
     export std::optional<iris::Module> deserialize_module(
-        std::string_view const data
+        JSON const& json
     )
     {
-        JSON const json = JSON::parse(data);
-
         iris::Module output{};
         from_json(json, output);
         return output;
