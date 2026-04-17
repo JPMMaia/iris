@@ -28,7 +28,7 @@ namespace iris::compiler
 
     export struct Diagnostic_related_information
     {
-        friend auto operator<=>(Diagnostic_related_information const& lhs, Diagnostic_related_information const& rhs) = default;
+        friend bool operator==(Diagnostic_related_information const& lhs, Diagnostic_related_information const& rhs) = default;
     };
 
     export using Diagnostic_data = std::pmr::string;
@@ -44,26 +44,15 @@ namespace iris::compiler
         Diagnostic_related_information related_information = {};
         Diagnostic_data data = {};
 
-        friend auto operator <=>(Diagnostic const& lhs, Diagnostic const& rhs)
-        {
-            if (auto cmp = lhs.file_path <=> rhs.file_path; cmp != 0)
-                return cmp;
-            if (auto cmp = lhs.range <=> rhs.range; cmp != 0)
-                return cmp;
-            if (auto cmp = lhs.source <=> rhs.source; cmp != 0)
-                return cmp;
-            if (auto cmp = lhs.severity <=> rhs.severity; cmp != 0)
-                return cmp;
-            if (auto cmp = lhs.code <=> rhs.code; cmp != 0)
-                return cmp;
-            if (auto cmp = lhs.message <=> rhs.message; cmp != 0)
-                return cmp;
-            return lhs.related_information <=> rhs.related_information;
-        }
-
         friend bool operator==(Diagnostic const& lhs, Diagnostic const& rhs)
         {
-            return (lhs <=> rhs) == 0;
+            return lhs.file_path == rhs.file_path &&
+                   lhs.range == rhs.range &&
+                   lhs.source == rhs.source &&
+                   lhs.severity == rhs.severity &&
+                   lhs.code == rhs.code &&
+                   lhs.message == rhs.message &&
+                   lhs.related_information == rhs.related_information;
         }
     };
 

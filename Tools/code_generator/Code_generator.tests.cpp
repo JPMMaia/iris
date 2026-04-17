@@ -283,7 +283,7 @@ namespace iris::tools::code_generator
         CHECK(struct_type.members[2].name == "member_2");
     }
 
-    TEST_CASE("Parse struct with #if defs")
+    TEST_CASE("Parse struct with equality operator")
     {
         std::stringstream string_stream;
         string_stream << "struct Foo\n";
@@ -292,11 +292,7 @@ namespace iris::tools::code_generator
         string_stream << "    std::uint64_t member_1;\n";
         string_stream << "    std::uint64_t member_2;\n";
         string_stream << "    \n";
-        string_stream << "#if HACK_SPACESHIP_OPERATOR\n";
-        string_stream << "    auto operator<=>(Foo const&, Foo const&) = default;\n";
-        string_stream << "#else\n";
-        string_stream << "    friend auto operator<=>(Foo const&, Foo const&) = default;\n";
-        string_stream << "#endif\n";
+        string_stream << "    friend bool operator==(Foo const&, Foo const&) = default;\n";
         string_stream << "};\n";
 
         File_types const file_types = identify_file_types(string_stream);

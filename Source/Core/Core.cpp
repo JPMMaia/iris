@@ -10,33 +10,6 @@ import iris.common;
 
 namespace iris
 {
-#if HACK_SPACESHIP_OPERATOR
-    template<typename... Ts>
-    std::strong_ordering operator<=>(std::variant<Ts...> const& lhs, std::variant<Ts...> const& rhs)
-    {
-        std::size_t const i = lhs.index();
-        std::size_t const j = rhs.index();
-        if (i != j)
-            return i <=> j;
-
-        std::strong_ordering result = std::strong_ordering::equal;
-        
-        auto const visitor = [&](auto const& lhs_value) -> void {
-            using real_type = std::remove_cv_t<std::remove_reference_t<decltype(lhs_value)>>;
-            auto const& rhs_value = std::get<real_type>(rhs);
-            result = lhs_value <=> rhs_value;
-        };
-
-        std::visit(visitor, lhs);
-
-        return result;
-    }
-
-    std::strong_ordering operator<=>(Type_instance const& lhs, Type_instance const& rhs) = default;
-    std::strong_ordering operator<=>(Type_reference const& lhs, Type_reference const& rhs) = default;
-    std::strong_ordering operator<=>(Expression const& lhs, Expression const& rhs) = default;
-    std::strong_ordering operator<=>(Statement const& lhs, Statement const& rhs) = default;
-
     bool operator==(Statement const& lhs, Statement const& rhs)
     {
         if (lhs.expressions.size() != rhs.expressions.size())
@@ -44,22 +17,13 @@ namespace iris
 
         for (std::size_t index = 0; index < lhs.expressions.size(); ++index)
         {
-            std::strong_ordering const result = lhs.expressions[index] <=> rhs.expressions[index];
-            if (result != std::strong_ordering::equal)
+            if (!(lhs.expressions[index] == rhs.expressions[index]))
                 return false;
         }
 
         return true;
     }
-
-    bool operator==(Type_instance const& lhs, Type_instance const& rhs) = default;
     
-    bool operator==(Type_reference const& lhs, Type_reference const& rhs)
-    {
-        return false; // TODo
-    }
-#endif
-
     bool operator==(Expression const& lhs, Expression const& rhs)
     {
         return lhs.data == rhs.data;
@@ -80,6 +44,21 @@ namespace iris
     {
         return lhs.description == rhs.description &&
                lhs.condition == rhs.condition;
+    }
+
+    // Comparison operator for sorting Source_range_location objects
+    bool operator<(Source_range_location const& lhs, Source_range_location const& rhs) noexcept
+    {
+        // First, compare by file path
+        if (lhs.file_path != rhs.file_path)
+            return lhs.file_path < rhs.file_path;
+
+        // If file paths are equal, compare by start line
+        if (lhs.range.start.line != rhs.range.start.line)
+            return lhs.range.start.line < rhs.range.start.line;
+
+        // If start lines are equal, compare by start column
+        return lhs.range.start.column < rhs.range.start.column;
     }
 
     Source_range create_source_range(

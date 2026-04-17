@@ -10,7 +10,7 @@ namespace iris
         std::uint64_t size = 0;
         std::uint64_t alignment = 0;
 
-        friend auto operator<=>(Struct_member_layout const&, Struct_member_layout const&) = default;
+        friend bool operator==(Struct_member_layout const&, Struct_member_layout const&) = default;
     };
 
     export std::ostream& operator<<(std::ostream& output_stream, Struct_member_layout const& value)
@@ -26,7 +26,7 @@ namespace iris
         std::uint64_t alignment = 0;
         std::pmr::vector<Struct_member_layout> members;
 
-        friend auto operator<=>(Struct_layout const&, Struct_layout const&) = default;
+        friend bool operator==(Struct_layout const&, Struct_layout const&) = default;
     };
 
     export std::ostream& operator<<(std::ostream& output_stream, Struct_layout const& value)

@@ -19,7 +19,7 @@ namespace iris::compiler
         std::filesystem::path file;
         std::filesystem::path output;
 
-        friend auto operator<=>(Compile_command const&, Compile_command const&) = default;
+        friend bool operator==(Compile_command const&, Compile_command const&) = default;
     };
 
     export std::pmr::vector<Compile_command> create_compile_commands(
