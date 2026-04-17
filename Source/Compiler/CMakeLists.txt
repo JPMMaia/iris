@@ -102,7 +102,7 @@ if(BUILD_TESTING)
    target_sources(Iris_compiler_tests
       PUBLIC FILE_SET modules TYPE CXX_MODULES
          FILES
-            "passes/Pass_test_helpers.cppm"
+            "Passes/Pass_test_helpers.cppm"
    )
 
    find_package(Catch2 CONFIG REQUIRED)
@@ -122,10 +122,10 @@ if(BUILD_TESTING)
       "main.tests.cpp"
       "Builder.tests.cpp"
       "Compiler.tests.cpp"
-      "passes/All_passes.tests.cpp"
-      "passes/Compile_time_pass.tests.cpp"
-      "passes/Instantiate_pass.tests.cpp"
-      "passes/Implicit_function_pass.tests.cpp"
+      "Passes/All_passes.tests.cpp"
+      "Passes/Compile_time_pass.tests.cpp"
+      "Passes/Instantiate_pass.tests.cpp"
+      "Passes/Implicit_function_pass.tests.cpp"
       "Recompilation.tests.cpp"
       "Validation.tests.cpp"
       "JIT/JIT_runner.tests.cpp"
