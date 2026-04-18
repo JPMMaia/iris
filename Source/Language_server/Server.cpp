@@ -27,6 +27,7 @@ import iris.language_server.core;
 import iris.language_server.diagnostics;
 import iris.language_server.go_to_location;
 import iris.language_server.inlay_hints;
+import iris.language_server.signature_help;
 import iris.parser.convertor;
 import iris.parser.parse_tree;
 import iris.parser.parser;
@@ -134,12 +135,18 @@ namespace iris::language_server
             .resolveProvider = false,
         };
 
+        lsp::SignatureHelpOptions const signature_help_options
+        {
+            .triggerCharacters = lsp::Array<lsp::String>{"(", ","},
+        };
+
         lsp::InitializeResult result
         {
             .capabilities =
             {
                 .textDocumentSync = text_document_sync_server_capabilities,
                 .completionProvider = completion_options,
+                .signatureHelpProvider = signature_help_options,
                 .definitionProvider = definition_options,
                 .inlayHintProvider = inlay_hint_options,
                 .diagnosticProvider = diagnostic_options,
@@ -901,5 +908,27 @@ namespace iris::language_server
         lsp::Range const utf_8_range = utf_16_range;
 
         return to_source_range(utf_8_range);
+    }
+
+    lsp::TextDocument_SignatureHelpResult compute_text_document_signature_help(
+        Server& server,
+        lsp::SignatureHelpParams const& parameters
+    )
+    {
+        std::optional<std::pair<Workspace_data&, std::size_t>> const workspace_core_module_pair =
+            find_workspace_core_module_index(server, parameters.textDocument.uri);
+        if (!workspace_core_module_pair.has_value())
+            return nullptr;
+
+        Workspace_data const& workspace_data = workspace_core_module_pair->first;
+        std::size_t const core_module_index = workspace_core_module_pair->second;
+
+        return compute_signature_help(
+            workspace_data.declaration_database,
+            workspace_data.core_module_parse_trees[core_module_index],
+            workspace_data.core_modules[core_module_index],
+            parameters.position,
+            server.logger.window_log_message
+        );
     }
 }

@@ -397,6 +397,8 @@ namespace iris::parser
         TSPoint const target_point
     )
     {
+        assert((start_point.row < target_point.row) || (start_point.row == target_point.row && start_point.column <= target_point.column));
+        
         TSPoint current_point = start_point;
         std::uint32_t current_byte = start_byte;
 

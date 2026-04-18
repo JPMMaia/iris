@@ -165,7 +165,7 @@ def generate_builtin() -> None:
 
 def install_iris(destination_directory: Path) -> None:
     run_command(root_directory.as_posix(), "cmake --install build --prefix " + destination_directory.as_posix())
-        
+
 # Execute commands
 def main() -> None:
 

@@ -130,6 +130,11 @@ namespace iris::language_server
         lsp::InlayHintParams const& parameters
     );
 
+    export lsp::TextDocument_SignatureHelpResult compute_text_document_signature_help(
+        Server& server,
+        lsp::SignatureHelpParams const& parameters
+    );
+
     std::filesystem::path to_filesystem_path(
         iris::compiler::Target const& target,
         lsp::Uri const& uri

@@ -119,8 +119,6 @@ namespace iris::language_server
                     message_handler.add<lsp::notifications::Workspace_DidChangeWorkspaceFolders>(
                         [&](lsp::notifications::Workspace_DidChangeWorkspaceFolders::Params&& parameters) -> void
                         {
-                            std::fprintf(stdout, "Workspace folder change event received.\n");
-                            std::fflush(stdout);
                         }
                     );
 
@@ -204,6 +202,13 @@ namespace iris::language_server
             [&](lsp::requests::TextDocument_InlayHint::Params&& parameters) -> lsp::requests::TextDocument_InlayHint::Result
             {
                 return compute_document_inlay_hints(server, parameters);
+            }
+        );
+
+        message_handler.add<lsp::requests::TextDocument_SignatureHelp>(
+            [&](lsp::requests::TextDocument_SignatureHelp::Params&& parameters) -> lsp::requests::TextDocument_SignatureHelp::Result
+            {
+                return compute_text_document_signature_help(server, parameters);
             }
         );
 

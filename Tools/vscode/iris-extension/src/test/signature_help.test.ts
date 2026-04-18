@@ -3,8 +3,8 @@ import * as assert from 'assert';
 import { get_document_uri, activate } from './helper.js';
 
 suite("Should display function signature", () => {
-    test.skip("Should show function signature with first parameter selected, and documentation 0", async () => {
-        const document_uri = get_document_uri('signature_help_function_0.iris');
+    test("Should show function signature with first parameter selected, and documentation 0", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_function_0.iris');
         await test_signature_help(document_uri, new vscode.Position(17, 21), {
             signatures: [create_add_function_signature()],
             activeSignature: 0,
@@ -12,8 +12,8 @@ suite("Should display function signature", () => {
         });
     });
 
-    test.skip("Should show function signature with first parameter selected, and documentation 1", async () => {
-        const document_uri = get_document_uri('signature_help_function_1.iris');
+    test("Should show function signature with first parameter selected, and documentation 1", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_function_1.iris');
         await test_signature_help(document_uri, new vscode.Position(17, 24), {
             signatures: [create_add_function_signature()],
             activeSignature: 0,
@@ -21,8 +21,8 @@ suite("Should display function signature", () => {
         });
     });
 
-    test.skip("Should show function signature with second parameter selected, and documentation 0", async () => {
-        const document_uri = get_document_uri('signature_help_function_2.iris');
+    test("Should show function signature with second parameter selected, and documentation 0", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_function_2.iris');
         await test_signature_help(document_uri, new vscode.Position(17, 25), {
             signatures: [create_add_function_signature()],
             activeSignature: 0,
@@ -30,8 +30,8 @@ suite("Should display function signature", () => {
         });
     });
 
-    test.skip("Should show function signature with second parameter selected, and documentation 1", async () => {
-        const document_uri = get_document_uri('signature_help_function_3.iris');
+    test("Should show function signature with second parameter selected, and documentation 1", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_function_3.iris');
         await test_signature_help(document_uri, new vscode.Position(17, 29), {
             signatures: [create_add_function_signature()],
             activeSignature: 0,
@@ -39,7 +39,7 @@ suite("Should display function signature", () => {
         });
     });
 
-    test.skip("Should show function signature of imported function", async () => {
+    test("Should show function signature of imported function", async () => {
         const document_uri = get_document_uri('projects/project_1/signature_help_function_0.iris');
         await test_signature_help(document_uri, new vscode.Position(8, 24), {
             signatures: [create_complex_add_function_signature()],
@@ -91,8 +91,8 @@ function create_complex_add_function_signature(): vscode.SignatureInformation {
 }
 
 suite("Should display struct signature", () => {
-    test.skip("Should show struct signature 0", async () => {
-        const document_uri = get_document_uri('signature_help_struct_0.iris');
+    test("Should show struct signature 0", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_0.iris');
         await test_signature_help(document_uri, new vscode.Position(14, 31), {
             signatures: [create_complex_struct_signature()],
             activeSignature: 0,
@@ -100,8 +100,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Should show struct signature 1", async () => {
-        const document_uri = get_document_uri('signature_help_struct_1.iris');
+    test("Should show struct signature 1", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_1.iris');
         await test_signature_help(document_uri, new vscode.Position(15, 21), {
             signatures: [create_complex_struct_signature()],
             activeSignature: 0,
@@ -109,17 +109,17 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Should show struct signature 2", async () => {
-        const document_uri = get_document_uri('signature_help_struct_2.iris');
-        await test_signature_help(document_uri, new vscode.Position(21, 30), {
+    test("Should show struct signature 2", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_2.iris');
+        await test_signature_help(document_uri, new vscode.Position(21, 14), {
             signatures: [create_complex_struct_signature()],
             activeSignature: 0,
             activeParameter: 0
         });
     });
 
-    test.skip("Should show struct signature 3", async () => {
-        const document_uri = get_document_uri('signature_help_struct_3.iris');
+    test("Should show struct signature 3", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_3.iris');
         await test_signature_help(document_uri, new vscode.Position(26, 25), {
             signatures: [create_complex_struct_signature()],
             activeSignature: 0,
@@ -127,8 +127,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Should show struct signature 4", async () => {
-        const document_uri = get_document_uri('signature_help_struct_4.iris');
+    test("Should show struct signature 4", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_4.iris');
         await test_signature_help(document_uri, new vscode.Position(16, 19), {
             signatures: [create_complex_struct_signature()],
             activeSignature: 0,
@@ -136,8 +136,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Should show struct signature 5", async () => {
-        const document_uri = get_document_uri('signature_help_struct_5.iris');
+    test("Should show struct signature 5", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_5.iris');
         await test_signature_help(document_uri, new vscode.Position(20, 21), {
             signatures: [create_complex_struct_signature()],
             activeSignature: 0,
@@ -145,8 +145,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Should show struct signature 6", async () => {
-        const document_uri = get_document_uri('signature_help_struct_6.iris');
+    test("Should show struct signature 6", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_6.iris');
         await test_signature_help(document_uri, new vscode.Position(15, 21), {
             signatures: [create_complex_struct_signature()],
             activeSignature: 0,
@@ -154,8 +154,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Should show struct signature 7", async () => {
-        const document_uri = get_document_uri('signature_help_struct_7.iris');
+    test("Should show struct signature 7", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_7.iris');
         await test_signature_help(document_uri, new vscode.Position(18, 26), {
             signatures: [create_complex_struct_signature()],
             activeSignature: 0,
@@ -163,8 +163,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Should show struct signature 8", async () => {
-        const document_uri = get_document_uri('signature_help_struct_8.iris');
+    test("Should show struct signature 8", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_8.iris');
         await test_signature_help(document_uri, new vscode.Position(16, 21), {
             signatures: [create_complex_struct_signature()],
             activeSignature: 0,
@@ -172,8 +172,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Active parameter should be the member after the previous parameter name if nothing is written yet", async () => {
-        const document_uri = get_document_uri('signature_help_struct_9.iris');
+    test("Active parameter should be the member after the previous parameter name if nothing is written yet", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_9.iris');
         await test_signature_help(document_uri, new vscode.Position(13, 20), {
             signatures: [create_foo_struct_signature()],
             activeSignature: 0,
@@ -181,8 +181,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Active parameter should be the member whose name best matches what is being written", async () => {
-        const document_uri = get_document_uri('signature_help_struct_10.iris');
+    test("Active parameter should be the member whose name best matches what is being written", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_10.iris');
         await test_signature_help(document_uri, new vscode.Position(14, 10), {
             signatures: [create_foo_struct_signature()],
             activeSignature: 0,
@@ -190,8 +190,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Active parameter should show the member that already exists at the cursor 0", async () => {
-        const document_uri = get_document_uri('signature_help_struct_11.iris');
+    test("Active parameter should show the member that already exists at the cursor 0", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_11.iris');
         await test_signature_help(document_uri, new vscode.Position(12, 25), {
             signatures: [create_foo_struct_signature()],
             activeSignature: 0,
@@ -199,8 +199,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Active parameter should show the member that already exists at the cursor 1", async () => {
-        const document_uri = get_document_uri('signature_help_struct_11.iris');
+    test("Active parameter should show the member that already exists at the cursor 1", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_11.iris');
         await test_signature_help(document_uri, new vscode.Position(13, 19), {
             signatures: [create_foo_struct_signature()],
             activeSignature: 0,
@@ -208,8 +208,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Active parameter should show the member that already exists at the cursor 2", async () => {
-        const document_uri = get_document_uri('signature_help_struct_11.iris');
+    test("Active parameter should show the member that already exists at the cursor 2", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_11.iris');
         await test_signature_help(document_uri, new vscode.Position(13, 20), {
             signatures: [create_foo_struct_signature()],
             activeSignature: 0,
@@ -217,8 +217,8 @@ suite("Should display struct signature", () => {
         });
     });
 
-    test.skip("Active parameter should show the member that already exists at the cursor 3", async () => {
-        const document_uri = get_document_uri('signature_help_struct_11.iris');
+    test("Active parameter should show the member that already exists at the cursor 3", async () => {
+        const document_uri = get_document_uri('projects/other/signature_help_struct_11.iris');
         await test_signature_help(document_uri, new vscode.Position(14, 15), {
             signatures: [create_foo_struct_signature()],
             activeSignature: 0,

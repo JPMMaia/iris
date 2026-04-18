@@ -1,5 +1,7 @@
 {
     "iris.iris_executable": "iris",
     "iris.trace.server": "verbose",
-    "chat.disableAIFeatures": true
+    "chat.disableAIFeatures": true,
+    "git.enabled": false,
+    "github.gitAuthentication": false
 }

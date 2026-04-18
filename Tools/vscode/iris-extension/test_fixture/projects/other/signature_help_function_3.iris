@@ -15,6 +15,6 @@ function add(lhs: Int32, rhs: Int32) -> (result: Int32)
 
 function run() -> ()
 {
-    var result = add(lhs, rhs)
+    var result = add(lhs, rhs);
 }
 

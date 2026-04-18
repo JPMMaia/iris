@@ -42,12 +42,8 @@ The Language Server is mainly tested through the Language Client tests. The test
 Run the tests using PowerShell from the workspace root:
 
 ```powershell
-Enter-VsDevEnv
 cmake --build build --target Iris_language_server_app
-cd Tools/vscode/iris-extension
-npm run compile
-$env:iris_language_server = "${pwd}/../../../build/Source/Language_server/iris_language_server.exe"
-npm run test
+python ./Scripts/build_utilities.py test_language_server
 ```
 
 ### Debugging the Language Server

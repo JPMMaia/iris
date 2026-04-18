@@ -29,6 +29,7 @@ target_sources(Iris_language_server
             "Location.cppm"
             "Message_handler.cppm"
             "Server.cppm"
+            "Signature_help.cppm"
    PRIVATE
       "Code_action.cpp"
       "Completion.cpp"
@@ -39,6 +40,7 @@ target_sources(Iris_language_server
       "Location.cpp"
       "Message_handler.cpp"
       "Server.cpp"
+      "Signature_help.cpp"
 )
 
 
@@ -57,18 +59,17 @@ target_sources(Iris_language_server_app
 install(TARGETS Iris_language_server_app)
 
 
-#[[
 if(BUILD_TESTING)
    add_executable(Iris_language_server_tests)
-   target_link_libraries(Iris_language_server_tests PRIVATE Iris_language_server)
+   target_link_libraries(Iris_language_server_tests PRIVATE Iris_language_server lsp)
 
    find_package(Catch2 CONFIG REQUIRED)
    target_link_libraries(Iris_language_server_tests PRIVATE Catch2::Catch2 Catch2::Catch2WithMain)
 
    target_sources(Iris_language_server_tests PRIVATE
+      "Signature_help.tests.cpp"
    )
 
    include(Catch)
    catch_discover_tests(Iris_language_server_tests)
 endif()
-#]]
