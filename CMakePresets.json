@@ -50,7 +50,10 @@
         "CMAKE_CXX_COMPILER": "clang++",
         "CMAKE_LINKER_TYPE": "MOLD",
         "CMAKE_BUILD_TYPE": "Debug",
-        "BUILD_SHARED_LIBS": "ON"
+        "BUILD_SHARED_LIBS": "ON",
+        "LLVM_DIR": "/usr/lib/llvm18/lib/cmake/llvm",
+        "LLD_DIR": "/usr/lib/llvm18/lib/cmake/lld",
+        "Clang_DIR": "/usr/lib/llvm18/lib/cmake/clang"
       }
     }
   ]

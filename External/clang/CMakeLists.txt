@@ -45,7 +45,7 @@ if (WIN32)
       COMMAND ${CMAKE_COMMAND} -DPROGRAM="${PROGRAM_CLANG_CL}" -DDESTINATION="${CMAKE_BINARY_DIR}/Source/Compiler" -P "${CMAKE_SOURCE_DIR}/Scripts/copy_runtime_dependencies.cmake"
    )
 else()
-   find_program(PROGRAM_CLANG "clang++.exe" REQUIRED)
+   find_program(PROGRAM_CLANG "clang++" REQUIRED)
    install(FILES ${PROGRAM_CLANG} TYPE BIN CONFIGURATIONS Debug Release)
 
    add_custom_command(
