@@ -22,6 +22,7 @@ target_sources(Iris_language_server
             "Code_action.cppm"
             "Completion.cppm"
             "Core.cppm"
+            "Debug.cppm"
             "Diagnostics.cppm"
             "Go_to_location.cppm"
             "Inlay_hints.cppm"
