@@ -492,4 +492,41 @@ namespace iris::parser
     {
         return (character & 0b11000000) != 0b10000000;
     }
+
+    static void print_node(
+        Parse_tree const& tree,
+        TSNode const node,
+        std::uint32_t const depth,
+        std::string& output
+    )
+    {
+        output.append(depth * 2, ' ');
+        output += ts_node_grammar_type(node);
+        output += " \"";
+        output += get_node_value(tree, Parse_node{node});
+        output += "\"\n";
+
+        std::uint32_t const child_count = ts_node_child_count(node);
+        for (std::uint32_t i = 0; i < child_count; ++i)
+            print_node(tree, ts_node_child(node, i), depth + 1, output);
+    }
+
+    std::string print_tree(
+        Parse_tree const& tree,
+        Parse_node const& node
+    )
+    {
+        std::string output;
+        print_node(tree, node.ts_node, 0, output);
+        return output;
+    }
+
+    std::string print_tree(
+        Parse_tree const& tree
+    )
+    {
+        std::string output;
+        print_node(tree, ts_tree_root_node(tree.ts_tree), 0, output);
+        return output;
+    }
 }

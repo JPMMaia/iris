@@ -154,4 +154,13 @@ namespace iris::parser
     export bool is_utf_8_code_point(
         char8_t const character
     );
+
+    export std::string print_tree(
+        Parse_tree const& tree
+    );
+
+    export std::string print_tree(
+        Parse_tree const& tree,
+        Parse_node const& node
+    );
 }
