@@ -11,7 +11,7 @@ FetchContent_MakeAvailable(extern_watcher)
 FetchContent_Declare(
   extern_lsp_framework
   GIT_REPOSITORY https://github.com/leon-bckl/lsp-framework.git
-  GIT_TAG        fa2a8f7de4fe612e10badc15201c2176de850c14
+  GIT_TAG        19eb448a13a6c9041eb12124e7189bcad50cc6f1
   EXCLUDE_FROM_ALL
 )
 set(LSP_USE_SANITIZERS OFF)

@@ -119,7 +119,8 @@ namespace iris::language_server
                     message_handler.add<lsp::notifications::Workspace_DidChangeWorkspaceFolders>(
                         [&](lsp::notifications::Workspace_DidChangeWorkspaceFolders::Params&& parameters) -> void
                         {
-                            connection.writeMessage("Workspace folder change event received.");
+                            std::fprintf(stdout, "Workspace folder change event received.\n");
+                            std::fflush(stdout);
                         }
                     );
 
