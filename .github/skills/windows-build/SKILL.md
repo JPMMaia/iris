@@ -5,19 +5,17 @@ description: 'Describes how to configure and build all CMake targets on Windows.
 
 ## Building with CMake
 
-We need to run the commands in a PowerShell terminal. Then, we need to setup the environment by running:
-
 To configure CMake:
 
-`Enter-VsDevEnv ; cmake --preset windows-debug`
+`cmake --preset windows-debug`
 
 To build all CMake targets:
 
-`Enter-VsDevEnv ; cmake --build build`
+`cmake --build build`
 
 To build a specific CMake `target`:
 
-`Enter-VsDevEnv ; cmake --build build --target target`
+`cmake --build build --target target`
 
 Do not use the CMake tools extension.
 
