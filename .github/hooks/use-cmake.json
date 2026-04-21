@@ -5,7 +5,8 @@
       {
         "type": "command",
         "powershell": "tsx ./use-cmake.ts",
-        "cwd": ".github/hooks"
+        "cwd": ".github/hooks",
+        "timeout": 500
       }
     ]
   }

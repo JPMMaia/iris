@@ -61,7 +61,7 @@ const hook_specific_output: helpers.Pre_tool_use_output_parameters = {
     hookEventName: "PreToolUse",
     permissionDecision: "allow",
     permissionDecisionReason: "",
-    updatedInput: { command: new_command },
+    updatedInput: { ...input.tool_input, command: new_command },
     additionalContext: ""
 };
 
