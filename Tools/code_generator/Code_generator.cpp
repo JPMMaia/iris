@@ -2540,13 +2540,13 @@ namespace iris::binary_serializer
 
         output_stream << initial_code;
 
-        std::string_view const function_template = R"(    export template <>
+        std::string_view const function_template = R"(    template <>
     void serialize(Serializer& serializer, {} const& value)
     {{
 {}
     }}
 
-    export template <>
+    template <>
     void deserialize(Deserializer& deserializer, {}& value)
     {{
 {}
@@ -2612,7 +2612,7 @@ namespace iris::json
 {
 )";
 
-        std::string_view const enum_template = R"(    export template <>
+        std::string_view const enum_template = R"(    template <>
     JSON to_json({} const& value)
     {{
         switch (value)
@@ -2621,7 +2621,7 @@ namespace iris::json
         }}
     }}
 
-    export template <>
+    template <>
     void from_json(JSON const& data, {}& output)
     {{
         std::string const& value = data.get<std::string>();
@@ -2630,7 +2630,7 @@ namespace iris::json
 
 )";
 
-        std::string_view const function_template = R"(    export template <>
+        std::string_view const function_template = R"(    template <>
     JSON to_json({} const& value)
     {{
         JSON data;
@@ -2638,7 +2638,7 @@ namespace iris::json
         return data;
     }}
 
-    export template <>
+    template <>
     void from_json(JSON const& data, {}& value)
     {{
 {}

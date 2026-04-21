@@ -11,7 +11,7 @@ import iris.core;
 
 namespace iris::json
 {
-    export template <>
+    template <>
     JSON to_json(Fundamental_type const& value)
     {
         switch (value)
@@ -40,7 +40,7 @@ namespace iris::json
         }
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Fundamental_type& output)
     {
         std::string const& value = data.get<std::string>();
@@ -67,7 +67,7 @@ namespace iris::json
         output = Fundamental_type::Bool;
     }
 
-    export template <>
+    template <>
     JSON to_json(Global_variable_type const& value)
     {
         switch (value)
@@ -79,7 +79,7 @@ namespace iris::json
         }
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Global_variable_type& output)
     {
         std::string const& value = data.get<std::string>();
@@ -89,7 +89,7 @@ namespace iris::json
         output = Global_variable_type::Constant;
     }
 
-    export template <>
+    template <>
     JSON to_json(Linkage const& value)
     {
         switch (value)
@@ -100,7 +100,7 @@ namespace iris::json
         }
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Linkage& output)
     {
         std::string const& value = data.get<std::string>();
@@ -109,7 +109,7 @@ namespace iris::json
         output = Linkage::External;
     }
 
-    export template <>
+    template <>
     JSON to_json(Binary_operation const& value)
     {
         switch (value)
@@ -137,7 +137,7 @@ namespace iris::json
         }
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Binary_operation& output)
     {
         std::string const& value = data.get<std::string>();
@@ -163,7 +163,7 @@ namespace iris::json
         output = Binary_operation::Add;
     }
 
-    export template <>
+    template <>
     JSON to_json(Cast_type const& value)
     {
         switch (value)
@@ -174,7 +174,7 @@ namespace iris::json
         }
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Cast_type& output)
     {
         std::string const& value = data.get<std::string>();
@@ -183,7 +183,7 @@ namespace iris::json
         output = Cast_type::Numeric;
     }
 
-    export template <>
+    template <>
     JSON to_json(Instantiate_expression_type const& value)
     {
         switch (value)
@@ -196,7 +196,7 @@ namespace iris::json
         }
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Instantiate_expression_type& output)
     {
         std::string const& value = data.get<std::string>();
@@ -207,7 +207,7 @@ namespace iris::json
         output = Instantiate_expression_type::Default;
     }
 
-    export template <>
+    template <>
     JSON to_json(Unary_operation const& value)
     {
         switch (value)
@@ -225,7 +225,7 @@ namespace iris::json
         }
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Unary_operation& output)
     {
         std::string const& value = data.get<std::string>();
@@ -241,7 +241,7 @@ namespace iris::json
         output = Unary_operation::Not;
     }
 
-    export template <>
+    template <>
     JSON to_json(Source_location const& value)
     {
         JSON data;
@@ -251,7 +251,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Source_location& value)
     {
         if (data.contains("file_path")) from_json(data.at("file_path"), value.file_path);
@@ -259,7 +259,7 @@ namespace iris::json
         from_json(data.at("column"), value.column);
     }
 
-    export template <>
+    template <>
     JSON to_json(Source_position const& value)
     {
         JSON data;
@@ -268,14 +268,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Source_position& value)
     {
         from_json(data.at("line"), value.line);
         from_json(data.at("column"), value.column);
     }
 
-    export template <>
+    template <>
     JSON to_json(Source_range const& value)
     {
         JSON data;
@@ -284,14 +284,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Source_range& value)
     {
         from_json(data.at("start"), value.start);
         from_json(data.at("end"), value.end);
     }
 
-    export template <>
+    template <>
     JSON to_json(Source_range_location const& value)
     {
         JSON data;
@@ -300,14 +300,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Source_range_location& value)
     {
         if (data.contains("file_path")) from_json(data.at("file_path"), value.file_path);
         from_json(data.at("range"), value.range);
     }
 
-    export template <>
+    template <>
     JSON to_json(Integer_type const& value)
     {
         JSON data;
@@ -316,14 +316,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Integer_type& value)
     {
         from_json(data.at("number_of_bits"), value.number_of_bits);
         from_json(data.at("is_signed"), value.is_signed);
     }
 
-    export template <>
+    template <>
     JSON to_json(Decimal_type const& value)
     {
         JSON data;
@@ -331,13 +331,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Decimal_type& value)
     {
         from_json(data.at("scale"), value.scale);
     }
 
-    export template <>
+    template <>
     JSON to_json(Array_slice_type const& value)
     {
         JSON data;
@@ -346,14 +346,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Array_slice_type& value)
     {
         if (data.contains("element_type")) from_json(data.at("element_type"), value.element_type);
         from_json(data.at("is_mutable"), value.is_mutable);
     }
 
-    export template <>
+    template <>
     JSON to_json(Builtin_type_reference const& value)
     {
         JSON data;
@@ -361,13 +361,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Builtin_type_reference& value)
     {
         from_json(data.at("value"), value.value);
     }
 
-    export template <>
+    template <>
     JSON to_json(Function_type const& value)
     {
         JSON data;
@@ -377,7 +377,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Function_type& value)
     {
         if (data.contains("input_parameter_types")) from_json(data.at("input_parameter_types"), value.input_parameter_types);
@@ -385,7 +385,7 @@ namespace iris::json
         from_json(data.at("is_variadic"), value.is_variadic);
     }
 
-    export template <>
+    template <>
     JSON to_json(Function_pointer_type const& value)
     {
         JSON data;
@@ -395,7 +395,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Function_pointer_type& value)
     {
         from_json(data.at("type"), value.type);
@@ -403,7 +403,7 @@ namespace iris::json
         if (data.contains("output_parameter_names")) from_json(data.at("output_parameter_names"), value.output_parameter_names);
     }
 
-    export template <>
+    template <>
     JSON to_json(Null_pointer_type const& value)
     {
         JSON data;
@@ -411,13 +411,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Null_pointer_type& value)
     {
 
     }
 
-    export template <>
+    template <>
     JSON to_json(Pointer_type const& value)
     {
         JSON data;
@@ -426,14 +426,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Pointer_type& value)
     {
         if (data.contains("element_type")) from_json(data.at("element_type"), value.element_type);
         from_json(data.at("is_mutable"), value.is_mutable);
     }
 
-    export template <>
+    template <>
     JSON to_json(Module_reference const& value)
     {
         JSON data;
@@ -441,13 +441,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Module_reference& value)
     {
         from_json(data.at("name"), value.name);
     }
 
-    export template <>
+    template <>
     JSON to_json(Constant_array_type const& value)
     {
         JSON data;
@@ -456,14 +456,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Constant_array_type& value)
     {
         if (data.contains("value_type")) from_json(data.at("value_type"), value.value_type);
         from_json(data.at("size"), value.size);
     }
 
-    export template <>
+    template <>
     JSON to_json(Soa_array_type const& value)
     {
         JSON data;
@@ -472,14 +472,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Soa_array_type& value)
     {
         if (data.contains("value_type")) from_json(data.at("value_type"), value.value_type);
         from_json(data.at("size"), value.size);
     }
 
-    export template <>
+    template <>
     JSON to_json(Soa_array_view_type const& value)
     {
         JSON data;
@@ -488,14 +488,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Soa_array_view_type& value)
     {
         if (data.contains("value_type")) from_json(data.at("value_type"), value.value_type);
         from_json(data.at("is_mutable"), value.is_mutable);
     }
 
-    export template <>
+    template <>
     JSON to_json(Custom_type_reference const& value)
     {
         JSON data;
@@ -504,14 +504,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Custom_type_reference& value)
     {
         from_json(data.at("module_reference"), value.module_reference);
         from_json(data.at("name"), value.name);
     }
 
-    export template <>
+    template <>
     JSON to_json(Type_instance const& value)
     {
         JSON data;
@@ -520,14 +520,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Type_instance& value)
     {
         from_json(data.at("type_constructor"), value.type_constructor);
         if (data.contains("arguments")) from_json(data.at("arguments"), value.arguments);
     }
 
-    export template <>
+    template <>
     JSON to_json(Parameter_type const& value)
     {
         JSON data;
@@ -535,13 +535,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Parameter_type& value)
     {
         from_json(data.at("name"), value.name);
     }
 
-    export template <>
+    template <>
     JSON to_json(Type_reference const& value)
     {
         JSON data;
@@ -550,14 +550,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Type_reference& value)
     {
         from_json(data.at("data"), value.data);
         if (data.contains("source_range")) from_json(data.at("source_range"), value.source_range);
     }
 
-    export template <>
+    template <>
     JSON to_json(Indexed_comment const& value)
     {
         JSON data;
@@ -566,14 +566,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Indexed_comment& value)
     {
         from_json(data.at("index"), value.index);
         from_json(data.at("comment"), value.comment);
     }
 
-    export template <>
+    template <>
     JSON to_json(Statement const& value)
     {
         JSON data;
@@ -581,13 +581,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Statement& value)
     {
         if (data.contains("expressions")) from_json(data.at("expressions"), value.expressions);
     }
 
-    export template <>
+    template <>
     JSON to_json(Global_variable_declaration const& value)
     {
         JSON data;
@@ -601,7 +601,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Global_variable_declaration& value)
     {
         from_json(data.at("name"), value.name);
@@ -613,7 +613,7 @@ namespace iris::json
         if (data.contains("source_location")) from_json(data.at("source_location"), value.source_location);
     }
 
-    export template <>
+    template <>
     JSON to_json(Alias_type_declaration const& value)
     {
         JSON data;
@@ -625,7 +625,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Alias_type_declaration& value)
     {
         from_json(data.at("name"), value.name);
@@ -635,7 +635,7 @@ namespace iris::json
         if (data.contains("source_location")) from_json(data.at("source_location"), value.source_location);
     }
 
-    export template <>
+    template <>
     JSON to_json(Enum_value const& value)
     {
         JSON data;
@@ -646,7 +646,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Enum_value& value)
     {
         from_json(data.at("name"), value.name);
@@ -655,7 +655,7 @@ namespace iris::json
         if (data.contains("source_location")) from_json(data.at("source_location"), value.source_location);
     }
 
-    export template <>
+    template <>
     JSON to_json(Enum_declaration const& value)
     {
         JSON data;
@@ -667,7 +667,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Enum_declaration& value)
     {
         from_json(data.at("name"), value.name);
@@ -677,7 +677,7 @@ namespace iris::json
         if (data.contains("source_location")) from_json(data.at("source_location"), value.source_location);
     }
 
-    export template <>
+    template <>
     JSON to_json(Forward_declaration const& value)
     {
         JSON data;
@@ -687,7 +687,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Forward_declaration& value)
     {
         from_json(data.at("name"), value.name);
@@ -695,7 +695,7 @@ namespace iris::json
         if (data.contains("source_location")) from_json(data.at("source_location"), value.source_location);
     }
 
-    export template <>
+    template <>
     JSON to_json(Struct_declaration const& value)
     {
         JSON data;
@@ -714,7 +714,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Struct_declaration& value)
     {
         from_json(data.at("name"), value.name);
@@ -731,7 +731,7 @@ namespace iris::json
         if (data.contains("member_source_positions")) from_json(data.at("member_source_positions"), value.member_source_positions);
     }
 
-    export template <>
+    template <>
     JSON to_json(Union_declaration const& value)
     {
         JSON data;
@@ -746,7 +746,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Union_declaration& value)
     {
         from_json(data.at("name"), value.name);
@@ -759,7 +759,7 @@ namespace iris::json
         if (data.contains("member_source_positions")) from_json(data.at("member_source_positions"), value.member_source_positions);
     }
 
-    export template <>
+    template <>
     JSON to_json(Function_condition const& value)
     {
         JSON data;
@@ -769,7 +769,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Function_condition& value)
     {
         from_json(data.at("description"), value.description);
@@ -777,7 +777,7 @@ namespace iris::json
         if (data.contains("source_range")) from_json(data.at("source_range"), value.source_range);
     }
 
-    export template <>
+    template <>
     JSON to_json(Function_declaration const& value)
     {
         JSON data;
@@ -797,7 +797,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Function_declaration& value)
     {
         from_json(data.at("name"), value.name);
@@ -815,7 +815,7 @@ namespace iris::json
         if (data.contains("output_parameter_source_positions")) from_json(data.at("output_parameter_source_positions"), value.output_parameter_source_positions);
     }
 
-    export template <>
+    template <>
     JSON to_json(Function_definition const& value)
     {
         JSON data;
@@ -825,7 +825,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Function_definition& value)
     {
         from_json(data.at("name"), value.name);
@@ -833,7 +833,7 @@ namespace iris::json
         if (data.contains("source_location")) from_json(data.at("source_location"), value.source_location);
     }
 
-    export template <>
+    template <>
     JSON to_json(Variable_expression const& value)
     {
         JSON data;
@@ -841,13 +841,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Variable_expression& value)
     {
         from_json(data.at("name"), value.name);
     }
 
-    export template <>
+    template <>
     JSON to_json(Expression_index const& value)
     {
         JSON data;
@@ -855,13 +855,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Expression_index& value)
     {
         from_json(data.at("expression_index"), value.expression_index);
     }
 
-    export template <>
+    template <>
     JSON to_json(Access_expression const& value)
     {
         JSON data;
@@ -870,14 +870,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Access_expression& value)
     {
         from_json(data.at("expression"), value.expression);
         from_json(data.at("member_name"), value.member_name);
     }
 
-    export template <>
+    template <>
     JSON to_json(Access_array_expression const& value)
     {
         JSON data;
@@ -886,14 +886,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Access_array_expression& value)
     {
         from_json(data.at("expression"), value.expression);
         from_json(data.at("index"), value.index);
     }
 
-    export template <>
+    template <>
     JSON to_json(Assert_expression const& value)
     {
         JSON data;
@@ -902,14 +902,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Assert_expression& value)
     {
         if (data.contains("message")) from_json(data.at("message"), value.message);
         from_json(data.at("statement"), value.statement);
     }
 
-    export template <>
+    template <>
     JSON to_json(Assignment_expression const& value)
     {
         JSON data;
@@ -919,7 +919,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Assignment_expression& value)
     {
         from_json(data.at("left_hand_side"), value.left_hand_side);
@@ -927,7 +927,7 @@ namespace iris::json
         if (data.contains("additional_operation")) from_json(data.at("additional_operation"), value.additional_operation);
     }
 
-    export template <>
+    template <>
     JSON to_json(Binary_expression const& value)
     {
         JSON data;
@@ -937,7 +937,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Binary_expression& value)
     {
         from_json(data.at("left_hand_side"), value.left_hand_side);
@@ -945,7 +945,7 @@ namespace iris::json
         from_json(data.at("operation"), value.operation);
     }
 
-    export template <>
+    template <>
     JSON to_json(Block_expression const& value)
     {
         JSON data;
@@ -953,13 +953,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Block_expression& value)
     {
         if (data.contains("statements")) from_json(data.at("statements"), value.statements);
     }
 
-    export template <>
+    template <>
     JSON to_json(Break_expression const& value)
     {
         JSON data;
@@ -967,13 +967,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Break_expression& value)
     {
         from_json(data.at("loop_count"), value.loop_count);
     }
 
-    export template <>
+    template <>
     JSON to_json(Call_expression const& value)
     {
         JSON data;
@@ -982,14 +982,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Call_expression& value)
     {
         from_json(data.at("expression"), value.expression);
         if (data.contains("arguments")) from_json(data.at("arguments"), value.arguments);
     }
 
-    export template <>
+    template <>
     JSON to_json(Cast_expression const& value)
     {
         JSON data;
@@ -999,7 +999,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Cast_expression& value)
     {
         from_json(data.at("source"), value.source);
@@ -1007,7 +1007,7 @@ namespace iris::json
         from_json(data.at("cast_type"), value.cast_type);
     }
 
-    export template <>
+    template <>
     JSON to_json(Comment_expression const& value)
     {
         JSON data;
@@ -1015,13 +1015,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Comment_expression& value)
     {
         from_json(data.at("comment"), value.comment);
     }
 
-    export template <>
+    template <>
     JSON to_json(Compile_time_expression const& value)
     {
         JSON data;
@@ -1029,13 +1029,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Compile_time_expression& value)
     {
         from_json(data.at("expression"), value.expression);
     }
 
-    export template <>
+    template <>
     JSON to_json(Constant_expression const& value)
     {
         JSON data;
@@ -1044,14 +1044,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Constant_expression& value)
     {
         from_json(data.at("type"), value.type);
         from_json(data.at("data"), value.data);
     }
 
-    export template <>
+    template <>
     JSON to_json(Constant_array_expression const& value)
     {
         JSON data;
@@ -1059,13 +1059,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Constant_array_expression& value)
     {
         if (data.contains("array_data")) from_json(data.at("array_data"), value.array_data);
     }
 
-    export template <>
+    template <>
     JSON to_json(Continue_expression const& value)
     {
         JSON data;
@@ -1073,13 +1073,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Continue_expression& value)
     {
 
     }
 
-    export template <>
+    template <>
     JSON to_json(Defer_expression const& value)
     {
         JSON data;
@@ -1087,13 +1087,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Defer_expression& value)
     {
         from_json(data.at("expression_to_defer"), value.expression_to_defer);
     }
 
-    export template <>
+    template <>
     JSON to_json(Dereference_and_access_expression const& value)
     {
         JSON data;
@@ -1102,14 +1102,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Dereference_and_access_expression& value)
     {
         from_json(data.at("expression"), value.expression);
         from_json(data.at("member_name"), value.member_name);
     }
 
-    export template <>
+    template <>
     JSON to_json(For_loop_expression const& value)
     {
         JSON data;
@@ -1122,7 +1122,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, For_loop_expression& value)
     {
         from_json(data.at("variable_name"), value.variable_name);
@@ -1133,7 +1133,7 @@ namespace iris::json
         if (data.contains("then_statements")) from_json(data.at("then_statements"), value.then_statements);
     }
 
-    export template <>
+    template <>
     JSON to_json(Function_expression const& value)
     {
         JSON data;
@@ -1142,14 +1142,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Function_expression& value)
     {
         from_json(data.at("declaration"), value.declaration);
         from_json(data.at("definition"), value.definition);
     }
 
-    export template <>
+    template <>
     JSON to_json(Instance_call_expression const& value)
     {
         JSON data;
@@ -1158,14 +1158,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Instance_call_expression& value)
     {
         from_json(data.at("left_hand_side"), value.left_hand_side);
         if (data.contains("arguments")) from_json(data.at("arguments"), value.arguments);
     }
 
-    export template <>
+    template <>
     JSON to_json(Instance_call_key const& value)
     {
         JSON data;
@@ -1175,7 +1175,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Instance_call_key& value)
     {
         from_json(data.at("module_name"), value.module_name);
@@ -1183,7 +1183,7 @@ namespace iris::json
         if (data.contains("arguments")) from_json(data.at("arguments"), value.arguments);
     }
 
-    export template <>
+    template <>
     JSON to_json(Condition_statement_pair const& value)
     {
         JSON data;
@@ -1193,7 +1193,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Condition_statement_pair& value)
     {
         if (data.contains("condition")) from_json(data.at("condition"), value.condition);
@@ -1201,7 +1201,7 @@ namespace iris::json
         if (data.contains("block_source_range")) from_json(data.at("block_source_range"), value.block_source_range);
     }
 
-    export template <>
+    template <>
     JSON to_json(If_expression const& value)
     {
         JSON data;
@@ -1209,13 +1209,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, If_expression& value)
     {
         if (data.contains("series")) from_json(data.at("series"), value.series);
     }
 
-    export template <>
+    template <>
     JSON to_json(Instantiate_member_value_pair const& value)
     {
         JSON data;
@@ -1225,7 +1225,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Instantiate_member_value_pair& value)
     {
         from_json(data.at("member_name"), value.member_name);
@@ -1233,7 +1233,7 @@ namespace iris::json
         if (data.contains("source_range")) from_json(data.at("source_range"), value.source_range);
     }
 
-    export template <>
+    template <>
     JSON to_json(Instantiate_expression const& value)
     {
         JSON data;
@@ -1242,14 +1242,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Instantiate_expression& value)
     {
         from_json(data.at("type"), value.type);
         if (data.contains("members")) from_json(data.at("members"), value.members);
     }
 
-    export template <>
+    template <>
     JSON to_json(Invalid_expression const& value)
     {
         JSON data;
@@ -1257,13 +1257,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Invalid_expression& value)
     {
         from_json(data.at("value"), value.value);
     }
 
-    export template <>
+    template <>
     JSON to_json(Null_pointer_expression const& value)
     {
         JSON data;
@@ -1271,13 +1271,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Null_pointer_expression& value)
     {
 
     }
 
-    export template <>
+    template <>
     JSON to_json(Parenthesis_expression const& value)
     {
         JSON data;
@@ -1285,13 +1285,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Parenthesis_expression& value)
     {
         from_json(data.at("expression"), value.expression);
     }
 
-    export template <>
+    template <>
     JSON to_json(Reflection_expression const& value)
     {
         JSON data;
@@ -1301,7 +1301,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Reflection_expression& value)
     {
         from_json(data.at("name"), value.name);
@@ -1309,7 +1309,7 @@ namespace iris::json
         if (data.contains("arguments")) from_json(data.at("arguments"), value.arguments);
     }
 
-    export template <>
+    template <>
     JSON to_json(Return_expression const& value)
     {
         JSON data;
@@ -1317,13 +1317,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Return_expression& value)
     {
         if (data.contains("expression")) from_json(data.at("expression"), value.expression);
     }
 
-    export template <>
+    template <>
     JSON to_json(Struct_expression const& value)
     {
         JSON data;
@@ -1331,13 +1331,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Struct_expression& value)
     {
         from_json(data.at("declaration"), value.declaration);
     }
 
-    export template <>
+    template <>
     JSON to_json(Switch_case_expression_pair const& value)
     {
         JSON data;
@@ -1346,14 +1346,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Switch_case_expression_pair& value)
     {
         if (data.contains("case_value")) from_json(data.at("case_value"), value.case_value);
         if (data.contains("statements")) from_json(data.at("statements"), value.statements);
     }
 
-    export template <>
+    template <>
     JSON to_json(Switch_expression const& value)
     {
         JSON data;
@@ -1362,14 +1362,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Switch_expression& value)
     {
         from_json(data.at("value"), value.value);
         if (data.contains("cases")) from_json(data.at("cases"), value.cases);
     }
 
-    export template <>
+    template <>
     JSON to_json(Ternary_condition_expression const& value)
     {
         JSON data;
@@ -1379,7 +1379,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Ternary_condition_expression& value)
     {
         from_json(data.at("condition"), value.condition);
@@ -1387,7 +1387,7 @@ namespace iris::json
         from_json(data.at("else_statement"), value.else_statement);
     }
 
-    export template <>
+    template <>
     JSON to_json(Type_expression const& value)
     {
         JSON data;
@@ -1395,13 +1395,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Type_expression& value)
     {
         from_json(data.at("type"), value.type);
     }
 
-    export template <>
+    template <>
     JSON to_json(Unary_expression const& value)
     {
         JSON data;
@@ -1410,14 +1410,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Unary_expression& value)
     {
         from_json(data.at("expression"), value.expression);
         from_json(data.at("operation"), value.operation);
     }
 
-    export template <>
+    template <>
     JSON to_json(Union_expression const& value)
     {
         JSON data;
@@ -1425,13 +1425,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Union_expression& value)
     {
         from_json(data.at("declaration"), value.declaration);
     }
 
-    export template <>
+    template <>
     JSON to_json(Variable_declaration_expression const& value)
     {
         JSON data;
@@ -1441,7 +1441,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Variable_declaration_expression& value)
     {
         from_json(data.at("name"), value.name);
@@ -1449,7 +1449,7 @@ namespace iris::json
         from_json(data.at("right_hand_side"), value.right_hand_side);
     }
 
-    export template <>
+    template <>
     JSON to_json(Variable_declaration_with_type_expression const& value)
     {
         JSON data;
@@ -1460,7 +1460,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Variable_declaration_with_type_expression& value)
     {
         from_json(data.at("name"), value.name);
@@ -1469,7 +1469,7 @@ namespace iris::json
         from_json(data.at("right_hand_side"), value.right_hand_side);
     }
 
-    export template <>
+    template <>
     JSON to_json(While_loop_expression const& value)
     {
         JSON data;
@@ -1478,14 +1478,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, While_loop_expression& value)
     {
         from_json(data.at("condition"), value.condition);
         if (data.contains("then_statements")) from_json(data.at("then_statements"), value.then_statements);
     }
 
-    export template <>
+    template <>
     JSON to_json(Expression const& value)
     {
         JSON data;
@@ -1494,14 +1494,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Expression& value)
     {
         from_json(data.at("data"), value.data);
         if (data.contains("source_range")) from_json(data.at("source_range"), value.source_range);
     }
 
-    export template <>
+    template <>
     JSON to_json(Type_constructor_parameter const& value)
     {
         JSON data;
@@ -1510,14 +1510,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Type_constructor_parameter& value)
     {
         from_json(data.at("name"), value.name);
         from_json(data.at("type"), value.type);
     }
 
-    export template <>
+    template <>
     JSON to_json(Type_constructor const& value)
     {
         JSON data;
@@ -1529,7 +1529,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Type_constructor& value)
     {
         from_json(data.at("name"), value.name);
@@ -1539,7 +1539,7 @@ namespace iris::json
         if (data.contains("source_location")) from_json(data.at("source_location"), value.source_location);
     }
 
-    export template <>
+    template <>
     JSON to_json(Function_constructor_parameter const& value)
     {
         JSON data;
@@ -1548,14 +1548,14 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Function_constructor_parameter& value)
     {
         from_json(data.at("name"), value.name);
         from_json(data.at("type"), value.type);
     }
 
-    export template <>
+    template <>
     JSON to_json(Function_constructor const& value)
     {
         JSON data;
@@ -1567,7 +1567,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Function_constructor& value)
     {
         from_json(data.at("name"), value.name);
@@ -1577,7 +1577,7 @@ namespace iris::json
         if (data.contains("source_location")) from_json(data.at("source_location"), value.source_location);
     }
 
-    export template <>
+    template <>
     JSON to_json(Language_version const& value)
     {
         JSON data;
@@ -1587,7 +1587,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Language_version& value)
     {
         from_json(data.at("major"), value.major);
@@ -1595,7 +1595,7 @@ namespace iris::json
         from_json(data.at("patch"), value.patch);
     }
 
-    export template <>
+    template <>
     JSON to_json(Import_module_with_alias const& value)
     {
         JSON data;
@@ -1606,7 +1606,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Import_module_with_alias& value)
     {
         from_json(data.at("module_name"), value.module_name);
@@ -1615,7 +1615,7 @@ namespace iris::json
         if (data.contains("source_range")) from_json(data.at("source_range"), value.source_range);
     }
 
-    export template <>
+    template <>
     JSON to_json(Module_dependencies const& value)
     {
         JSON data;
@@ -1623,13 +1623,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Module_dependencies& value)
     {
         if (data.contains("alias_imports")) from_json(data.at("alias_imports"), value.alias_imports);
     }
 
-    export template <>
+    template <>
     JSON to_json(Module_declarations const& value)
     {
         JSON data;
@@ -1645,7 +1645,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Module_declarations& value)
     {
         if (data.contains("alias_type_declarations")) from_json(data.at("alias_type_declarations"), value.alias_type_declarations);
@@ -1659,7 +1659,7 @@ namespace iris::json
         if (data.contains("type_constructors")) from_json(data.at("type_constructors"), value.type_constructors);
     }
 
-    export template <>
+    template <>
     JSON to_json(Module_instanced_declarations const& value)
     {
         JSON data;
@@ -1669,7 +1669,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Module_instanced_declarations& value)
     {
         if (data.contains("struct_declarations")) from_json(data.at("struct_declarations"), value.struct_declarations);
@@ -1677,7 +1677,7 @@ namespace iris::json
         if (data.contains("function_declarations")) from_json(data.at("function_declarations"), value.function_declarations);
     }
 
-    export template <>
+    template <>
     JSON to_json(Module_definitions const& value)
     {
         JSON data;
@@ -1685,13 +1685,13 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Module_definitions& value)
     {
         if (data.contains("function_definitions")) from_json(data.at("function_definitions"), value.function_definitions);
     }
 
-    export template <>
+    template <>
     JSON to_json(Module const& value)
     {
         JSON data;
@@ -1708,7 +1708,7 @@ namespace iris::json
         return data;
     }
 
-    export template <>
+    template <>
     void from_json(JSON const& data, Module& value)
     {
         from_json(data.at("language_version"), value.language_version);
