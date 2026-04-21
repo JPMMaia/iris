@@ -50,7 +50,27 @@ $env:iris_language_server = "${pwd}/../../../build/Source/Language_server/iris_l
 npm run test
 ```
 
-Note: do **not** set `mode=debug` when running tests. That mode makes the extension try to attach to a server already listening on port 12345 instead of spawning one, causing all tests to fail with `ECONNREFUSED`.
+### Debugging the Language Server
+
+It might be useful to print the Parser tree and nodes.
+
+To print a iris::parser::Parse_tree:
+
+```
+std::string const debug_string = iris::parser::print_tree(parse_tree);
+write_debug_message(debug_string);
+```
+
+To print a iris::parser::Parse_node:
+
+```
+std::string const debug_string = iris::parser::print_node(parse_tree, node);
+write_debug_message(debug_string);
+```
+
+You can also print any messages using `write_debug_message()`. The output will be located in `build/logs/debug-language-server.log`.
+
+Make sure that `iris.language_server.debug` is imported.
 
 ## Making changes to the Language Server
 
