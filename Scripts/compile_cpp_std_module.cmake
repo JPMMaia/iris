@@ -9,10 +9,12 @@ if (MSVC)
 
     file(MAKE_DIRECTORY ${STD_MODULE_OUT})
 
-    set(STD_COMPILE_OPTIONS "/std:c++latest" "/EHsc" "/nologo" "/D_DLL" "/D_SCL_SECURE_NO_WARNINGS")
+    set(STD_COMPILE_OPTIONS "/std:c++latest" "/EHsc" "/nologo" "/D_SCL_SECURE_NO_WARNINGS")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        list(APPEND STD_COMPILE_OPTIONS "/D_DEBUG")
+        list(APPEND STD_COMPILE_OPTIONS "/MDd")
+    else ()
+        list(APPEND STD_COMPILE_OPTIONS "/MD")
     endif ()
 
     add_custom_command(

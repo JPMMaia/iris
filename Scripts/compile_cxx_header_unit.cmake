@@ -10,10 +10,12 @@ macro(compile_cxx_header_unit target input header_type header_path header_unit_n
             list(APPEND include_compiler_string /I${dir})
         endforeach ()
 
-        set(header_compile_options "/std:c++latest" "/EHsc" "/nologo" "/D_DLL" "/D_SCL_SECURE_NO_WARNINGS")
+        set(header_compile_options "/std:c++latest" "/EHsc" "/nologo" "/D_SCL_SECURE_NO_WARNINGS")
 
         if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-            list(APPEND header_compile_options "/D_DEBUG")
+            list(APPEND header_compile_options "/MDd")
+        else ()
+            list(APPEND header_compile_options "/MD")
         endif ()
 
         list(APPEND header_compile_options ${additional_compile_options})
