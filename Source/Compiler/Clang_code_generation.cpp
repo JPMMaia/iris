@@ -2,7 +2,7 @@ module;
 
 #include <assert.h>
 
-#include <clang/CodeGen/CodeGenABITypes.h>
+#include <llvm/ADT/FunctionExtras.h>
 
 module iris.compiler.clang_code_generation;
 
@@ -25,6 +25,38 @@ import iris.core.types;
 namespace iris::compiler
 {
     static constexpr std::string_view c_builtin_module_name = "iris.builtin";
+
+    struct Clang_data
+    {
+        std::unique_ptr<clang::CompilerInstance> compiler_instance;
+    };
+
+    struct Clang_module_declarations
+    {
+        std::pmr::unordered_map<std::pmr::string, clang::FunctionDecl*, iris::String_hash, iris::String_equal> function_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::TypedefDecl*, iris::String_hash, iris::String_equal> alias_type_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::EnumDecl*, iris::String_hash, iris::String_equal> enum_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, iris::String_hash, iris::String_equal> struct_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, iris::String_hash, iris::String_equal> union_declarations;
+    };
+
+    struct Clang_declaration_database
+    {
+        std::pmr::unordered_map<std::pmr::string, Clang_module_declarations, iris::String_hash, iris::String_equal> map;
+    };
+
+    struct Clang_context
+    {
+        clang::ASTContext& ast_context;
+        std::unique_ptr<clang::CodeGenerator> code_generator;
+    };
+
+    struct Clang_module_data
+    {
+        clang::ASTContext& ast_context;
+        std::unique_ptr<clang::CodeGenerator> code_generator;
+        Clang_declaration_database declaration_database;
+    };
 
     clang::QualType get_opaque_forward_declaration(
         clang::ASTContext& clang_ast_context
@@ -700,7 +732,12 @@ namespace iris::compiler
         }
     }
 
-    Clang_context create_clang_context(
+    void destroy_clang_context(Clang_context* data)
+    {
+        delete data;
+    }
+
+    std::unique_ptr<Clang_context, void(*)(Clang_context*)> create_clang_context(
         llvm::LLVMContext& llvm_context,
         Clang_data const& clang_data,
         std::string_view const module_name
@@ -723,35 +760,45 @@ namespace iris::compiler
         };
         code_generator->Initialize(clang_ast_context);
 
-        return Clang_context
+        std::unique_ptr<Clang_context, void(*)(Clang_context*)> output
         {
-            .ast_context = clang_ast_context,
-            .code_generator = std::move(code_generator),
+            new Clang_context
+            {
+                .ast_context = clang_ast_context,
+                .code_generator = std::move(code_generator),
+            },
+            destroy_clang_context
         };
+
+        return output;
     }
 
-    Clang_module_data create_clang_module_data(
-        Clang_context&& clang_context,
+    Clang_module_data_pointer create_clang_module_data(
+        Clang_context_pointer&& clang_context,
         std::span<iris::Module const* const> const sorted_modules,
         Declaration_database const& declaration_database
     )
     {
-        clang::ASTContext& clang_ast_context = clang_context.ast_context;
+        clang::ASTContext& clang_ast_context = clang_context->ast_context;
 
         Clang_declaration_database clang_declaration_database;
 
         for (Module const* sorted_module : sorted_modules)
             add_clang_declarations(clang_declaration_database, clang_ast_context, *sorted_module, declaration_database);
 
-        return Clang_module_data
-        {
-            .ast_context = clang_ast_context,
-            .code_generator = std::move(clang_context.code_generator),
-            .declaration_database = std::move(clang_declaration_database),
-        };
+        Clang_module_data_pointer output(
+            new Clang_module_data
+            {
+                .ast_context = clang_ast_context,
+                .code_generator = std::move(clang_context->code_generator),
+                .declaration_database = std::move(clang_declaration_database),
+            },
+            destroy_clang_module_data
+        );
+        return output;
     }
 
-    Clang_module_data create_clang_module_data(
+    Clang_module_data_pointer create_clang_module_data(
         llvm::LLVMContext& llvm_context,
         Clang_data const& clang_data,
         std::string_view const module_name,
@@ -759,7 +806,7 @@ namespace iris::compiler
         Declaration_database const& declaration_database
     )
     {
-        Clang_context clang_context = create_clang_context(llvm_context, clang_data, module_name);
+        Clang_context_pointer clang_context = create_clang_context(llvm_context, clang_data, module_name);
         return create_clang_module_data(std::move(clang_context), sorted_modules, declaration_database);
     }
 
@@ -2690,7 +2737,12 @@ namespace iris::compiler
         return create_type(clang_ast_context, type_reference[0], alloca_type, declaration_database, clang_declaration_database);
     }
 
-    Clang_data create_clang_data(
+    void destroy_clang_data(Clang_data* data)
+    {
+        delete data;
+    }
+
+    Clang_data_pointer create_clang_data(
         llvm::LLVMContext& llvm_context,
         llvm::Triple const& llvm_triple,
         unsigned int const optimization_level
@@ -2720,9 +2772,45 @@ namespace iris::compiler
 
         compiler_instance->createASTContext();
 
-        return Clang_data
-        {
-            .compiler_instance = std::move(compiler_instance),
-        };
+        Clang_data_pointer output
+        (
+            new Clang_data
+            {
+                .compiler_instance = std::move(compiler_instance),
+            },
+            destroy_clang_data
+        );
+
+        return output;
+    }
+
+    void destroy_clang_module_data(Clang_module_data* data)
+    {
+        delete data;
+    }
+
+    clang::CompilerInstance& get_compiler_instance(Clang_data const& clang_data)
+    {
+        return *clang_data.compiler_instance.get();
+    }
+
+    Clang_declaration_database& get_clang_declaration_database(Clang_module_data& clang_module_data)
+    {
+        return clang_module_data.declaration_database;
+    }
+
+    Clang_declaration_database const& get_clang_declaration_database(Clang_module_data const& clang_module_data)
+    {
+        return clang_module_data.declaration_database;
+    }
+
+    clang::ASTContext& get_clang_ast_context(Clang_module_data& clang_module_data)
+    {
+        return clang_module_data.ast_context;
+    }
+
+    clang::ASTContext const& get_clang_ast_context(Clang_module_data const& clang_module_data)
+    {
+        return clang_module_data.ast_context;
     }
 }

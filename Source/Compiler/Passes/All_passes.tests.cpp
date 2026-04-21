@@ -1,24 +1,3 @@
-#include <clang/AST/ASTContext.h>
-#include <clang/AST/Decl.h>
-#include <clang/AST/DeclBase.h>
-#include <clang/AST/Type.h>
-#include <clang/Basic/Builtins.h>
-#include <clang/Basic/CodeGenOptions.h>
-#include <clang/Basic/Diagnostic.h>
-#include <clang/Basic/FileManager.h>
-#include <clang/Basic/IdentifierTable.h>
-#include <clang/Basic/SourceLocation.h>
-#include <clang/Basic/SourceManager.h>
-#include <clang/CodeGen/CodeGenABITypes.h>
-#include <clang/CodeGen/CGFunctionInfo.h>
-#include <clang/CodeGen/ModuleBuilder.h>
-#include "clang/Frontend/CompilerInstance.h"
-#include <clang/Lex/HeaderSearchOptions.h>
-#include <clang/Lex/PreprocessorOptions.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/Support/VirtualFileSystem.h>
-
 import iris.compiler;
 import iris.compiler.all_passes;
 import iris.compiler.clang_code_generation;
@@ -38,7 +17,7 @@ namespace iris::compiler
     struct All_passes_runtime_context
     {
         iris::compiler::LLVM_data llvm_data;
-        iris::compiler::Clang_context clang_context;
+        iris::compiler::Clang_context_pointer clang_context;
     };
 
     static All_passes_runtime_context create_all_passes_runtime_context(
@@ -63,9 +42,9 @@ namespace iris::compiler
 
         sorted_modules.push_back(&core_module);
 
-        iris::compiler::Clang_context clang_context = iris::compiler::create_clang_context(
+        iris::compiler::Clang_context_pointer clang_context = iris::compiler::create_clang_context(
             *llvm_data.context,
-            llvm_data.clang_data,
+            *llvm_data.clang_data,
             "Iris_clang_module"
         );
 
@@ -104,7 +83,7 @@ namespace iris::compiler
             .llvm_context = *runtime_context.llvm_data.context,
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
-            .clang_context = runtime_context.clang_context,
+            .clang_context = *runtime_context.clang_context,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
         };

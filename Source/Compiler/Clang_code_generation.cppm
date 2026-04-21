@@ -1,8 +1,11 @@
+module;
+
+#include "Clang_forward_declarations.h"
+
 export module iris.compiler.clang_code_generation;
 
 import std;
 import llvm;
-import clang;
 
 import iris.core;
 import iris.core.declarations;
@@ -13,6 +16,8 @@ import iris.compiler.types;
 
 namespace iris::compiler
 {
+    export void destroy_clang_module_data(Clang_module_data* data);
+
     export void add_clang_struct_declaration(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
@@ -255,13 +260,13 @@ namespace iris::compiler
         Convertion_type const convertion_type
     );
 
-    export Clang_data create_clang_data(
+    export std::unique_ptr<Clang_data, void(*)(Clang_data*)> create_clang_data(
         llvm::LLVMContext& llvm_context,
         llvm::Triple const& llvm_triple,
         unsigned int const optimization_level
     );
 
-    export Clang_context create_clang_context(
+    export std::unique_ptr<Clang_context, void(*)(Clang_context*)> create_clang_context(
         llvm::LLVMContext& llvm_context,
         Clang_data const& clang_data,
         std::string_view const module_name
@@ -274,17 +279,24 @@ namespace iris::compiler
         Declaration_database const& declaration_database
     );
 
-    export Clang_module_data create_clang_module_data(
-        Clang_context&& clang_context,
+    export Clang_module_data_pointer create_clang_module_data(
+        Clang_context_pointer&& clang_context,
         std::span<iris::Module const* const> const sorted_modules,
         Declaration_database const& declaration_database
     );
 
-    export Clang_module_data create_clang_module_data(
+    export Clang_module_data_pointer create_clang_module_data(
         llvm::LLVMContext& llvm_context,
         Clang_data const& clang_data,
         std::string_view const module_name,
         std::span<iris::Module const* const> const sorted_modules,
         Declaration_database const& declaration_database
     );
+
+    export clang::CompilerInstance& get_compiler_instance(Clang_data const& clang_data);
+
+    export Clang_declaration_database& get_clang_declaration_database(Clang_module_data& clang_module_data);
+    export Clang_declaration_database const& get_clang_declaration_database(Clang_module_data const& clang_module_data);
+    export clang::ASTContext& get_clang_ast_context(Clang_module_data& clang_module_data);
+    export clang::ASTContext const& get_clang_ast_context(Clang_module_data const& clang_module_data);
 }

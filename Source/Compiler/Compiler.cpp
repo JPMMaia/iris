@@ -3,13 +3,12 @@ module;
 #include <assert.h>
 #include <stdio.h>
 
-#include <clang/CodeGen/CodeGenABITypes.h>
+#include <llvm/ADT/FunctionExtras.h>
 
 module iris.compiler;
 
 import std;
 import llvm;
-import clang;
 
 import iris.binary_serializer;
 import iris.common;
@@ -1359,7 +1358,7 @@ namespace iris::compiler
         // This merges identical functions. We might have a lot of these when generating functions using function constructors that only use pointers.
         module_pass_manager.addPass(llvm::MergeFunctionsPass());
 
-        Clang_data clang_data = create_clang_data(
+        std::unique_ptr<Clang_data, void(*)(Clang_data*)> clang_data = create_clang_data(
             *llvm_context,
             llvm::Triple{ target_triple },
             options.is_optimized ? 2 : 0
@@ -1470,9 +1469,9 @@ namespace iris::compiler
         
         add_import_usages(new_core_module, {});
 
-        Clang_context clang_context = create_clang_context(
+        Clang_context_pointer clang_context = create_clang_context(
             *llvm_data.context,
-            llvm_data.clang_data,
+            *llvm_data.clang_data,
             "Iris_clang_module"
         );
 
@@ -1494,7 +1493,7 @@ namespace iris::compiler
                 .llvm_context = *llvm_data.context,
                 .llvm_data_layout = llvm_data.data_layout,
                 .declaration_database = declaration_database,
-                .clang_context = clang_context,
+                .clang_context = *clang_context,
                 .output_allocator = {},
                 .temporaries_allocator = {},
             };
@@ -1523,7 +1522,7 @@ namespace iris::compiler
             {}
         );
 
-        Clang_module_data& clang_module_data = compilation_database.clang_module_data;
+        Clang_module_data& clang_module_data = *compilation_database.clang_module_data;
         Type_database& type_database = compilation_database.type_database;
 
         std::unique_ptr<llvm::Module> llvm_module = create_module(*llvm_data.context, llvm_data.target_triple, llvm_data.data_layout, clang_module_data, new_core_module, core_module_dependencies, functions_to_compile, declaration_database, type_database, compilation_options);
@@ -1795,8 +1794,8 @@ namespace iris::compiler
         for (Function_declaration const& declaration : function_declarations)
         {
             add_clang_function_declaration(
-                clang_module_data.declaration_database,
-                clang_module_data.ast_context,
+                get_clang_declaration_database(clang_module_data),
+                get_clang_ast_context(clang_module_data),
                 "Iris.Test_main",
                 declaration,
                 declaration_database
@@ -1806,24 +1805,24 @@ namespace iris::compiler
 
     Compilation_database process_modules_and_create_compilation_database(
         LLVM_data& llvm_data,
-        Clang_context&& clang_context,
+        Clang_context_pointer&& clang_context,
         std::span<iris::Module const* const> const sorted_modules,
         Declaration_database& declaration_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {    
-        Clang_module_data clang_module_data = create_clang_module_data(
+        Clang_module_data_pointer clang_module_data = create_clang_module_data(
             std::move(clang_context),
             sorted_modules,
             declaration_database
         );
 
-        add_additional_test_declarations_to_clang_database(clang_module_data, declaration_database, temporaries_allocator);
+        add_additional_test_declarations_to_clang_database(*clang_module_data, declaration_database, temporaries_allocator);
 
         Type_database type_database = create_type_database(*llvm_data.context);
         for (Module const* sorted_module : sorted_modules)
-            add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, clang_module_data, *sorted_module);
+            add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, *clang_module_data, *sorted_module);
 
         return Compilation_database
         {
@@ -1847,9 +1846,9 @@ namespace iris::compiler
 
         std::pmr::vector<iris::Module const*> const sorted_core_modules = sort_core_modules(core_module_dependencies, &core_module, {}, {});
 
-        Clang_context clang_context = create_clang_context(
+        Clang_context_pointer clang_context = create_clang_context(
             *llvm_data.context,
-            llvm_data.clang_data,
+            *llvm_data.clang_data,
             "Iris_clang_module"
         );
 
@@ -1859,7 +1858,7 @@ namespace iris::compiler
                 .llvm_context = *llvm_data.context,
                 .llvm_data_layout = llvm_data.data_layout,
                 .declaration_database = declaration_database,
-                .clang_context = clang_context,
+                .clang_context = *clang_context,
                 .output_allocator = {},
                 .temporaries_allocator = {},
             };
@@ -1880,7 +1879,7 @@ namespace iris::compiler
             *llvm_data.context,
             llvm_data.target_triple,
             llvm_data.data_layout,
-            compilation_database.clang_module_data,
+            *compilation_database.clang_module_data,
             core_module,
             core_module_dependencies,
             std::nullopt,

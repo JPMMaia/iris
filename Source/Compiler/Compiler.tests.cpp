@@ -6761,16 +6761,16 @@ std::filesystem::path const header_module_file_path = create_and_import_c_header
     iris::add_declarations(declaration_database, *core_module);
 
     std::pmr::vector<iris::Module const*> core_modules{ &core_module.value() };
-    iris::compiler::Clang_module_data clang_module_data = iris::compiler::create_clang_module_data(
+    iris::compiler::Clang_module_data_pointer clang_module_data = iris::compiler::create_clang_module_data(
         *llvm_data.context,
-        llvm_data.clang_data,
+        *llvm_data.clang_data,
         "Iris_clang_module",
         core_modules,
         declaration_database
     );
 
     iris::compiler::Type_database type_database = iris::compiler::create_type_database(*llvm_data.context);
-    iris::compiler::add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, clang_module_data, *core_module);
+    iris::compiler::add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, *clang_module_data, *core_module);
 
     iris::Struct_layout const actual_struct_layout = iris::compiler::calculate_struct_layout(llvm_data.data_layout, type_database, "my_module", "My_struct");
 

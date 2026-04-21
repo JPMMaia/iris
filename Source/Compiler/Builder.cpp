@@ -3,8 +3,6 @@ module;
 #include <assert.h>
 #include <stdio.h>
 
-#include <clang/CodeGen/CodeGenABITypes.h>
-
 module iris.compiler.builder;
 
 import std;
@@ -964,7 +962,7 @@ namespace iris::compiler
                     {
                         std::filesystem::path const output_file_path = build_directory_path / std::format("{}.{}.{}", artifact.name, source_file_path.stem().generic_string(), "ll");
                         bool const success = compile_cpp(
-                            llvm_data.clang_data,
+                            *llvm_data.clang_data,
                             llvm_data.target_triple,
                             source_file_path,
                             output_llvm_ir_file,
@@ -984,7 +982,7 @@ namespace iris::compiler
                     }
 
                     bool const success = compile_cpp(
-                        llvm_data.clang_data,
+                        *llvm_data.clang_data,
                         llvm_data.target_triple,
                         source_file_path,
                         output_assembly_file,
@@ -1020,7 +1018,7 @@ namespace iris::compiler
                 };
 
                 bool const success = compile_cpp(
-                    llvm_data.clang_data,
+                    *llvm_data.clang_data,
                     llvm_data.target_triple,
                     tests_main_file_path,
                     output_assembly_file,
@@ -1730,16 +1728,16 @@ namespace iris::compiler
         iris::add_declarations(declaration_database, *core_module);
 
         std::pmr::vector<iris::Module const*> core_modules{ &core_module.value() };
-        iris::compiler::Clang_module_data clang_module_data = iris::compiler::create_clang_module_data(
+        iris::compiler::Clang_module_data_pointer clang_module_data = iris::compiler::create_clang_module_data(
             *llvm_data.context,
-            llvm_data.clang_data,
+            *llvm_data.clang_data,
             "Iris_clang_module",
             core_modules,
             declaration_database
         );
 
         iris::compiler::Type_database type_database = iris::compiler::create_type_database(*llvm_data.context);
-        iris::compiler::add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, clang_module_data, *core_module);
+        iris::compiler::add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, *clang_module_data, *core_module);
 
         std::optional<iris::Struct_layout> const struct_layout = iris::compiler::calculate_struct_layout(llvm_data.data_layout, type_database, core_module->name, struct_name);
         if (!struct_layout.has_value())

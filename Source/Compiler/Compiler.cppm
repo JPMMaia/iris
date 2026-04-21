@@ -29,7 +29,7 @@ namespace iris::compiler
         llvm::DataLayout data_layout;
         std::unique_ptr<llvm::LLVMContext> context;
         Optimization_managers optimization_managers;
-        Clang_data clang_data;
+        std::unique_ptr<Clang_data, void(*)(Clang_data*)> clang_data;
     };
 
     export struct LLVM_module_data
@@ -114,13 +114,13 @@ namespace iris::compiler
 
     export struct Compilation_database
     {
-        Clang_module_data clang_module_data;
+        Clang_module_data_pointer clang_module_data;
         Type_database type_database;
     };
 
     export Compilation_database process_modules_and_create_compilation_database(
         LLVM_data& llvm_data,
-        Clang_context&& clang_context,
+        Clang_context_pointer&& clang_context,
         std::span<iris::Module const* const> const sorted_modules,
         Declaration_database& declaration_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,

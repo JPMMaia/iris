@@ -14,6 +14,8 @@ import iris.compiler.clang_data;
 
 namespace iris::compiler
 {
+    clang::CompilerInstance& get_compiler_instance(Clang_data const& clang_data);
+
     std::filesystem::path find_clang(bool const use_clang_cl)
     {
         std::filesystem::path const local_path{use_clang_cl ? "clang-cl.exe" : "clang++"};
@@ -166,7 +168,7 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        clang::CompilerInstance& clang_compiler_instance = *clang_data.compiler_instance.get();
+        clang::CompilerInstance& clang_compiler_instance = get_compiler_instance(clang_data);
 
         llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> diagnostic_ids{new clang::DiagnosticIDs{}};
         llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> diagnostic_options{new clang::DiagnosticOptions{}};

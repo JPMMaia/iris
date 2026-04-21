@@ -1,6 +1,7 @@
 #pragma warning(push, 0)
 
 #include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/FunctionExtras.h>
 #include <llvm/ADT/IntrusiveRefCntPtr.h>
 #include <llvm/ADT/PointerUnion.h>
 
