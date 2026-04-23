@@ -1,0 +1,167 @@
+module iris.json;
+
+import iris.builtin as iris_builtin;
+
+import c.stdio as cstdio;
+import c.string as cstring;
+
+export struct Write_stream
+{
+    write: function<(value: *C_char) -> ()> = null;
+}
+
+export function_constructor to_json(value_type: Type)
+{
+    return function(stream: Write_stream, value: *value_type) -> ()
+    {
+        if value == null
+        {
+            stream.write("null"c);
+            return;
+        }
+
+        var kind = @get_type_kind::<value_type>();
+        var size_in_bytes = @size_of::<value_type>();
+
+        var is_numeric_value = true;
+
+        if kind == iris_builtin.Type_kind.Bool
+        {
+            stream.write(value ? "true"c : "false"c);
+        }
+        else if kind == iris_builtin.Type_kind.Struct
+        {
+            // TODO if object, go through members
+            stream.write("??"c);
+        }
+        else if kind == iris_builtin.Type_kind.Union
+        {
+            // TODO
+            stream.write("??"c);
+        }
+        else if kind == iris_builtin.Type_kind.Enum
+        {
+            // TODO
+            stream.write("??"c);
+        }
+        else if kind == iris_builtin.Type_kind.Pointer
+        {
+            // TODO
+            stream.write("pointer"c);
+        }
+        else if kind == iris_builtin.Type_kind.Array_slice
+        {
+            // TODO
+            stream.write("Array_slice"c);
+        }
+        else if kind == iris_builtin.Type_kind.Constant_array
+        {
+            // TODO
+            stream.write("Constant_array"c);
+        }
+        else if kind == iris_builtin.Type_kind.Function_pointer
+        {
+            // TODO
+            stream.write("Function_pointer"c);
+        }
+        else if kind == iris_builtin.Type_kind.Builtin
+        {
+            // TODO
+            stream.write("Builtin"c);
+        }
+        else if kind == iris_builtin.Type_kind.Builtin
+        {
+            // TODO
+            stream.write("Builtin"c);
+        }
+        else if kind == iris_builtin.Type_kind.Null_pointer
+        {
+            stream.write("null"c);
+        }
+        else if is_numeric_value
+        {
+            mutable format_specifier_buffer: Constant_array::<C_char, 16> = [];
+            var format_specifier = create_format_specifier(format_specifier_buffer, kind, size_in_bytes);
+            
+            mutable format_buffer: Constant_array::<C_char, 64> = [];
+            cstdio.snprintf(&format_buffer[0], 64, format_specifier, *value);
+
+            stream.write(&format_buffer[0]);
+        }
+    };
+}
+
+function create_format_specifier(buffer: Array_slice::<mutable C_char>, kind: Type_kind, size_in_bytes: Uint64) -> (*C_char)
+{
+    var specifier = get_format_specifier(kind, size_in_bytes);
+    write_format_specifier(buffer, specifier);
+    return buffer.data;
+}
+
+function get_format_specifier(kind: Type_kind, size_in_bytes: Uint64) -> (*C_char)
+{
+    if kind == iris_builtin.Type_kind.Int
+    {
+        switch size_in_bytes
+        {
+            case 1: return stdio.PRIi8;
+            case 2: return stdio.PRIi16;
+            case 4: return stdio.PRIi32;
+            default: return stdio.PRIi64;
+        }
+    }
+    else if kind == iris_builtin.Type_kind.Uint
+    {
+        switch size_in_bytes
+        {
+            case 1: return stdio.PRIu8;
+            case 2: return stdio.PRIu16;
+            case 4: return stdio.PRIu32;
+            default: return stdio.PRIu64;
+        }
+    }
+    else if kind == iris_builtin.Type_kind.Float
+    {
+        return "f"c;
+    }
+
+    return stdio.PRIi64;
+}
+
+function write_format_specifier(buffer: Array_slice::<mutable C_char>, specifier: *C_char) -> (*C_char)
+{
+    buffer[0] = '%';
+    var length = cstring.strlen(specifier) as Uint64;
+    for index in 0u64 to length
+    {
+        buffer[1 + index] = specifier[index];
+    }
+    buffer[length] = 0 as C_char;
+}
+
+export function_constructor print_json(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+        var stream: Write_stream = explicit {
+            write: print_to_stdout
+        };
+
+        to_json::<value_type>(stream, value);
+    };
+}
+
+function print_to_stdout(value: *C_char) -> ()
+{
+    cstdio.printf("%s", value);
+}
+
+export function_constructor print_json_difference(value_type: Type)
+{
+    return function(lhs: *value_type, rhs: *value_type) -> ()
+    {
+        print_json::<value_type>(lhs);
+        cstdio.printf(" == ");
+        print_json::<value_type>(rhs);
+    };
+}

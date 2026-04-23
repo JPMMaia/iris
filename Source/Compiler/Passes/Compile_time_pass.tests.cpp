@@ -422,6 +422,64 @@ export function run_member_type_usage() -> ()
         CHECK(location != builtin_import->usages.end());
     }
 
+    TEST_CASE("Rewrites check equality to print json difference before checking", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_check;
+
+function run(lhs: Int32, rhs: Int32) -> ()
+{
+    check(lhs == rhs);
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_check;
+
+import iris.json as iris_json;
+
+function run(lhs: Int32, rhs: Int32) -> ()
+{
+    {
+        if lhs != rhs
+        {
+            iris_json.print_json_difference::<Int32>(&lhs, &rhs);
+        }
+        check(lhs == rhs);
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("check equality records iris.json print_json_difference import usage", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_check;
+
+import iris.json as iris_json;
+
+function run(lhs: Int32, rhs: Int32) -> ()
+{
+    check(lhs == rhs);
+}
+)";
+
+        iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input, {});
+        run_compile_time_pass(context, "run");
+
+        Import_module_with_alias const* const json_import = find_import_module_with_alias(context.core_module, "iris_json");
+        REQUIRE(json_import != nullptr);
+
+        auto const location = std::find(
+            json_import->usages.begin(),
+            json_import->usages.end(),
+            "print_json_difference"
+        );
+
+        CHECK(location != json_import->usages.end());
+    }
+
     TEST_CASE("Evaluates compile_time reflection member_offset", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_reflection;

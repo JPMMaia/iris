@@ -81,6 +81,11 @@ namespace iris::common
         return get_share_path("source/Builtin.iris");
     }
 
+    std::filesystem::path get_json_module_file_path()
+    {
+        return get_share_path("source/json.iris");
+    }
+
     std::filesystem::path get_tests_main_file_path()
     {
         return get_share_path("source/tests_main.cpp");

@@ -9,6 +9,7 @@ import llvm;
 import std;
 import std.compat;
 
+import iris.compiler.analysis;
 import iris.compiler.types;
 import iris.core;
 import iris.core.declarations;
@@ -18,6 +19,11 @@ import iris.core.types;
 
 namespace iris::compiler
 {    
+    constexpr std::string_view g_check_function_name = "check";
+    constexpr std::string_view g_json_module_name = "iris.json";
+    constexpr std::string_view g_json_alias = "iris_json";
+    constexpr std::string_view g_json_print_difference_function_name = "print_json_difference";
+
     static iris::Statement create_block_statement(
         std::pmr::vector<iris::Statement> statements,
         std::pmr::polymorphic_allocator<> const& output_allocator
@@ -96,8 +102,7 @@ namespace iris::compiler
     static void add_import_usage_for_module(
         iris::Module& core_module,
         std::string_view const module_name,
-        std::string_view const usage,
-        std::pmr::polymorphic_allocator<> const& output_allocator
+        std::string_view const usage
     )
     {
         auto const location = std::find_if(
@@ -112,7 +117,275 @@ namespace iris::compiler
         if (usage_location != location->usages.end())
             return;
 
-        location->usages.push_back(std::pmr::string{usage, output_allocator});
+        location->usages.push_back(std::pmr::string{usage, location->usages.get_allocator()});
+    }
+
+    static Import_module_with_alias const& ensure_import_module_with_alias(
+        iris::Module& core_module,
+        std::string_view const module_name,
+        std::string_view const alias,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        Import_module_with_alias const* const existing_import = find_import_module_with_module_name(core_module, module_name);
+        if (existing_import != nullptr)
+            return *existing_import;
+
+        Import_module_with_alias new_import
+        {
+            .module_name = std::pmr::string{module_name, output_allocator},
+            .alias = std::pmr::string{alias, output_allocator},
+            .usages = std::pmr::vector<std::pmr::string>{output_allocator},
+            .source_range = std::nullopt,
+        };
+
+        core_module.dependencies.alias_imports.push_back(std::move(new_import));
+        return core_module.dependencies.alias_imports.back();
+    }
+
+    static iris::Statement create_binary_expression_statement(
+        iris::Statement const& source_statement,
+        iris::Expression_index const left_hand_side,
+        iris::Expression_index const right_hand_side,
+        iris::Binary_operation const operation
+    )
+    {
+        iris::Statement output = {};
+        output.expressions.reserve(source_statement.expressions.size() + 1);
+
+        Expression_reference<iris::Binary_expression> binary_expression = create_expression_inside_statement<iris::Binary_expression>(output.expressions);
+        iris::Expression_index const copied_left_hand_side = copy_expressions_to_new_statement(output, source_statement, left_hand_side);
+        iris::Expression_index const copied_right_hand_side = copy_expressions_to_new_statement(output, source_statement, right_hand_side);
+
+        *binary_expression.value =
+        {
+            .left_hand_side = copied_left_hand_side,
+            .right_hand_side = copied_right_hand_side,
+            .operation = operation,
+        };
+
+        return output;
+    }
+
+    static iris::Statement create_print_json_difference_statement(
+        std::string_view const import_alias,
+        iris::Type_reference const& argument_type,
+        iris::Statement const& source_statement,
+        iris::Expression_index const left_hand_side,
+        iris::Expression_index const right_hand_side,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        iris::Statement output = {};
+
+        // Push Call_expression and Instance_call_expression with explicitly initialized
+        // PMR vector members using output_allocator to avoid default-resource crashes in
+        // MSVC debug mode. Indices are captured before any further push_back calls.
+        std::size_t const call_expression_index = output.expressions.size();
+        output.expressions.push_back(iris::Expression{
+            .data = iris::Call_expression{
+                .expression = {},
+                .arguments = std::pmr::vector<iris::Expression_index>{output_allocator},
+            }
+        });
+
+        std::size_t const instance_call_expression_index = output.expressions.size();
+        output.expressions.push_back(iris::Expression{
+            .data = iris::Instance_call_expression{
+                .left_hand_side = {},
+                .arguments = std::pmr::vector<iris::Statement>{output_allocator},
+            }
+        });
+
+        iris::Expression_index const copied_left_hand_side = copy_expressions_to_new_statement(output, source_statement, left_hand_side);
+        iris::Expression_index const copied_right_hand_side = copy_expressions_to_new_statement(output, source_statement, right_hand_side);
+
+        std::size_t const left_address_of_index = output.expressions.size();
+        output.expressions.push_back(iris::Expression{ .data = iris::Unary_expression{} });
+
+        std::size_t const right_address_of_index = output.expressions.size();
+        output.expressions.push_back(iris::Expression{ .data = iris::Unary_expression{} });
+
+        std::size_t const alias_expression_index = output.expressions.size();
+        output.expressions.push_back(iris::Expression{ .data = iris::Variable_expression{} });
+
+        std::size_t const access_expression_index = output.expressions.size();
+        output.expressions.push_back(iris::Expression{ .data = iris::Access_expression{} });
+
+        // All push_backs done; access expressions by index (pointers from push_back may be
+        // invalid after any reallocation above).
+        std::get<iris::Unary_expression>(output.expressions[left_address_of_index].data) = {
+            .expression = copied_left_hand_side,
+            .operation = iris::Unary_operation::Address_of,
+        };
+        std::get<iris::Unary_expression>(output.expressions[right_address_of_index].data) = {
+            .expression = copied_right_hand_side,
+            .operation = iris::Unary_operation::Address_of,
+        };
+
+        std::get<iris::Variable_expression>(output.expressions[alias_expression_index].data).name =
+            std::pmr::string{import_alias, output_allocator};
+
+        iris::Access_expression& access_expr = std::get<iris::Access_expression>(output.expressions[access_expression_index].data);
+        access_expr.expression = {.expression_index = alias_expression_index};
+        access_expr.member_name = std::pmr::string{g_json_print_difference_function_name, output_allocator};
+
+        iris::Instance_call_expression& instance_call_expr = std::get<iris::Instance_call_expression>(output.expressions[instance_call_expression_index].data);
+        instance_call_expr.left_hand_side = {.expression_index = access_expression_index};
+        instance_call_expr.arguments.push_back(create_type_expression_statement(argument_type));
+
+        iris::Call_expression& call_expr = std::get<iris::Call_expression>(output.expressions[call_expression_index].data);
+        call_expr.expression = {.expression_index = instance_call_expression_index};
+        call_expr.arguments.push_back({.expression_index = left_address_of_index});
+        call_expr.arguments.push_back({.expression_index = right_address_of_index});
+
+        return output;
+    }
+
+    static iris::Statement create_if_statement(
+        iris::Statement condition,
+        iris::Statement then_statement,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        iris::Statement output = {};
+
+        Expression_reference<iris::If_expression> if_expression = create_expression_inside_statement<iris::If_expression>(output.expressions);
+        if_expression.value->series = std::pmr::vector<iris::Condition_statement_pair>{output_allocator};
+
+        iris::Condition_statement_pair pair
+        {
+            .condition = std::move(condition),
+            .then_statements = std::pmr::vector<iris::Statement>{output_allocator},
+            .block_source_range = std::nullopt,
+        };
+        pair.then_statements.push_back(std::move(then_statement));
+
+        if_expression.value->series.push_back(std::move(pair));
+        return output;
+    }
+
+    static bool is_check_equality_call(
+        iris::Module const& core_module,
+        iris::Statement const& statement,
+        iris::Call_expression const*& call_expression,
+        iris::Binary_expression const*& binary_expression
+    )
+    {
+        if (statement.expressions.empty())
+            return false;
+
+        iris::Expression const& root_expression = statement.expressions[0];
+        if (!root_expression.source_range.has_value())
+            return false;
+
+        if (!std::holds_alternative<iris::Call_expression>(root_expression.data))
+            return false;
+
+        iris::Call_expression const& current_call_expression = std::get<iris::Call_expression>(root_expression.data);
+        if (current_call_expression.expression.expression_index >= statement.expressions.size())
+            return false;
+
+        iris::Expression const& callee_expression = statement.expressions[current_call_expression.expression.expression_index];
+        if (!std::holds_alternative<iris::Variable_expression>(callee_expression.data))
+            return false;
+
+        iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(callee_expression.data);
+        if (variable_expression.name != g_check_function_name)
+            return false;
+
+        if (find_function_declaration(core_module, g_check_function_name).has_value())
+            return false;
+
+        if (current_call_expression.arguments.size() != 1)
+            return false;
+
+        iris::Expression_index const argument_expression_index = current_call_expression.arguments[0];
+        if (argument_expression_index.expression_index >= statement.expressions.size())
+            return false;
+
+        iris::Expression const& argument_expression = statement.expressions[argument_expression_index.expression_index];
+        if (!std::holds_alternative<iris::Binary_expression>(argument_expression.data))
+            return false;
+
+        iris::Binary_expression const& current_binary_expression = std::get<iris::Binary_expression>(argument_expression.data);
+        if (current_binary_expression.operation != iris::Binary_operation::Equal)
+            return false;
+
+        call_expression = &current_call_expression;
+        binary_expression = &current_binary_expression;
+        return true;
+    }
+
+    static void rewrite_check_equality_statement(
+        iris::Function_declaration const& function_declaration,
+        iris::Statement& statement,
+        Scope const& scope,
+        Compile_time_parameters const& parameters
+    )
+    {
+        iris::Call_expression const* call_expression = nullptr;
+        iris::Binary_expression const* binary_expression = nullptr;
+        if (!is_check_equality_call(parameters.core_module, statement, call_expression, binary_expression))
+            return;
+
+        if (binary_expression->left_hand_side.expression_index >= statement.expressions.size())
+            return;
+
+        iris::Expression const& left_hand_side_expression = statement.expressions[binary_expression->left_hand_side.expression_index];
+        std::optional<iris::Type_reference> const left_hand_side_type = get_expression_type(
+            parameters.core_module,
+            &function_declaration,
+            scope,
+            statement,
+            left_hand_side_expression,
+            std::nullopt,
+            parameters.declaration_database
+        );
+        if (!left_hand_side_type.has_value())
+            return;
+
+        Import_module_with_alias const& json_import = ensure_import_module_with_alias(
+            parameters.core_module,
+            g_json_module_name,
+            g_json_alias,
+            parameters.output_allocator
+        );
+        add_import_usage_for_module(
+            parameters.core_module,
+            g_json_module_name,
+            g_json_print_difference_function_name
+        );
+
+        iris::Statement condition_statement = create_binary_expression_statement(
+            statement,
+            binary_expression->left_hand_side,
+            binary_expression->right_hand_side,
+            iris::Binary_operation::Not_equal
+        );
+        iris::Statement print_difference_statement = create_print_json_difference_statement(
+            json_import.alias,
+            left_hand_side_type.value(),
+            statement,
+            binary_expression->left_hand_side,
+            binary_expression->right_hand_side,
+            parameters.output_allocator
+        );
+        iris::Statement if_statement = create_if_statement(
+            std::move(condition_statement),
+            std::move(print_difference_statement),
+            parameters.output_allocator
+        );
+
+        iris::Statement original_check_statement = statement;
+        if (!original_check_statement.expressions.empty())
+            original_check_statement.expressions[0].source_range = std::nullopt;
+
+        std::pmr::vector<iris::Statement> block_statements{parameters.output_allocator};
+        block_statements.push_back(std::move(if_statement));
+        block_statements.push_back(std::move(original_check_statement));
+
+        statement = create_block_statement(std::move(block_statements), parameters.output_allocator);
     }
 
     static Compile_time_value_and_type create_value_and_type(
@@ -685,7 +958,7 @@ namespace iris::compiler
                 throw std::runtime_error{ "member_type() requires a struct or union type argument!" };
             }
 
-            add_import_usage_for_module(parameters.core_module, "iris.builtin", "Type_kind", parameters.output_allocator);
+            add_import_usage_for_module(parameters.core_module, "iris.builtin", "Type_kind");
 
             return create_value_and_type(create_type_expression_statement(output_type.value()));
         }
@@ -1087,13 +1360,35 @@ namespace iris::compiler
         Compile_time_parameters const& parameters
     )
     {
-        auto const visit_and_replace = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
+        Scope scope{};
+        add_parameters_to_scope(
+            scope,
+            function_declaration.input_parameter_names,
+            function_declaration.type.input_parameter_types,
+            function_declaration.input_parameter_source_positions
+        );
+
+        auto const callback = [&](iris::Statement const& statement, Scope const& scope) -> void
         {
             iris::Statement& mutable_statement = const_cast<iris::Statement&>(statement);
-            visit_and_replace_compile_time_expressions(mutable_statement, expression, parameters);
-            return false;
+            auto const visit_and_replace = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
+            {
+                iris::Statement& mutable_nested_statement = const_cast<iris::Statement&>(statement);
+                visit_and_replace_compile_time_expressions(mutable_nested_statement, expression, parameters);
+                return false;
+            };
+
+            visit_expressions(mutable_statement, visit_and_replace);
+            rewrite_check_equality_statement(function_declaration, mutable_statement, scope, parameters);
         };
 
-        visit_expressions(function_definition.statements, visit_and_replace);
+        visit_statements_using_scope(
+            parameters.core_module,
+            &function_declaration,
+            scope,
+            function_definition.statements,
+            parameters.declaration_database,
+            callback
+        );
     }
 }

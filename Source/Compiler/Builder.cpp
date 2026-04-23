@@ -360,6 +360,7 @@ namespace iris::compiler
         std::pmr::vector<std::filesystem::path> source_files{temporaries_allocator};
 
         source_files.push_back(iris::common::get_builtin_module_file_path());
+        source_files.push_back(iris::common::get_json_module_file_path());
 
         for (Artifact const& artifact : artifacts)
         {
