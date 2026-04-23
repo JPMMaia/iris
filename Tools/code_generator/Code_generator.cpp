@@ -2599,6 +2599,7 @@ namespace iris::binary_serializer
 
         std::string_view const initial_code = R"(module;
 
+#define EXPORT export
 #include "Generics.h"
 
 #include <compare>
@@ -2612,7 +2613,7 @@ namespace iris::json
 {
 )";
 
-        std::string_view const enum_template = R"(    template <>
+        std::string_view const enum_template = R"(    EXPORT template <>
     JSON to_json({} const& value)
     {{
         switch (value)
@@ -2621,7 +2622,7 @@ namespace iris::json
         }}
     }}
 
-    template <>
+    EXPORT template <>
     void from_json(JSON const& data, {}& output)
     {{
         std::string const& value = data.get<std::string>();
@@ -2630,7 +2631,7 @@ namespace iris::json
 
 )";
 
-        std::string_view const function_template = R"(    template <>
+        std::string_view const function_template = R"(    EXPORT template <>
     JSON to_json({} const& value)
     {{
         JSON data;
@@ -2638,7 +2639,7 @@ namespace iris::json
         return data;
     }}
 
-    template <>
+    EXPORT template <>
     void from_json(JSON const& data, {}& value)
     {{
 {}

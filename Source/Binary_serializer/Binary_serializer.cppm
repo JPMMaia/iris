@@ -2,8 +2,8 @@ export module iris.binary_serializer;
 
 import std;
 
-import iris.binary_serializer.generated;
-import iris.binary_serializer.generics;
+export import iris.binary_serializer.generated;
+export import iris.binary_serializer.generics;
 import iris.common;
 import iris.core;
 
