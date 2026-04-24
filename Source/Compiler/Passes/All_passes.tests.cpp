@@ -137,6 +137,12 @@ export function_constructor add(value_type: Type)
     };
 }
 
+@unique_name("All_passes_test_1@add@3510542370392782654")
+function All_passes_test_1@add@3510542370392782654(first: Int32, second: Int32) -> (result: Int32)
+{
+    return first + second;
+}
+
 function run() -> ()
 {
     {
@@ -182,6 +188,12 @@ export type_constructor Box(element_type: Type)
     {
         value: element_type = ;
     };
+}
+
+@unique_name("All_passes_test_2@Box@8186224852659227827")
+struct All_passes_test_2@Box@8186224852659227827
+{
+    value: Int32 = ;
 }
 
 export function get_value(instance: *Box::<element_type>, element_type: Type) -> (result: element_type)
@@ -245,6 +257,12 @@ export type_constructor Box(element_type: Type)
     {
         value: element_type = ;
     };
+}
+
+@unique_name("All_passes_test_3@Box@16743479164112415117")
+struct All_passes_test_3@Box@16743479164112415117
+{
+    value: Int32 = ;
 }
 
 export function get_value(instance: *Box::<element_type>, element_type: Type) -> (result: element_type)
@@ -361,6 +379,57 @@ function run() -> ()
 
     containers.dynamic_array@push_back@11054321879898878598(&instance, 1);
     var element = containers.dynamic_array@get@9219431704710098038(&instance, 0u64);
+}
+
+@unique_name("containers.dynamic_array@Dynamic_array@5865945007316310718")
+struct containers.dynamic_array@Dynamic_array@5865945007316310718
+{
+    data: *mutable Int32 = null;
+    length: Uint64 = 0u64;
+    capacity: Uint64 = 0u64;
+    allocator: da.Allocator = {};
+}
+
+@unique_name("containers.dynamic_array@create@2530642789161636205")
+function containers.dynamic_array@create@2530642789161636205(allocator: da.Allocator) -> (instance: da.containers.dynamic_array@Dynamic_array@5865945007316310718)
+    precondition "allocator.allocate != null" { allocator.allocate != null }
+    precondition "allocator.deallocate != null" { allocator.deallocate != null }
+{
+    return {
+        data: null,
+        length: 0u64,
+        capacity: 0u64,
+        allocator: allocator
+    };
+}
+
+@unique_name("containers.dynamic_array@push_back@11054321879898878598")
+function containers.dynamic_array@push_back@11054321879898878598(instance: *mutable da.containers.dynamic_array@Dynamic_array@5865945007316310718, element: Int32) -> ()
+    precondition "instance != null" { instance != null }
+{
+    if instance->length == instance->capacity
+    {
+        var new_capacity = 2u64 * (instance->capacity + 1u64);
+
+        var allocation_size_in_bytes = new_capacity * 4u64;
+        var allocation = instance->allocator.allocate(allocation_size_in_bytes, 4u64);
+        assert "Allocation did not fail" { allocation != null };
+
+        instance->data = allocation as *mutable Int32;
+        instance->capacity = new_capacity;
+    }
+
+    var index = instance->length;
+    instance->data[index] = element;
+    instance->length += 1u64;
+}
+
+@unique_name("containers.dynamic_array@get@9219431704710098038")
+function containers.dynamic_array@get@9219431704710098038(instance: *mutable da.containers.dynamic_array@Dynamic_array@5865945007316310718, index: Uint64) -> (result: Int32)
+    precondition "instance != null" { instance != null }
+    precondition "index < instance->length" { index < instance->length }
+{
+    return instance->data[index];
 }
 )";
 

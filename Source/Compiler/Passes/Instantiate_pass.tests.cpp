@@ -145,6 +145,24 @@ export function_constructor add(value_type: Type)
     };
 }
 
+@unique_name("Function_constructor@add@10481941949038830817")
+function Function_constructor@add@10481941949038830817(first: Int32, second: Int32) -> (result: Int32)
+{
+    return first + second;
+}
+
+@unique_name("Function_constructor@add@4195550094456234142")
+function Function_constructor@add@4195550094456234142(first: Float32, second: Float32) -> (result: Float32)
+{
+    return first + second;
+}
+
+@unique_name("Function_constructor@add@3937835667124936396")
+function Function_constructor@add@3937835667124936396(first: Uint32, second: Uint32) -> (result: Uint32)
+{
+    return first + second;
+}
+
 function run() -> ()
 {
     var a = Function_constructor@add@10481941949038830817(1, 2);
@@ -188,6 +206,20 @@ export type_constructor Dynamic_array(element_type: Type)
     };
 }
 
+@unique_name("Type_constructor@Dynamic_array@9266664480299747837")
+struct Type_constructor@Dynamic_array@9266664480299747837
+{
+    data: *Float16 = null;
+    length: Uint64 = 0u64;
+}
+
+@unique_name("Type_constructor@Dynamic_array@12246575587352456780")
+struct Type_constructor@Dynamic_array@12246575587352456780
+{
+    data: *Int32 = null;
+    length: Uint64 = 0u64;
+}
+
 function run(instance_0: Type_constructor@Dynamic_array@9266664480299747837) -> ()
 {
     var instance_1: Type_constructor@Dynamic_array@12246575587352456780 = {};
@@ -227,6 +259,13 @@ export type_constructor Dynamic_array(element_type: Type)
         data: *element_type = null;
         length: Uint64 = 0u64;
     };
+}
+
+@unique_name("Type_constructor@Dynamic_array@12246575587352456780")
+struct Type_constructor@Dynamic_array@12246575587352456780
+{
+    data: *Int32 = null;
+    length: Uint64 = 0u64;
 }
 
 struct My_array

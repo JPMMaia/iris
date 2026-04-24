@@ -2373,6 +2373,35 @@ namespace iris
             process_without_unique_name(declaration);
     }
 
+    static void add_sorted_declaration_infos(
+        std::pmr::vector<Declaration_info>& declaration_infos,
+        Module_instanced_declarations const& declarations,
+        bool const is_export
+    )
+    {
+        auto const process = [&](auto const& declaration) -> void
+        {
+            Declaration_info info
+            {
+                .declaration = {.data = &declaration},
+                .unique_name = declaration.unique_name,
+                .is_export = is_export,
+                .source_location = &declaration.source_location
+            };
+
+            add_sorted_declaration_info(declaration_infos, info);
+        };
+
+        for (Struct_declaration const& declaration : declarations.struct_declarations)
+            process(declaration);
+
+        for (Union_declaration const& declaration : declarations.union_declarations)
+            process(declaration);
+
+        for (Function_declaration const& declaration : declarations.function_declarations)
+            process(declaration);
+    }
+
     std::pmr::vector<Declaration_info> get_declaration_infos(
         iris::Module const& core_module,
         std::pmr::polymorphic_allocator<> const& allocator
@@ -2389,6 +2418,12 @@ namespace iris
         add_sorted_declaration_infos(
             output,
             core_module.internal_declarations,
+            false
+        );
+
+        add_sorted_declaration_infos(
+            output,
+            core_module.instanced_declarations,
             false
         );
 
