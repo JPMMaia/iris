@@ -16,7 +16,7 @@ export function main() -> (result: Int32)
     var my_float32 = 1f32;
     var my_float64 = 1f64;
 
-    var my_c_char = 1cc;
+    var my_c_char = 'a';
     var my_c_short = 1cs;
     var my_c_int = 1ci;
     var my_c_long = 1cl;

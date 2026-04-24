@@ -923,8 +923,9 @@ namespace iris
             }
             case iris::Fundamental_type::C_char:
             {
+                add_text(buffer, "'");
                 add_text(buffer, expression.data);
-                add_text(buffer, "cc");
+                add_text(buffer, "'");
                 break;
             }
             case iris::Fundamental_type::C_schar:

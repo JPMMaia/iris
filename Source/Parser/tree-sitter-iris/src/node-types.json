@@ -550,6 +550,10 @@
           "named": true
         },
         {
+          "type": "Char",
+          "named": true
+        },
+        {
           "type": "Number",
           "named": true
         },
@@ -2636,6 +2640,10 @@
   {
     "type": "Array_slice",
     "named": false
+  },
+  {
+    "type": "Char",
+    "named": true
   },
   {
     "type": "Constant_array",

@@ -2454,15 +2454,7 @@ namespace iris::parser
 
             if (first_character == 'c')
             {
-                if (suffix == "cc")
-                {
-                    return 
-                    {
-                        .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_char),
-                        .data = create_string(value_without_suffix, output_allocator),
-                    };
-                }
-                else if (suffix == "cs")
+                if (suffix == "cs")
                 {
                     return 
                     {
@@ -2567,6 +2559,16 @@ namespace iris::parser
                     .data = create_string(value_without_quotes, output_allocator),
                 };
             }
+        }
+        else if (choice == "Char")
+        {
+            // value is the full token e.g. 'a' or '\n'; strip surrounding single quotes
+            std::string_view const inner = value.substr(1, value.size() - 2);
+            return
+            {
+                .type = create_fundamental_type_type_reference(iris::Fundamental_type::C_char),
+                .data = create_string(inner, output_allocator),
+            };
         }
         
         return {};

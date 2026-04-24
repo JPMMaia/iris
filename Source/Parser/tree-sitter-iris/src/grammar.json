@@ -2433,6 +2433,10 @@
         {
           "type": "SYMBOL",
           "name": "String"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Char"
         }
       ]
     },
@@ -3439,6 +3443,10 @@
     "String": {
       "type": "PATTERN",
       "value": "\"(?:(?:\\\\\")|[^\"])*\"[a-z0-9]*"
+    },
+    "Char": {
+      "type": "PATTERN",
+      "value": "'(\\\\[\\\\'\\'ntr]|[^\\\\'])'"
     },
     "Comment": {
       "type": "PREC_LEFT",

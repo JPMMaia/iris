@@ -4825,7 +4825,7 @@ entry:
   store half 0xH3C00, ptr %my_float16, align 2
   store float 1.000000e+00, ptr %my_float32, align 4
   store double 1.000000e+00, ptr %my_float64, align 8
-  store i8 1, ptr %my_c_char, align 1
+  store i8 97, ptr %my_c_char, align 1
   store i16 1, ptr %my_c_short, align 2
   store i32 1, ptr %my_c_int, align 4
   store i32 1, ptr %my_c_long, align 4

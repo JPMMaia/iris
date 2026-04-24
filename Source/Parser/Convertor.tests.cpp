@@ -118,6 +118,12 @@ namespace iris::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts char_literals.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "char_literals.iris";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts c_interoperability_call_function_that_returns_bool.iris", "[Convertor]")
     {
         std::string_view const input_file = "c_interoperability_call_function_that_returns_bool.iris";

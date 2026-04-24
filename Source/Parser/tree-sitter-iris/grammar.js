@@ -189,7 +189,7 @@ module.exports = grammar({
       $.Expression_for_loop,
       $.Expression_if
     ),
-    Expression_constant: $ => choice($.Boolean, $.Number, $.String),
+    Expression_constant: $ => choice($.Boolean, $.Number, $.String, $.Char),
     Expression_continue: $ => "continue",
     Expression_create_array: $ => seq("[", optional(seq($.Generic_expression_or_instantiate, repeat(seq(",", $.Generic_expression_or_instantiate)))), "]"),
     Expression_defer: $ => seq("defer", $.Generic_expression),
@@ -266,6 +266,7 @@ module.exports = grammar({
     Integer_without_suffix: $ => /\d+/,
     Number: $ => /\d+([.]\d+)?[a-z0-9]*/,
     String: $ => /"(?:(?:\\")|[^"])*"[a-z0-9]*/,
+    Char: $ => /'(\\[\\'\'ntr]|[^\\'])'/,
     Comment: $ => prec.left(0, repeat1(token(seq("//", /.*/)))),
   }
 });

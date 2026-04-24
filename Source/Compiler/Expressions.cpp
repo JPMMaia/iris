@@ -3525,8 +3525,41 @@ namespace iris::compiler
                     .type = type
                 };
             }
+            case Fundamental_type::C_char: {
+                llvm::Type* const llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, type, type_database);
+
+                std::string_view const char_data = expression.data;
+                std::uint64_t char_value = 0;
+                if (!char_data.empty() && char_data[0] == '\\' && char_data.size() == 2)
+                {
+                    switch (char_data[1])
+                    {
+                    case '\\': char_value = 92; break;
+                    case '\'':  char_value = 39; break;
+                    case 'n':  char_value = 10; break;
+                    case 't':  char_value = 9;  break;
+                    case 'r':  char_value = 13; break;
+                    default:   char_value = static_cast<std::uint64_t>(static_cast<unsigned char>(char_data[1])); break;
+                    }
+                }
+                else if (!char_data.empty())
+                {
+                    char_value = static_cast<std::uint64_t>(static_cast<unsigned char>(char_data[0]));
+                }
+
+                unsigned const number_of_bits = llvm_type->getIntegerBitWidth();
+                llvm::APInt const char_int_value{ number_of_bits, char_value, true };
+
+                llvm::Value* const instruction = llvm::ConstantInt::get(llvm_type, char_int_value);
+
+                return
+                {
+                    .name = "",
+                    .value = instruction,
+                    .type = type
+                };
+            }
             case Fundamental_type::C_bool:
-            case Fundamental_type::C_char:
             case Fundamental_type::C_schar:
             case Fundamental_type::C_uchar:
             case Fundamental_type::C_short:

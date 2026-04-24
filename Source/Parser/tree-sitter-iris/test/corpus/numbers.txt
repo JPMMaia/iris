@@ -20,7 +20,7 @@ export function main() -> (result: Int32)
     var my_float32 = 1.0f32;
     var my_float64 = 1.0f64;
 
-    var my_c_char = 1cc;
+    var my_c_char = 'a';
     var my_c_short = 1cs;
     var my_c_int = 1ci;
     var my_c_long = 1cl;
@@ -156,7 +156,7 @@ export function main() -> (result: Int32)
                 (Identifier))
               (Generic_expression
                 (Expression_constant
-                  (Number)))))
+                  (Char)))))
           (Statement
             (Expression_variable_declaration
               (Expression_variable_mutability)
