@@ -3691,6 +3691,23 @@ function run() -> ()
     }
 
 
+    TEST_CASE("Validates that returning mutable pointer to const pointer is allowed", "[Validation][Return_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+function get_value() -> (result: *C_char)
+{
+    mutable value: C_char = 0 as C_char;
+    var pointer: *mutable C_char = &value;
+    return pointer;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that the expression type of a return expression matches the function output type", "[Validation][Return_expression]")
     {
         std::string_view const input = R"(module Test;
