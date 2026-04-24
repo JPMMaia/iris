@@ -203,6 +203,15 @@ namespace iris::execution_engine
         std::span<Statement const> const type_instance_arguments
     )
     {
+        auto const try_get_parameter_type_expression = [&](std::string_view const parameter_name) -> std::optional<Type_expression>
+        {
+            return find_type_expression_from_function_constructor_arguments(
+                function_constructor_parameters,
+                type_instance_arguments,
+                parameter_name
+            );
+        };
+
         auto const process_expression = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
         {
             iris::Expression& mutable_expression = const_cast<iris::Expression&>(expression);
@@ -210,11 +219,7 @@ namespace iris::execution_engine
             {
                 Variable_expression const& variable_expression = std::get<Variable_expression>(expression.data);
 
-                std::optional<Type_expression> const new_parameter_type = find_type_expression_from_function_constructor_arguments(
-                    function_constructor_parameters,
-                    type_instance_arguments,
-                    variable_expression.name
-                );
+                std::optional<Type_expression> const new_parameter_type = try_get_parameter_type_expression(variable_expression.name);
                 if (!new_parameter_type.has_value())
                     return false;
 
@@ -222,6 +227,38 @@ namespace iris::execution_engine
 
                 // TODO use allocator to copy
                 mutable_expression.data = type_expression;
+            }
+            else if (std::holds_alternative<Instance_call_expression>(expression.data))
+            {
+                Instance_call_expression& instance_call_expression = std::get<Instance_call_expression>(mutable_expression.data);
+
+                for (Statement& argument_statement : instance_call_expression.arguments)
+                {
+                    for (Expression& argument_expression : argument_statement.expressions)
+                    {
+                        if (std::holds_alternative<Variable_expression>(argument_expression.data))
+                        {
+                            Variable_expression const& argument_variable_expression = std::get<Variable_expression>(argument_expression.data);
+                            std::optional<Type_expression> const new_parameter_type = try_get_parameter_type_expression(argument_variable_expression.name);
+                            if (!new_parameter_type.has_value())
+                                continue;
+
+                            argument_expression.data = new_parameter_type.value();
+                        }
+                        else if (std::holds_alternative<Type_expression>(argument_expression.data))
+                        {
+                            Type_expression& argument_type_expression = std::get<Type_expression>(argument_expression.data);
+                            if (!iris::replace_parameter_types_by_instance_arguments(
+                                argument_type_expression.type,
+                                function_constructor_parameters,
+                                type_instance_arguments
+                            ))
+                            {
+                                throw std::runtime_error{ "Could not find parameter type in type constructor!" };
+                            }
+                        }
+                    }
+                }
             }
 
             return false;

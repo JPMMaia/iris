@@ -278,4 +278,68 @@ struct My_array
 
         CHECK(expected == actual);
     }
+
+    TEST_CASE("Instantiates function constructor calls print_json", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const input = R"(module json_usage;
+
+function_constructor to_json(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+    };
+}
+
+function_constructor print_json(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+        to_json::<value_type>(value);
+    };
+}
+
+export function run(value: *Int32) -> ()
+{
+    print_json::<Int32>(value);
+}
+)";
+
+std::string_view const expected = R"(module json_usage;
+
+function_constructor to_json(value_type: Type)
+{
+    return function (value: *value_type) -> ()
+    {
+    };
+}
+
+@unique_name("json_usage@to_json@8192659410663046636")
+function json_usage@to_json@8192659410663046636(value: *Int32) -> ()
+{
+}
+
+function_constructor print_json(value_type: Type)
+{
+    return function (value: *value_type) -> ()
+    {
+        to_json::<value_type>(value);
+    };
+}
+
+@unique_name("json_usage@print_json@8253239461601449526")
+function json_usage@print_json@8253239461601449526(value: *Int32) -> ()
+{
+    json_usage@to_json@8192659410663046636(value);
+}
+
+export function run(value: *Int32) -> ()
+{
+    json_usage@print_json@8253239461601449526(value);
+}
+)";
+
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, {}, "run");
+
+        CHECK(expected == actual);
+    }
 }

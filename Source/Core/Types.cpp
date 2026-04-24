@@ -742,6 +742,17 @@ namespace iris
 
                 type_reference = replacement_type.value();
             }
+            else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
+            {
+                Custom_type_reference const& custom_type_reference = std::get<Custom_type_reference>(type_reference.data);
+                std::optional<Type_reference> const replacement_type = get_instance_argument_type(
+                    constructor_parameters,
+                    instance_arguments,
+                    custom_type_reference.name
+                );
+                if (replacement_type.has_value())
+                    type_reference = replacement_type.value();
+            }
             else if (std::holds_alternative<Array_slice_type>(type_reference.data))
             {
                 Array_slice_type& array_slice_type = std::get<Array_slice_type>(type_reference.data);
