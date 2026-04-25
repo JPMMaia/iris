@@ -15,7 +15,6 @@ namespace iris::compiler
     {
         Compile_time_parameters const compile_time_parameters
         {
-            .core_module = core_module,
             .dependencies = parameters.dependencies,
             .output_allocator = parameters.output_allocator,
             .temporaries_allocator = parameters.temporaries_allocator,
@@ -31,7 +30,7 @@ namespace iris::compiler
     }
 
     void run_all_passes_on_function(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration& function_declaration,
         iris::Function_definition& function_definition,
         All_passes_parameters const& parameters
@@ -39,7 +38,6 @@ namespace iris::compiler
     {
         Compile_time_parameters const compile_time_parameters
         {
-            .core_module = core_module,
             .dependencies = parameters.dependencies,
             .output_allocator = parameters.output_allocator,
             .temporaries_allocator = parameters.temporaries_allocator,
@@ -48,9 +46,9 @@ namespace iris::compiler
             .declaration_database = parameters.declaration_database,
             .clang_context = parameters.clang_context,
         };
-        run_compile_time_pass_on_function(function_declaration, function_definition, compile_time_parameters);
+        run_compile_time_pass_on_function(module_name, function_declaration, function_definition, compile_time_parameters);
         
-        run_instantiate_pass_on_function(core_module, function_declaration, function_definition, parameters);
-        run_implicit_function_pass_on_function(core_module, parameters.dependencies, parameters.declaration_database, function_declaration, function_definition);
+        run_instantiate_pass_on_function(module_name, function_declaration, function_definition, parameters);
+        run_implicit_function_pass_on_function(module_name, parameters.dependencies, parameters.declaration_database, function_declaration, function_definition);
     }
 }

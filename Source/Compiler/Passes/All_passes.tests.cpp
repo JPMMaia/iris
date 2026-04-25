@@ -93,7 +93,7 @@ namespace iris::compiler
         };
 
         run_all_passes_on_function(
-            core_module,
+            core_module.name,
             *function_declaration,
             *function_definition,
             parameters

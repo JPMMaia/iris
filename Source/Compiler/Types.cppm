@@ -119,7 +119,6 @@ namespace iris::compiler
     export llvm::Type* type_reference_to_llvm_type_on_demand(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Module const& core_module,
         Type_reference const& type_reference,
         Declaration_database const& declaration_database,
         Clang_context const& clang_context
@@ -128,7 +127,6 @@ namespace iris::compiler
     export llvm::Type* type_reference_to_llvm_type_on_demand(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Module const& core_module,
         std::span<Type_reference const> type_reference,
         Declaration_database const& declaration_database,
         Clang_context const& clang_context

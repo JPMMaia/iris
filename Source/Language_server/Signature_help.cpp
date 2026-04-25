@@ -972,7 +972,7 @@ namespace iris::language_server
                 : std::nullopt;
 
             std::pmr::string const type_str = iris::format_type_reference(
-                core_module,
+                core_module.dependencies,
                 type_ref,
                 output_allocator,
                 temporaries_allocator
@@ -1012,7 +1012,7 @@ namespace iris::language_server
                 : std::nullopt;
 
             std::pmr::string const type_str = iris::format_type_reference(
-                core_module,
+                core_module.dependencies,
                 type_ref,
                 output_allocator,
                 temporaries_allocator
@@ -1051,7 +1051,7 @@ namespace iris::language_server
                 : std::nullopt;
 
             std::pmr::string const type_str = iris::format_type_reference(
-                core_module,
+                core_module.dependencies,
                 type_ref,
                 output_allocator,
                 temporaries_allocator

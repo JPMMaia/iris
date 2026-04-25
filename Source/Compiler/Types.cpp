@@ -1386,7 +1386,6 @@ namespace iris::compiler
     static llvm::Type* pointer_type_to_llvm_type_on_demand(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Module const& core_module,
         Pointer_type const type,
         Declaration_database const& declaration_database,
         Clang_context const& clang_context
@@ -1394,7 +1393,7 @@ namespace iris::compiler
     {
         llvm::Type* pointed_type =
             !type.element_type.empty() ?
-            type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, type.element_type[0], declaration_database, clang_context) :
+            type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, type.element_type[0], declaration_database, clang_context) :
             llvm::PointerType::get(llvm::Type::getInt8Ty(llvm_context), 0);
         return pointed_type->getPointerTo();
     }
@@ -1402,7 +1401,6 @@ namespace iris::compiler
     llvm::Type* type_reference_to_llvm_type_on_demand(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Module const& core_module,
         Type_reference const& type_reference,
         Declaration_database const& declaration_database,
         Clang_context const& clang_context
@@ -1421,7 +1419,7 @@ namespace iris::compiler
         else if (std::holds_alternative<Constant_array_type>(type_reference.data))
         {
             Constant_array_type const& data = std::get<Constant_array_type>(type_reference.data);
-            llvm::Type* const llvm_element_type = type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, data.value_type, declaration_database, clang_context);
+            llvm::Type* const llvm_element_type = type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, data.value_type, declaration_database, clang_context);
             return llvm::ArrayType::get(llvm_element_type, data.size);
         }
         else if (std::holds_alternative<Soa_array_type>(type_reference.data))
@@ -1435,7 +1433,7 @@ namespace iris::compiler
         else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
         {
             Custom_type_reference const& data = std::get<Custom_type_reference>(type_reference.data);
-            std::string_view const module_name = find_module_name(core_module, data.module_reference);
+            std::string_view const module_name = data.module_reference.name;
             return convert_type_on_demand(clang_context, declaration_database, module_name, data.name);
         }
         else if (std::holds_alternative<Fundamental_type>(type_reference.data))
@@ -1462,7 +1460,7 @@ namespace iris::compiler
         else if (std::holds_alternative<Pointer_type>(type_reference.data))
         {
             Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
-            return pointer_type_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, data, declaration_database, clang_context);
+            return pointer_type_to_llvm_type_on_demand(llvm_context, llvm_data_layout, data, declaration_database, clang_context);
         }
         else if (std::holds_alternative<Type_instance>(type_reference.data))
         {
@@ -1490,7 +1488,6 @@ namespace iris::compiler
     llvm::Type* type_reference_to_llvm_type_on_demand(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Module const& core_module,
         std::span<Type_reference const> const type_reference,
         Declaration_database const& declaration_database,
         Clang_context const& clang_context
@@ -1499,7 +1496,7 @@ namespace iris::compiler
         if (type_reference.empty())
             return llvm::Type::getVoidTy(llvm_context);
 
-        return type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, type_reference[0], declaration_database, clang_context);
+        return type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, type_reference[0], declaration_database, clang_context);
     }
 
     std::pmr::vector<llvm::Type*> type_references_to_llvm_types(

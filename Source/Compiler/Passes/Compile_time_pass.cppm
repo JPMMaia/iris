@@ -22,7 +22,6 @@ namespace iris::compiler
 
     export struct Compile_time_parameters
     {
-        iris::Module const& core_module;
         Module_dependencies& dependencies;
         std::pmr::polymorphic_allocator<> const& output_allocator;
         std::pmr::polymorphic_allocator<> const& temporaries_allocator;
@@ -33,12 +32,14 @@ namespace iris::compiler
     };
 
     std::optional<Compile_time_value_and_type> evaluate_compile_time_expression(
+        std::string_view const module_name,
         iris::Statement const& statement,
         iris::Expression const& expression,
         Compile_time_parameters const& parameters
     );
 
     std::optional<Compile_time_value_and_type> evaluate_compile_time_statement(
+        std::string_view const module_name,
         iris::Statement const& statement,
         Compile_time_parameters const& parameters
     );
@@ -49,6 +50,7 @@ namespace iris::compiler
     );
 
     export void run_compile_time_pass_on_function(
+        std::string_view const module_name,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition& function_definition,
         Compile_time_parameters const& parameters

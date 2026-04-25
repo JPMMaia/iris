@@ -31,12 +31,12 @@ namespace iris::compiler
     }
 
     static std::optional<Implicit_function_data> find_implicit_function_auxiliary(
+        std::string_view const module_name,
         iris::Statement const& statement,
         std::size_t const call_expression_index,
         std::size_t const left_access_expression_index,
         std::string_view const access_expression_member_name,
         bool const dereference,
-        iris::Module const& core_module,
         Scope const& scope,
         iris::Declaration_database const& declaration_database
     )
@@ -74,8 +74,9 @@ namespace iris::compiler
                         return std::nullopt;
 
                     std::pmr::string const declaration_module_name = get_type_module_name(declaration->module_name, struct_declaration.name);
+                    iris::Module_dependencies const& dependencies = get_module_dependencies(declaration_database, module_name);
                     iris::Import_module_with_alias const* const import_module_with_alias = iris::find_import_module_with_module_name(
-                        core_module.dependencies,
+                        dependencies,
                         declaration_module_name
                     );
                     std::optional<std::string_view> const import_alias = 
@@ -99,10 +100,10 @@ namespace iris::compiler
     }
 
     static std::optional<Implicit_function_data> find_implicit_function(
+        std::string_view const module_name,
         iris::Statement const& statement,
         iris::Expression const& expression,
         std::size_t const expression_index,
-        iris::Module const& core_module,
         Scope const& scope,
         iris::Declaration_database const& declaration_database
     )
@@ -117,12 +118,12 @@ namespace iris::compiler
                 iris::Access_expression const& access_expression = std::get<iris::Access_expression>(left_call_expression.data);
 
                 return find_implicit_function_auxiliary(
+                    module_name,
                     statement,
                     expression_index,
                     access_expression.expression.expression_index,
                     access_expression.member_name,
                     false,
-                    core_module,
                     scope,
                     declaration_database
                 );
@@ -132,12 +133,12 @@ namespace iris::compiler
                 iris::Dereference_and_access_expression const& access_expression = std::get<iris::Dereference_and_access_expression>(left_call_expression.data);
                 
                 return find_implicit_function_auxiliary(
+                    module_name,
                     statement,
                     expression_index,
                     access_expression.expression.expression_index,
                     access_expression.member_name,
                     true,
-                    core_module,
                     scope,
                     declaration_database
                 );
@@ -276,7 +277,7 @@ namespace iris::compiler
     }*/
 
     void run_implicit_function_pass_on_function(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Module_dependencies& dependencies,
         iris::Declaration_database const& declaration_database,
         iris::Function_declaration const& function_declaration,
@@ -301,10 +302,10 @@ namespace iris::compiler
                     std::size_t const expression_index = find_expression_index(statement, expression);
 
                     std::optional<Implicit_function_data> const implicit_function = find_implicit_function(
+                        module_name,
                         statement,
                         expression,
                         expression_index,
-                        core_module,
                         scope,
                         declaration_database
                     );
@@ -333,7 +334,7 @@ namespace iris::compiler
         };
 
         visit_statements_using_scope(
-            core_module.name,
+            module_name,
             &function_declaration,
             scope,
             function_definition.statements,
@@ -354,7 +355,7 @@ namespace iris::compiler
                 continue;
 
             run_implicit_function_pass_on_function(
-                core_module,
+                core_module.name,
                 core_module.dependencies,
                 declaration_database,
                 *function_declaration.value(),

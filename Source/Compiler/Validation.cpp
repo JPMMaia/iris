@@ -604,7 +604,7 @@ namespace iris::compiler
 
         if (!declaration.has_value())
         {
-            std::pmr::string const type_name = iris::format_type_reference(core_module, type, temporaries_allocator, temporaries_allocator);
+            std::pmr::string const type_name = iris::format_type_reference(core_module.dependencies, type, temporaries_allocator, temporaries_allocator);
 
             return
             {
@@ -630,7 +630,7 @@ namespace iris::compiler
 
         if (integer_type.number_of_bits != 8 && integer_type.number_of_bits != 16 && integer_type.number_of_bits != 32 && integer_type.number_of_bits != 64)
         {
-            std::pmr::string const type_name = iris::format_type_reference(core_module, type, temporaries_allocator, temporaries_allocator);
+            std::pmr::string const type_name = iris::format_type_reference(core_module.dependencies, type, temporaries_allocator, temporaries_allocator);
 
             return
             {
@@ -1018,8 +1018,8 @@ namespace iris::compiler
 
             if (!are_compatible_types(declaration_database, declaration.type, type_reference))
             {
-                std::pmr::string const provided_type_name = iris::format_type_reference(core_module, type_reference, temporaries_allocator, temporaries_allocator);
-                std::pmr::string const expected_type_name = iris::format_type_reference(core_module, declaration.type, temporaries_allocator, temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(core_module.dependencies, type_reference, temporaries_allocator, temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(core_module.dependencies, declaration.type, temporaries_allocator, temporaries_allocator);
 
                 return
                 {
@@ -1109,8 +1109,8 @@ namespace iris::compiler
 
             if (!are_compatible_types(declaration_database, default_value_type, member_type))
             {
-                std::pmr::string const provided_type_name = iris::format_type_reference(core_module, default_value_type, temporaries_allocator, temporaries_allocator);
-                std::pmr::string const expected_type_name = iris::format_type_reference(core_module, member_type, temporaries_allocator, temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(core_module.dependencies, default_value_type, temporaries_allocator, temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(core_module.dependencies, member_type, temporaries_allocator, temporaries_allocator);
 
                 diagnostics.push_back(
                     create_error_diagnostic_with_code(
@@ -1414,7 +1414,7 @@ namespace iris::compiler
 
             if (!condition_type_optional.has_value() || (!is_bool(condition_type_optional.value()) && !is_c_bool(condition_type_optional.value())))
             {
-                std::pmr::string const provided_type_name = iris::format_type_reference(core_module, condition_type_optional, temporaries_allocator, temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(core_module.dependencies, condition_type_optional, temporaries_allocator, temporaries_allocator);
 
                 diagnostics.push_back(
                     create_error_diagnostic(
@@ -1728,7 +1728,7 @@ namespace iris::compiler
                     );
                     if (!function_declaration.has_value() || (!std::holds_alternative<iris::Function_declaration const*>(function_declaration->data) && !std::holds_alternative<iris::Function_constructor const*>(function_declaration->data)))
                     {
-                        std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+                        std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                         return
                         {
@@ -1750,7 +1750,7 @@ namespace iris::compiler
             {
                 if (access_expression.member_name != "data" && access_expression.member_name != "length")
                 {
-                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                     return
                     {
@@ -1770,7 +1770,7 @@ namespace iris::compiler
             {
                 if (access_expression.member_name != "data" && access_expression.member_name != "length" && access_expression.member_name != "view")
                 {
-                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                     return
                     {
@@ -1790,7 +1790,7 @@ namespace iris::compiler
             {
                 if (access_expression.member_name != "data" && access_expression.member_name != "length" && access_expression.member_name != "start_index" && access_expression.member_name != "end_index")
                 {
-                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                     return
                     {
@@ -1924,7 +1924,7 @@ namespace iris::compiler
 
         if (!condition_type_optional.has_value() || (!is_bool(condition_type_optional.value()) && !is_c_bool(condition_type_optional.value())))
         {
-            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return 
             {
@@ -2116,8 +2116,8 @@ namespace iris::compiler
         if (!can_assign_type(parameters.declaration_database, left_hand_side_type_optional, right_hand_side_type_optional))
         {
             iris::Expression const& right_hand_side_expression = parameters.statement.expressions[expression.right_hand_side.expression_index];
-            std::pmr::string const left_hand_side_type_name = iris::format_type_reference(parameters.core_module, left_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-            std::pmr::string const right_hand_side_type_name = iris::format_type_reference(parameters.core_module, right_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const left_hand_side_type_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const right_hand_side_type_name = iris::format_type_reference(parameters.core_module.dependencies, right_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -2174,8 +2174,8 @@ namespace iris::compiler
         
         if (!are_compatible_types(parameters.declaration_database, left_hand_side_type_optional, right_hand_side_type_optional))
         {
-            std::pmr::string const left_hand_side_type_name = iris::format_type_reference(parameters.core_module, left_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-            std::pmr::string const right_hand_side_type_name = iris::format_type_reference(parameters.core_module, right_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const left_hand_side_type_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const right_hand_side_type_name = iris::format_type_reference(parameters.core_module.dependencies, right_hand_side_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -2486,7 +2486,7 @@ namespace iris::compiler
                     if (!first_argument_type_optional.has_value() || is_null_pointer_type(first_argument_type_optional.value()))
                     {
                         iris::Expression const& first_argument_expression = parameters.statement.expressions[expression.arguments[0].expression_index];
-                        std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, first_argument_type_optional.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+                        std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, first_argument_type_optional.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                         return
                         {
@@ -2533,7 +2533,7 @@ namespace iris::compiler
                         {
                             std::pmr::string const provided_type_name =
                                 argument_type_optional.has_value() ?
-                                iris::format_type_reference(parameters.core_module, argument_type_optional.value(), parameters.temporaries_allocator, parameters.temporaries_allocator) :
+                                iris::format_type_reference(parameters.core_module.dependencies, argument_type_optional.value(), parameters.temporaries_allocator, parameters.temporaries_allocator) :
                                 std::pmr::string{"?", parameters.temporaries_allocator};
 
                             return
@@ -2737,8 +2737,8 @@ namespace iris::compiler
             if (!can_assign_type(parameters.declaration_database, parameter_type, argument_type_optional))
             {
                 std::optional<Source_range> const argument_source_range = parameters.statement.expressions[expression_index].source_range;
-                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, argument_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, parameter_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, argument_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, parameter_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 diagnostics.push_back(
                     {
@@ -2778,8 +2778,8 @@ namespace iris::compiler
                     source_range,
                     std::format(
                         "Cannot apply numeric cast from '{}' to '{}'.",
-                        iris::format_type_reference(parameters.core_module, source_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator),
-                        iris::format_type_reference(parameters.core_module, underlying_destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
+                        iris::format_type_reference(parameters.core_module.dependencies, source_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                        iris::format_type_reference(parameters.core_module.dependencies, underlying_destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
                     )
                 )
             };
@@ -2804,8 +2804,8 @@ namespace iris::compiler
                     source_range,
                     std::format(
                         "Cannot apply numeric cast from '{}' to '{}'.",
-                        iris::format_type_reference(parameters.core_module, underlying_source_type, parameters.temporaries_allocator, parameters.temporaries_allocator),
-                        iris::format_type_reference(parameters.core_module, underlying_destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
+                        iris::format_type_reference(parameters.core_module.dependencies, underlying_source_type, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                        iris::format_type_reference(parameters.core_module.dependencies, underlying_destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
                     )
                 )
             };
@@ -2820,8 +2820,8 @@ namespace iris::compiler
                     source_range,
                     std::format(
                         "Numeric cast from '{}' to '{}'.",
-                        iris::format_type_reference(parameters.core_module, source_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator),
-                        iris::format_type_reference(parameters.core_module, expression.destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
+                        iris::format_type_reference(parameters.core_module.dependencies, source_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                        iris::format_type_reference(parameters.core_module.dependencies, expression.destination_type, parameters.temporaries_allocator, parameters.temporaries_allocator)
                     )
                 )
             };
@@ -2872,7 +2872,7 @@ namespace iris::compiler
         if (!range_begin_type_optional.has_value() || (!is_integer(range_begin_type_optional.value()) && !is_floating_point(range_begin_type_optional.value())))
         {
             iris::Expression const& range_begin_expression = parameters.statement.expressions[expression.range_begin.expression_index];
-            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -2918,8 +2918,8 @@ namespace iris::compiler
 
         if (!are_compatible_types(parameters.declaration_database, range_begin_type_optional, range_end_type_optional))
         {
-            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, range_end_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-            std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, range_end_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -2944,8 +2944,8 @@ namespace iris::compiler
             if (!are_compatible_types(parameters.declaration_database, range_begin_type_optional, step_by_type_optional))
             {
                 iris::Expression const& step_by_expression = parameters.statement.expressions[expression.step_by->expression_index];
-                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, step_by_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, step_by_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, range_begin_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 return
                 {
@@ -3017,7 +3017,7 @@ namespace iris::compiler
 
                     if (!condition_type_optional.has_value() || (!is_bool(condition_type_optional.value()) && !is_c_bool(condition_type_optional.value())))
                     {
-                        std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                        std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                         diagnostics.push_back(
                             create_error_diagnostic(
@@ -3201,7 +3201,7 @@ namespace iris::compiler
                         create_sub_source_range(pair.source_range, 0, pair.member_name.size()),
                         std::format(
                             "'{}.{}' does not exist.",
-                            iris::format_type_reference(parameters.core_module, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                            iris::format_type_reference(parameters.core_module.dependencies, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
                             pair.member_name
                         )
                     )
@@ -3223,8 +3223,8 @@ namespace iris::compiler
 
             if (!can_assign_type(parameters.declaration_database, member_type, assigned_value_type))
             {
-                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, assigned_value_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, member_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, assigned_value_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, member_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 return
                 {
@@ -3234,7 +3234,7 @@ namespace iris::compiler
                         std::format(
                             "Cannot assign value of type '{}' to member '{}.{}' of type '{}'.",
                             provided_type_name,
-                            iris::format_type_reference(parameters.core_module, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                            iris::format_type_reference(parameters.core_module.dependencies, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
                             pair.member_name,
                             expected_type_name
                         ),
@@ -3289,7 +3289,7 @@ namespace iris::compiler
                                 source_range,
                                 std::format(
                                     "'{}.{}' is not set. Explicit instantiate expression requires all members to be set.",
-                                    iris::format_type_reference(parameters.core_module, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                                    iris::format_type_reference(parameters.core_module.dependencies, type_to_instantiate, parameters.temporaries_allocator, parameters.temporaries_allocator),
                                     member_info.member_name
                                 )
                             )
@@ -3361,8 +3361,8 @@ namespace iris::compiler
 
             if (!can_assign_type(parameters.declaration_database, expected_type, underlying_provided_type))
             {
-                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, underlying_provided_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, expected_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, underlying_provided_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, expected_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 return
                 {
@@ -3387,7 +3387,7 @@ namespace iris::compiler
             {
                 if (!parameters.function_declaration->type.output_parameter_types.empty())
                 {
-                    std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, expected_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                    std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, expected_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                     return {
                         create_error_diagnostic(
@@ -3418,7 +3418,7 @@ namespace iris::compiler
         if (!type_optional.has_value() || (!is_enum_type(parameters.declaration_database, type_optional.value()) && !is_integer(type_optional.value())))
         {
             iris::Expression const& value_expression = parameters.statement.expressions[expression.value.expression_index];
-            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -3466,8 +3466,8 @@ namespace iris::compiler
 
             if (!are_compatible_types(parameters.declaration_database, type_optional, case_value_type_optional))
             {
-                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, case_value_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, case_value_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 diagnostics.push_back(
                     create_error_diagnostic_with_code(
@@ -3522,7 +3522,7 @@ namespace iris::compiler
         if (!condition_type_optional.has_value() || (!is_bool(condition_type_optional.value()) && !is_c_bool(condition_type_optional.value())))
         {
             iris::Expression const& condition_expression = parameters.statement.expressions[expression.condition.expression_index];
-            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -3588,8 +3588,8 @@ namespace iris::compiler
 
         if (!are_compatible_types(parameters.declaration_database, then_type_optional, else_type_optional))
         {
-            std::pmr::string const then_type_name = iris::format_type_reference(parameters.core_module, then_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
-            std::pmr::string const else_type_name = iris::format_type_reference(parameters.core_module, else_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const then_type_name = iris::format_type_reference(parameters.core_module.dependencies, then_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const else_type_name = iris::format_type_reference(parameters.core_module.dependencies, else_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return
             {
@@ -3904,7 +3904,7 @@ namespace iris::compiler
                         right_hand_side.source_range,
                         std::format(
                             "Cannot assign expression of type '{}' to variable '{}'. Expected struct or union type.",
-                            iris::format_type_reference(parameters.core_module, type, parameters.temporaries_allocator, parameters.temporaries_allocator),
+                            iris::format_type_reference(parameters.core_module.dependencies, type, parameters.temporaries_allocator, parameters.temporaries_allocator),
                             expression.name
                         )
                     )
@@ -3925,8 +3925,8 @@ namespace iris::compiler
 
             if (!can_assign_type(parameters.declaration_database, type, right_hand_side_type))
             {
-                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module, type, parameters.temporaries_allocator, parameters.temporaries_allocator);
-                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, right_hand_side_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, right_hand_side_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
                 return
                 {
@@ -4020,7 +4020,7 @@ namespace iris::compiler
 
         if (!condition_type_optional.has_value() || (!is_bool(condition_type_optional.value()) && !is_c_bool(condition_type_optional.value())))
         {
-            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, condition_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
 
             return 
             {

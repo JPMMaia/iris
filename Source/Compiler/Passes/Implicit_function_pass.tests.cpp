@@ -37,7 +37,7 @@ namespace iris::compiler
         REQUIRE(function_definition != nullptr);
 
         run_implicit_function_pass_on_function(
-            core_module,
+            core_module.name,
             core_module.dependencies,
             context.declaration_database,
             *function_declaration.value(),

@@ -19,7 +19,7 @@ namespace iris
     );
 
     export std::pmr::string format_type_reference(
-        iris::Module const& core_module,
+        iris::Module_dependencies const& dependencies,
         std::optional<iris::Type_reference> const& type_reference,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator

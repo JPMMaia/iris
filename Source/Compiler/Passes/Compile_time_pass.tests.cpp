@@ -66,7 +66,6 @@ namespace iris::compiler
 
         Compile_time_parameters const parameters =
         {
-            .core_module = core_module,
             .dependencies = core_module.dependencies,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
@@ -77,6 +76,7 @@ namespace iris::compiler
         };
 
         run_compile_time_pass_on_function(
+            core_module.name,
             *function_declaration,
             *function_definition,
             parameters
@@ -105,7 +105,6 @@ namespace iris::compiler
 
         Compile_time_parameters const parameters =
         {
-            .core_module = core_module,
             .dependencies = core_module.dependencies,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
@@ -116,6 +115,7 @@ namespace iris::compiler
         };
 
         run_compile_time_pass_on_function(
+            core_module.name,
             *function_declaration,
             *function_definition,
             parameters

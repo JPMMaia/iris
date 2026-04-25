@@ -266,7 +266,8 @@ namespace iris::compiler
     }
 
     static bool is_check_equality_call(
-        iris::Module const& core_module,
+        std::string_view const module_name,
+        iris::Declaration_database const& declaration_datbase,
         iris::Statement const& statement,
         iris::Call_expression const*& call_expression,
         iris::Binary_expression const*& binary_expression
@@ -294,7 +295,7 @@ namespace iris::compiler
         if (variable_expression.name != g_check_function_name)
             return false;
 
-        if (find_function_declaration(core_module, g_check_function_name).has_value())
+        if (iris::find_declaration(declaration_datbase, module_name, g_check_function_name).has_value())
             return false;
 
         if (current_call_expression.arguments.size() != 1)
@@ -318,6 +319,7 @@ namespace iris::compiler
     }
 
     static void rewrite_check_equality_statement(
+        std::string_view const module_name,
         iris::Function_declaration const& function_declaration,
         iris::Statement& statement,
         Scope const& scope,
@@ -326,7 +328,7 @@ namespace iris::compiler
     {
         iris::Call_expression const* call_expression = nullptr;
         iris::Binary_expression const* binary_expression = nullptr;
-        if (!is_check_equality_call(parameters.core_module, statement, call_expression, binary_expression))
+        if (!is_check_equality_call(module_name, parameters.declaration_database, statement, call_expression, binary_expression))
             return;
 
         if (binary_expression->left_hand_side.expression_index >= statement.expressions.size())
@@ -334,7 +336,7 @@ namespace iris::compiler
 
         iris::Expression const& left_hand_side_expression = statement.expressions[binary_expression->left_hand_side.expression_index];
         std::optional<iris::Type_reference> const left_hand_side_type = get_expression_type(
-            parameters.core_module.name,
+            module_name,
             &function_declaration,
             scope,
             statement,
@@ -465,6 +467,7 @@ namespace iris::compiler
     }
 
     static std::uint64_t get_required_reflection_index_argument(
+        std::string_view const module_name,
         iris::Statement const& statement,
         iris::Reflection_expression const& expression,
         std::string_view const function_name,
@@ -479,7 +482,7 @@ namespace iris::compiler
             throw std::runtime_error{ std::format("{}() has an invalid argument index!", function_name) };
 
         iris::Expression const& index_expression = statement.expressions[index_expression_index.expression_index];
-        std::optional<Compile_time_value_and_type> const index_value = evaluate_compile_time_expression(statement, index_expression, parameters);
+        std::optional<Compile_time_value_and_type> const index_value = evaluate_compile_time_expression(module_name, statement, index_expression, parameters);
         if (!index_value.has_value())
             throw std::runtime_error{ std::format("{}() argument must be a compile-time integer constant!", function_name) };
 
@@ -690,6 +693,7 @@ namespace iris::compiler
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_for_loop_expression(
+        std::string_view const module_name,
         iris::Statement const& statement,
         iris::For_loop_expression const& expression,
         Compile_time_parameters const& parameters
@@ -710,7 +714,7 @@ namespace iris::compiler
         }
 
         iris::Expression const& range_begin_expression = statement.expressions[expression.range_begin.expression_index];
-        std::optional<Compile_time_value_and_type> const range_begin_value = evaluate_compile_time_expression(statement, range_begin_expression, parameters);
+        std::optional<Compile_time_value_and_type> const range_begin_value = evaluate_compile_time_expression(module_name, statement, range_begin_expression, parameters);
         if (!range_begin_value.has_value())
             return std::nullopt;
 
@@ -718,7 +722,7 @@ namespace iris::compiler
         if (!range_begin_integer.has_value())
             return std::nullopt;
 
-        std::optional<Compile_time_value_and_type> const range_end_value = evaluate_compile_time_statement(expression.range_end, parameters);
+        std::optional<Compile_time_value_and_type> const range_end_value = evaluate_compile_time_statement(module_name, expression.range_end, parameters);
         if (!range_end_value.has_value())
             return std::nullopt;
 
@@ -734,7 +738,7 @@ namespace iris::compiler
                     return std::nullopt;
 
                 iris::Expression const& step_expression = statement.expressions[expression.step_by->expression_index];
-                std::optional<Compile_time_value_and_type> const step_value = evaluate_compile_time_expression(statement, step_expression, parameters);
+                std::optional<Compile_time_value_and_type> const step_value = evaluate_compile_time_expression(module_name, statement, step_expression, parameters);
                 if (!step_value.has_value())
                     return std::nullopt;
 
@@ -820,6 +824,7 @@ namespace iris::compiler
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_reflection_expression(
+        std::string_view const module_name,
         iris::Statement const& statement,
         iris::Reflection_expression const& expression,
         Compile_time_parameters const& parameters
@@ -834,7 +839,6 @@ namespace iris::compiler
             llvm::Type* const llvm_type = type_reference_to_llvm_type_on_demand(
                 parameters.llvm_context,
                 parameters.llvm_data_layout,
-                parameters.core_module,
                 type_reference,
                 parameters.declaration_database,
                 parameters.clang_context
@@ -857,7 +861,6 @@ namespace iris::compiler
             llvm::Type* const llvm_type = type_reference_to_llvm_type_on_demand(
                 parameters.llvm_context,
                 parameters.llvm_data_layout,
-                parameters.core_module,
                 type_reference,
                 parameters.declaration_database,
                 parameters.clang_context
@@ -879,7 +882,7 @@ namespace iris::compiler
                 throw std::runtime_error{ "type_name() does not take runtime arguments!" };
 
             std::pmr::string const type_name = format_type_reference(
-                parameters.core_module,
+                parameters.dependencies,
                 expression.type_arguments[0],
                 parameters.output_allocator,
                 parameters.temporaries_allocator
@@ -929,7 +932,7 @@ namespace iris::compiler
             if (expression.type_arguments.size() != 1)
                 throw std::runtime_error{ "member_type() requires exactly one type argument!" };
 
-            std::uint64_t const member_index = get_required_reflection_index_argument(statement, expression, "member_type", parameters);
+            std::uint64_t const member_index = get_required_reflection_index_argument(module_name, statement, expression, "member_type", parameters);
 
             Type_reference const& type_reference = expression.type_arguments[0];
             std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
@@ -967,7 +970,7 @@ namespace iris::compiler
             if (expression.type_arguments.size() != 1)
                 throw std::runtime_error{ "member_offset() requires exactly one type argument!" };
 
-            std::uint64_t const member_index = get_required_reflection_index_argument(statement, expression, "member_offset", parameters);
+            std::uint64_t const member_index = get_required_reflection_index_argument(module_name, statement, expression, "member_offset", parameters);
 
             Type_reference const& type_reference = expression.type_arguments[0];
             std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
@@ -984,7 +987,6 @@ namespace iris::compiler
                 llvm::Type* const llvm_type = type_reference_to_llvm_type_on_demand(
                     parameters.llvm_context,
                     parameters.llvm_data_layout,
-                    parameters.core_module,
                     type_reference,
                     parameters.declaration_database,
                     parameters.clang_context
@@ -1019,7 +1021,7 @@ namespace iris::compiler
             if (expression.type_arguments.size() != 1)
                 throw std::runtime_error{ "member_name() requires exactly one type argument!" };
 
-            std::uint64_t const member_index = get_required_reflection_index_argument(statement, expression, "member_name", parameters);
+            std::uint64_t const member_index = get_required_reflection_index_argument(module_name, statement, expression, "member_name", parameters);
 
             Type_reference const& type_reference = expression.type_arguments[0];
             std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
@@ -1076,6 +1078,7 @@ namespace iris::compiler
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_unary_expression(
+        std::string_view const module_name,
         iris::Statement const& statement,
         iris::Unary_expression const& expression,
         Compile_time_parameters const& parameters
@@ -1097,7 +1100,7 @@ namespace iris::compiler
         }
 
         iris::Expression const& right_side_expression = statement.expressions[expression.expression.expression_index];
-        std::optional<Compile_time_value_and_type> const right_side_value = evaluate_compile_time_expression(statement, right_side_expression, parameters);
+        std::optional<Compile_time_value_and_type> const right_side_value = evaluate_compile_time_expression(module_name, statement, right_side_expression, parameters);
         if (!right_side_value.has_value())
             return std::nullopt;
 
@@ -1115,6 +1118,7 @@ namespace iris::compiler
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_binary_expression(
+        std::string_view const module_name,
         iris::Statement const& statement,
         iris::Binary_expression const& expression,
         Compile_time_parameters const& parameters
@@ -1132,11 +1136,11 @@ namespace iris::compiler
         iris::Expression const& left_expression = statement.expressions[expression.left_hand_side.expression_index];
         iris::Expression const& right_expression = statement.expressions[expression.right_hand_side.expression_index];
 
-        std::optional<Compile_time_value_and_type> const left_value = evaluate_compile_time_expression(statement, left_expression, parameters);
+        std::optional<Compile_time_value_and_type> const left_value = evaluate_compile_time_expression(module_name, statement, left_expression, parameters);
         if (!left_value.has_value())
             throw std::runtime_error{ "Could not evaluate left operand in compile_time binary expression" };
 
-        std::optional<Compile_time_value_and_type> const right_value = evaluate_compile_time_expression(statement, right_expression, parameters);
+        std::optional<Compile_time_value_and_type> const right_value = evaluate_compile_time_expression(module_name, statement, right_expression, parameters);
         if (!right_value.has_value())
             throw std::runtime_error{ "Could not evaluate right operand in compile_time binary expression" };
 
@@ -1182,6 +1186,7 @@ namespace iris::compiler
     }
 
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_variable_expression(
+        std::string_view const module_name,
         iris::Statement const& statement,
         iris::Variable_expression const& expression,
         Compile_time_parameters const& parameters
@@ -1189,10 +1194,10 @@ namespace iris::compiler
     {
         // Search for global variables:
         {
-            std::optional<iris::Global_variable_declaration const*> const declaration = iris::find_global_variable_declaration(parameters.core_module, expression.name);
-            if (declaration.has_value())
+            std::optional<iris::Declaration> const declaration = iris::find_underlying_declaration(parameters.declaration_database, module_name, expression.name);
+            if (declaration.has_value() && std::holds_alternative<iris::Global_variable_declaration const*>(declaration->data))
             {
-                iris::Global_variable_declaration const& global_variable_declaration = *declaration.value();
+                iris::Global_variable_declaration const& global_variable_declaration = *std::get<iris::Global_variable_declaration const*>(declaration->data);
                 return Compile_time_value_and_type
                 {
                     .statement = global_variable_declaration.initial_value,
@@ -1205,6 +1210,7 @@ namespace iris::compiler
     }
 
     std::optional<Compile_time_value_and_type> evaluate_compile_time_expression(
+        std::string_view const module_name,
         iris::Statement const& statement,
         iris::Expression const& expression,
         Compile_time_parameters const& parameters
@@ -1217,7 +1223,7 @@ namespace iris::compiler
                 return std::nullopt;
                 
             iris::Expression const& right_side_expression = statement.expressions[compile_time_expression.expression.expression_index];
-            return evaluate_compile_time_expression(statement, right_side_expression, parameters);
+            return evaluate_compile_time_expression(module_name, statement, right_side_expression, parameters);
         }
         else if (std::holds_alternative<iris::Constant_expression>(expression.data))
         {
@@ -1236,7 +1242,7 @@ namespace iris::compiler
                     return create_value_and_type(create_block_statement(serie.then_statements, parameters.output_allocator));
 
                 iris::Statement const& condition_statement = serie.condition.value();
-                std::optional<Compile_time_value_and_type> const condition_value = evaluate_compile_time_statement(condition_statement, parameters);
+                std::optional<Compile_time_value_and_type> const condition_value = evaluate_compile_time_statement(module_name, condition_statement, parameters);
                 if (!condition_value.has_value())
                     return std::nullopt;
 
@@ -1253,33 +1259,34 @@ namespace iris::compiler
         else if (std::holds_alternative<iris::For_loop_expression>(expression.data))
         {
             iris::For_loop_expression const& for_loop_expression = std::get<iris::For_loop_expression>(expression.data);
-            return evaluate_compile_time_for_loop_expression(statement, for_loop_expression, parameters);
+            return evaluate_compile_time_for_loop_expression(module_name, statement, for_loop_expression, parameters);
         }
         else if (std::holds_alternative<iris::Reflection_expression>(expression.data))
         {
             iris::Reflection_expression const& reflection_expression = std::get<iris::Reflection_expression>(expression.data);
-            return evaluate_compile_time_reflection_expression(statement, reflection_expression, parameters);
+            return evaluate_compile_time_reflection_expression(module_name, statement, reflection_expression, parameters);
         }
         else if (std::holds_alternative<iris::Unary_expression>(expression.data))
         {
             iris::Unary_expression const& unary_expression = std::get<iris::Unary_expression>(expression.data);
-            return evaluate_compile_time_unary_expression(statement, unary_expression, parameters);
+            return evaluate_compile_time_unary_expression(module_name, statement, unary_expression, parameters);
         }
         else if (std::holds_alternative<iris::Binary_expression>(expression.data))
         {
             iris::Binary_expression const& binary_expression = std::get<iris::Binary_expression>(expression.data);
-            return evaluate_compile_time_binary_expression(statement, binary_expression, parameters);
+            return evaluate_compile_time_binary_expression(module_name, statement, binary_expression, parameters);
         }
         else if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
             iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
-            return evaluate_compile_time_variable_expression(statement, variable_expression, parameters);
+            return evaluate_compile_time_variable_expression(module_name, statement, variable_expression, parameters);
         }
 
         return std::nullopt;
     }
 
     std::optional<Compile_time_value_and_type> evaluate_compile_time_statement(
+        std::string_view const module_name,
         iris::Statement const& statement,
         Compile_time_parameters const& parameters
     )
@@ -1289,6 +1296,7 @@ namespace iris::compiler
 
         iris::Expression const& expression = statement.expressions[0];
         return evaluate_compile_time_expression(
+            module_name,
             statement,
             expression,
             parameters
@@ -1296,6 +1304,7 @@ namespace iris::compiler
     }
 
     static void visit_and_replace_compile_time_expressions(
+        std::string_view const module_name,
         iris::Statement& statement,
         iris::Expression const& expression,
         Compile_time_parameters const& parameters
@@ -1310,6 +1319,7 @@ namespace iris::compiler
             iris::Expression const& right_side_expression = statement.expressions[compile_time_expression.expression.expression_index];
             
             std::optional<Compile_time_value_and_type> new_value = evaluate_compile_time_expression(
+                module_name,
                 statement,
                 right_side_expression,
                 parameters
@@ -1324,6 +1334,7 @@ namespace iris::compiler
             iris::Reflection_expression const& reflection_expression = std::get<iris::Reflection_expression>(expression.data);
             
             std::optional<Compile_time_value_and_type> new_value = evaluate_compile_time_reflection_expression(
+                module_name,
                 statement,
                 reflection_expression,
                 parameters
@@ -1347,6 +1358,7 @@ namespace iris::compiler
                 continue;
 
             run_compile_time_pass_on_function(
+                core_module.name,
                 *function_declaration.value(),
                 function_definition,
                 parameters
@@ -1355,6 +1367,7 @@ namespace iris::compiler
     }
 
     void run_compile_time_pass_on_function(
+        std::string_view const module_name,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition& function_definition,
         Compile_time_parameters const& parameters
@@ -1374,16 +1387,16 @@ namespace iris::compiler
             auto const visit_and_replace = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
             {
                 iris::Statement& mutable_nested_statement = const_cast<iris::Statement&>(statement);
-                visit_and_replace_compile_time_expressions(mutable_nested_statement, expression, parameters);
+                visit_and_replace_compile_time_expressions(module_name, mutable_nested_statement, expression, parameters);
                 return false;
             };
 
             visit_expressions(mutable_statement, visit_and_replace);
-            rewrite_check_equality_statement(function_declaration, mutable_statement, scope, parameters);
+            rewrite_check_equality_statement(module_name, function_declaration, mutable_statement, scope, parameters);
         };
 
         visit_statements_using_scope(
-            parameters.core_module.name,
+            module_name,
             &function_declaration,
             scope,
             function_definition.statements,

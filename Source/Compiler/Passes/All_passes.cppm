@@ -29,7 +29,7 @@ namespace iris::compiler
     );
 
     export void run_all_passes_on_function(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration& function_declaration,
         iris::Function_definition& function_definition,
         All_passes_parameters const& parameters

@@ -83,7 +83,7 @@ namespace iris::compiler
         };
 
         run_instantiate_pass_on_function(
-            core_module,
+            core_module.name,
             *function_declaration,
             *function_definition,
             parameters

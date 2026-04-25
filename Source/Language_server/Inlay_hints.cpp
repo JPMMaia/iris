@@ -169,7 +169,7 @@ namespace iris::language_server
         if (iris::is_custom_type_reference(type))
         {
             std::pmr::string const type_name = iris::format_type_reference(
-                core_module,
+                core_module.dependencies,
                 type,
                 temporaries_allocator,
                 temporaries_allocator
@@ -349,7 +349,7 @@ namespace iris::language_server
                 else
                 {
                     std::pmr::string const type_name = iris::format_type_reference(
-                        core_module,
+                        core_module.dependencies,
                         type,
                         temporaries_allocator,
                         temporaries_allocator
@@ -384,7 +384,7 @@ namespace iris::language_server
         else
         {
             std::pmr::string const type_name = iris::format_type_reference(
-                core_module,
+                core_module.dependencies,
                 type,
                 temporaries_allocator,
                 temporaries_allocator

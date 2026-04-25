@@ -135,7 +135,7 @@ namespace iris::compiler
     }
 
     static void instantiate_function(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Statement& statement,
         iris::Expression const& expression,
         Instance_call_key const key,
@@ -166,9 +166,8 @@ namespace iris::compiler
             key
         );
 
-        // TODO switch to core_module of function declaration
         run_all_passes_on_function(
-            core_module,
+            key.module_name,
             function_expression.declaration,
             function_expression.definition,
             parameters
@@ -296,11 +295,11 @@ namespace iris::compiler
     }
 
     static void visit_deduced_instance_calls(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition& function_definition,
         All_passes_parameters const& parameters,
-        std::function<void(iris::Module const&, iris::Statement&, iris::Expression const&, Instance_call_key const&, All_passes_parameters const&)> const& callback
+        std::function<void(std::string_view, iris::Statement&, iris::Expression const&, Instance_call_key const&, All_passes_parameters const&)> const& callback
     )
     {
         auto const scope_callback = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> bool
@@ -312,7 +311,7 @@ namespace iris::compiler
                     iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
                     std::optional<Deduced_instance_call> const deduced_instance_call = deduce_instance_call_arguments(
                         parameters.declaration_database,
-                        core_module.name,
+                        module_name,
                         scope,
                         statement,
                         call_expression,
@@ -329,7 +328,7 @@ namespace iris::compiler
                         iris::Statement& mutable_statement = const_cast<iris::Statement&>(statement);
 
                         callback(
-                            core_module,
+                            module_name,
                             mutable_statement,
                             statement.expressions[call_expression.expression.expression_index],
                             key,
@@ -346,7 +345,7 @@ namespace iris::compiler
 
                     Instance_call_key const key = create_instance_call_key(
                         parameters.declaration_database,
-                        core_module.name,
+                        module_name,
                         instance_call_expression,
                         statement
                     );
@@ -354,7 +353,7 @@ namespace iris::compiler
                     iris::Statement& mutable_statement = const_cast<iris::Statement&>(statement);
 
                     callback(
-                        core_module,
+                        module_name,
                         mutable_statement,
                         expression,
                         key,
@@ -377,7 +376,7 @@ namespace iris::compiler
         add_parameters_to_scope(scope, function_declaration.input_parameter_names, function_declaration.type.input_parameter_types, function_declaration.input_parameter_source_positions);
 
         visit_statements_using_scope(
-            core_module.name,
+            module_name,
             &function_declaration,
             scope,
             function_definition.statements,
@@ -387,14 +386,14 @@ namespace iris::compiler
     }
 
     static void instantiate_functions_in_function(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition& function_definition,
         All_passes_parameters const& parameters
     )
     {
         visit_deduced_instance_calls(
-            core_module,
+            module_name,
             function_declaration,
             function_definition,
             parameters,
@@ -407,7 +406,7 @@ namespace iris::compiler
         }
 
         std::pmr::vector<Replace_instantiate_function_parameters> replace_parameters;
-        auto const gather_replacements = [&](iris::Module const& core_module, iris::Statement& statement, iris::Expression const& expression, Instance_call_key const key, All_passes_parameters const& parameters)
+        auto const gather_replacements = [&](std::string_view const module_name, iris::Statement& statement, iris::Expression const& expression, Instance_call_key const key, All_passes_parameters const& parameters)
         {
             replace_parameters.push_back({
                 statement,
@@ -417,7 +416,7 @@ namespace iris::compiler
         };
 
         visit_deduced_instance_calls(
-            core_module,
+            module_name,
             function_declaration,
             function_definition,
             parameters,
@@ -440,7 +439,7 @@ namespace iris::compiler
             std::optional<Function_declaration const*> const function_declaration = find_function_declaration(core_module, function_definition.name);
 
             instantiate_functions_in_function(
-                core_module,
+                core_module.name,
                 *function_declaration.value(),
                 function_definition,
                 parameters
@@ -449,7 +448,7 @@ namespace iris::compiler
     }
 
     static void verify_no_instance_calls(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const& function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -462,7 +461,7 @@ namespace iris::compiler
             iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
 
             std::optional<iris::Type_reference> const expression_type = get_expression_type(
-                core_module.name,
+                module_name,
                 &function_declaration,
                 scope,
                 statement,
@@ -490,7 +489,7 @@ namespace iris::compiler
     }
 
     static void verify_no_instance_calls_in_function(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition const& function_definition,
         iris::Declaration_database const& declaration_database
@@ -500,7 +499,7 @@ namespace iris::compiler
         {
             auto const verify_all = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
             {
-                verify_no_instance_calls(core_module, function_declaration, scope, statement, expression, declaration_database);
+                verify_no_instance_calls(module_name, function_declaration, scope, statement, expression, declaration_database);
                 return false;
             };
 
@@ -516,7 +515,7 @@ namespace iris::compiler
         add_parameters_to_scope(scope, function_declaration.input_parameter_names, function_declaration.type.input_parameter_types, function_declaration.input_parameter_source_positions);
 
         visit_statements_using_scope(
-            core_module.name,
+            module_name,
             &function_declaration,
             scope,
             function_definition.statements,
@@ -537,7 +536,7 @@ namespace iris::compiler
                 continue;
 
             verify_no_instance_calls_in_function(
-                core_module,
+                core_module.name,
                 *declaration.value(),
                 definition,
                 declaration_database
@@ -569,7 +568,6 @@ namespace iris::compiler
     }
 
     static void verify_no_type_instances_in_function(
-        iris::Module const& core_module,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition const& function_definition,
         iris::Declaration_database const& declaration_database
@@ -610,17 +608,17 @@ namespace iris::compiler
     }
 
     void run_instantiate_pass_on_function(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration& function_declaration,
         iris::Function_definition& function_definition,
         All_passes_parameters const& parameters
     )
     {
-        instantiate_functions_in_function(core_module, function_declaration, function_definition, parameters);
+        instantiate_functions_in_function(module_name, function_declaration, function_definition, parameters);
         instantiate_types_in_function(parameters.declaration_database, function_declaration, function_definition, parameters.instanced_declarations);
 
-        verify_no_instance_calls_in_function(core_module, function_declaration, function_definition, parameters.declaration_database);
-        verify_no_type_instances_in_function(core_module, function_declaration, function_definition, parameters.declaration_database);
+        verify_no_instance_calls_in_function(module_name, function_declaration, function_definition, parameters.declaration_database);
+        verify_no_type_instances_in_function(function_declaration, function_definition, parameters.declaration_database);
     }
 
     void run_instantiate_pass_on_module(

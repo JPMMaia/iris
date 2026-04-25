@@ -2483,7 +2483,7 @@ namespace iris
     }
 
     std::pmr::string format_type_reference(
-        iris::Module const& core_module,
+        iris::Module_dependencies const& dependencies,
         std::optional<iris::Type_reference> const& type_reference,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -2493,7 +2493,7 @@ namespace iris
 
         Format_options const options
         {
-            .alias_imports = core_module.dependencies.alias_imports,
+            .alias_imports = dependencies.alias_imports,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
         };

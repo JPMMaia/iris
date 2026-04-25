@@ -13,7 +13,7 @@ namespace iris::compiler
     );
 
     export void run_implicit_function_pass_on_function(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Module_dependencies& dependencies,
         iris::Declaration_database const& declaration_database,
         iris::Function_declaration const& function_declaration,

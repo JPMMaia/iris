@@ -386,11 +386,11 @@ namespace iris::language_server
         std::optional<iris::Type_reference> const provided_underlying_type = get_underlying_type(declaration_database, mismatch_data.provided_type);
         std::optional<iris::Type_reference> const expected_underlying_type = get_underlying_type(declaration_database, mismatch_data.expected_type);
 
-        std::pmr::string const provided_type_name = iris::format_type_reference(core_module, mismatch_data.provided_type, temporaries_allocator, temporaries_allocator);
-        std::pmr::string const provided_underlying_type_name = iris::format_type_reference(core_module, provided_underlying_type, temporaries_allocator, temporaries_allocator);
+        std::pmr::string const provided_type_name = iris::format_type_reference(core_module.dependencies, mismatch_data.provided_type, temporaries_allocator, temporaries_allocator);
+        std::pmr::string const provided_underlying_type_name = iris::format_type_reference(core_module.dependencies, provided_underlying_type, temporaries_allocator, temporaries_allocator);
 
-        std::pmr::string const expected_type_name = iris::format_type_reference(core_module, mismatch_data.expected_type, temporaries_allocator, temporaries_allocator);
-        std::pmr::string const expected_underlying_type_name = iris::format_type_reference(core_module, expected_underlying_type, temporaries_allocator, temporaries_allocator);
+        std::pmr::string const expected_type_name = iris::format_type_reference(core_module.dependencies, mismatch_data.expected_type, temporaries_allocator, temporaries_allocator);
+        std::pmr::string const expected_underlying_type_name = iris::format_type_reference(core_module.dependencies, expected_underlying_type, temporaries_allocator, temporaries_allocator);
 
         iris::Source_range const source_range = iris::create_source_range(
             diagnostic.range.end.line,
