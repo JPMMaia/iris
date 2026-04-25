@@ -1584,7 +1584,7 @@ namespace iris::compiler
 
             std::optional<Custom_type_reference> custom_type_reference = get_function_constructor_type_reference(
                 declaration_database,
-                core_module,
+                core_module.name,
                 statement.expressions[data.left_hand_side.expression_index],
                 statement
             );
@@ -1929,7 +1929,7 @@ namespace iris::compiler
 
         return get_function_constructor_type_reference(
             declaration_database,
-            core_module,
+            core_module.name,
             expression,
             statement
         );

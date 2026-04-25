@@ -62,6 +62,7 @@ namespace iris
     export struct Declaration_database
     {
         std::pmr::unordered_map<Module_name, Declaration_map, String_hash, String_equal> map;
+        std::pmr::unordered_map<Module_name, Module_dependencies const*> dependencies;
     };
 
     export Declaration_database create_declaration_database();
@@ -111,6 +112,11 @@ namespace iris
         Declaration_database& database,
         Type_instance const& type_instance,
         Struct_declaration const& struct_declaration
+    );
+
+    export Module_dependencies const& get_module_dependencies(
+        Declaration_database const& database,
+        std::string_view const module_name
     );
 
     export std::optional<Declaration> find_declaration(
@@ -195,14 +201,14 @@ namespace iris
 
     export std::optional<Custom_type_reference> get_function_constructor_type_reference(
         Declaration_database const& declaration_database,
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Expression const& expression,
         Statement const& statement
     );
 
     export Instance_call_key create_instance_call_key(
         Declaration_database const& declaration_database,
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Instance_call_expression const& expression,
         Statement const& statement
     );
@@ -220,7 +226,7 @@ namespace iris
 
     export Function_constructor const* get_function_constructor(
         Declaration_database const& declaration_database,
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Expression const& expression,
         Statement const& statement
     );

@@ -43,6 +43,15 @@ namespace iris
         return {};
     }
 
+    static void set_dependencies(
+        Declaration_database& database,
+        std::string_view const module_name,
+        Module_dependencies const& dependencies
+    )
+    {
+        database.dependencies[module_name.data()] = &dependencies;
+    }
+
     void add_declarations(
         Declaration_database& database,
         std::string_view const module_name,
@@ -134,6 +143,8 @@ namespace iris
         Module const& core_module
     )
     {
+        set_dependencies(database, core_module.name, core_module.dependencies);
+
         add_declarations(
             database,
             core_module.name,
@@ -169,6 +180,14 @@ namespace iris
     {
         Declaration_map& map = database.map[module_name.data()];
         map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = is_export}));
+    }
+
+    Module_dependencies const& get_module_dependencies(
+        Declaration_database const& database,
+        std::string_view const module_name
+    )
+    {
+        return *database.dependencies.at(module_name.data());
     }
 
     std::optional<Declaration> find_declaration(
@@ -532,7 +551,7 @@ namespace iris
 
     std::optional<Custom_type_reference> get_function_constructor_type_reference(
         Declaration_database const& declaration_database,
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Expression const& expression,
         Statement const& statement
     )
@@ -540,14 +559,14 @@ namespace iris
         if (std::holds_alternative<Variable_expression>(expression.data))
         {
             Variable_expression const& variable_expression = std::get<Variable_expression>(expression.data);
-            std::optional<Declaration> const declaration = find_declaration(declaration_database, core_module.name, variable_expression.name);
+            std::optional<Declaration> const declaration = find_declaration(declaration_database, module_name, variable_expression.name);
             if (!declaration.has_value() || !std::holds_alternative<Function_constructor const*>(declaration.value().data))
                 return std::nullopt;
 
             return Custom_type_reference
             {
                 .module_reference = {
-                    .name = core_module.name
+                    .name = std::pmr::string{module_name}
                 },
                 .name = variable_expression.name
             };
@@ -560,7 +579,8 @@ namespace iris
                 return std::nullopt;
 
             Variable_expression const& variable_expression = std::get<Variable_expression>(left_hand_side_expression.data);
-            Import_module_with_alias const* const import_module = find_import_module_with_alias(core_module.dependencies, variable_expression.name);
+            Module_dependencies const& dependencies = get_module_dependencies(declaration_database, module_name);
+            Import_module_with_alias const* const import_module = find_import_module_with_alias(dependencies, variable_expression.name);
             if (import_module == nullptr)
                 return std::nullopt;
 
@@ -578,7 +598,7 @@ namespace iris
 
             return get_function_constructor_type_reference(
                 declaration_database,
-                core_module,
+                module_name,
                 statement.expressions[data.left_hand_side.expression_index],
                 statement
             );
@@ -589,14 +609,14 @@ namespace iris
 
     Instance_call_key create_instance_call_key(
         Declaration_database const& declaration_database,
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Instance_call_expression const& expression,
         Statement const& statement
     )
     {
         std::optional<Custom_type_reference> const custom_type_reference = get_function_constructor_type_reference(
             declaration_database,
-            core_module,
+            module_name,
             statement.expressions[expression.left_hand_side.expression_index],
             statement
         );
@@ -634,14 +654,14 @@ namespace iris
 
     Function_constructor const* get_function_constructor(
         Declaration_database const& declaration_database,
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Expression const& expression,
         Statement const& statement
     )
     {
         std::optional<Custom_type_reference> const custom_type_reference = get_function_constructor_type_reference(
             declaration_database,
-            core_module,
+            module_name,
             expression,
             statement
         );
@@ -737,14 +757,14 @@ namespace iris
 
     std::pair<Instance_call_key, Function_expression> create_instance_call_expression_value(
         Declaration_database const& declaration_database,
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Instance_call_expression const& expression,
         Statement const& statement
     )
     {
         Function_constructor const* function_constructor = get_function_constructor(
             declaration_database,
-            core_module,
+            module_name,
             statement.expressions[expression.left_hand_side.expression_index],
             statement
         );
@@ -753,7 +773,7 @@ namespace iris
 
         Instance_call_key const key = create_instance_call_key(
             declaration_database,
-            core_module,
+            module_name,
             expression,
             statement
         );

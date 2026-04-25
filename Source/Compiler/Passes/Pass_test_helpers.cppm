@@ -16,8 +16,12 @@ namespace iris::compiler::tests
     export struct Parsed_module_context
     {
         iris::Declaration_database declaration_database;
-        std::pmr::vector<iris::Module> dependency_core_modules;
-        iris::Module core_module;
+        std::pmr::vector<iris::Module> core_modules;
+
+        std::span<iris::Module const> dependencies() const { return std::span<iris::Module const>{ core_modules.data(), core_modules.size() - 1 }; }
+        
+        iris::Module& core_module() { return core_modules.back(); }
+        iris::Module const& core_module() const { return core_modules.back(); }
     };
 
     export Parsed_module_context parse_module_context(
@@ -28,11 +32,10 @@ namespace iris::compiler::tests
         Parsed_module_context context
         {
             .declaration_database = create_declaration_database(),
-            .dependency_core_modules = {},
-            .core_module = {},
+            .core_modules = {},
         };
 
-        context.dependency_core_modules.reserve(input_dependencies_text.size());
+        context.core_modules.reserve(input_dependencies_text.size() + 1);
 
         for (std::size_t index = 0; index < input_dependencies_text.size(); ++index)
         {
@@ -47,8 +50,8 @@ namespace iris::compiler::tests
             if (!dependency_module.has_value())
                 throw std::runtime_error{"Could not parse dependency module text."};
 
-            add_declarations(context.declaration_database, dependency_module.value());
-            context.dependency_core_modules.push_back(std::move(dependency_module.value()));
+            context.core_modules.push_back(std::move(dependency_module.value()));
+            add_declarations(context.declaration_database, context.core_modules.back());
         }
 
         std::optional<iris::Module> core_module = iris::parser::parse_and_convert_to_module(
@@ -60,9 +63,8 @@ namespace iris::compiler::tests
         if (!core_module.has_value())
             throw std::runtime_error{"Could not parse input module text."};
 
-        context.core_module = std::move(core_module.value());
-
-        add_declarations(context.declaration_database, context.core_module);
+        context.core_modules.push_back(std::move(core_module.value()));
+        add_declarations(context.declaration_database, context.core_modules.back());
 
         return context;
     }

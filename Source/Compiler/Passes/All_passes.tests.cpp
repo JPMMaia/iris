@@ -62,16 +62,17 @@ namespace iris::compiler
     )
     {
         iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input_text, input_dependencies_text);
+        iris::Module& core_module = context.core_module();
 
-        iris::Function_declaration* function_declaration = iris::compiler::tests::find_mutable_function_declaration(context.core_module, function_name);
+        iris::Function_declaration* function_declaration = iris::compiler::tests::find_mutable_function_declaration(core_module, function_name);
         REQUIRE(function_declaration != nullptr);
 
-        iris::Function_definition* function_definition = iris::compiler::tests::find_mutable_function_definition(context.core_module, function_name);
+        iris::Function_definition* function_definition = iris::compiler::tests::find_mutable_function_definition(core_module, function_name);
         REQUIRE(function_definition != nullptr);
 
         All_passes_runtime_context runtime_context = create_all_passes_runtime_context(
-            context.core_module,
-            context.dependency_core_modules,
+            core_module,
+            context.dependencies(),
             context.declaration_database
         );
 
@@ -84,21 +85,21 @@ namespace iris::compiler
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
             .clang_context = *runtime_context.clang_context,
-            .dependencies = context.core_module.dependencies,
-            .instanced_declarations = context.core_module.instanced_declarations,
-            .definitions = context.core_module.definitions,
+            .dependencies = core_module.dependencies,
+            .instanced_declarations = core_module.instanced_declarations,
+            .definitions = core_module.definitions,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
         };
 
         run_all_passes_on_function(
-            context.core_module,
+            core_module,
             *function_declaration,
             *function_definition,
             parameters
         );
 
-        return iris::compiler::tests::format_core_module_to_text(context.core_module);
+        return iris::compiler::tests::format_core_module_to_text(core_module);
     }
 
     TEST_CASE("Combines compile_time_pass and instantiate_pass", "[All_passes][Passes]")

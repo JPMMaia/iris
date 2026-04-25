@@ -28,22 +28,23 @@ namespace iris::compiler
     )
     {
         iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input_text, input_dependencies_text);
+        iris::Module& core_module = context.core_module();
 
-        std::optional<Function_declaration const*> const function_declaration = find_function_declaration(context.core_module, function_name);
+        std::optional<Function_declaration const*> const function_declaration = find_function_declaration(core_module, function_name);
         REQUIRE(function_declaration.has_value());
 
-        iris::Function_definition* function_definition = find_mutable_function_definition(context.core_module, function_name);
+        iris::Function_definition* function_definition = find_mutable_function_definition(core_module, function_name);
         REQUIRE(function_definition != nullptr);
 
         run_implicit_function_pass_on_function(
-            context.core_module,
-            context.core_module.dependencies,
+            core_module,
+            core_module.dependencies,
             context.declaration_database,
             *function_declaration.value(),
             *function_definition
         );
 
-        std::pmr::string const actual = iris::compiler::tests::format_core_module_to_text(context.core_module);
+        std::pmr::string const actual = iris::compiler::tests::format_core_module_to_text(core_module);
 
         CHECK(expected == actual);
     }

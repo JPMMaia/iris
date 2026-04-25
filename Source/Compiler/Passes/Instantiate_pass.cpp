@@ -346,7 +346,7 @@ namespace iris::compiler
 
                     Instance_call_key const key = create_instance_call_key(
                         parameters.declaration_database,
-                        core_module,
+                        core_module.name,
                         instance_call_expression,
                         statement
                     );
