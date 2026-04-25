@@ -1494,6 +1494,9 @@ namespace iris::compiler
                 .llvm_data_layout = llvm_data.data_layout,
                 .declaration_database = declaration_database,
                 .clang_context = *clang_context,
+                .dependencies = new_core_module.dependencies,
+                .instanced_declarations = new_core_module.instanced_declarations,
+                .definitions = new_core_module.definitions,
                 .output_allocator = {},
                 .temporaries_allocator = {},
             };
@@ -1859,6 +1862,9 @@ namespace iris::compiler
                 .llvm_data_layout = llvm_data.data_layout,
                 .declaration_database = declaration_database,
                 .clang_context = *clang_context,
+                .dependencies = core_module.dependencies,
+                .instanced_declarations = core_module.instanced_declarations,
+                .definitions = core_module.definitions,
                 .output_allocator = {},
                 .temporaries_allocator = {},
             };

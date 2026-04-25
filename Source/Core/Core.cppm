@@ -978,17 +978,17 @@ namespace iris
     export std::optional<Union_declaration const*> find_union_declaration(Module const& module, std::string_view name);
 
     export Import_module_with_alias const* find_import_module_with_alias(
-        iris::Module const& core_module,
+        iris::Module_dependencies const& dependencies,
         std::string_view const alias_name
     );
 
     export Import_module_with_alias* find_import_module_with_alias(
-        iris::Module& core_module,
+        iris::Module_dependencies& dependencies,
         std::string_view const alias_name
     );
 
     export Import_module_with_alias const* find_import_module_with_module_name(
-        iris::Module const& core_module,
+        iris::Module_dependencies const& dependencies,
         std::string_view const module_name
     );
 

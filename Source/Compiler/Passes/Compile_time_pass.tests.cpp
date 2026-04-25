@@ -66,6 +66,7 @@ namespace iris::compiler
         Compile_time_parameters const parameters =
         {
             .core_module = context.core_module,
+            .dependencies = context.core_module.dependencies,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
             .llvm_context = *runtime_context.llvm_data.context,
@@ -102,6 +103,7 @@ namespace iris::compiler
         Compile_time_parameters const parameters =
         {
             .core_module = context.core_module,
+            .dependencies = context.core_module.dependencies,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
             .llvm_context = *runtime_context.llvm_data.context,
@@ -410,7 +412,7 @@ export function run_member_type_usage() -> ()
         iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input, {});
         run_compile_time_pass(context, "run_member_type_usage");
 
-        Import_module_with_alias const* const builtin_import = find_import_module_with_alias(context.core_module, "Builtin");
+        Import_module_with_alias const* const builtin_import = find_import_module_with_alias(context.core_module.dependencies, "Builtin");
         REQUIRE(builtin_import != nullptr);
 
         auto const location = std::find(
@@ -468,7 +470,7 @@ function run(lhs: Int32, rhs: Int32) -> ()
         iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input, {});
         run_compile_time_pass(context, "run");
 
-        Import_module_with_alias const* const json_import = find_import_module_with_alias(context.core_module, "iris_json");
+        Import_module_with_alias const* const json_import = find_import_module_with_alias(context.core_module.dependencies, "iris_json");
         REQUIRE(json_import != nullptr);
 
         auto const location = std::find(

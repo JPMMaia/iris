@@ -345,7 +345,7 @@ namespace iris::language_server
 
         std::string_view const node_to_access_value = iris::parser::get_node_value(parse_tree, node_to_access.value());
         iris::Import_module_with_alias const* import_module = find_import_module_with_alias(
-            core_module,
+            core_module.dependencies,
             node_to_access_value
         );
         if (import_module == nullptr)
@@ -570,7 +570,7 @@ namespace iris::language_server
 
         std::string_view const node_to_access_value = iris::parser::get_node_value(parse_tree, node_to_access.value());
         iris::Import_module_with_alias const* import_module = find_import_module_with_alias(
-            core_module,
+            core_module.dependencies,
             node_to_access_value
         );
         if (import_module != nullptr)

@@ -74,6 +74,9 @@ namespace iris::compiler
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
             .clang_context = *runtime_context.clang_context,
+            .dependencies = context.core_module.dependencies,
+            .instanced_declarations = context.core_module.instanced_declarations,
+            .definitions = context.core_module.definitions,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
         };
@@ -106,6 +109,9 @@ namespace iris::compiler
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
             .clang_context = *runtime_context.clang_context,
+            .dependencies = context.core_module.dependencies,
+            .instanced_declarations = context.core_module.instanced_declarations,
+            .definitions = context.core_module.definitions,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
         };
@@ -275,6 +281,64 @@ struct My_array
 )";
 
         std::pmr::string const actual = run_instantiate_pass_and_format(input, {});
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Instantiates nested function constructor calls across module boundary", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const dependency = R"(module iris.json;
+
+export function_constructor to_json(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+    };
+}
+
+export function_constructor print_json(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+        to_json::<value_type>(value);
+    };
+}
+)";
+
+        std::string_view const input = R"(module json_usage;
+
+import iris.json as iris_json;
+
+function run(value: *Int32) -> ()
+{
+    iris_json.print_json::<Int32>(value);
+}
+)";
+
+
+        std::string_view const expected = R"(module json_usage;
+
+import iris.json as iris_json;
+
+function run(value: *Int32) -> ()
+{
+    iris.json@print_json@9753731967319569499(value);
+}
+
+@unique_name("iris.json@to_json@3489948734076117284")
+function iris.json@to_json@3489948734076117284(value: *Int32) -> ()
+{
+}
+
+@unique_name("iris.json@print_json@9753731967319569499")
+function iris.json@print_json@9753731967319569499(value: *Int32) -> ()
+{
+    iris.json@to_json@3489948734076117284(value);
+}
+)";
+
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies, "run");
 
         CHECK(expected == actual);
     }

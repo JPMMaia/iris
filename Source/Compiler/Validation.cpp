@@ -1855,7 +1855,7 @@ namespace iris::compiler
                 // Check declaration inside imported module:
                 {
                     Import_module_with_alias const* const import_alias = find_import_module_with_alias(
-                        parameters.core_module,
+                        parameters.core_module.dependencies,
                         variable_expression.name
                     );
                     if (import_alias != nullptr)
@@ -3970,7 +3970,7 @@ namespace iris::compiler
             return {};
 
         Import_module_with_alias const* const import_alias = find_import_module_with_alias(
-            parameters.core_module,
+            parameters.core_module.dependencies,
             expression.name
         );
         if (import_alias != nullptr)

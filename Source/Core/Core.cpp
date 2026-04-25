@@ -353,48 +353,48 @@ namespace iris
     }
 
     Import_module_with_alias const* find_import_module_with_alias(
-        iris::Module const& core_module,
+        iris::Module_dependencies const& dependencies,
         std::string_view const alias_name
     )
     {
         auto const location = std::find_if(
-            core_module.dependencies.alias_imports.begin(),
-            core_module.dependencies.alias_imports.end(),
+            dependencies.alias_imports.begin(),
+            dependencies.alias_imports.end(),
             [&](Import_module_with_alias const& import_alias) -> bool { return import_alias.alias == alias_name; }
         );
-        if (location == core_module.dependencies.alias_imports.end())
+        if (location == dependencies.alias_imports.end())
             return nullptr;
 
         return &(*location);
     }
 
     Import_module_with_alias* find_import_module_with_alias(
-        iris::Module& core_module,
+        iris::Module_dependencies& dependencies,
         std::string_view const alias_name
     )
     {
         auto const location = std::find_if(
-            core_module.dependencies.alias_imports.begin(),
-            core_module.dependencies.alias_imports.end(),
+            dependencies.alias_imports.begin(),
+            dependencies.alias_imports.end(),
             [&](Import_module_with_alias const& import_alias) -> bool { return import_alias.alias == alias_name; }
         );
-        if (location == core_module.dependencies.alias_imports.end())
+        if (location == dependencies.alias_imports.end())
             return nullptr;
 
         return &(*location);
     }
 
     Import_module_with_alias const* find_import_module_with_module_name(
-        iris::Module const& core_module,
+        iris::Module_dependencies const& dependencies,
         std::string_view const module_name
     )
     {
         auto const location = std::find_if(
-            core_module.dependencies.alias_imports.begin(),
-            core_module.dependencies.alias_imports.end(),
+            dependencies.alias_imports.begin(),
+            dependencies.alias_imports.end(),
             [&](Import_module_with_alias const& import_alias) -> bool { return import_alias.module_name == module_name; }
         );
-        if (location == core_module.dependencies.alias_imports.end())
+        if (location == dependencies.alias_imports.end())
             return nullptr;
 
         return &(*location);

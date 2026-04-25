@@ -863,7 +863,7 @@ namespace iris::compiler
                                 }
 
                                 Import_module_with_alias const* import_alias = find_import_module_with_alias(
-                                    core_module,
+                                    core_module.dependencies,
                                     variable_expression.name
                                 );
                                 assert(import_alias != nullptr);
@@ -2357,12 +2357,12 @@ namespace iris::compiler
     }
 
     void add_import_usage(
-        iris::Module& core_module,
+        iris::Module_dependencies& dependencies,
         std::string_view const alias,
         std::string_view const usage
     )
     {
-        iris::Import_module_with_alias* import_module = iris::find_import_module_with_alias(core_module, alias);
+        iris::Import_module_with_alias* import_module = iris::find_import_module_with_alias(dependencies, alias);
         if (import_module != nullptr)
         {
             auto const location = std::find_if(

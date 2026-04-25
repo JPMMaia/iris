@@ -20,15 +20,15 @@ import iris.compiler.types;
 namespace iris::compiler
 {
     static void add_instantiated_type_to_module(
-        iris::Module& core_module,
         Declaration_database& declaration_database,
-        Type_instance const& type_instance
+        Type_instance const& type_instance,
+        Module_instanced_declarations& instanced_declarations
     )
     {
         std::pmr::string const mangled_name = mangle_type_instance_name(type_instance);
 
         std::optional<Declaration> const existing = find_declaration_in_instanced_module_declarations(
-            core_module.instanced_declarations,
+            instanced_declarations,
             type_instance.type_constructor.module_reference.name,
             mangled_name
         );
@@ -40,20 +40,20 @@ namespace iris::compiler
         if (std::holds_alternative<Struct_declaration>(storage.data))
         {
             Struct_declaration& struct_declaration = std::get<Struct_declaration>(storage.data);
-            core_module.instanced_declarations.struct_declarations.push_back(std::move(struct_declaration));
+            instanced_declarations.struct_declarations.push_back(std::move(struct_declaration));
             
-            add_struct_declaration(declaration_database, type_instance.type_constructor.module_reference.name, false, core_module.instanced_declarations.struct_declarations.back());
+            add_struct_declaration(declaration_database, type_instance.type_constructor.module_reference.name, false, instanced_declarations.struct_declarations.back());
         }
     }
 
     static void instantiate_type(
-        iris::Module& core_module,
         Declaration_database& declaration_database,
         iris::Type_reference& mutable_type_reference,
-        Type_instance const& type_instance
+        Type_instance const& type_instance,
+        Module_instanced_declarations& instanced_declarations
     )
     {
-        add_instantiated_type_to_module(core_module, declaration_database, type_instance);
+        add_instantiated_type_to_module(declaration_database, type_instance, instanced_declarations);
 
         // Replace `iris::Type_instance` by the actual type
         {
@@ -64,8 +64,9 @@ namespace iris::compiler
     }
 
     static void instantiate_all_types(
-        iris::Module& core_module,
-        Declaration_database& declaration_database
+        iris::Module const& core_module,
+        Declaration_database& declaration_database,
+        Module_instanced_declarations& instanced_declarations
     )
     {
         auto const instantiate_all = [&](std::string_view const declaration_name, iris::Type_reference const& type_reference) -> bool {
@@ -75,7 +76,7 @@ namespace iris::compiler
                 iris::Type_reference& mutable_type_reference = const_cast<iris::Type_reference&>(type_reference);
                 
                 Type_instance const& type_instance = std::get<Type_instance>(type_reference.data);
-                instantiate_type(core_module, declaration_database, mutable_type_reference, type_instance);
+                instantiate_type(declaration_database, mutable_type_reference, type_instance, instanced_declarations);
             }
 
             return false;
@@ -88,10 +89,10 @@ namespace iris::compiler
     }
 
     static void instantiate_types_in_function(
-        iris::Module& core_module,
         Declaration_database& declaration_database,
         iris::Function_declaration& function_declaration,
-        iris::Function_definition& function_definition
+        iris::Function_definition& function_definition,
+        Module_instanced_declarations& instanced_declarations
     )
     {
         auto const instantiate_all = [&](iris::Type_reference const& type_reference) -> bool {
@@ -101,7 +102,7 @@ namespace iris::compiler
                 iris::Type_reference& mutable_type_reference = const_cast<iris::Type_reference&>(type_reference);
 
                 Type_instance const& type_instance = std::get<Type_instance>(type_reference.data);
-                instantiate_type(core_module, declaration_database, mutable_type_reference, type_instance);
+                instantiate_type(declaration_database, mutable_type_reference, type_instance, instanced_declarations);
             }
 
             return false;
@@ -134,7 +135,7 @@ namespace iris::compiler
     }
 
     static void instantiate_function(
-        iris::Module& core_module,
+        iris::Module const& core_module,
         iris::Statement& statement,
         iris::Expression const& expression,
         Instance_call_key const key,
@@ -144,7 +145,7 @@ namespace iris::compiler
         std::pmr::string const mangled_name = std::pmr::string{mangle_instance_call_name(key)};
 
         std::optional<Declaration> const existing = find_declaration_in_instanced_module_declarations(
-            core_module.instanced_declarations,
+            parameters.instanced_declarations,
             key.module_name,
             mangled_name
         );
@@ -165,6 +166,7 @@ namespace iris::compiler
             key
         );
 
+        // TODO switch to core_module of function declaration
         run_all_passes_on_function(
             core_module,
             function_expression.declaration,
@@ -172,10 +174,10 @@ namespace iris::compiler
             parameters
         );
 
-        core_module.instanced_declarations.function_declarations.push_back(function_expression.declaration);
-        core_module.definitions.function_definitions.push_back(function_expression.definition);
+        parameters.instanced_declarations.function_declarations.push_back(function_expression.declaration);
+        parameters.definitions.function_definitions.push_back(function_expression.definition);
 
-        add_function_declaration(parameters.declaration_database, key.module_name, false, core_module.instanced_declarations.function_declarations.back());
+        add_function_declaration(parameters.declaration_database, key.module_name, false, parameters.instanced_declarations.function_declarations.back());
     }
 
     struct Replace_instantiate_function_parameters
@@ -247,7 +249,6 @@ namespace iris::compiler
     }
 
     static void replace_instantiate_function(
-        iris::Module& core_module,
         Replace_instantiate_function_parameters const& instantiate_parameters,
         All_passes_parameters const& parameters
     )
@@ -295,11 +296,11 @@ namespace iris::compiler
     }
 
     static void visit_deduced_instance_calls(
-        iris::Module& core_module,
+        iris::Module const& core_module,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition& function_definition,
         All_passes_parameters const& parameters,
-        std::function<void(iris::Module&, iris::Statement&, iris::Expression const&, Instance_call_key const&, All_passes_parameters const&)> const& callback
+        std::function<void(iris::Module const&, iris::Statement&, iris::Expression const&, Instance_call_key const&, All_passes_parameters const&)> const& callback
     )
     {
         auto const scope_callback = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> bool
@@ -386,7 +387,7 @@ namespace iris::compiler
     }
 
     static void instantiate_functions_in_function(
-        iris::Module& core_module,
+        iris::Module const& core_module,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition& function_definition,
         All_passes_parameters const& parameters
@@ -406,7 +407,7 @@ namespace iris::compiler
         }
 
         std::pmr::vector<Replace_instantiate_function_parameters> replace_parameters;
-        auto const gather_replacements = [&](iris::Module& core_module, iris::Statement& statement, iris::Expression const& expression, Instance_call_key const key, All_passes_parameters const& parameters)
+        auto const gather_replacements = [&](iris::Module const& core_module, iris::Statement& statement, iris::Expression const& expression, Instance_call_key const key, All_passes_parameters const& parameters)
         {
             replace_parameters.push_back({
                 statement,
@@ -425,7 +426,7 @@ namespace iris::compiler
 
         for (Replace_instantiate_function_parameters const value : replace_parameters)
         {
-            replace_instantiate_function(core_module, value, parameters);
+            replace_instantiate_function(value, parameters);
         }
     }
 
@@ -609,14 +610,14 @@ namespace iris::compiler
     }
 
     void run_instantiate_pass_on_function(
-        iris::Module& core_module,
+        iris::Module const& core_module,
         iris::Function_declaration& function_declaration,
         iris::Function_definition& function_definition,
         All_passes_parameters const& parameters
     )
     {
         instantiate_functions_in_function(core_module, function_declaration, function_definition, parameters);
-        instantiate_types_in_function(core_module, parameters.declaration_database, function_declaration, function_definition);
+        instantiate_types_in_function(parameters.declaration_database, function_declaration, function_definition, parameters.instanced_declarations);
 
         verify_no_instance_calls_in_function(core_module, function_declaration, function_definition, parameters.declaration_database);
         verify_no_type_instances_in_function(core_module, function_declaration, function_definition, parameters.declaration_database);
@@ -628,7 +629,7 @@ namespace iris::compiler
     )
     {
         instantiate_all_functions(core_module, parameters);
-        instantiate_all_types(core_module, parameters.declaration_database);
+        instantiate_all_types(core_module, parameters.declaration_database, parameters.instanced_declarations);
 
         verify_no_instance_calls_in_module(core_module, parameters.declaration_database);
         verify_no_type_instances_in_module(core_module, parameters.declaration_database);

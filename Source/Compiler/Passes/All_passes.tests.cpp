@@ -84,6 +84,9 @@ namespace iris::compiler
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
             .clang_context = *runtime_context.clang_context,
+            .dependencies = context.core_module.dependencies,
+            .instanced_declarations = context.core_module.instanced_declarations,
+            .definitions = context.core_module.definitions,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
         };

@@ -75,7 +75,7 @@ namespace iris::compiler
 
                     std::pmr::string const declaration_module_name = get_type_module_name(declaration->module_name, struct_declaration.name);
                     iris::Import_module_with_alias const* const import_module_with_alias = iris::find_import_module_with_module_name(
-                        core_module,
+                        core_module.dependencies,
                         declaration_module_name
                     );
                     std::optional<std::string_view> const import_alias = 
@@ -276,7 +276,8 @@ namespace iris::compiler
     }*/
 
     void run_implicit_function_pass_on_function(
-        iris::Module& core_module,
+        iris::Module const& core_module,
+        iris::Module_dependencies& dependencies,
         iris::Declaration_database const& declaration_database,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition& function_definition
@@ -310,7 +311,7 @@ namespace iris::compiler
                     if (implicit_function.has_value())
                     {
                         if (implicit_function->import_alias.has_value())
-                            add_import_usage(core_module, implicit_function->import_alias.value(), implicit_function->function_name);
+                            add_import_usage(dependencies, implicit_function->import_alias.value(), implicit_function->function_name);
 
                         iris::Statement new_statement = transform_statement_with_implicit_function(
                             statement,
@@ -354,6 +355,7 @@ namespace iris::compiler
 
             run_implicit_function_pass_on_function(
                 core_module,
+                core_module.dependencies,
                 declaration_database,
                 *function_declaration.value(),
                 function_definition

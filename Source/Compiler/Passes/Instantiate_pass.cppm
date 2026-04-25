@@ -17,7 +17,7 @@ namespace iris::compiler
     );
 
     export void run_instantiate_pass_on_function(
-        iris::Module& core_module,
+        iris::Module const& core_module,
         iris::Function_declaration& function_declaration,
         iris::Function_definition& function_definition,
         All_passes_parameters const& parameters

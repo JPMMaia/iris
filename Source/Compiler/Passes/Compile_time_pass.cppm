@@ -22,7 +22,8 @@ namespace iris::compiler
 
     export struct Compile_time_parameters
     {
-        iris::Module& core_module;
+        iris::Module const& core_module;
+        Module_dependencies& dependencies;
         std::pmr::polymorphic_allocator<> const& output_allocator;
         std::pmr::polymorphic_allocator<> const& temporaries_allocator;
         llvm::LLVMContext& llvm_context;

@@ -560,7 +560,7 @@ namespace iris
                 return std::nullopt;
 
             Variable_expression const& variable_expression = std::get<Variable_expression>(left_hand_side_expression.data);
-            Import_module_with_alias const* const import_module = find_import_module_with_alias(core_module, variable_expression.name);
+            Import_module_with_alias const* const import_module = find_import_module_with_alias(core_module.dependencies, variable_expression.name);
             if (import_module == nullptr)
                 return std::nullopt;
 

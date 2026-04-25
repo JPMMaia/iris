@@ -100,17 +100,17 @@ namespace iris::compiler
     }
 
     static void add_import_usage_for_module(
-        iris::Module& core_module,
+        iris::Module_dependencies& dependencies,
         std::string_view const module_name,
         std::string_view const usage
     )
     {
         auto const location = std::find_if(
-            core_module.dependencies.alias_imports.begin(),
-            core_module.dependencies.alias_imports.end(),
+            dependencies.alias_imports.begin(),
+            dependencies.alias_imports.end(),
             [&](Import_module_with_alias const& alias_import) -> bool { return alias_import.module_name == module_name; }
         );
-        if (location == core_module.dependencies.alias_imports.end())
+        if (location == dependencies.alias_imports.end())
             return;
 
         auto const usage_location = std::find(location->usages.begin(), location->usages.end(), usage);
@@ -121,13 +121,13 @@ namespace iris::compiler
     }
 
     static Import_module_with_alias const& ensure_import_module_with_alias(
-        iris::Module& core_module,
+        iris::Module_dependencies& dependencies,
         std::string_view const module_name,
         std::string_view const alias,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
-        Import_module_with_alias const* const existing_import = find_import_module_with_module_name(core_module, module_name);
+        Import_module_with_alias const* const existing_import = find_import_module_with_module_name(dependencies, module_name);
         if (existing_import != nullptr)
             return *existing_import;
 
@@ -139,8 +139,8 @@ namespace iris::compiler
             .source_range = std::nullopt,
         };
 
-        core_module.dependencies.alias_imports.push_back(std::move(new_import));
-        return core_module.dependencies.alias_imports.back();
+        dependencies.alias_imports.push_back(std::move(new_import));
+        return dependencies.alias_imports.back();
     }
 
     static iris::Statement create_binary_expression_statement(
@@ -346,13 +346,13 @@ namespace iris::compiler
             return;
 
         Import_module_with_alias const& json_import = ensure_import_module_with_alias(
-            parameters.core_module,
+            parameters.dependencies,
             g_json_module_name,
             g_json_alias,
             parameters.output_allocator
         );
         add_import_usage_for_module(
-            parameters.core_module,
+            parameters.dependencies,
             g_json_module_name,
             g_json_print_difference_function_name
         );
@@ -958,7 +958,7 @@ namespace iris::compiler
                 throw std::runtime_error{ "member_type() requires a struct or union type argument!" };
             }
 
-            add_import_usage_for_module(parameters.core_module, "iris.builtin", "Type_kind");
+            add_import_usage_for_module(parameters.dependencies, "iris.builtin", "Type_kind");
 
             return create_value_and_type(create_type_expression_statement(output_type.value()));
         }

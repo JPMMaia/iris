@@ -212,7 +212,7 @@ namespace iris::compiler
     );
 
     export void add_import_usage(
-        iris::Module& core_module,
+        iris::Module_dependencies& dependencies,
         std::string_view const alias,
         std::string_view const usage
     );
