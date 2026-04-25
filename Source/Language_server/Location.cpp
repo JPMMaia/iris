@@ -133,7 +133,7 @@ namespace iris::language_server
             {
                 iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression_to_access.data);
                 
-                std::optional<Declaration> const declaration = find_underlying_declaration_using_import_alias(declaration_database, core_module, variable_expression.name, access_expression.member_name);
+                std::optional<Declaration> const declaration = find_underlying_declaration_using_import_alias(declaration_database, core_module.name, variable_expression.name, access_expression.member_name);
                 return declaration;
             }
         }
@@ -220,7 +220,7 @@ namespace iris::language_server
             );
 
             iris::compiler::visit_statements_using_scope(
-                core_module,
+                core_module.name,
                 function->declaration,
                 scope,
                 function->definition->statements,

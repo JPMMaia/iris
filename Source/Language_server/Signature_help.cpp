@@ -123,7 +123,7 @@ namespace iris::language_server
                         std::get<iris::Variable_expression>(access_target.data);
                     std::optional<Declaration> const decl =
                         find_underlying_declaration_using_import_alias(
-                            declaration_database, core_module, var.name, access.member_name);
+                            declaration_database, core_module.name, var.name, access.member_name);
                     if (decl.has_value() &&
                         std::holds_alternative<iris::Function_declaration const*>(decl->data))
                     {
@@ -392,7 +392,7 @@ namespace iris::language_server
             return nullptr;
 
         std::optional<iris::Type_reference> const expression_type = iris::compiler::get_expression_type(
-            core_module,
+            core_module.name,
             function_declaration,
             scope,
             statement,
@@ -525,7 +525,7 @@ namespace iris::language_server
         std::optional<Declaration> const declaration =
             find_underlying_declaration_using_import_alias(
                 declaration_database,
-                core_module,
+                core_module.name,
                 left_hand_side,
                 member_name
             );
@@ -602,7 +602,7 @@ namespace iris::language_server
         std::optional<Declaration> const decl =
             find_underlying_declaration_using_import_alias(
                 declaration_database,
-                core_module,
+                core_module.name,
                 left_hand_side,
                 member_name
             );
@@ -1453,7 +1453,7 @@ namespace iris::language_server
             return std::nullopt;
 
         std::optional<iris::Type_reference> const expression_type = iris::compiler::get_expression_type(
-            core_module,
+            core_module.name,
             containing_function->declaration,
             scope.value(),
             callee_statement,

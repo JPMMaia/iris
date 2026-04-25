@@ -139,7 +139,7 @@ namespace iris::compiler
     export std::optional<Type_info> create_type_info(std::optional<iris::Type_reference> type, bool is_mutable);
 
     export std::optional<Type_info> get_expression_type_info(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -149,7 +149,7 @@ namespace iris::compiler
     );
 
     export std::optional<iris::Type_reference> get_expression_type(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -158,7 +158,7 @@ namespace iris::compiler
     );
 
     export std::optional<iris::Type_reference> get_expression_type(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -176,7 +176,7 @@ namespace iris::compiler
 
     export std::optional<Deduced_instance_call> deduce_instance_call_arguments(
         iris::Declaration_database const& declaration_database,
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Scope const& scope,
         iris::Statement const& statement,
         iris::Call_expression const& call_expression,
@@ -239,7 +239,7 @@ namespace iris::compiler
 
     export template <typename Function>
     void visit_statements_using_scope(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope& scope,
         std::span<iris::Statement const> const statements,
@@ -260,7 +260,7 @@ namespace iris::compiler
                 if (std::holds_alternative<iris::Block_expression>(expression.data))
                 {
                     iris::Block_expression const& block_expression = std::get<iris::Block_expression>(expression.data);
-                    visit_statements_using_scope(core_module, function_declaration, scope, block_expression.statements, declaration_database, callback);
+                    visit_statements_using_scope(module_name, function_declaration, scope, block_expression.statements, declaration_database, callback);
                 }
                 else if (std::holds_alternative<iris::If_expression>(expression.data))
                 {
@@ -271,14 +271,14 @@ namespace iris::compiler
                         if (pair.condition.has_value())
                             callback(pair.condition.value(), scope);
 
-                        visit_statements_using_scope(core_module, function_declaration, scope, pair.then_statements, declaration_database, callback);
+                        visit_statements_using_scope(module_name, function_declaration, scope, pair.then_statements, declaration_database, callback);
                     }
                 }
                 else if (std::holds_alternative<iris::For_loop_expression>(expression.data))
                 {
                     iris::For_loop_expression const& for_loop_expression = std::get<iris::For_loop_expression>(expression.data);
 
-                    std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[for_loop_expression.range_begin.expression_index], std::nullopt, declaration_database);
+                    std::optional<iris::Type_reference> const type_reference = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[for_loop_expression.range_begin.expression_index], std::nullopt, declaration_database);
                     if (type_reference.has_value())
                     {
                         scope.variables.push_back(
@@ -287,7 +287,7 @@ namespace iris::compiler
                     }
 
                     callback(for_loop_expression.range_end, scope);
-                    visit_statements_using_scope(core_module, function_declaration, scope, for_loop_expression.then_statements, declaration_database, callback);
+                    visit_statements_using_scope(module_name, function_declaration, scope, for_loop_expression.then_statements, declaration_database, callback);
 
                     if (type_reference.has_value())
                         scope.variables.pop_back();
@@ -304,12 +304,12 @@ namespace iris::compiler
                     iris::Switch_expression const& switch_expression = std::get<iris::Switch_expression>(expression.data);
 
                     for (iris::Switch_case_expression_pair const& pair : switch_expression.cases)
-                        visit_statements_using_scope(core_module, function_declaration, scope, pair.statements, declaration_database, callback);
+                        visit_statements_using_scope(module_name, function_declaration, scope, pair.statements, declaration_database, callback);
                 }
                 else if (std::holds_alternative<iris::Variable_declaration_expression>(expression.data))
                 {
                     iris::Variable_declaration_expression const& data = std::get<iris::Variable_declaration_expression>(expression.data);
-                    std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.right_hand_side.expression_index], std::nullopt, declaration_database);
+                    std::optional<iris::Type_reference> const type_reference = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.right_hand_side.expression_index], std::nullopt, declaration_database);
                     if (type_reference.has_value())
                         scope.variables.push_back(
                             create_variable(data.name, type_reference.value(), data.is_mutable, false, expression.source_range)
@@ -330,7 +330,7 @@ namespace iris::compiler
                 {
                     iris::While_loop_expression const& while_loop_expression = std::get<iris::While_loop_expression>(expression.data);
 
-                    visit_statements_using_scope(core_module, function_declaration, scope, while_loop_expression.then_statements, declaration_database, callback);
+                    visit_statements_using_scope(module_name, function_declaration, scope, while_loop_expression.then_statements, declaration_database, callback);
                 }
             }
         }

@@ -143,14 +143,14 @@ namespace iris
 
     export std::optional<Declaration> find_declaration_using_import_alias(
         Declaration_database const& database,
-        iris::Module const& core_module,
+        std::string_view const current_module_name,
         std::string_view const import_alias_name,
         std::string_view const declaration_name
     );
 
     export std::optional<Declaration> find_underlying_declaration_using_import_alias(
         Declaration_database const& database,
-        iris::Module const& core_module,
+        std::string_view const current_module_name,
         std::string_view const import_alias_name,
         std::string_view const declaration_name
     );

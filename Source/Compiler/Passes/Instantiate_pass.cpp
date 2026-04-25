@@ -312,7 +312,7 @@ namespace iris::compiler
                     iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
                     std::optional<Deduced_instance_call> const deduced_instance_call = deduce_instance_call_arguments(
                         parameters.declaration_database,
-                        core_module,
+                        core_module.name,
                         scope,
                         statement,
                         call_expression,
@@ -377,7 +377,7 @@ namespace iris::compiler
         add_parameters_to_scope(scope, function_declaration.input_parameter_names, function_declaration.type.input_parameter_types, function_declaration.input_parameter_source_positions);
 
         visit_statements_using_scope(
-            core_module,
+            core_module.name,
             &function_declaration,
             scope,
             function_definition.statements,
@@ -462,7 +462,7 @@ namespace iris::compiler
             iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
 
             std::optional<iris::Type_reference> const expression_type = get_expression_type(
-                core_module,
+                core_module.name,
                 &function_declaration,
                 scope,
                 statement,
@@ -516,7 +516,7 @@ namespace iris::compiler
         add_parameters_to_scope(scope, function_declaration.input_parameter_names, function_declaration.type.input_parameter_types, function_declaration.input_parameter_source_positions);
 
         visit_statements_using_scope(
-            core_module,
+            core_module.name,
             &function_declaration,
             scope,
             function_definition.statements,

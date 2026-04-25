@@ -917,7 +917,7 @@ namespace iris::compiler
                 iris::Statement const& statement = value.value.value();
 
                 std::pmr::vector<std::optional<Type_info>> const expression_types = calculate_expression_type_infos_of_statement(
-                    core_module,
+                    core_module.name,
                     nullptr,
                     scope,
                     statement,
@@ -947,7 +947,7 @@ namespace iris::compiler
                 }
 
                 std::optional<Type_reference> const type = get_expression_type(
-                    core_module,
+                    core_module.name,
                     nullptr,
                     scope,
                     statement,
@@ -983,7 +983,7 @@ namespace iris::compiler
     )
     {
         std::pmr::vector<std::optional<Type_info>> const expression_types = calculate_expression_type_infos_of_statement(
-            core_module,
+            core_module.name,
             nullptr,
             {},
             declaration.initial_value,
@@ -1076,7 +1076,7 @@ namespace iris::compiler
             iris::Statement const& member_default_value = declaration.member_default_values[member_index];
 
             std::pmr::vector<std::optional<Type_info>> const expression_types = calculate_expression_type_infos_of_statement(
-                core_module,
+                core_module.name,
                 nullptr,
                 {},
                 member_default_value,
@@ -1404,7 +1404,7 @@ namespace iris::compiler
             }
 
             std::optional<iris::Type_reference> const condition_type_optional = get_expression_type(
-                core_module,
+                core_module.name,
                 &function_declaration,
                 scope,
                 function_condition.condition,
@@ -1493,7 +1493,7 @@ namespace iris::compiler
                     iris::Variable_declaration_expression const& variable_declaration = std::get<iris::Variable_declaration_expression>(expression.data);
 
                     std::optional<iris::Type_reference> variable_type = get_expression_type(
-                        core_module,
+                        core_module.name,
                         function_declaration,
                         new_scope,
                         statement,
@@ -1538,7 +1538,7 @@ namespace iris::compiler
     )
     {
         std::pmr::vector<std::optional<Type_info>> const expression_types = calculate_expression_type_infos_of_statement(
-            core_module,
+            core_module.name,
             function_declaration,
             scope,
             statement,
@@ -1914,7 +1914,7 @@ namespace iris::compiler
     )
     {
         std::optional<iris::Type_reference> const condition_type_optional = get_expression_type(
-            parameters.core_module,
+            parameters.core_module.name,
             parameters.function_declaration,
             parameters.scope,
             expression.statement,
@@ -2387,7 +2387,7 @@ namespace iris::compiler
 
                 if (expression.arguments.size() > 0)
                 {
-                    std::optional<Type_info> const first_argument_type_info = get_expression_type_info(parameters.core_module, nullptr, parameters.scope, parameters.statement, parameters.statement.expressions[expression.arguments[0].expression_index], std::nullopt, parameters.declaration_database);
+                    std::optional<Type_info> const first_argument_type_info = get_expression_type_info(parameters.core_module.name, nullptr, parameters.scope, parameters.statement, parameters.statement.expressions[expression.arguments[0].expression_index], std::nullopt, parameters.declaration_database);
                     if (first_argument_type_info.has_value() && std::holds_alternative<iris::Pointer_type>(first_argument_type_info->type.data))
                     {
                         std::optional<Type_reference> value_type = remove_pointer(first_argument_type_info->type);
@@ -2421,7 +2421,7 @@ namespace iris::compiler
 
                 if (expression.arguments.size() > 0)
                 {
-                    std::optional<Type_info> first_argument_type_info = get_expression_type_info(parameters.core_module, nullptr, parameters.scope, parameters.statement, parameters.statement.expressions[expression.arguments[0].expression_index], std::nullopt, parameters.declaration_database);
+                    std::optional<Type_info> first_argument_type_info = get_expression_type_info(parameters.core_module.name, nullptr, parameters.scope, parameters.statement, parameters.statement.expressions[expression.arguments[0].expression_index], std::nullopt, parameters.declaration_database);
                     if (first_argument_type_info.has_value() && std::holds_alternative<iris::Pointer_type>(first_argument_type_info->type.data))
                         pointer_type = std::move(first_argument_type_info->type);
                 }
@@ -2632,7 +2632,7 @@ namespace iris::compiler
         {
             std::optional<Deduced_instance_call> const deduced_instance_call = deduce_instance_call_arguments(
                 parameters.declaration_database,
-                parameters.core_module,
+                parameters.core_module.name,
                 parameters.scope,
                 parameters.statement,
                 expression,
@@ -2908,7 +2908,7 @@ namespace iris::compiler
         }
 
         std::optional<iris::Type_reference> const range_end_type_optional = get_expression_type(
-            parameters.core_module,
+            parameters.core_module.name,
             parameters.function_declaration,
             new_scope,
             expression.range_end,
@@ -3007,7 +3007,7 @@ namespace iris::compiler
                 if (condition_diagnostics.empty())
                 {
                     std::optional<iris::Type_reference> const condition_type_optional = get_expression_type(
-                        parameters.core_module,
+                        parameters.core_module.name,
                         parameters.function_declaration,
                         parameters.scope,
                         pair.condition.value(),
@@ -3212,7 +3212,7 @@ namespace iris::compiler
 
             iris::Expression const& member_value_expression = parameters.statement.expressions[pair.value.expression_index];
             std::optional<iris::Type_reference> const assigned_value_type = get_expression_type(
-                parameters.core_module,
+                parameters.core_module.name,
                 parameters.function_declaration,
                 parameters.scope,
                 parameters.statement,
@@ -3569,7 +3569,7 @@ namespace iris::compiler
         }
 
         std::optional<iris::Type_reference> const then_type_optional = get_expression_type(
-            parameters.core_module,
+            parameters.core_module.name,
             parameters.function_declaration,
             parameters.scope,
             expression.then_statement,
@@ -3578,7 +3578,7 @@ namespace iris::compiler
         );
 
         std::optional<iris::Type_reference> const else_type_optional = get_expression_type(
-            parameters.core_module,
+            parameters.core_module.name,
             parameters.function_declaration,
             parameters.scope,
             expression.else_statement,
@@ -3914,7 +3914,7 @@ namespace iris::compiler
         else
         {
             std::optional<iris::Type_reference> const& right_hand_side_type = get_expression_type(
-                parameters.core_module,
+                parameters.core_module.name,
                 parameters.function_declaration,
                 parameters.scope,
                 parameters.statement,
@@ -4010,7 +4010,7 @@ namespace iris::compiler
         }
 
         std::optional<iris::Type_reference> const condition_type_optional = get_expression_type(
-            parameters.core_module,
+            parameters.core_module.name,
             parameters.function_declaration,
             parameters.scope,
             expression.condition,
@@ -4080,7 +4080,7 @@ namespace iris::compiler
     }
 
     std::pmr::vector<std::optional<Type_info>> calculate_expression_type_infos_of_statement(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -4098,7 +4098,7 @@ namespace iris::compiler
             std::optional<iris::Type_reference> const expected_expression_type = get_expected_expression_type(statement, expected_statement_type, expression_index);
             
             expression_types[expression_index] = get_expression_type_info(
-                core_module,
+                module_name,
                 function_declaration,
                 scope,
                 statement,
@@ -4112,7 +4112,7 @@ namespace iris::compiler
     }
 
     std::pmr::vector<std::optional<iris::Type_reference>> calculate_expression_types_of_statement(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -4129,7 +4129,7 @@ namespace iris::compiler
             iris::Expression const& expression = statement.expressions[expression_index];
             
             expression_types[expression_index] = get_expression_type(
-                core_module,
+                module_name,
                 function_declaration,
                 scope,
                 statement,
@@ -4296,7 +4296,7 @@ namespace iris::compiler
 
                     std::optional<Declaration> const declaration = find_declaration_using_import_alias(
                         declaration_database,
-                        core_module,
+                        core_module.name,
                         variable_expression.name,
                         access_expression.member_name
                     );

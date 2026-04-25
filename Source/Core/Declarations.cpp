@@ -275,17 +275,19 @@ namespace iris
 
     std::optional<Declaration> find_declaration_using_import_alias(
         Declaration_database const& database,
-        iris::Module const& core_module,
+        std::string_view const current_module_name,
         std::string_view const import_alias_name,
         std::string_view const declaration_name
     )
     {
+        Module_dependencies const& dependencies = get_module_dependencies(database, current_module_name);
+
         auto const location = std::find_if(
-            core_module.dependencies.alias_imports.begin(),
-            core_module.dependencies.alias_imports.end(),
+            dependencies.alias_imports.begin(),
+            dependencies.alias_imports.end(),
             [import_alias_name](Import_module_with_alias const& alias_import) -> bool { return alias_import.alias == import_alias_name; }
         );
-        if (location == core_module.dependencies.alias_imports.end())
+        if (location == dependencies.alias_imports.end())
             return std::nullopt;
 
         return find_declaration(
@@ -297,14 +299,14 @@ namespace iris
 
     std::optional<Declaration> find_underlying_declaration_using_import_alias(
         Declaration_database const& database,
-        iris::Module const& core_module,
+        std::string_view const current_module_name,
         std::string_view const import_alias_name,
         std::string_view const declaration_name
     )
     {
         std::optional<Declaration> optional_declaration = find_declaration_using_import_alias(
             database,
-            core_module,
+            current_module_name,
             import_alias_name,
             declaration_name
         );

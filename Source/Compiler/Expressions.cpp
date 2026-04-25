@@ -112,7 +112,7 @@ namespace iris::compiler
 
             iris::compiler::Scope scope{};
             std::optional<iris::Type_reference> type = get_expression_type(
-                global_variable_module,
+                global_variable_module.name,
                 parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
                 scope,
                 global_variable_declaration.initial_value,
@@ -1391,7 +1391,7 @@ namespace iris::compiler
 
             Scope const scope = create_type_analysis_scope(parameters);
             std::optional<Type_reference> const array_base_expression_type = get_expression_type(
-                parameters.core_module,
+                parameters.core_module.name,
                 parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
                 scope,
                 statement,

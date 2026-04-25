@@ -345,7 +345,7 @@ namespace iris::compiler
         {
             iris::For_loop_expression& data = std::get<iris::For_loop_expression>(expression.data);
 
-            std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.range_begin.expression_index], std::nullopt, declaration_database);
+            std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module.name, nullptr, scope, statement, statement.expressions[data.range_begin.expression_index], std::nullopt, declaration_database);
             if (type_reference.has_value())
             {
                 scope.variables.push_back(
@@ -480,7 +480,7 @@ namespace iris::compiler
         else if (std::holds_alternative<iris::Variable_declaration_expression>(expression.data))
         {
             iris::Variable_declaration_expression& data = std::get<iris::Variable_declaration_expression>(expression.data);
-            std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.right_hand_side.expression_index], std::nullopt, declaration_database);
+            std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module.name, nullptr, scope, statement, statement.expressions[data.right_hand_side.expression_index], std::nullopt, declaration_database);
             if (type_reference.has_value())
                 scope.variables.push_back(
                     create_variable(data.name, type_reference.value(), data.is_mutable, false, expression.source_range)
@@ -530,7 +530,7 @@ namespace iris::compiler
     }
 
     std::optional<iris::Type_reference> get_expression_type(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -542,7 +542,7 @@ namespace iris::compiler
             return std::nullopt;
 
         return get_expression_type(
-            core_module,
+            module_name,
             function_declaration,
             scope,
             statement,
@@ -554,7 +554,7 @@ namespace iris::compiler
 
     
     iris::Function_declaration const* get_function_declaration_to_call(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Statement const& statement,
         iris::Expression const& expression,
         iris::Declaration_database const& declaration_database
@@ -569,7 +569,7 @@ namespace iris::compiler
         {
             iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
 
-            std::optional<Declaration> const declaration = find_declaration(declaration_database, core_module.name, variable_expression.name);
+            std::optional<Declaration> const declaration = find_declaration(declaration_database, module_name, variable_expression.name);
             if (declaration.has_value() && std::holds_alternative<iris::Function_declaration const*>(declaration->data))
                 return std::get<iris::Function_declaration const*>(declaration->data);
         }
@@ -578,7 +578,7 @@ namespace iris::compiler
     }
 
     std::optional<iris::Type_reference> get_type_to_instantiate(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -611,7 +611,7 @@ namespace iris::compiler
                 if (assignment_expression.right_hand_side.expression_index == expression_index)
                 {
                     std::optional<iris::Type_reference> const left_hand_side_type = get_expression_type(
-                        core_module,
+                        module_name,
                         function_declaration,
                         scope,
                         statement,
@@ -632,7 +632,7 @@ namespace iris::compiler
                     if (argument_expression.expression_index == expression_index)
                     {
                         iris::Function_declaration const* const function_declaration_to_call = get_function_declaration_to_call(
-                            core_module,
+                            module_name,
                             statement,
                             statement.expressions[call_expression.expression.expression_index],
                             declaration_database
@@ -653,7 +653,7 @@ namespace iris::compiler
                     if (member.value.expression_index == expression_index)
                     {
                         std::optional<iris::Type_reference> const current_expression_type = get_expression_type(
-                            core_module,
+                            module_name,
                             function_declaration,
                             scope,
                             statement,
@@ -789,7 +789,7 @@ namespace iris::compiler
     }
 
     std::optional<Type_info> get_expression_type_info(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -802,7 +802,7 @@ namespace iris::compiler
         {
             Access_expression const& data = std::get<iris::Access_expression>(expression.data);
             
-            std::optional<Type_info> const type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+            std::optional<Type_info> const type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
             std::optional<iris::Type_reference> const type_reference = type_info.has_value() ? std::optional<iris::Type_reference>{type_info->type} : std::optional<iris::Type_reference>{std::nullopt};
 
             bool const is_import_alias_or_enum_name = !type_reference.has_value();
@@ -818,7 +818,7 @@ namespace iris::compiler
                     {
                         std::optional<Declaration> const declaration_optional = find_declaration_using_import_alias(
                             declaration_database,
-                            core_module,
+                            module_name,
                             variable_expression.name,
                             data.member_name
                         );
@@ -851,7 +851,7 @@ namespace iris::compiler
                                         };    
                                     }
 
-                                    std::optional<iris::Type_reference> value_type = get_expression_type(core_module, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
+                                    std::optional<iris::Type_reference> value_type = get_expression_type(module_name, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
                                     if (!value_type.has_value())
                                         return std::nullopt;
 
@@ -863,7 +863,7 @@ namespace iris::compiler
                                 }
 
                                 Import_module_with_alias const* import_alias = find_import_module_with_alias(
-                                    core_module.dependencies,
+                                    get_module_dependencies(declaration_database, module_name),
                                     variable_expression.name
                                 );
                                 assert(import_alias != nullptr);
@@ -881,7 +881,7 @@ namespace iris::compiler
                     {
                         std::optional<Declaration> const declaration_optional = find_underlying_declaration(
                             declaration_database,
-                            core_module.name,
+                            module_name,
                             variable_expression.name
                         );
 
@@ -891,7 +891,7 @@ namespace iris::compiler
                             {
                                 return Type_info
                                 {
-                                    .type = create_custom_type_reference(core_module.name, variable_expression.name),
+                                    .type = create_custom_type_reference(module_name, variable_expression.name),
                                     .is_mutable = false,
                                 };
                             }
@@ -1081,7 +1081,7 @@ namespace iris::compiler
                 iris::Dereference_and_access_expression const& dereference_and_access_expression = std::get<iris::Dereference_and_access_expression>(left_hand_side_expression.data);
 
                 std::optional<Type_info> const soa_type_info = get_expression_type_info(
-                    core_module,
+                    module_name,
                     nullptr,
                     scope,
                     statement,
@@ -1128,7 +1128,7 @@ namespace iris::compiler
                 }
             }
 
-            std::optional<Type_info> const lhs_type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);;
+            std::optional<Type_info> const lhs_type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);;
             std::optional<iris::Type_reference> const lhs_type_reference = lhs_type_info.has_value() ? std::optional<iris::Type_reference>{lhs_type_info->type} : std::optional<iris::Type_reference>{std::nullopt};
             if (!lhs_type_reference.has_value())
                 return std::nullopt;
@@ -1228,7 +1228,7 @@ namespace iris::compiler
                 case iris::Binary_operation::Bit_shift_left:
                 case iris::Binary_operation::Bit_shift_right:
                 default: {
-                    std::optional<iris::Type_reference> type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.left_hand_side.expression_index], std::nullopt, declaration_database);
+                    std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.left_hand_side.expression_index], std::nullopt, declaration_database);
                     if (!type.has_value())
                         return std::nullopt;
 
@@ -1244,7 +1244,7 @@ namespace iris::compiler
         {
             Call_expression const& data = std::get<iris::Call_expression>(expression.data);
 
-            std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+            std::optional<iris::Type_reference> const type_reference = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
 
             if (type_reference.has_value() && std::holds_alternative<iris::Builtin_type_reference>(type_reference.value().data))
             {
@@ -1261,7 +1261,7 @@ namespace iris::compiler
 
                     if (data.arguments.size() > 0)
                     {
-                        std::optional<Type_info> const first_argument_type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
+                        std::optional<Type_info> const first_argument_type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
                         if (first_argument_type_info.has_value() && std::holds_alternative<Pointer_type>(first_argument_type_info->type.data))
                         {
                             Pointer_type const& pointer_type = std::get<Pointer_type>(first_argument_type_info->type.data);
@@ -1293,7 +1293,7 @@ namespace iris::compiler
                     if (data.arguments.size() == 0)
                         return std::nullopt;
                     
-                    std::optional<Type_info> const first_argument_type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
+                    std::optional<Type_info> const first_argument_type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
                     return first_argument_type_info;
                 }
                 else if (builtin_type_reference.value == "reinterpret_as")
@@ -1314,7 +1314,7 @@ namespace iris::compiler
                     {
                         iris::Access_expression const& access_expression = std::get<iris::Access_expression>(callable_expression.data);
                         receiver_type_info = get_expression_type_info(
-                            core_module,
+                            module_name,
                             nullptr,
                             scope,
                             statement,
@@ -1327,7 +1327,7 @@ namespace iris::compiler
                     {
                         iris::Dereference_and_access_expression const& access_expression = std::get<iris::Dereference_and_access_expression>(callable_expression.data);
                         receiver_type_info = get_expression_type_info(
-                            core_module,
+                            module_name,
                             nullptr,
                             scope,
                             statement,
@@ -1371,7 +1371,7 @@ namespace iris::compiler
             {
                 std::optional<Deduced_instance_call> const deduced_instance_call = deduce_instance_call_arguments(
                     declaration_database,
-                    core_module,
+                    module_name,
                     scope,
                     statement,
                     data,
@@ -1455,7 +1455,7 @@ namespace iris::compiler
                 };
             }
 
-            std::optional<iris::Type_reference> const element_type = get_expression_type(core_module, nullptr, scope, data.array_data[0], std::nullopt, declaration_database);
+            std::optional<iris::Type_reference> const element_type = get_expression_type(module_name, nullptr, scope, data.array_data[0], std::nullopt, declaration_database);
             if (!element_type.has_value())
                 return std::nullopt;
 
@@ -1468,7 +1468,7 @@ namespace iris::compiler
         else if (std::holds_alternative<iris::Defer_expression>(expression.data))
         {
             Defer_expression const& data = std::get<iris::Defer_expression>(expression.data);
-            std::optional<Type_reference> type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression_to_defer.expression_index], std::nullopt, declaration_database);
+            std::optional<Type_reference> type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression_to_defer.expression_index], std::nullopt, declaration_database);
             if (!type.has_value())
                 return std::nullopt;
 
@@ -1482,7 +1482,7 @@ namespace iris::compiler
         {
             Dereference_and_access_expression const& data = std::get<iris::Dereference_and_access_expression>(expression.data);
 
-            std::optional<Type_reference> const left_side_type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+            std::optional<Type_reference> const left_side_type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
             if (!left_side_type.has_value() || !is_non_void_pointer(left_side_type.value()) || !is_pointer(left_side_type.value()))
                 return std::nullopt;
 
@@ -1584,7 +1584,7 @@ namespace iris::compiler
 
             std::optional<Custom_type_reference> custom_type_reference = get_function_constructor_type_reference(
                 declaration_database,
-                core_module.name,
+                module_name,
                 statement.expressions[data.left_hand_side.expression_index],
                 statement
             );
@@ -1607,7 +1607,7 @@ namespace iris::compiler
                 expected_expression_type.has_value() ?
                 expected_expression_type.value() :            
                 get_type_to_instantiate(
-                    core_module,
+                    module_name,
                     function_declaration,
                     scope,
                     statement,
@@ -1675,7 +1675,7 @@ namespace iris::compiler
         else if (std::holds_alternative<iris::Parenthesis_expression>(expression.data))
         {
             Parenthesis_expression const& data = std::get<iris::Parenthesis_expression>(expression.data);
-            std::optional<iris::Type_reference> type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+            std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
             if (!type.has_value())
                 return std::nullopt;
 
@@ -1703,7 +1703,7 @@ namespace iris::compiler
         else if (std::holds_alternative<iris::Ternary_condition_expression>(expression.data))
         {
             Ternary_condition_expression const& data = std::get<iris::Ternary_condition_expression>(expression.data);
-            std::optional<iris::Type_reference> type = get_expression_type(core_module, nullptr, scope, data.then_statement, std::nullopt, declaration_database);
+            std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, data.then_statement, std::nullopt, declaration_database);
             if (!type.has_value())
                 return std::nullopt;
 
@@ -1734,7 +1734,7 @@ namespace iris::compiler
                 case iris::Unary_operation::Pre_decrement:
                 case iris::Unary_operation::Post_decrement:
                 {
-                    std::optional<iris::Type_reference> type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+                    std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
                     if (!type.has_value())
                         return std::nullopt;
 
@@ -1746,7 +1746,7 @@ namespace iris::compiler
                 }
                 case iris::Unary_operation::Indirection:
                 {
-                    std::optional<iris::Type_reference> const expression_type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+                    std::optional<iris::Type_reference> const expression_type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
                     if (!expression_type.has_value())
                         return std::nullopt;
 
@@ -1769,7 +1769,7 @@ namespace iris::compiler
                 }
                 case iris::Unary_operation::Address_of:
                 {
-                    std::optional<Type_info> const expression_type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+                    std::optional<Type_info> const expression_type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
                     if (!expression_type_info.has_value())
                     {
                         return Type_info
@@ -1816,7 +1816,7 @@ namespace iris::compiler
             {
                 std::optional<Declaration> const declaration_optional = find_declaration(
                     declaration_database,
-                    core_module.name,
+                    module_name,
                     data.name
                 );
                 if (declaration_optional.has_value())
@@ -1833,7 +1833,7 @@ namespace iris::compiler
                             };
                         }
 
-                        std::optional<iris::Type_reference> type = get_expression_type(core_module, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
+                        std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
                         if (!type.has_value())
                             return std::nullopt;
                     
@@ -1881,7 +1881,7 @@ namespace iris::compiler
     }
 
     std::optional<iris::Type_reference> get_expression_type(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -1891,7 +1891,7 @@ namespace iris::compiler
     )
     {
         std::optional<Type_info> type_info = get_expression_type_info(
-            core_module,
+            module_name,
             function_declaration,
             scope,
             statement,
@@ -1907,14 +1907,14 @@ namespace iris::compiler
 
     std::optional<Custom_type_reference> get_function_constructor_type_reference_using_scope(
         Declaration_database const& declaration_database,
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Scope const& scope,
         iris::Statement const& statement,
         iris::Expression const& expression
     )
     {
         std::optional<iris::Type_reference> const expression_type = get_expression_type(
-            core_module,
+            module_name,
             nullptr,
             scope,
             statement,
@@ -1929,14 +1929,14 @@ namespace iris::compiler
 
         return get_function_constructor_type_reference(
             declaration_database,
-            core_module.name,
+            module_name,
             expression,
             statement
         );
     }
 
     std::optional<iris::Type_reference> get_instance_call_implicit_first_argument(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Scope const& scope,
         iris::Statement const& statement,
         iris::Expression const& left_hand_side,
@@ -1947,7 +1947,7 @@ namespace iris::compiler
         {
             Access_expression const& data = std::get<iris::Access_expression>(left_hand_side.data);
             std::optional<iris::Type_reference> const type_reference = get_expression_type(
-                core_module,
+                module_name,
                 nullptr,
                 scope,
                 statement,
@@ -2042,7 +2042,7 @@ namespace iris::compiler
 
     std::optional<Deduced_instance_call> deduce_instance_call_arguments(
         iris::Declaration_database const& declaration_database,
-        iris::Module const& core_module,
+        std::string_view const module_name,
         Scope const& scope,
         iris::Statement const& statement,
         iris::Call_expression const& call_expression,
@@ -2053,7 +2053,7 @@ namespace iris::compiler
 
         std::optional<Custom_type_reference> const custom_type_reference = get_function_constructor_type_reference_using_scope(
             declaration_database,
-            core_module,
+            module_name,
             scope,
             statement,
             left_hand_side
@@ -2069,7 +2069,7 @@ namespace iris::compiler
             return std::nullopt;
 
         std::optional<iris::Type_reference> const implicit_first_argument_type = get_instance_call_implicit_first_argument(
-            core_module,
+            module_name,
             scope,
             statement,
             left_hand_side,
@@ -2087,7 +2087,7 @@ namespace iris::compiler
             iris::Expression const& argument_expression = statement.expressions[call_expression.arguments[argument_index].expression_index];
 
             std::optional<iris::Type_reference> argument_type = get_expression_type(
-                core_module,
+                module_name,
                 nullptr,
                 scope,
                 statement,
@@ -2411,7 +2411,7 @@ namespace iris::compiler
                     if (std::holds_alternative<iris::Variable_declaration_expression>(first_expression.data))
                     {
                         iris::Variable_declaration_expression const& variable = std::get<iris::Variable_declaration_expression>(first_expression.data);
-                        std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[variable.right_hand_side.expression_index], std::nullopt, declaration_database);
+                        std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module.name, nullptr, scope, statement, statement.expressions[variable.right_hand_side.expression_index], std::nullopt, declaration_database);
                         if (type_reference.has_value())
                             output->variables.push_back(
                                 create_variable(variable.name, type_reference.value(), variable.is_mutable, false, first_expression.source_range)
@@ -2442,7 +2442,7 @@ namespace iris::compiler
         );
 
         iris::compiler::visit_statements_using_scope(
-            core_module,
+            core_module.name,
             &function_declaration,
             scope,
             function_definition.statements,

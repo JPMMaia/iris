@@ -270,7 +270,7 @@ namespace iris::compiler
     );
 
     std::pmr::vector<std::optional<Type_info>> calculate_expression_type_infos_of_statement(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,
@@ -280,7 +280,7 @@ namespace iris::compiler
     );
 
     std::pmr::vector<std::optional<iris::Type_reference>> calculate_expression_types_of_statement(
-        iris::Module const& core_module,
+        std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
         Scope const& scope,
         iris::Statement const& statement,

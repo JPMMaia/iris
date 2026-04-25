@@ -333,7 +333,7 @@ namespace iris::compiler
         };
 
         visit_statements_using_scope(
-            core_module,
+            core_module.name,
             &function_declaration,
             scope,
             function_definition.statements,

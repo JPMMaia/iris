@@ -56,7 +56,7 @@ namespace iris::language_server
                 iris::Variable_declaration_expression const& variable_declaration = std::get<iris::Variable_declaration_expression>(expression.data);
 
                 std::optional<iris::Type_reference> const variable_type = get_expression_type(
-                    core_module,
+                    core_module.name,
                     &function_declaration,
                     scope,
                     statement,
@@ -99,7 +99,7 @@ namespace iris::language_server
         };
 
         iris::compiler::visit_statements_using_scope(
-            core_module,
+            core_module.name,
             &function_declaration,
             scope,
             function_definition.statements,

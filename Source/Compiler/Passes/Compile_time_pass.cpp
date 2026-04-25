@@ -334,7 +334,7 @@ namespace iris::compiler
 
         iris::Expression const& left_hand_side_expression = statement.expressions[binary_expression->left_hand_side.expression_index];
         std::optional<iris::Type_reference> const left_hand_side_type = get_expression_type(
-            parameters.core_module,
+            parameters.core_module.name,
             &function_declaration,
             scope,
             statement,
@@ -1383,7 +1383,7 @@ namespace iris::compiler
         };
 
         visit_statements_using_scope(
-            parameters.core_module,
+            parameters.core_module.name,
             &function_declaration,
             scope,
             function_definition.statements,

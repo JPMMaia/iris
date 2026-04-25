@@ -262,7 +262,7 @@ namespace iris::language_server
                             iris::Expression const& expression_to_access = statement.expressions[access_expression.expression.expression_index];
 
                             std::optional<iris::Type_reference> const expression_to_access_type = iris::compiler::get_expression_type(
-                                core_module,
+                                core_module.name,
                                 function->declaration,
                                 scope,
                                 statement,
@@ -371,7 +371,7 @@ namespace iris::language_server
                                 Instantiate_member_value_pair const& member = *instantiate_member_location;
 
                                 std::optional<iris::Type_reference> const type_to_instantiate = get_expression_type(
-                                    core_module,
+                                    core_module.name,
                                     function->declaration,
                                     scope,
                                     statement,
@@ -447,7 +447,7 @@ namespace iris::language_server
             );
 
             iris::compiler::visit_statements_using_scope(
-                core_module,
+                core_module.name,
                 function->declaration,
                 scope,
                 function->definition->statements,

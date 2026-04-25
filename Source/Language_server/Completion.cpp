@@ -638,7 +638,7 @@ namespace iris::language_server
             if (scope.has_value())
             {
                 std::optional<iris::Type_reference> const expression_type = iris::compiler::get_expression_type(
-                    core_module,
+                    core_module.name,
                     function_declaration,
                     scope.value(),
                     access_statement,
@@ -880,7 +880,7 @@ namespace iris::language_server
             auto const process_expression = [&](iris::Function_declaration const* const function_declaration, iris::compiler::Scope const& scope, iris::Statement const& statement, iris::Expression const& expression) -> bool
             {
                 std::optional<iris::Type_reference> const expression_type = iris::compiler::get_expression_type(
-                    core_module,
+                    core_module.name,
                     function_declaration,
                     scope,
                     statement,

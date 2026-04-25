@@ -489,7 +489,7 @@ namespace iris::language_server
                 if (expression != nullptr)
                 {
                     std::optional<iris::Type_reference> const type_to_instantiate = get_expression_type(
-                        core_module,
+                        core_module.name,
                         function->declaration,
                         scope,
                         statement,
@@ -540,7 +540,7 @@ namespace iris::language_server
             );
 
             iris::compiler::visit_statements_using_scope(
-                core_module,
+                core_module.name,
                 function->declaration,
                 scope,
                 function->definition->statements,
