@@ -533,6 +533,14 @@
         {
           "type": "Expression_if",
           "named": true
+        },
+        {
+          "type": "Expression_variable_declaration",
+          "named": true
+        },
+        {
+          "type": "Expression_variable_declaration_with_type",
+          "named": true
         }
       ]
     }

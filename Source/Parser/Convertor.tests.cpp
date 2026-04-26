@@ -268,6 +268,12 @@ namespace iris::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts compile_time_var.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "compile_time_var.iris";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts constant_array_expressions.iris", "[Convertor]")
     {
         std::string_view const input_file = "constant_array_expressions.iris";

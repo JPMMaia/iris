@@ -6,6 +6,8 @@ module Compile_time_expressions;
 
 export function foo() -> ()
 {
+    compile_time var kind = true;
+
     compile_time if true
     {
     }
@@ -35,6 +37,16 @@ export function foo() -> ()
         (Function_output_parameters))
       (Function_definition
         (Block
+          (Statement
+            (Expression_compile_time
+              (Expression_compile_time_statements
+                (Expression_variable_declaration
+                  (Expression_variable_mutability)
+                  (Variable_name
+                    (Identifier))
+                  (Generic_expression
+                    (Expression_constant
+                      (Boolean)))))))
           (Statement
             (Expression_compile_time
               (Expression_compile_time_statements

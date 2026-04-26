@@ -713,7 +713,11 @@ namespace iris
         for (std::size_t statement_index = 0; statement_index < statements.size(); ++statement_index)
         {
             Statement const& current_statement = statements[statement_index];
-            
+
+            // Skip statements that were erased (e.g. compile_time var declarations after propagation).
+            if (current_statement.expressions.empty())
+                continue;
+
             if (statement_index > 0)
             {
                 Statement const& previous_statement = statements[statement_index - 1];
@@ -866,7 +870,12 @@ namespace iris
     )
     {
         add_text(buffer, "compile_time ");
-        add_format_expression(buffer, statement, get_expression(statement, expression.expression), indentation, options);
+
+        iris::Expression const& wrapped_expression = get_expression(statement, expression.expression);
+        add_format_expression(buffer, statement, wrapped_expression, indentation, options);
+
+        if (statement_ends_with_semicolon(wrapped_expression))
+            add_text(buffer, ";");
     }
 
     void add_format_expression_constant(

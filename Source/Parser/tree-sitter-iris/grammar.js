@@ -186,6 +186,8 @@ module.exports = grammar({
     Expression_comment: $ => $.Comment,
     Expression_compile_time: $ => seq("compile_time", $.Expression_compile_time_statements),
     Expression_compile_time_statements: $ => choice(
+      seq($.Expression_variable_declaration, ";"),
+      seq($.Expression_variable_declaration_with_type, ";"),
       $.Expression_for_loop,
       $.Expression_if
     ),

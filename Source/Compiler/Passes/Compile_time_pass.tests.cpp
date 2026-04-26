@@ -194,6 +194,40 @@ export function run_1() -> (result: Int32)
         CHECK(expected == actual);
     }
 
+    TEST_CASE("Propagates compile_time var declaration and removes runtime local", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_var;
+
+export function run() -> (result: Int32)
+{
+    compile_time var is_enabled = true;
+
+    compile_time if is_enabled
+    {
+        return 7;
+    }
+    else
+    {
+        return 8;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_var;
+
+export function run() -> (result: Int32)
+{
+    {
+        return 7;
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
     TEST_CASE("Unrolls compile_time for loop", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_for;
