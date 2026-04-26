@@ -194,6 +194,44 @@ export function run_1() -> (result: Int32)
         CHECK(expected == actual);
     }
 
+    TEST_CASE("Evaluates compile_time if with all branch conditions false", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_if;
+
+var g_value = 2;
+
+export function run_0() -> (result: Int32)
+{
+    compile_time if g_value == 0
+    {
+        return 0;
+    }
+    else if g_value == 1
+    {
+        return 1;
+    }
+
+    return 2;
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_if;
+
+var g_value = 2;
+
+export function run_0() -> (result: Int32)
+{
+    {
+    }
+    return 2;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_0");
+
+        CHECK(expected == actual);
+    }
+
     TEST_CASE("Propagates compile_time var declaration and removes runtime local", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_var;

@@ -1604,7 +1604,7 @@ namespace iris::compiler
                     return create_value_and_type(create_block_statement(serie.then_statements, parameters.output_allocator));
             }
 
-            return std::nullopt;
+            return create_value_and_type(create_block_statement({}, parameters.output_allocator));
         }
         else if (std::holds_alternative<iris::For_loop_expression>(expression.data))
         {
