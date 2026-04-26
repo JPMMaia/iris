@@ -2859,6 +2859,81 @@ function run(value: Int32) -> (result: Int32)
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Allows compile_time if with compile-time computable condition", "[Validation][If_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+var g_flag = true;
+
+function run() -> ()
+{
+    compile_time if g_flag
+    {
+    }
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that compile_time if condition must be computable at compile-time", "[Validation][If_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run(value: Bool) -> ()
+{
+    compile_time if value
+    {
+    }
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 21, 5, 26),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Compile_time if condition must be computable at compile-time.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that compile_time if condition cannot use mutable global variable", "[Validation][If_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+mutable g_flag = true;
+
+function run() -> ()
+{
+    compile_time if g_flag
+    {
+    }
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(7, 21, 7, 27),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Compile_time if condition must be computable at compile-time.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
 
     TEST_CASE("Validates that members are not duplicate", "[Validation][Instantiate_expression]")
     {

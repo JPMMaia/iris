@@ -2988,6 +2988,20 @@ namespace iris::compiler
     {
         std::pmr::vector<iris::compiler::Diagnostic> diagnostics{parameters.temporaries_allocator};
 
+        bool const is_compile_time_if = [&]()
+        {
+            for (iris::Expression const& expr : parameters.statement.expressions)
+            {
+                if (std::holds_alternative<iris::Compile_time_expression>(expr.data))
+                {
+                    iris::Compile_time_expression const& cte = std::get<iris::Compile_time_expression>(expr.data);
+                    if (cte.expression.expression_index == parameters.expression_index)
+                        return true;
+                }
+            }
+            return false;
+        }();
+
         for (Condition_statement_pair const& pair : expression.series)
         {
             if (pair.condition.has_value())
@@ -3029,6 +3043,37 @@ namespace iris::compiler
                                 )
                             )
                         );
+                    }
+                    else if (is_compile_time_if)
+                    {
+                        std::pmr::vector<std::optional<Type_info>> const condition_expression_types = calculate_expression_type_infos_of_statement(
+                            parameters.core_module.name,
+                            parameters.function_declaration,
+                            parameters.scope,
+                            pair.condition.value(),
+                            std::nullopt,
+                            parameters.declaration_database,
+                            parameters.temporaries_allocator
+                        );
+
+                        bool const condition_is_compile_time = is_computable_at_compile_time(
+                            parameters.core_module,
+                            parameters.scope,
+                            pair.condition.value(),
+                            condition_expression_types,
+                            parameters.declaration_database
+                        );
+
+                        if (!condition_is_compile_time)
+                        {
+                            diagnostics.push_back(
+                                create_error_diagnostic(
+                                    parameters.core_module.source_file_path,
+                                    get_statement_source_range(pair.condition.value()),
+                                    "Compile_time if condition must be computable at compile-time."
+                                )
+                            );
+                        }
                     }
                 }
 
