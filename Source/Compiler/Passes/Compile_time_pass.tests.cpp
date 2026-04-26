@@ -645,6 +645,176 @@ export function run_get_type_kind() -> ()
         CHECK(expected == actual);
     }
 
+    TEST_CASE("Evaluates compile_time var, if and Type_kind", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+export function run() -> ()
+{
+    compile_time var kind = @get_type_kind::<Int32>();
+    compile_time if kind == Type_kind.Int
+    {
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+export function run() -> ()
+{
+    {
+        return 0;
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time enum access", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+enum My_enum
+{
+    value_0 = 0,
+}
+
+export function run() -> ()
+{
+    compile_time var value = My_enum.value_0;
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+enum My_enum
+{
+    value_0 = 0,
+}
+
+export function run() -> ()
+{
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time enum access with implicit values", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+enum My_enum
+{
+    A = 1,
+    B,
+    C,
+}
+
+export function run() -> (result: Int32)
+{
+    compile_time if My_enum.B == 2
+    {
+        compile_time if My_enum.C == 3
+        {
+            return 1;
+        }
+        else
+        {
+            return 2;
+        }
+    }
+    else
+    {
+        return 3;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+enum My_enum
+{
+    A = 1,
+    B,
+    C,
+}
+
+export function run() -> (result: Int32)
+{
+    {
+        {
+            return 1;
+        }
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time enum access after explicit reset", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+enum My_enum
+{
+    A = 3,
+    B,
+    C,
+    D = 20,
+    E,
+}
+
+export function run() -> (result: Int32)
+{
+    compile_time if My_enum.E == 21
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+enum My_enum
+{
+    A = 3,
+    B,
+    C,
+    D = 20,
+    E,
+}
+
+export function run() -> (result: Int32)
+{
+    {
+        return 1;
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
     TEST_CASE("Evaluates compile_time binary equal", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_binary_expression;

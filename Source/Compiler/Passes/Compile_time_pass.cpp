@@ -1420,6 +1420,15 @@ namespace iris::compiler
             Compile_time_local_variable const* local_variable = find_compile_time_local_variable(compile_time_local_variables, expression.name);
             if (local_variable != nullptr)
             {
+                std::optional<Compile_time_value_and_type> const evaluated_local_statement = evaluate_compile_time_statement(
+                    module_name,
+                    local_variable->statement,
+                    parameters,
+                    compile_time_local_variables
+                );
+                if (evaluated_local_statement.has_value())
+                    return evaluated_local_statement;
+
                 return Compile_time_value_and_type
                 {
                     .statement = local_variable->statement,
@@ -1445,6 +1454,90 @@ namespace iris::compiler
         return std::nullopt;
     }
 
+    std::optional<Compile_time_value_and_type> evaluate_compile_time_access_enum_value(
+        iris::Declaration_database const& declaration_database,
+        std::string_view const module_name,
+        std::string_view const enum_name,
+        std::string_view const enum_value_name
+    )
+    {
+        std::optional<iris::Declaration> const declaration = iris::find_underlying_declaration(declaration_database, module_name, enum_name);
+        if (declaration.has_value())
+        {
+            if (std::holds_alternative<iris::Enum_declaration const*>(declaration->data))
+            {
+                iris::Enum_declaration const& enum_declaration = *std::get<iris::Enum_declaration const*>(declaration->data);
+                auto const enum_value_location = std::find_if(
+                    enum_declaration.values.begin(),
+                    enum_declaration.values.end(),
+                    [&](Enum_value const& enum_value) -> bool { return enum_value.name == enum_value_name; }
+                );
+
+                if (enum_value_location == enum_declaration.values.end())
+                    return std::nullopt;
+
+                std::size_t const index = std::distance(enum_declaration.values.begin(), enum_value_location);
+
+                if (enum_declaration.values[index].value.has_value())
+                {
+                    return Compile_time_value_and_type
+                    {
+                        .statement = enum_declaration.values[index].value.value(),
+                        .type = iris::create_custom_type_reference(module_name, enum_name)
+                    };
+                }
+                else
+                {
+                    auto const create_inferred_value = [&](std::int64_t const value) -> Compile_time_value_and_type
+                    {
+                        return Compile_time_value_and_type
+                        {
+                            .statement = create_constant_expression_statement(
+                                create_integer_type_type_reference(32, true),
+                                std::pmr::string{std::to_string(value)}
+                            ),
+                            .type = iris::create_custom_type_reference(module_name, enum_name)
+                        };
+                    };
+
+                    if (index == 0)
+                        return create_inferred_value(0);
+
+                    std::optional<std::size_t> previous_explicit_index = std::nullopt;
+                    for (std::size_t previous_index = index; previous_index > 0; --previous_index)
+                    {
+                        if (enum_declaration.values[previous_index - 1].value.has_value())
+                        {
+                            previous_explicit_index = previous_index - 1;
+                            break;
+                        }
+                    }
+
+                    if (!previous_explicit_index.has_value())
+                        return create_inferred_value(static_cast<std::int64_t>(index));
+
+                    Compile_time_value_and_type const previous_explicit_value =
+                    {
+                        .statement = enum_declaration.values[previous_explicit_index.value()].value.value(),
+                        .type = std::nullopt
+                    };
+
+                    std::optional<Compile_time_integer_value> const previous_integer_value = get_integer_from_value(previous_explicit_value);
+                    if (!previous_integer_value.has_value())
+                        return std::nullopt;
+
+                    std::int64_t const delta = static_cast<std::int64_t>(index - previous_explicit_index.value());
+                    if (previous_integer_value->is_signed)
+                        return create_inferred_value(previous_integer_value->signed_value + delta);
+
+                    return create_inferred_value(static_cast<std::int64_t>(previous_integer_value->unsigned_value) + delta);
+                }
+            }
+        }
+
+        return std::nullopt;
+    }
+
     std::optional<Compile_time_value_and_type> evaluate_compile_time_expression(
         std::string_view const module_name,
         iris::Statement const& statement,
@@ -1453,7 +1546,27 @@ namespace iris::compiler
         std::vector<Compile_time_local_variable> const& compile_time_local_variables
     )
     {
-        if (std::holds_alternative<iris::Compile_time_expression>(expression.data))
+        if (std::holds_alternative<iris::Access_expression>(expression.data))
+        {
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
+            if (access_expression.expression.expression_index >= statement.expressions.size())
+                return std::nullopt;
+                
+            iris::Expression const& left_side_expression = statement.expressions[access_expression.expression.expression_index];
+
+            if (std::holds_alternative<iris::Variable_expression>(left_side_expression.data))
+            {
+                iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_side_expression.data);
+                
+                if (variable_expression.name == "Type_kind")
+                    return evaluate_compile_time_access_enum_value(parameters.declaration_database, "iris.builtin", "Type_kind", access_expression.member_name);
+
+                return evaluate_compile_time_access_enum_value(parameters.declaration_database, module_name, variable_expression.name, access_expression.member_name);
+            }
+
+            return std::nullopt;
+        }
+        else if (std::holds_alternative<iris::Compile_time_expression>(expression.data))
         {
             iris::Compile_time_expression const& compile_time_expression = std::get<iris::Compile_time_expression>(expression.data);
             if (compile_time_expression.expression.expression_index >= statement.expressions.size())

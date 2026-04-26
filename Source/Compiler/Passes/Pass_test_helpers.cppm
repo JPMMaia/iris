@@ -6,6 +6,7 @@ export module iris.compiler.pass_test_helpers;
 
 import std;
 
+import iris.common.filesystem_common;
 import iris.core;
 import iris.core.declarations;
 import iris.core.formatter;
@@ -35,7 +36,16 @@ namespace iris::compiler::tests
             .core_modules = {},
         };
 
-        context.core_modules.reserve(input_dependencies_text.size() + 1);
+        context.core_modules.reserve(input_dependencies_text.size() + 2);
+
+        {
+            std::optional<iris::Module> builtin_module = iris::parser::parse_and_convert_to_module(iris::common::get_builtin_module_file_path(), {}, {});
+            if (!builtin_module.has_value())
+                throw std::runtime_error{"Could not builtin module."};
+
+            context.core_modules.push_back(std::move(builtin_module.value()));
+            add_declarations(context.declaration_database, context.core_modules.back());
+        }
 
         for (std::size_t index = 0; index < input_dependencies_text.size(); ++index)
         {

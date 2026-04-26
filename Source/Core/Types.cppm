@@ -823,6 +823,10 @@ namespace iris
         if (predicate(expression, statement))
             return true;
 
+        // Predicate might have emptied th statement
+        if (statement.expressions.empty())
+            return false;
+
         if (std::holds_alternative<Block_expression>(expression.data))
         {
             Block_expression const& data = std::get<Block_expression>(expression.data);
@@ -895,8 +899,9 @@ namespace iris
             Function_t predicate
         )
     {
-        for (iris::Expression const& expression : statement.expressions)
+        for (std::size_t index = 0; index < statement.expressions.size(); ++index)
         {
+            iris::Expression const& expression = statement.expressions[index];
             if (visit_expressions(expression, statement, predicate))
                 return true;
         }
