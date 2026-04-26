@@ -458,6 +458,39 @@ function run(lhs: Int32, rhs: Int32) -> ()
         CHECK(expected == actual);
     }
 
+    TEST_CASE("Rewrites check equality to print json difference before checking 2", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_check;
+
+function run(lhs: Int32, rhs: Int32) -> ()
+{
+    check((1+2) == (3+4));
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_check;
+
+import iris.json as iris_json;
+
+function run(lhs: Int32, rhs: Int32) -> ()
+{
+    {
+        var __lhs = (1 + 2);
+        var __rhs = (3 + 4);
+        if __lhs != __rhs
+        {
+            iris_json.print_json_difference::<Int32>(&__lhs, &__rhs);
+        }
+        check(__lhs == __rhs);
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
     TEST_CASE("check equality records iris.json print_json_difference import usage", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_check;
