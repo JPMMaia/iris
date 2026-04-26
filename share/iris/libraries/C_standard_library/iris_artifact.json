@@ -21,6 +21,10 @@
                 {
                     "name": "c.string",
                     "header": "string.h"
+                },
+                {
+                    "name": "c.inttypes",
+                    "header": "inttypes.h"
                 }
             ]
         }
