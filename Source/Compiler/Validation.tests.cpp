@@ -13,6 +13,7 @@ using iris::compiler::operator<<;
 #include <catch2/catch_test_macros.hpp>
 
 import std;
+import iris.common.filesystem_common;
 import iris.compiler;
 import iris.compiler.analysis;
 import iris.compiler.diagnostic;
@@ -50,7 +51,14 @@ namespace iris::compiler
         };
 
         std::pmr::vector<iris::Module> dependency_core_modules;
-        dependency_core_modules.reserve(input_dependencies_text.size());
+        dependency_core_modules.reserve(1 + input_dependencies_text.size());
+
+        {
+            std::optional<iris::Module> builtin_module = iris::parser::parse_and_convert_to_module(iris::common::get_builtin_module_file_path(), {}, {});
+            REQUIRE(builtin_module.has_value());
+            dependency_core_modules.push_back(std::move(builtin_module.value()));
+            add_declarations(declaration_database, dependency_core_modules.back());
+        }
 
         for (std::size_t index = 0; index < input_dependencies_text.size(); ++index)
         {
@@ -63,18 +71,16 @@ namespace iris::compiler
                 {}
             );
             REQUIRE(dependency_module.has_value());
+            dependency_core_modules.push_back(std::move(dependency_module.value()));
 
-            add_declarations(declaration_database, dependency_module.value());
-            
+            add_declarations(declaration_database, dependency_core_modules.back());
             Analysis_result const result = process_module(
-                dependency_module.value(),
+                dependency_core_modules.back(),
                 declaration_database,
                 options,
                 {}
             );
             REQUIRE(result.diagnostics.empty());
-
-            dependency_core_modules.push_back(std::move(dependency_module.value()));
         }
 
         std::optional<iris::Module> core_module = iris::parser::parse_and_convert_to_module(
@@ -4373,6 +4379,32 @@ function run(condition: Bool) -> ()
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
                 .message = "Variable 'value_2' does not exist.",
+                .related_information = {},
+            },
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+
+    TEST_CASE("Validates Type_kind", "[Validation][Type_kind]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run(parameter: Type_kind) -> ()
+{
+    var a = Type_kind.Struct;
+    var b = Type_kind.Asd;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            {
+                .range = create_source_range(6, 13, 6, 26),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Member 'Asd' does not exist in the type 'Type_kind'.",
                 .related_information = {},
             },
         };

@@ -1870,6 +1870,27 @@ namespace iris::compiler
                         .is_mutable = false,
                     };
                 }
+
+                if (data.name == "Type_kind")
+                {
+                    std::optional<Declaration> const declaration_optional = find_underlying_declaration(
+                        declaration_database,
+                        "iris.builtin",
+                        "Type_kind"
+                    );
+
+                    if (declaration_optional.has_value())
+                    {
+                        if (std::holds_alternative<Enum_declaration const*>(declaration_optional->data))
+                        {
+                            return Type_info
+                            {
+                                .type = create_custom_type_reference("iris.builtin", "Type_kind"),
+                                .is_mutable = false,
+                            };
+                        }
+                    }
+                }
             }
 
             return std::nullopt;

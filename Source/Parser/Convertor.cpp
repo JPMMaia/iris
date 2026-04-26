@@ -690,6 +690,9 @@ namespace iris::parser
             if (type_name == "Type")
                 return create_builtin_type_reference(create_string("Type", output_allocator));
 
+            if (type_name == "Type_kind")
+                return create_custom_type_reference("iris.builtin", "Type_kind");
+
             std::optional<iris::Type_reference> type_reference = parse_type_name(
                 module_info.module_name,
                 type_name,

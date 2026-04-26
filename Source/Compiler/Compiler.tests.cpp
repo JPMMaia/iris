@@ -5577,6 +5577,31 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.is_test_mode = true});
   }
 
+  TEST_CASE("Compile Type Kind", "[LLVM_IR]")
+  {
+    char const* const input_file = "type_kind.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private void @test_type_kind_run(i32 noundef %"arguments[0].parameter") #0 {
+entry:
+  %parameter = alloca i32, align 4
+  %a = alloca i32, align 4
+  store i32 %"arguments[0].parameter", ptr %parameter, align 4
+  store i32 4, ptr %a, align 4
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Unary Expressions", "[LLVM_IR]")
   {
     char const* const input_file = "unary_expressions.iris";

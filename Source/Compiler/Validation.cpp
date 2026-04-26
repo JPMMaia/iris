@@ -3979,6 +3979,9 @@ namespace iris::compiler
         if (is_builtin_function_name(expression.name))
             return {};
 
+        if (expression.name == "Type_kind")
+            return {};
+
         return
         {
             create_error_diagnostic(

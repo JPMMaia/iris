@@ -492,6 +492,19 @@ namespace iris::compiler
             else if (std::holds_alternative<Variable_expression>(left_hand_side_expression.data))
             {
                 Variable_expression const& variable_expression = std::get<Variable_expression>(left_hand_side_expression.data);
+
+                if (variable_expression.name == "Type_kind")
+                {
+                    return Custom_type_reference
+                    {
+                        .module_reference =
+                        {
+                            .name = "iris.builtin",
+                        },
+                        .name = variable_expression.name
+                    };
+                }
+
                 return Custom_type_reference
                 {
                     .module_reference =
@@ -5588,7 +5601,7 @@ namespace iris::compiler
         Expression_parameters const& parameters
     )
     {
-        char const* const variable_name = expression.name.c_str();
+        std::string_view const variable_name = expression.name;
 
         auto const is_variable = [variable_name](Value_and_type const& element) -> bool
         {
@@ -5693,6 +5706,21 @@ namespace iris::compiler
                     .name = expression.name,
                     .value = nullptr,
                     .type = std::nullopt
+                };
+            }
+        }
+
+        // Search for builtin types:
+        {
+            if (variable_name == "Type_kind")
+            {
+                Type_reference type = create_custom_type_reference("iris.builtin", "Type_kind");
+
+                return Value_and_type
+                {
+                    .name = expression.name,
+                    .value = nullptr,
+                    .type = std::move(type)
                 };
             }
         }

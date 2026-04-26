@@ -1624,6 +1624,12 @@ namespace iris
         Format_options const& options
     )
     {
+        if (value.module_reference.name == "iris.builtin")
+        {
+            add_text(buffer, value.name);
+            return;
+        }
+
         auto const is_import = [&](Import_module_with_alias const& import_module) -> bool
         {
             return import_module.module_name == value.module_reference.name;
