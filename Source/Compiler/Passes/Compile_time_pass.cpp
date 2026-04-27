@@ -1628,6 +1628,12 @@ namespace iris::compiler
             iris::For_loop_expression const& for_loop_expression = std::get<iris::For_loop_expression>(expression.data);
             return evaluate_compile_time_for_loop_expression(module_name, statement, for_loop_expression, parameters, compile_time_local_variables);
         }
+        else if (std::holds_alternative<iris::Parenthesis_expression>(expression.data))
+        {
+            iris::Parenthesis_expression const& parenthesis_expression = std::get<iris::Parenthesis_expression>(expression.data);
+            iris::Expression const& inner_expression = statement.expressions[parenthesis_expression.expression.expression_index];
+            return evaluate_compile_time_expression(module_name, statement, inner_expression, parameters, compile_time_local_variables);
+        }
         else if (std::holds_alternative<iris::Reflection_expression>(expression.data))
         {
             iris::Reflection_expression const& reflection_expression = std::get<iris::Reflection_expression>(expression.data);

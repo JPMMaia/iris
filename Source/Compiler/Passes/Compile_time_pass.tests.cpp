@@ -1220,7 +1220,7 @@ var g_value = 2;
 
 export function run_chained_or() -> (result: Int32)
 {
-    compile_time if g_value == 0 || g_value == 2
+    compile_time if (g_value == 0) || (g_value == 2)
     {
         return 121;
     }
