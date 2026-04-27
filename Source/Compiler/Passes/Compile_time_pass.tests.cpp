@@ -1044,4 +1044,207 @@ export function run_greater_than_or_equal_to() -> (result: Int32)
 
         CHECK(expected == actual);
     }
+
+    TEST_CASE("Evaluates compile_time binary logical_and with both true", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_binary_expression;
+
+export function run_logical_and_true() -> (result: Int32)
+{
+    compile_time if true && true
+    {
+        return 71;
+    }
+    else
+    {
+        return 72;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_binary_expression;
+
+export function run_logical_and_true() -> (result: Int32)
+{
+    {
+        return 71;
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_logical_and_true");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time binary logical_and with one false", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_binary_expression;
+
+export function run_logical_and_false() -> (result: Int32)
+{
+    compile_time if true && false
+    {
+        return 81;
+    }
+    else
+    {
+        return 82;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_binary_expression;
+
+export function run_logical_and_false() -> (result: Int32)
+{
+    {
+        return 82;
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_logical_and_false");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time binary logical_or with one true", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_binary_expression;
+
+export function run_logical_or_true() -> (result: Int32)
+{
+    compile_time if false || true
+    {
+        return 91;
+    }
+    else
+    {
+        return 92;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_binary_expression;
+
+export function run_logical_or_true() -> (result: Int32)
+{
+    {
+        return 91;
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_logical_or_true");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time binary logical_or with both false", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_binary_expression;
+
+export function run_logical_or_false() -> (result: Int32)
+{
+    compile_time if false || false
+    {
+        return 101;
+    }
+    else
+    {
+        return 102;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_binary_expression;
+
+export function run_logical_or_false() -> (result: Int32)
+{
+    {
+        return 102;
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_logical_or_false");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time binary chained logical_and with integer comparisons", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_binary_expression;
+
+var g_value = 1;
+var g_debug = true;
+
+export function run_chained_and() -> (result: Int32)
+{
+    compile_time if g_value == 1 && g_debug
+    {
+        return 111;
+    }
+    else
+    {
+        return 112;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_binary_expression;
+
+var g_value = 1;
+
+var g_debug = true;
+
+export function run_chained_and() -> (result: Int32)
+{
+    {
+        return 111;
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_chained_and");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time binary chained logical_or with integer comparisons", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_binary_expression;
+
+var g_value = 2;
+
+export function run_chained_or() -> (result: Int32)
+{
+    compile_time if g_value == 0 || g_value == 2
+    {
+        return 121;
+    }
+    else
+    {
+        return 122;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_binary_expression;
+
+var g_value = 2;
+
+export function run_chained_or() -> (result: Int32)
+{
+    {
+        return 121;
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_chained_or");
+
+        CHECK(expected == actual);
+    }
 }

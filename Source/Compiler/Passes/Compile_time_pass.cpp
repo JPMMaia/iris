@@ -1318,7 +1318,7 @@ namespace iris::compiler
         std::vector<Compile_time_local_variable> const& compile_time_local_variables
     )
     {
-        if (!is_comparison_binary_operation(expression.operation) && !is_equality_binary_operation(expression.operation))
+        if (!is_comparison_binary_operation(expression.operation) && !is_equality_binary_operation(expression.operation) && !is_logical_binary_operation(expression.operation))
             throw std::runtime_error{ std::format("Unsupported compile_time binary operation '{}'", static_cast<int>(expression.operation)) };
 
         if (expression.left_hand_side.expression_index >= statement.expressions.size())
@@ -1337,6 +1337,23 @@ namespace iris::compiler
         std::optional<Compile_time_value_and_type> const right_value = evaluate_compile_time_expression(module_name, statement, right_expression, parameters, compile_time_local_variables);
         if (!right_value.has_value())
             throw std::runtime_error{ "Could not evaluate right operand in compile_time binary expression" };
+
+        if (is_logical_binary_operation(expression.operation))
+        {
+            std::optional<bool> const left_bool = get_bool_from_value(left_value.value());
+            if (!left_bool.has_value())
+                return std::nullopt;
+
+            std::optional<bool> const right_bool = get_bool_from_value(right_value.value());
+            if (!right_bool.has_value())
+                return std::nullopt;
+
+            bool const result = expression.operation == iris::Binary_operation::Logical_and
+                ? left_bool.value() && right_bool.value()
+                : left_bool.value() || right_bool.value();
+
+            return create_value_and_type(create_constant_bool_expression_statement(result));
+        }
 
         std::optional<Compile_time_integer_value> const left_integer = get_integer_from_value(left_value.value());
         if (!left_integer.has_value())
