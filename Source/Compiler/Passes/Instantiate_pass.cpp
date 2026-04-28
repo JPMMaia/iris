@@ -134,6 +134,278 @@ namespace iris::compiler
         return false;
     }
 
+    static std::optional<std::size_t> find_parent_call_expression_index(
+        iris::Statement const& statement,
+        std::size_t const callee_expression_index
+    );
+
+    static Import_module_with_alias const& ensure_import_module_with_alias(
+        iris::Module_dependencies& dependencies,
+        std::string_view const module_name,
+        std::string_view const alias,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        Import_module_with_alias const* const existing_import = find_import_module_with_module_name(dependencies, module_name);
+        if (existing_import != nullptr)
+            return *existing_import;
+
+        Import_module_with_alias new_import
+        {
+            .module_name = std::pmr::string{module_name, output_allocator},
+            .alias = std::pmr::string{alias, output_allocator},
+            .usages = std::pmr::vector<std::pmr::string>{output_allocator},
+            .source_range = std::nullopt,
+        };
+
+        dependencies.alias_imports.push_back(std::move(new_import));
+        return dependencies.alias_imports.back();
+    }
+
+    static bool is_name_mangled(std::string_view const name)
+    {
+        return name.find('@') != std::string_view::npos;
+    }
+
+    static std::pmr::string create_unique_import_alias(
+        iris::Module_dependencies const& dependencies,
+        std::string_view const preferred_alias,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        Import_module_with_alias const* const existing_alias = find_import_module_with_alias(dependencies, preferred_alias);
+        if (existing_alias == nullptr)
+            return std::pmr::string{preferred_alias, output_allocator};
+
+        for (std::size_t index = 1; ; ++index)
+        {
+            std::pmr::string candidate{preferred_alias, output_allocator};
+            candidate += "_";
+            candidate += std::to_string(index);
+
+            if (find_import_module_with_alias(dependencies, candidate) == nullptr)
+                return candidate;
+        }
+    }
+
+    static std::string_view ensure_target_alias_for_source_import(
+        iris::Module_dependencies const& source_dependencies,
+        iris::Module_dependencies& target_dependencies,
+        std::string_view const source_alias,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        Import_module_with_alias const* const source_import = find_import_module_with_alias(source_dependencies, source_alias);
+        if (source_import == nullptr)
+            return {};
+
+        Import_module_with_alias const* const existing_target_import = find_import_module_with_module_name(target_dependencies, source_import->module_name);
+        if (existing_target_import != nullptr)
+            return existing_target_import->alias;
+
+        std::pmr::string const target_alias = create_unique_import_alias(
+            target_dependencies,
+            source_alias,
+            output_allocator
+        );
+
+        return ensure_import_module_with_alias(
+            target_dependencies,
+            source_import->module_name,
+            target_alias,
+            output_allocator
+        ).alias;
+    }
+
+    static void add_usage_to_target_import_alias(
+        iris::Module_dependencies& target_dependencies,
+        std::string_view const target_alias,
+        std::string_view const usage,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        if (target_alias.empty() || usage.empty())
+            return;
+
+        Import_module_with_alias* const import_alias = find_import_module_with_alias(target_dependencies, target_alias);
+        if (import_alias == nullptr)
+            return;
+
+        auto const existing_usage = std::find(import_alias->usages.begin(), import_alias->usages.end(), usage);
+        if (existing_usage != import_alias->usages.end())
+            return;
+
+        import_alias->usages.push_back(std::pmr::string{usage, output_allocator});
+    }
+
+    static void rewrite_statement_for_cross_module_context(
+        iris::Statement& statement,
+        std::string_view const source_module_name,
+        std::string_view const target_module_name,
+        iris::Module_dependencies const& source_dependencies,
+        iris::Module_dependencies& target_dependencies,
+        iris::Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        if (source_module_name == target_module_name)
+            return;
+
+        Import_module_with_alias const* const source_module_import = find_import_module_with_module_name(target_dependencies, source_module_name);
+        std::pmr::string const source_module_alias = source_module_import != nullptr ? source_module_import->alias : std::pmr::string{};
+
+        struct Direct_call_rewrite
+        {
+            iris::Statement* statement = nullptr;
+            std::size_t expression_index = 0;
+        };
+
+        struct Alias_rewrite
+        {
+            iris::Statement* statement = nullptr;
+            std::size_t expression_index = 0;
+            std::pmr::string member_name;
+            std::pmr::string replacement_alias;
+        };
+
+        std::pmr::vector<Direct_call_rewrite> direct_call_rewrites;
+        std::pmr::vector<Alias_rewrite> alias_rewrites;
+
+        auto const gather_rewrites = [&](iris::Expression const& expression, iris::Statement const& current_statement) -> bool
+        {
+            iris::Statement& owning_statement = const_cast<iris::Statement&>(current_statement);
+            std::size_t const expression_index = find_expression_index(owning_statement, expression);
+
+            if (std::holds_alternative<iris::Variable_expression>(expression.data))
+            {
+                iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
+
+                if (!is_name_mangled(variable_expression.name))
+                {
+                    std::optional<std::size_t> const parent_call_expression_index = find_parent_call_expression_index(owning_statement, expression_index);
+                    if (parent_call_expression_index.has_value())
+                    {
+                        iris::Call_expression const& parent_call = std::get<iris::Call_expression>(
+                            owning_statement.expressions[parent_call_expression_index.value()].data
+                        );
+
+                        if (parent_call.expression.expression_index == expression_index)
+                        {
+                            std::optional<Declaration> const declaration = find_declaration(
+                                declaration_database,
+                                source_module_name,
+                                variable_expression.name
+                            );
+                            if (declaration.has_value() && !source_module_alias.empty())
+                            {
+                                direct_call_rewrites.push_back({
+                                    .statement = &owning_statement,
+                                    .expression_index = expression_index,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            else if (std::holds_alternative<iris::Access_expression>(expression.data))
+            {
+                iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
+                iris::Expression const& left_hand_side = owning_statement.expressions[access_expression.expression.expression_index];
+                if (std::holds_alternative<iris::Variable_expression>(left_hand_side.data))
+                {
+                    iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_hand_side.data);
+                    std::string_view const replacement_alias = ensure_target_alias_for_source_import(
+                        source_dependencies,
+                        target_dependencies,
+                        variable_expression.name,
+                        output_allocator
+                    );
+                    if (!replacement_alias.empty())
+                    {
+                        alias_rewrites.push_back({
+                            .statement = &owning_statement,
+                            .expression_index = access_expression.expression.expression_index,
+                            .member_name = std::pmr::string{access_expression.member_name, output_allocator},
+                            .replacement_alias = std::pmr::string{replacement_alias, output_allocator}
+                        });
+                    }
+                }
+            }
+
+            return false;
+        };
+
+        iris::visit_expressions(statement, gather_rewrites);
+
+        for (Alias_rewrite const& replacement : alias_rewrites)
+        {
+            iris::Expression& left_hand_side = replacement.statement->expressions[replacement.expression_index];
+            iris::Variable_expression& variable_expression = std::get<iris::Variable_expression>(left_hand_side.data);
+            variable_expression.name = replacement.replacement_alias;
+
+            add_usage_to_target_import_alias(
+                target_dependencies,
+                replacement.replacement_alias,
+                replacement.member_name,
+                output_allocator
+            );
+        }
+
+        for (Direct_call_rewrite const& rewrite : direct_call_rewrites)
+        {
+            iris::Variable_expression const variable_expression = std::get<iris::Variable_expression>(
+                rewrite.statement->expressions[rewrite.expression_index].data
+            );
+
+            rewrite.statement->expressions.push_back(
+                iris::create_variable_expression(std::pmr::string{source_module_alias, output_allocator})
+            );
+            std::size_t const alias_expression_index = rewrite.statement->expressions.size() - 1;
+
+            rewrite.statement->expressions[rewrite.expression_index] = {
+                .data = iris::Access_expression{
+                    .expression = iris::Expression_index{ .expression_index = alias_expression_index },
+                    .member_name = variable_expression.name,
+                }
+            };
+
+            add_usage_to_target_import_alias(
+                target_dependencies,
+                source_module_alias,
+                variable_expression.name,
+                output_allocator
+            );
+        }
+    }
+
+    static void rewrite_expressions_for_cross_module_context(
+        iris::Function_definition& function_definition,
+        std::string_view const source_module_name,
+        std::string_view const target_module_name,
+        iris::Module_dependencies& target_dependencies,
+        iris::Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        if (source_module_name == target_module_name)
+            return;
+
+        iris::Module_dependencies const& source_dependencies = get_module_dependencies(declaration_database, source_module_name);
+
+        for (iris::Statement& statement : function_definition.statements)
+        {
+            rewrite_statement_for_cross_module_context(
+                statement,
+                source_module_name,
+                target_module_name,
+                source_dependencies,
+                target_dependencies,
+                declaration_database,
+                output_allocator
+            );
+        }
+    }
+
     static void instantiate_function(
         std::string_view const module_name,
         iris::Statement& statement,
@@ -171,6 +443,15 @@ namespace iris::compiler
             function_expression.declaration,
             function_expression.definition,
             parameters
+        );
+
+        rewrite_expressions_for_cross_module_context(
+            function_expression.definition,
+            key.module_name,
+            parameters.target_module_name,
+            parameters.dependencies,
+            parameters.declaration_database,
+            parameters.output_allocator
         );
 
         parameters.instanced_declarations.function_declarations.push_back(function_expression.declaration);

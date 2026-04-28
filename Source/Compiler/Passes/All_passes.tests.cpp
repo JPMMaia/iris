@@ -81,6 +81,7 @@ namespace iris::compiler
 
         All_passes_parameters const parameters =
         {
+            .target_module_name = core_module.name,
             .llvm_context = *runtime_context.llvm_data.context,
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,

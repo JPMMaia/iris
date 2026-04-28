@@ -1490,6 +1490,7 @@ namespace iris::compiler
         {
             All_passes_parameters const pass_parameters
             {
+                .target_module_name = new_core_module.name,
                 .llvm_context = *llvm_data.context,
                 .llvm_data_layout = llvm_data.data_layout,
                 .declaration_database = declaration_database,
@@ -1858,6 +1859,7 @@ namespace iris::compiler
         {
             All_passes_parameters const pass_parameters
             {
+                .target_module_name = core_module.name,
                 .llvm_context = *llvm_data.context,
                 .llvm_data_layout = llvm_data.data_layout,
                 .declaration_database = declaration_database,

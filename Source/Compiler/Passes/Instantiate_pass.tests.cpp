@@ -71,6 +71,7 @@ namespace iris::compiler
 
         All_passes_parameters const parameters =
         {
+            .target_module_name = core_module.name,
             .llvm_context = *runtime_context.llvm_data.context,
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
@@ -107,6 +108,7 @@ namespace iris::compiler
 
         All_passes_parameters const parameters =
         {
+            .target_module_name = core_module.name,
             .llvm_context = *runtime_context.llvm_data.context,
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
@@ -121,6 +123,32 @@ namespace iris::compiler
         run_instantiate_pass_on_module(core_module, parameters);
 
         return iris::compiler::tests::format_core_module_to_text(core_module);
+    }
+
+    static bool has_import_usage(
+        iris::Module_dependencies const& dependencies,
+        std::string_view const alias,
+        std::string_view const usage
+    )
+    {
+        Import_module_with_alias const* const import_alias = find_import_module_with_alias(dependencies, alias);
+        if (import_alias == nullptr)
+            return false;
+
+        return std::find(import_alias->usages.begin(), import_alias->usages.end(), usage) != import_alias->usages.end();
+    }
+
+    static bool has_import_usage_for_module(
+        iris::Module_dependencies const& dependencies,
+        std::string_view const module_name,
+        std::string_view const usage
+    )
+    {
+        Import_module_with_alias const* const import_alias = find_import_module_with_module_name(dependencies, module_name);
+        if (import_alias == nullptr)
+            return false;
+
+        return std::find(import_alias->usages.begin(), import_alias->usages.end(), usage) != import_alias->usages.end();
     }
 
     TEST_CASE("Replaces function constructor calls after instantiation", "[Instantiate_pass][Passes]")
@@ -291,10 +319,18 @@ struct My_array
     {
         std::string_view const dependency = R"(module iris.json;
 
+import another_module as am;
+
+function use_internal() -> ()
+{
+}
+
 export function_constructor to_json(value_type: Type)
 {
     return function(value: *value_type) -> ()
     {
+        use_internal();
+        am.foo();
     };
 }
 
@@ -321,6 +357,7 @@ function run(value: *Int32) -> ()
         std::string_view const expected = R"(module json_usage;
 
 import iris.json as iris_json;
+import another_module as am;
 
 function run(value: *Int32) -> ()
 {
@@ -330,6 +367,8 @@ function run(value: *Int32) -> ()
 @unique_name("iris.json@to_json@3489948734076117284")
 function iris.json@to_json@3489948734076117284(value: *Int32) -> ()
 {
+    iris_json.use_internal();
+    am.foo();
 }
 
 @unique_name("iris.json@print_json@9753731967319569499")
@@ -338,7 +377,6 @@ function iris.json@print_json@9753731967319569499(value: *Int32) -> ()
     iris.json@to_json@3489948734076117284(value);
 }
 )";
-
         std::array<std::string_view, 1> const dependencies = { dependency };
         std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies, "run");
 
@@ -370,7 +408,7 @@ export function run(value: *Int32) -> ()
 }
 )";
 
-std::string_view const expected = R"(module json_usage;
+        std::string_view const expected = R"(module json_usage;
 
 function_constructor to_json(value_type: Type)
 {
@@ -407,5 +445,137 @@ export function run(value: *Int32) -> ()
         std::pmr::string const actual = run_instantiate_pass_and_format(input, {}, "run");
 
         CHECK(expected == actual);
+    }
+
+    TEST_CASE("Rewrites nested constructor calls across modules", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const dependency = R"(module iris.json_nested;
+
+function use_internal() -> ()
+{
+}
+
+export function_constructor to_json(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+        if true
+        {
+            use_internal();
+        }
+    };
+}
+)";
+
+        std::string_view const input = R"(module json_nested_usage;
+
+import iris.json_nested as json_nested;
+
+function run(value: *Int32) -> ()
+{
+    json_nested.to_json::<Int32>(value);
+}
+)";
+
+        std::string_view const expected = R"(module json_nested_usage;
+
+import iris.json_nested as json_nested;
+
+function run(value: *Int32) -> ()
+{
+    iris.json_nested@to_json@217872819520902618(value);
+}
+
+@unique_name("iris.json_nested@to_json@217872819520902618")
+function iris.json_nested@to_json@217872819520902618(value: *Int32) -> ()
+{
+    if true
+    {
+        json_nested.use_internal();
+    }
+}
+)";
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Adds import usages for rewritten constructor accesses", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const dependency = R"(module iris.json_usage_test;
+
+import another_module as am;
+
+function use_internal() -> ()
+{
+}
+
+export function_constructor to_json(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+        use_internal();
+        am.foo();
+    };
+}
+
+export function_constructor print_json(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+        to_json::<value_type>(value);
+    };
+}
+)";
+
+        std::string_view const input = R"(module json_usage_test;
+
+import iris.json_usage_test as iris_json;
+
+function run(value: *Int32) -> ()
+{
+    iris_json.print_json::<Int32>(value);
+}
+)";
+
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input, dependencies);
+        iris::Module& core_module = context.core_module();
+
+        iris::Function_declaration* function_declaration = iris::compiler::tests::find_mutable_function_declaration(core_module, "run");
+        REQUIRE(function_declaration != nullptr);
+
+        iris::Function_definition* function_definition = iris::compiler::tests::find_mutable_function_definition(core_module, "run");
+        REQUIRE(function_definition != nullptr);
+
+        Instantiate_runtime_context runtime_context = create_instantiate_runtime_context(core_module, context.declaration_database);
+
+        std::pmr::polymorphic_allocator<> output_allocator;
+        std::pmr::polymorphic_allocator<> temporaries_allocator;
+
+        All_passes_parameters const parameters =
+        {
+            .target_module_name = core_module.name,
+            .llvm_context = *runtime_context.llvm_data.context,
+            .llvm_data_layout = runtime_context.llvm_data.data_layout,
+            .declaration_database = context.declaration_database,
+            .clang_context = *runtime_context.clang_context,
+            .dependencies = core_module.dependencies,
+            .instanced_declarations = core_module.instanced_declarations,
+            .definitions = core_module.definitions,
+            .output_allocator = output_allocator,
+            .temporaries_allocator = temporaries_allocator,
+        };
+
+        run_instantiate_pass_on_function(
+            core_module.name,
+            *function_declaration,
+            *function_definition,
+            parameters
+        );
+
+        CHECK(has_import_usage(core_module.dependencies, "iris_json", "use_internal"));
+        CHECK(has_import_usage_for_module(core_module.dependencies, "another_module", "foo"));
     }
 }

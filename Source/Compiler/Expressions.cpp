@@ -6170,7 +6170,7 @@ namespace iris::compiler
 
         for (Statement const& statement : statements)
         {
-            if (!is_comment(statement))
+            if (!is_comment(statement) && !statement.expressions.empty())
             {
                 new_parameters.local_variables = all_local_variables;
 
