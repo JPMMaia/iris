@@ -66,12 +66,19 @@ namespace iris::compiler
 
         Instantiate_runtime_context runtime_context = create_instantiate_runtime_context(core_module, context.declaration_database);
 
+        std::pmr::vector<iris::Module const*> sorted_modules;
+        sorted_modules.reserve(context.dependencies().size() + 1);
+        for (iris::Module const& dependency_module : context.dependencies())
+            sorted_modules.push_back(&dependency_module);
+        sorted_modules.push_back(&core_module);
+
         std::pmr::polymorphic_allocator<> output_allocator;
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
         All_passes_parameters const parameters =
         {
             .target_module_name = core_module.name,
+            .sorted_core_modules = sorted_modules,
             .llvm_context = *runtime_context.llvm_data.context,
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
@@ -103,12 +110,19 @@ namespace iris::compiler
 
         Instantiate_runtime_context runtime_context = create_instantiate_runtime_context(core_module, context.declaration_database);
 
+        std::pmr::vector<iris::Module const*> sorted_modules;
+        sorted_modules.reserve(context.dependencies().size() + 1);
+        for (iris::Module const& dependency_module : context.dependencies())
+            sorted_modules.push_back(&dependency_module);
+        sorted_modules.push_back(&core_module);
+
         std::pmr::polymorphic_allocator<> output_allocator;
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
         All_passes_parameters const parameters =
         {
             .target_module_name = core_module.name,
+            .sorted_core_modules = sorted_modules,
             .llvm_context = *runtime_context.llvm_data.context,
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
@@ -364,10 +378,15 @@ function run(value: *Int32) -> ()
     iris.json@print_json@9753731967319569499(value);
 }
 
+@unique_name("iris.json.use_internal")
+function iris.json.use_internal() -> ()
+{
+}
+
 @unique_name("iris.json@to_json@3489948734076117284")
 function iris.json@to_json@3489948734076117284(value: *Int32) -> ()
 {
-    iris_json.use_internal();
+    iris.json.use_internal();
     am.foo();
 }
 
@@ -481,6 +500,11 @@ function run(value: *Int32) -> ()
 
 import iris.json_nested as json_nested;
 
+@unique_name("iris.json_nested.use_internal")
+function iris.json_nested.use_internal() -> ()
+{
+}
+
 function run(value: *Int32) -> ()
 {
     iris.json_nested@to_json@217872819520902618(value);
@@ -491,8 +515,72 @@ function iris.json_nested@to_json@217872819520902618(value: *Int32) -> ()
 {
     if true
     {
-        json_nested.use_internal();
+        iris.json_nested.use_internal();
     }
+}
+)";
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Duplicates private function dependencies recursively across modules", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const dependency = R"(module iris.json_recursive;
+
+function private_leaf() -> ()
+{
+}
+
+function private_mid() -> ()
+{
+    private_leaf();
+}
+
+export function_constructor to_json(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+        private_mid();
+    };
+}
+)";
+
+        std::string_view const input = R"(module json_recursive_usage;
+
+import iris.json_recursive as json_recursive;
+
+function run(value: *Int32) -> ()
+{
+    json_recursive.to_json::<Int32>(value);
+}
+)";
+
+        std::string_view const expected = R"(module json_recursive_usage;
+
+import iris.json_recursive as json_recursive;
+
+@unique_name("iris.json_recursive.private_leaf")
+function iris.json_recursive.private_leaf() -> ()
+{
+}
+
+function run(value: *Int32) -> ()
+{
+    iris.json_recursive@to_json@1271315375365545525(value);
+}
+
+@unique_name("iris.json_recursive.private_mid")
+function iris.json_recursive.private_mid() -> ()
+{
+    iris.json_recursive.private_leaf();
+}
+
+@unique_name("iris.json_recursive@to_json@1271315375365545525")
+function iris.json_recursive@to_json@1271315375365545525(value: *Int32) -> ()
+{
+    iris.json_recursive.private_mid();
 }
 )";
         std::array<std::string_view, 1> const dependencies = { dependency };
@@ -544,10 +632,17 @@ function run(value: *Int32) -> ()
     iris.json_nested@print_json@11451538589209302994(value);
 }
 
+@unique_name("iris.json_nested.print_to_stdout")
+function iris.json_nested.print_to_stdout(value: *C_char) -> ()
+{
+}
+
 @unique_name("iris.json_nested@print_json@11451538589209302994")
 function iris.json_nested@print_json@11451538589209302994(value: *Int32) -> ()
 {
-    var stream: json_nested.Write_stream = explicit { write: json_nested.print_to_stdout };
+    var stream: json_nested.Write_stream = explicit {
+        write: iris.json_nested.print_to_stdout
+    };
 }
 )";
         std::array<std::string_view, 1> const dependencies = { dependency };
@@ -606,12 +701,19 @@ function run(value: *Int32) -> ()
 
         Instantiate_runtime_context runtime_context = create_instantiate_runtime_context(core_module, context.declaration_database);
 
+        std::pmr::vector<iris::Module const*> sorted_modules;
+        sorted_modules.reserve(context.dependencies().size() + 1);
+        for (iris::Module const& dependency_module : context.dependencies())
+            sorted_modules.push_back(&dependency_module);
+        sorted_modules.push_back(&core_module);
+
         std::pmr::polymorphic_allocator<> output_allocator;
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
         All_passes_parameters const parameters =
         {
             .target_module_name = core_module.name,
+            .sorted_core_modules = sorted_modules,
             .llvm_context = *runtime_context.llvm_data.context,
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
@@ -630,7 +732,7 @@ function run(value: *Int32) -> ()
             parameters
         );
 
-        CHECK(has_import_usage(core_module.dependencies, "iris_json", "use_internal"));
+        CHECK(!has_import_usage(core_module.dependencies, "iris_json", "use_internal"));
         CHECK(has_import_usage_for_module(core_module.dependencies, "another_module", "foo"));
     }
 }

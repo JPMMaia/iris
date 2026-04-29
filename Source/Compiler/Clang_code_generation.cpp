@@ -725,10 +725,15 @@ namespace iris::compiler
             clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
 
             std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(function_declaration.name);
-            assert(instance_custom_type_reference.has_value());
-            
-            auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
-            instance_iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
+            if (instance_custom_type_reference.has_value())
+            {
+                auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
+                instance_iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
+            }
+            else
+            {
+                iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
+            }
         }
     }
 

@@ -139,6 +139,131 @@ namespace iris::compiler
         std::size_t const callee_expression_index
     );
 
+    static void rewrite_expressions_for_cross_module_context(
+        iris::Function_definition& function_definition,
+        std::string_view const source_module_name,
+        std::string_view const target_module_name,
+        iris::Module_dependencies& target_dependencies,
+        iris::Declaration_database& declaration_database,
+        iris::Module_instanced_declarations& target_instanced_declarations,
+        iris::Module_definitions& target_definitions,
+        std::span<iris::Module const* const> const sorted_core_modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::unordered_set<std::pmr::string>& duplicated_private_functions
+    );
+
+    static Module const* find_module_by_name(
+        std::span<iris::Module const* const> const sorted_core_modules,
+        std::string_view const module_name
+    )
+    {
+        auto const location = std::find_if(
+            sorted_core_modules.begin(),
+            sorted_core_modules.end(),
+            [module_name](iris::Module const* const module) -> bool
+            {
+                return module != nullptr && module->name == module_name;
+            }
+        );
+        if (location == sorted_core_modules.end())
+            return nullptr;
+
+        return *location;
+    }
+
+    static std::pmr::string create_private_dependency_name(
+        std::string_view const source_module_name,
+        std::string_view const function_name,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::string name{source_module_name, output_allocator};
+        name += ".";
+        name += function_name;
+        return name;
+    }
+
+    static std::pmr::string create_private_dependency_key(
+        std::string_view const source_module_name,
+        std::string_view const function_name,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::string key{source_module_name, output_allocator};
+        key += "::";
+        key += function_name;
+        return key;
+    }
+
+    static bool ensure_private_function_is_duplicated(
+        std::string_view const source_module_name,
+        std::string_view const target_module_name,
+        std::string_view const function_name,
+        iris::Module_dependencies& target_dependencies,
+        iris::Declaration_database& declaration_database,
+        iris::Module_instanced_declarations& target_instanced_declarations,
+        iris::Module_definitions& target_definitions,
+        std::span<iris::Module const* const> const sorted_core_modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::unordered_set<std::pmr::string>& duplicated_private_functions
+    )
+    {
+        std::pmr::string const duplicate_key = create_private_dependency_key(source_module_name, function_name, output_allocator);
+        if (duplicated_private_functions.contains(duplicate_key))
+            return true;
+
+        std::pmr::string const duplicated_name = create_private_dependency_name(source_module_name, function_name, output_allocator);
+        if (find_declaration(declaration_database, target_module_name, duplicated_name).has_value())
+        {
+            duplicated_private_functions.insert(duplicate_key);
+            return true;
+        }
+
+        Module const* const source_module = find_module_by_name(sorted_core_modules, source_module_name);
+        if (source_module == nullptr)
+            return false;
+
+        std::optional<Function_declaration const*> const source_declaration = find_function_declaration(*source_module, function_name);
+        std::optional<Function_definition const*> const source_definition = find_function_definition(*source_module, function_name);
+        if (!source_declaration.has_value() || !source_definition.has_value())
+            return false;
+
+        duplicated_private_functions.insert(duplicate_key);
+
+        Function_declaration duplicated_declaration = *source_declaration.value();
+        duplicated_declaration.name = duplicated_name;
+        duplicated_declaration.unique_name = std::pmr::string{duplicated_name, output_allocator};
+        duplicated_declaration.linkage = Linkage::Private;
+
+        Function_definition duplicated_definition = *source_definition.value();
+        duplicated_definition.name = duplicated_name;
+
+        target_instanced_declarations.function_declarations.push_back(std::move(duplicated_declaration));
+        target_definitions.function_definitions.push_back(std::move(duplicated_definition));
+
+        add_function_declaration(
+            declaration_database,
+            target_module_name,
+            false,
+            target_instanced_declarations.function_declarations.back()
+        );
+
+        rewrite_expressions_for_cross_module_context(
+            target_definitions.function_definitions.back(),
+            source_module_name,
+            target_module_name,
+            target_dependencies,
+            declaration_database,
+            target_instanced_declarations,
+            target_definitions,
+            sorted_core_modules,
+            output_allocator,
+            duplicated_private_functions
+        );
+
+        return true;
+    }
+
     static Import_module_with_alias const& ensure_import_module_with_alias(
         iris::Module_dependencies& dependencies,
         std::string_view const module_name,
@@ -244,8 +369,12 @@ namespace iris::compiler
         std::string_view const target_module_name,
         iris::Module_dependencies const& source_dependencies,
         iris::Module_dependencies& target_dependencies,
-        iris::Declaration_database const& declaration_database,
-        std::pmr::polymorphic_allocator<> const& output_allocator
+        iris::Declaration_database& declaration_database,
+        iris::Module_instanced_declarations& target_instanced_declarations,
+        iris::Module_definitions& target_definitions,
+        std::span<iris::Module const* const> const sorted_core_modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::unordered_set<std::pmr::string>& duplicated_private_functions
     )
     {
         if (source_module_name == target_module_name)
@@ -266,6 +395,13 @@ namespace iris::compiler
             std::size_t expression_index = 0;
         };
 
+        struct Private_function_rewrite
+        {
+            iris::Statement* statement = nullptr;
+            std::size_t expression_index = 0;
+            std::pmr::string function_name;
+        };
+
         struct Alias_rewrite
         {
             iris::Statement* statement = nullptr;
@@ -276,6 +412,7 @@ namespace iris::compiler
 
         std::pmr::vector<Direct_call_rewrite> direct_call_rewrites;
         std::pmr::vector<Variable_reference_rewrite> variable_reference_rewrites;
+        std::pmr::vector<Private_function_rewrite> private_function_rewrites;
         std::pmr::vector<Alias_rewrite> alias_rewrites;
 
         auto const gather_rewrites = [&](iris::Expression const& expression, iris::Statement const& current_statement) -> bool
@@ -303,7 +440,15 @@ namespace iris::compiler
                                 source_module_name,
                                 variable_expression.name
                             );
-                            if (declaration.has_value() && !source_module_alias.empty())
+                            if (declaration.has_value() && std::holds_alternative<Function_declaration const*>(declaration->data) && !declaration->is_export)
+                            {
+                                private_function_rewrites.push_back({
+                                    .statement = &owning_statement,
+                                    .expression_index = expression_index,
+                                    .function_name = std::pmr::string{variable_expression.name, output_allocator}
+                                });
+                            }
+                            else if (declaration.has_value() && !source_module_alias.empty())
                             {
                                 direct_call_rewrites.push_back({
                                     .statement = &owning_statement,
@@ -334,7 +479,15 @@ namespace iris::compiler
                         source_module_name,
                         variable_expression.name
                     );
-                    if (declaration.has_value() && !source_module_alias.empty())
+                    if (declaration.has_value() && std::holds_alternative<Function_declaration const*>(declaration->data) && !declaration->is_export)
+                    {
+                        private_function_rewrites.push_back({
+                            .statement = &owning_statement,
+                            .expression_index = expression_index,
+                            .function_name = std::pmr::string{variable_expression.name, output_allocator}
+                        });
+                    }
+                    else if (declaration.has_value() && !source_module_alias.empty())
                     {
                         variable_reference_rewrites.push_back({
                             .statement = &owning_statement,
@@ -372,6 +525,28 @@ namespace iris::compiler
         };
 
         iris::visit_expressions(statement, gather_rewrites);
+
+        for (Private_function_rewrite const& rewrite : private_function_rewrites)
+        {
+            bool const duplicated = ensure_private_function_is_duplicated(
+                source_module_name,
+                target_module_name,
+                rewrite.function_name,
+                target_dependencies,
+                declaration_database,
+                target_instanced_declarations,
+                target_definitions,
+                sorted_core_modules,
+                output_allocator,
+                duplicated_private_functions
+            );
+            if (!duplicated)
+                continue;
+
+            iris::Expression& expression = rewrite.statement->expressions[rewrite.expression_index];
+            iris::Variable_expression& variable_expression = std::get<iris::Variable_expression>(expression.data);
+            variable_expression.name = create_private_dependency_name(source_module_name, rewrite.function_name, output_allocator);
+        }
 
         for (Alias_rewrite const& replacement : alias_rewrites)
         {
@@ -445,8 +620,12 @@ namespace iris::compiler
         std::string_view const source_module_name,
         std::string_view const target_module_name,
         iris::Module_dependencies& target_dependencies,
-        iris::Declaration_database const& declaration_database,
-        std::pmr::polymorphic_allocator<> const& output_allocator
+        iris::Declaration_database& declaration_database,
+        iris::Module_instanced_declarations& target_instanced_declarations,
+        iris::Module_definitions& target_definitions,
+        std::span<iris::Module const* const> const sorted_core_modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::unordered_set<std::pmr::string>& duplicated_private_functions
     )
     {
         if (source_module_name == target_module_name)
@@ -463,7 +642,11 @@ namespace iris::compiler
                 source_dependencies,
                 target_dependencies,
                 declaration_database,
-                output_allocator
+                target_instanced_declarations,
+                target_definitions,
+                sorted_core_modules,
+                output_allocator,
+                duplicated_private_functions
             );
         }
     }
@@ -507,19 +690,25 @@ namespace iris::compiler
             parameters
         );
 
+        std::pmr::unordered_set<std::pmr::string> duplicated_private_functions;
+
         rewrite_expressions_for_cross_module_context(
             function_expression.definition,
             key.module_name,
             parameters.target_module_name,
             parameters.dependencies,
             parameters.declaration_database,
-            parameters.output_allocator
+            parameters.instanced_declarations,
+            parameters.definitions,
+            parameters.sorted_core_modules,
+            parameters.output_allocator,
+            duplicated_private_functions
         );
 
         parameters.instanced_declarations.function_declarations.push_back(function_expression.declaration);
         parameters.definitions.function_definitions.push_back(function_expression.definition);
 
-        add_function_declaration(parameters.declaration_database, key.module_name, false, parameters.instanced_declarations.function_declarations.back());
+        add_function_declaration(parameters.declaration_database, parameters.target_module_name, false, parameters.instanced_declarations.function_declarations.back());
     }
 
     struct Replace_instantiate_function_parameters

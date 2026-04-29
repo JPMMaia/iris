@@ -76,12 +76,19 @@ namespace iris::compiler
             context.declaration_database
         );
 
+        std::pmr::vector<iris::Module const*> sorted_modules;
+        sorted_modules.reserve(context.dependencies().size() + 1);
+        for (iris::Module const& dependency_module : context.dependencies())
+            sorted_modules.push_back(&dependency_module);
+        sorted_modules.push_back(&core_module);
+
         std::pmr::polymorphic_allocator<> output_allocator;
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
         All_passes_parameters const parameters =
         {
             .target_module_name = core_module.name,
+            .sorted_core_modules = sorted_modules,
             .llvm_context = *runtime_context.llvm_data.context,
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,

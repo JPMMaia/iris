@@ -13,6 +13,7 @@ namespace iris::compiler
     export struct All_passes_parameters
     {
         std::string_view target_module_name;
+        std::span<iris::Module const* const> sorted_core_modules;
         llvm::LLVMContext& llvm_context;
         llvm::DataLayout const& llvm_data_layout;
         iris::Declaration_database& declaration_database;
