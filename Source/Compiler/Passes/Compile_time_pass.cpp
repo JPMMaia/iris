@@ -1424,6 +1424,33 @@ namespace iris::compiler
         return nullptr;
     }
 
+    static std::optional<Compile_time_value_and_type> evaluate_propagated_compile_time_local_variable(
+        std::string_view const module_name,
+        iris::Variable_expression const& expression,
+        Compile_time_parameters const& parameters,
+        std::vector<Compile_time_local_variable> const& compile_time_local_variables
+    )
+    {
+        Compile_time_local_variable const* local_variable = find_compile_time_local_variable(compile_time_local_variables, expression.name);
+        if (local_variable == nullptr)
+            return std::nullopt;
+
+        std::optional<Compile_time_value_and_type> const evaluated_local_statement = evaluate_compile_time_statement(
+            module_name,
+            local_variable->statement,
+            parameters,
+            compile_time_local_variables
+        );
+        if (evaluated_local_statement.has_value())
+            return evaluated_local_statement;
+
+        return Compile_time_value_and_type
+        {
+            .statement = local_variable->statement,
+            .type = local_variable->type
+        };
+    }
+
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_variable_expression(
         std::string_view const module_name,
         iris::Statement const& statement,
@@ -1434,24 +1461,14 @@ namespace iris::compiler
     {
         // Search for local compile_time variables that were propagated earlier.
         {
-            Compile_time_local_variable const* local_variable = find_compile_time_local_variable(compile_time_local_variables, expression.name);
-            if (local_variable != nullptr)
-            {
-                std::optional<Compile_time_value_and_type> const evaluated_local_statement = evaluate_compile_time_statement(
-                    module_name,
-                    local_variable->statement,
-                    parameters,
-                    compile_time_local_variables
-                );
-                if (evaluated_local_statement.has_value())
-                    return evaluated_local_statement;
-
-                return Compile_time_value_and_type
-                {
-                    .statement = local_variable->statement,
-                    .type = local_variable->type
-                };
-            }
+            std::optional<Compile_time_value_and_type> const local_value = evaluate_propagated_compile_time_local_variable(
+                module_name,
+                expression,
+                parameters,
+                compile_time_local_variables
+            );
+            if (local_value.has_value())
+                return local_value;
         }
 
         // Search for global variables:
@@ -1707,7 +1724,21 @@ namespace iris::compiler
         std::vector<Compile_time_local_variable>& compile_time_local_variables
     )
     {
-        if (std::holds_alternative<iris::Compile_time_expression>(expression.data))
+        if (std::holds_alternative<iris::Variable_expression>(expression.data))
+        {
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
+            std::optional<Compile_time_value_and_type> const new_value = evaluate_propagated_compile_time_local_variable(
+                module_name,
+                variable_expression,
+                parameters,
+                compile_time_local_variables
+            );
+            if (new_value.has_value())
+            {
+                replace_expression(statement, expression, new_value->statement, parameters.temporaries_allocator);
+            }
+        }
+        else if (std::holds_alternative<iris::Compile_time_expression>(expression.data))
         {
             iris::Compile_time_expression const& compile_time_expression = std::get<iris::Compile_time_expression>(expression.data);
             if (compile_time_expression.expression.expression_index >= statement.expressions.size())

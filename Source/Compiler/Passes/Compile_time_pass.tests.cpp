@@ -266,6 +266,50 @@ export function run() -> (result: Int32)
         CHECK(expected == actual);
     }
 
+    TEST_CASE("Propagates compile_time var declaration to expressions", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_var;
+
+function take(a: Int32)
+
+export function run() -> ()
+{
+    compile_time var v0 = 1;
+    take(v0);
+
+    {
+        take(v0);
+    }
+
+    for index in 0 to v0
+    {
+        take(v0 + 2);
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_var;
+
+export function run() -> ()
+{
+    take(1);
+
+    {
+        take(1);
+    }
+
+    for index in 0 to 1
+    {
+        take(1 + 2);
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
     TEST_CASE("Unrolls compile_time for loop", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_for;
