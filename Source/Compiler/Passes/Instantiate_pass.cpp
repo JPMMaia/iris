@@ -260,6 +260,12 @@ namespace iris::compiler
             std::size_t expression_index = 0;
         };
 
+        struct Variable_reference_rewrite
+        {
+            iris::Statement* statement = nullptr;
+            std::size_t expression_index = 0;
+        };
+
         struct Alias_rewrite
         {
             iris::Statement* statement = nullptr;
@@ -269,6 +275,7 @@ namespace iris::compiler
         };
 
         std::pmr::vector<Direct_call_rewrite> direct_call_rewrites;
+        std::pmr::vector<Variable_reference_rewrite> variable_reference_rewrites;
         std::pmr::vector<Alias_rewrite> alias_rewrites;
 
         auto const gather_rewrites = [&](iris::Expression const& expression, iris::Statement const& current_statement) -> bool
@@ -303,7 +310,36 @@ namespace iris::compiler
                                     .expression_index = expression_index,
                                 });
                             }
+
+                            return false;
                         }
+                    }
+
+                    bool const is_access_left_hand_side = std::ranges::any_of(
+                        owning_statement.expressions,
+                        [&](iris::Expression const& candidate_expression)
+                        {
+                            if (!std::holds_alternative<iris::Access_expression>(candidate_expression.data))
+                                return false;
+
+                            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(candidate_expression.data);
+                            return access_expression.expression.expression_index == expression_index;
+                        }
+                    );
+                    if (is_access_left_hand_side)
+                        return false;
+
+                    std::optional<Declaration> const declaration = find_declaration(
+                        declaration_database,
+                        source_module_name,
+                        variable_expression.name
+                    );
+                    if (declaration.has_value() && !source_module_alias.empty())
+                    {
+                        variable_reference_rewrites.push_back({
+                            .statement = &owning_statement,
+                            .expression_index = expression_index,
+                        });
                     }
                 }
             }
@@ -347,6 +383,32 @@ namespace iris::compiler
                 target_dependencies,
                 replacement.replacement_alias,
                 replacement.member_name,
+                output_allocator
+            );
+        }
+
+        for (Variable_reference_rewrite const& rewrite : variable_reference_rewrites)
+        {
+            iris::Variable_expression const variable_expression = std::get<iris::Variable_expression>(
+                rewrite.statement->expressions[rewrite.expression_index].data
+            );
+
+            rewrite.statement->expressions.push_back(
+                iris::create_variable_expression(std::pmr::string{source_module_alias, output_allocator})
+            );
+            std::size_t const alias_expression_index = rewrite.statement->expressions.size() - 1;
+
+            rewrite.statement->expressions[rewrite.expression_index] = {
+                .data = iris::Access_expression{
+                    .expression = iris::Expression_index{ .expression_index = alias_expression_index },
+                    .member_name = variable_expression.name,
+                }
+            };
+
+            add_usage_to_target_import_alias(
+                target_dependencies,
+                source_module_alias,
+                variable_expression.name,
                 output_allocator
             );
         }

@@ -501,6 +501,61 @@ function iris.json_nested@to_json@217872819520902618(value: *Int32) -> ()
         CHECK(expected == actual);
     }
 
+    TEST_CASE("Rewrites nested constructor calls across modules 2", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const dependency = R"(module iris.json_nested;
+
+export struct Write_stream
+{
+    write: function<(value: *C_char) -> ()> = null;
+}
+
+function print_to_stdout(value: *C_char) -> ()
+{
+}
+
+export function_constructor print_json(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+        var stream: Write_stream = explicit {
+            write: print_to_stdout
+        };
+    };
+}
+)";
+
+        std::string_view const input = R"(module json_nested_usage;
+
+import iris.json_nested as json_nested;
+
+function run(value: *Int32) -> ()
+{
+    json_nested.print_json::<Int32>(value);
+}
+)";
+
+        std::string_view const expected = R"(module json_nested_usage;
+
+import iris.json_nested as json_nested;
+
+function run(value: *Int32) -> ()
+{
+    iris.json_nested@print_json@11451538589209302994(value);
+}
+
+@unique_name("iris.json_nested@print_json@11451538589209302994")
+function iris.json_nested@print_json@11451538589209302994(value: *Int32) -> ()
+{
+    var stream: json_nested.Write_stream = explicit { write: json_nested.print_to_stdout };
+}
+)";
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies, "run");
+
+        CHECK(expected == actual);
+    }
+
     TEST_CASE("Adds import usages for rewritten constructor accesses", "[Instantiate_pass][Passes]")
     {
         std::string_view const dependency = R"(module iris.json_usage_test;
