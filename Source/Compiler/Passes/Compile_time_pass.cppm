@@ -29,6 +29,7 @@ namespace iris::compiler
         llvm::DataLayout const& llvm_data_layout;
         iris::Declaration_database const& declaration_database;
         iris::compiler::Clang_context const& clang_context;
+        bool is_test_mode;
     };
 
     std::optional<Compile_time_value_and_type> evaluate_compile_time_expression(

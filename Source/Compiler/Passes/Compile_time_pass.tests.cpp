@@ -73,6 +73,7 @@ namespace iris::compiler
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
             .clang_context = *runtime_context.clang_context,
+            .is_test_mode = false,
         };
 
         run_compile_time_pass_on_function(
@@ -112,6 +113,7 @@ namespace iris::compiler
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
             .clang_context = *runtime_context.clang_context,
+            .is_test_mode = false,
         };
 
         run_compile_time_pass_on_function(

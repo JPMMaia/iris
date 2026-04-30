@@ -22,11 +22,12 @@ namespace iris::compiler
             .llvm_data_layout = parameters.llvm_data_layout,
             .declaration_database = parameters.declaration_database,
             .clang_context = parameters.clang_context,
+            .is_test_mode = parameters.is_test_mode,
         };
         run_compile_time_pass_on_module(core_module, compile_time_parameters);
 
         run_instantiate_pass_on_module(core_module, parameters);
-        run_implicit_function_pass_on_module(core_module, parameters.declaration_database);
+        run_implicit_function_pass_on_module(core_module, parameters.declaration_database, parameters.is_test_mode);
     }
 
     void run_all_passes_on_function(
@@ -45,6 +46,7 @@ namespace iris::compiler
             .llvm_data_layout = parameters.llvm_data_layout,
             .declaration_database = parameters.declaration_database,
             .clang_context = parameters.clang_context,
+            .is_test_mode = parameters.is_test_mode,
         };
         run_compile_time_pass_on_function(module_name, function_declaration, function_definition, compile_time_parameters);
         

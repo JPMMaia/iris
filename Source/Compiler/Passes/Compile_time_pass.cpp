@@ -1848,6 +1848,9 @@ namespace iris::compiler
             if (!function_declaration.has_value())
                 continue;
 
+            if (function_declaration.value()->is_test && !parameters.is_test_mode)
+                continue;
+
             run_compile_time_pass_on_function(
                 core_module.name,
                 *function_declaration.value(),

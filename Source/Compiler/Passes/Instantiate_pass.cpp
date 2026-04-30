@@ -970,6 +970,12 @@ namespace iris::compiler
         {
             std::optional<Function_declaration const*> const function_declaration = find_function_declaration(core_module, function_definition.name);
 
+            if (!function_declaration.has_value())
+                continue;
+
+            if (function_declaration.value()->is_test && !parameters.is_test_mode)
+                continue;
+
             instantiate_functions_in_function(
                 core_module.name,
                 *function_declaration.value(),
@@ -1058,13 +1064,17 @@ namespace iris::compiler
 
     static void verify_no_instance_calls_in_module(
         iris::Module const& core_module,
-        iris::Declaration_database const& declaration_database
+        iris::Declaration_database const& declaration_database,
+        bool const is_test_mode
     )
     {
         for (iris::Function_definition const& definition : core_module.definitions.function_definitions)
         {
             std::optional<Function_declaration const*> const declaration = find_function_declaration(core_module, definition.name);
             if (!declaration.has_value())
+                continue;
+
+            if (declaration.value()->is_test && !is_test_mode)
                 continue;
 
             verify_no_instance_calls_in_function(
@@ -1161,7 +1171,7 @@ namespace iris::compiler
         instantiate_all_functions(core_module, parameters);
         instantiate_all_types(core_module, parameters.declaration_database, parameters.instanced_declarations);
 
-        verify_no_instance_calls_in_module(core_module, parameters.declaration_database);
+        verify_no_instance_calls_in_module(core_module, parameters.declaration_database, parameters.is_test_mode);
         verify_no_type_instances_in_module(core_module, parameters.declaration_database);
     }
 }

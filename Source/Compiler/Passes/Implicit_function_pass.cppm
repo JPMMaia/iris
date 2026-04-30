@@ -9,7 +9,8 @@ namespace iris::compiler
 {
     export void run_implicit_function_pass_on_module(
         iris::Module& core_module,
-        iris::Declaration_database const& declaration_database
+        iris::Declaration_database const& declaration_database,
+        bool const is_test_mode
     );
 
     export void run_implicit_function_pass_on_function(

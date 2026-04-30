@@ -98,6 +98,7 @@ namespace iris::compiler
             .definitions = core_module.definitions,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
+            .is_test_mode = false,
         };
 
         run_all_passes_on_function(

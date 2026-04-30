@@ -88,6 +88,7 @@ namespace iris::compiler
             .definitions = core_module.definitions,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
+            .is_test_mode = false,
         };
 
         run_instantiate_pass_on_function(
@@ -132,6 +133,7 @@ namespace iris::compiler
             .definitions = core_module.definitions,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
+            .is_test_mode = false,
         };
 
         run_instantiate_pass_on_module(core_module, parameters);
@@ -723,6 +725,7 @@ function run(value: *Int32) -> ()
             .definitions = core_module.definitions,
             .output_allocator = output_allocator,
             .temporaries_allocator = temporaries_allocator,
+            .is_test_mode = false,
         };
 
         run_instantiate_pass_on_function(

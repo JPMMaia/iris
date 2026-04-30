@@ -23,6 +23,7 @@ namespace iris::compiler
         Module_definitions& definitions;
         std::pmr::polymorphic_allocator<> const& output_allocator;
         std::pmr::polymorphic_allocator<> const& temporaries_allocator;
+        bool is_test_mode;
     };
 
     export void run_all_passes_on_module(

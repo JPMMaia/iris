@@ -345,13 +345,17 @@ namespace iris::compiler
 
     void run_implicit_function_pass_on_module(
         iris::Module& core_module,
-        iris::Declaration_database const& declaration_database
+        iris::Declaration_database const& declaration_database,
+        bool const is_test_mode
     )
     {
         for (iris::Function_definition& function_definition : core_module.definitions.function_definitions)
         {
             std::optional<Function_declaration const*> const function_declaration = find_function_declaration(core_module, function_definition.name);
             if (!function_declaration.has_value())
+                continue;
+
+            if (function_declaration.value()->is_test && !is_test_mode)
                 continue;
 
             run_implicit_function_pass_on_function(

@@ -139,9 +139,21 @@ namespace iris
     bool is_test_mode = false;
   };
 
+  static void add_test_mode_dependencies(
+    iris::Module& core_module,
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path>& module_name_to_file_path_map
+  )
+  {
+    module_name_to_file_path_map.emplace("c.inttypes", import_c_header_and_get_file_path("c.inttypes", "inttypes.h"));
+    module_name_to_file_path_map.emplace("c.stdio", import_c_header_and_get_file_path("c.stdio", "stdio.h"));
+    module_name_to_file_path_map.emplace("c.string", import_c_header_and_get_file_path("c.string", "string.h"));
+    module_name_to_file_path_map.emplace("iris.json", parse_and_get_file_path(iris::common::get_json_module_file_path()));
+    core_module.dependencies.alias_imports.push_back({"iris.json", "iris_json"});
+  }
+
   void test_create_llvm_module(
     std::string_view const input_file,
-    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> module_name_to_file_path_map,
     std::string_view const expected_llvm_ir,
     Test_options const test_options = {}
   )
@@ -164,6 +176,9 @@ namespace iris
       {}
     );
     REQUIRE(core_module.has_value());
+
+    if (test_options.is_test_mode)
+      add_test_mode_dependencies(core_module.value(), module_name_to_file_path_map);
 
     iris::compiler::Compilation_options const compilation_options
     {
@@ -5541,7 +5556,32 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     std::string const test_source_file_path = (g_test_source_files_path / input_file).generic_string();
 
     std::string const expected_llvm_ir = std::format(R"(
-@iris_test_source_file_path = internal constant [{} x i8] c"{}\00"
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
+%struct.iris_json_Write_stream = type {{ ptr }}
+
+@iris_test_source_file_path = internal constant [68 x i8] c"C:/Users/JPMMa/Desktop/source/iris/Examples/txt/test_framework.iris\00"
+@global_1 = internal constant [4 x i8] c"hhi\00"
+@global_2 = internal constant [3 x i8] c"hi\00"
+@global_3 = internal constant [2 x i8] c"i\00"
+@global_4 = internal constant [4 x i8] c"lli\00"
+@global_5 = internal constant [4 x i8] c"hhu\00"
+@global_6 = internal constant [3 x i8] c"hu\00"
+@global_7 = internal constant [2 x i8] c"u\00"
+@global_8 = internal constant [4 x i8] c"llu\00"
+@global_9 = internal constant [2 x i8] c"f\00"
+@global_10 = internal constant [4 x i8] c"lld\00"
+@global_11 = internal constant [5 x i8] c"null\00"
+@global_12 = internal constant [3 x i8] c"%s\00"
+@global_13 = internal constant [5 x i8] c" == \00"
+
+; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
+declare i32 @snprintf(ptr noundef, i64 noundef, ptr noundef, ...) #0
+
+; Function Attrs: convergent
+declare i64 @strlen(ptr noundef) #0
 
 ; Function Attrs: convergent
 define private i32 @Test_framework_add(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b") #0 {{
@@ -5559,19 +5599,307 @@ entry:
 ; Function Attrs: convergent
 define void @Test_framework_test_addition() #0 {{
 entry:
+  %__lhs = alloca i32, align 4
+  %__rhs = alloca i32, align 4
+  %__lhs1 = alloca i32, align 4
+  %__rhs2 = alloca i32, align 4
   %0 = call i32 @Test_framework_add(i32 noundef 1, i32 noundef 2)
-  %1 = icmp eq i32 %0, 3
-  call void @iris_test_check(i1 noundef zeroext %1, ptr noundef @iris_test_source_file_path, i64 noundef 11)
-  %2 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
-  %3 = icmp eq i32 %2, 5
-  call void @iris_test_check(i1 noundef zeroext %3, ptr noundef @iris_test_source_file_path, i64 noundef 12)
+  store i32 %0, ptr %__lhs, align 4
+  store i32 3, ptr %__rhs, align 4
+  %1 = load i32, ptr %__lhs, align 4
+  %2 = load i32, ptr %__rhs, align 4
+  %3 = icmp ne i32 %1, %2
+  br i1 %3, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  call void @"iris.json@print_json_difference@16983553210230134252"(ptr noundef %__lhs, ptr noundef %__rhs)
+  br label %if_s1_after
+
+if_s1_after:                                      ; preds = %if_s0_then, %entry
+  %4 = load i32, ptr %__lhs, align 4
+  %5 = load i32, ptr %__rhs, align 4
+  %6 = icmp eq i32 %4, %5
+  call void @iris_test_check(i1 noundef zeroext %6, ptr noundef @iris_test_source_file_path, i64 noundef 0)
+  %7 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
+  store i32 %7, ptr %__lhs1, align 4
+  store i32 5, ptr %__rhs2, align 4
+  %8 = load i32, ptr %__lhs1, align 4
+  %9 = load i32, ptr %__rhs2, align 4
+  %10 = icmp ne i32 %8, %9
+  br i1 %10, label %if_s0_then3, label %if_s1_after4
+
+if_s0_then3:                                      ; preds = %if_s1_after
+  call void @"iris.json@print_json_difference@16983553210230134252"(ptr noundef %__lhs1, ptr noundef %__rhs2)
+  br label %if_s1_after4
+
+if_s1_after4:                                     ; preds = %if_s0_then3, %if_s1_after
+  %11 = load i32, ptr %__lhs1, align 4
+  %12 = load i32, ptr %__rhs2, align 4
+  %13 = icmp eq i32 %11, %12
+  call void @iris_test_check(i1 noundef zeroext %13, ptr noundef @iris_test_source_file_path, i64 noundef 0)
+  ret void
+}}
+
+; Function Attrs: convergent
+define private ptr @iris.json.create_format_specifier(ptr %"arguments[0].buffer_0", i64 %"arguments[0].buffer_1", i32 noundef %"arguments[1].kind", i64 noundef %"arguments[2].size_in_bytes") #0 {{
+entry:
+  %buffer = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %kind = alloca i32, align 4
+  %size_in_bytes = alloca i64, align 8
+  %specifier = alloca ptr, align 8
+  %0 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 0
+  store ptr %"arguments[0].buffer_0", ptr %0, align 8
+  %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 1
+  store i64 %"arguments[0].buffer_1", ptr %1, align 8
+  store i32 %"arguments[1].kind", ptr %kind, align 4
+  store i64 %"arguments[2].size_in_bytes", ptr %size_in_bytes, align 8
+  %2 = load i32, ptr %kind, align 4
+  %3 = load i64, ptr %size_in_bytes, align 8
+  %4 = call ptr @iris.json.get_format_specifier(i32 noundef %2, i64 noundef %3)
+  store ptr %4, ptr %specifier, align 8
+  %5 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 0
+  %6 = load ptr, ptr %5, align 8
+  %7 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 1
+  %8 = load i64, ptr %7, align 8
+  %9 = load ptr, ptr %specifier, align 8
+  call void @iris.json.write_format_specifier(ptr %6, i64 %8, ptr noundef %9)
+  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  ret ptr %11
+}}
+
+; Function Attrs: convergent
+define private ptr @iris.json.get_format_specifier(i32 noundef %"arguments[0].kind", i64 noundef %"arguments[1].size_in_bytes") #0 {{
+entry:
+  %kind = alloca i32, align 4
+  %size_in_bytes = alloca i64, align 8
+  store i32 %"arguments[0].kind", ptr %kind, align 4
+  store i64 %"arguments[1].size_in_bytes", ptr %size_in_bytes, align 8
+  %0 = load i32, ptr %kind, align 4
+  %1 = icmp eq i32 %0, 0
+  br i1 %1, label %if_s0_then, label %if_s1_else
+
+if_s0_then:                                       ; preds = %entry
+  %2 = load i64, ptr %size_in_bytes, align 8
+  switch i64 %2, label %switch_case_default [
+    i64 1, label %switch_case_i0_
+    i64 2, label %switch_case_i1_
+    i64 4, label %switch_case_i2_
+  ]
+
+if_s1_else:                                       ; preds = %entry
+  %3 = load i32, ptr %kind, align 4
+  %4 = icmp eq i32 %3, 1
+  br i1 %4, label %if_s2_then, label %if_s3_else
+
+if_s2_then:                                       ; preds = %if_s1_else
+  %5 = load i64, ptr %size_in_bytes, align 8
+  switch i64 %5, label %switch_case_default5 [
+    i64 1, label %switch_case_i0_2
+    i64 2, label %switch_case_i1_3
+    i64 4, label %switch_case_i2_4
+  ]
+
+if_s3_else:                                       ; preds = %if_s1_else
+  %6 = load i32, ptr %kind, align 4
+  %7 = icmp eq i32 %6, 2
+  br i1 %7, label %if_s4_then, label %if_s5_after
+
+if_s4_then:                                       ; preds = %if_s3_else
+  ret ptr @global_9
+
+if_s5_after:                                      ; preds = %if_s3_else, %switch_after1, %switch_after
+  ret ptr @global_10
+
+switch_after:                                     ; No predecessors!
+  br label %if_s5_after
+
+switch_case_i0_:                                  ; preds = %if_s0_then
+  ret ptr @global_1
+
+switch_case_i1_:                                  ; preds = %if_s0_then
+  ret ptr @global_2
+
+switch_case_i2_:                                  ; preds = %if_s0_then
+  ret ptr @global_3
+
+switch_case_default:                              ; preds = %if_s0_then
+  ret ptr @global_4
+
+switch_after1:                                    ; No predecessors!
+  br label %if_s5_after
+
+switch_case_i0_2:                                 ; preds = %if_s2_then
+  ret ptr @global_5
+
+switch_case_i1_3:                                 ; preds = %if_s2_then
+  ret ptr @global_6
+
+switch_case_i2_4:                                 ; preds = %if_s2_then
+  ret ptr @global_7
+
+switch_case_default5:                             ; preds = %if_s2_then
+  ret ptr @global_8
+}}
+
+; Function Attrs: convergent
+define private void @iris.json.write_format_specifier(ptr %"arguments[0].buffer_0", i64 %"arguments[0].buffer_1", ptr noundef %"arguments[1].specifier") #0 {{
+entry:
+  %buffer = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %specifier = alloca ptr, align 8
+  %length = alloca i64, align 8
+  %index = alloca i64, align 8
+  %0 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 0
+  store ptr %"arguments[0].buffer_0", ptr %0, align 8
+  %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 1
+  store i64 %"arguments[0].buffer_1", ptr %1, align 8
+  store ptr %"arguments[1].specifier", ptr %specifier, align 8
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %array_slice_element_pointer = getelementptr i8, ptr %3, i32 0
+  store i8 37, ptr %array_slice_element_pointer, align 1
+  %4 = load ptr, ptr %specifier, align 8
+  %5 = call i64 @strlen(ptr noundef %4)
+  store i64 %5, ptr %length, align 8
+  store i64 0, ptr %index, align 8
+  br label %for_loop_condition
+
+for_loop_condition:                               ; preds = %for_loop_update_index, %entry
+  %6 = load i64, ptr %length, align 8
+  %7 = load i64, ptr %index, align 8
+  %8 = icmp ult i64 %7, %6
+  br i1 %8, label %for_loop_then, label %for_loop_after
+
+for_loop_then:                                    ; preds = %for_loop_condition
+  %9 = load i64, ptr %index, align 8
+  %10 = add i64 1, %9
+  %11 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %12 = load ptr, ptr %11, align 8
+  %array_slice_element_pointer1 = getelementptr i8, ptr %12, i64 %10
+  %13 = load i64, ptr %index, align 8
+  %14 = load ptr, ptr %specifier, align 8
+  %array_element_pointer = getelementptr i8, ptr %14, i64 %13
+  %15 = load i8, ptr %array_element_pointer, align 1
+  store i8 %15, ptr %array_slice_element_pointer1, align 1
+  br label %for_loop_update_index
+
+for_loop_update_index:                            ; preds = %for_loop_then
+  %16 = load i64, ptr %index, align 8
+  %17 = add i64 %16, 1
+  store i64 %17, ptr %index, align 8
+  br label %for_loop_condition
+
+for_loop_after:                                   ; preds = %for_loop_condition
+  %18 = load i64, ptr %length, align 8
+  %19 = add i64 1, %18
+  %20 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %21 = load ptr, ptr %20, align 8
+  %array_slice_element_pointer2 = getelementptr i8, ptr %21, i64 %19
+  store i8 0, ptr %array_slice_element_pointer2, align 1
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @"iris.json@to_json@3489948734076117284"(ptr noundef %"arguments[0].stream", ptr noundef %"arguments[1].value") #0 {{
+entry:
+  %0 = alloca %struct.iris_json_Write_stream, align 8
+  %value = alloca ptr, align 8
+  %array = alloca [16 x i8], i64 16, align 1
+  %format_specifier_buffer = alloca [16 x i8], align 1
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %format_specifier = alloca ptr, align 8
+  %array1 = alloca [64 x i8], i64 64, align 1
+  %format_buffer = alloca [64 x i8], align 1
+  %2 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  store ptr %"arguments[0].stream", ptr %2, align 8
+  store ptr %"arguments[1].value", ptr %value, align 8
+  %3 = load ptr, ptr %value, align 8
+  %4 = icmp eq ptr %3, null
+  br i1 %4, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  %5 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %6 = load ptr, ptr %5, align 8
+  call void %6(ptr noundef @global_11)
+  ret void
+
+if_s1_after:                                      ; preds = %entry
+  call void @llvm.memset.p0.i64(ptr align 1 %array, i8 0, i64 16, i1 false)
+  %7 = load [16 x i8], ptr %array, align 1
+  store [16 x i8] %7, ptr %format_specifier_buffer, align 1
+  %data_pointer = getelementptr [16 x i8], ptr %format_specifier_buffer, i32 0, i32 0
+  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  store ptr %data_pointer, ptr %8, align 8
+  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  store i64 16, ptr %9, align 8
+  %10 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  %12 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 1
+  %13 = load i64, ptr %12, align 8
+  %14 = call ptr @iris.json.create_format_specifier(ptr %11, i64 %13, i32 noundef 0, i64 noundef 4)
+  store ptr %14, ptr %format_specifier, align 8
+  call void @llvm.memset.p0.i64(ptr align 1 %array1, i8 0, i64 64, i1 false)
+  %15 = load [64 x i8], ptr %array1, align 1
+  store [64 x i8] %15, ptr %format_buffer, align 1
+  %array_element_pointer = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
+  %16 = load ptr, ptr %value, align 8
+  %17 = load ptr, ptr %format_specifier, align 8
+  %18 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 64, ptr noundef %17, ptr noundef %16)
+  %19 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %20 = load ptr, ptr %19, align 8
+  %array_element_pointer2 = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
+  call void %20(ptr noundef %array_element_pointer2)
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @iris.json.print_to_stdout(ptr noundef %"arguments[0].value") #0 {{
+entry:
+  %value = alloca ptr, align 8
+  store ptr %"arguments[0].value", ptr %value, align 8
+  %0 = load ptr, ptr %value, align 8
+  %1 = call i32 (ptr, ...) @printf(ptr noundef @global_12, ptr noundef %0)
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @"iris.json@print_json@9753731967319569499"(ptr noundef %"arguments[0].value") #0 {{
+entry:
+  %value = alloca ptr, align 8
+  %stream = alloca %struct.iris_json_Write_stream, align 8
+  store ptr %"arguments[0].value", ptr %value, align 8
+  %0 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
+  store ptr @iris.json.print_to_stdout, ptr %0, align 8
+  %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
+  %2 = load ptr, ptr %1, align 8
+  %3 = load ptr, ptr %value, align 8
+  call void @"iris.json@to_json@3489948734076117284"(ptr noundef %2, ptr noundef %3)
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @"iris.json@print_json_difference@16983553210230134252"(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
+entry:
+  %lhs = alloca ptr, align 8
+  %rhs = alloca ptr, align 8
+  store ptr %"arguments[0].lhs", ptr %lhs, align 8
+  store ptr %"arguments[1].rhs", ptr %rhs, align 8
+  %0 = load ptr, ptr %lhs, align 8
+  call void @"iris.json@print_json@9753731967319569499"(ptr noundef %0)
+  %1 = call i32 (ptr, ...) @printf(ptr noundef @global_13)
+  %2 = load ptr, ptr %rhs, align 8
+  call void @"iris.json@print_json@9753731967319569499"(ptr noundef %2)
   ret void
 }}
 
 ; Function Attrs: convergent
 declare void @iris_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
 )", test_source_file_path.size() + 1, test_source_file_path);
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.is_test_mode = true});

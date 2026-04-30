@@ -1501,6 +1501,7 @@ namespace iris::compiler
                 .definitions = new_core_module.definitions,
                 .output_allocator = {},
                 .temporaries_allocator = {},
+                .is_test_mode = compilation_options.is_test_mode,
             };
 
             run_all_passes_on_module(new_core_module, pass_parameters);
@@ -1871,12 +1872,15 @@ namespace iris::compiler
                 .definitions = core_module.definitions,
                 .output_allocator = {},
                 .temporaries_allocator = {},
+                .is_test_mode = compilation_options.is_test_mode,
             };
 
             run_all_passes_on_module(core_module, pass_parameters);
         }
 
-         Compilation_database compilation_database = process_modules_and_create_compilation_database(
+        add_import_usages(core_module, {});
+
+        Compilation_database compilation_database = process_modules_and_create_compilation_database(
             llvm_data,
             std::move(clang_context),
             sorted_core_modules,
