@@ -507,6 +507,7 @@ namespace iris::language_server
 
             std::pmr::vector<std::filesystem::path> core_module_source_file_paths = get_artifacts_source_files(
                 artifacts,
+                false,
                 output_allocator,
                 temporaries_allocator
             );

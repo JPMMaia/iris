@@ -138,6 +138,7 @@ namespace iris::compiler
 
         std::pmr::vector<std::filesystem::path> const source_file_paths = get_artifacts_source_files(
             artifacts,
+            builder.is_test_mode,
             output_allocator,
             temporaries_allocator
         );
@@ -309,27 +310,41 @@ namespace iris::compiler
     {
         std::pmr::vector<Artifact> artifacts{temporaries_allocator};
 
+        auto add_required_artifact = [&](std::string_view artifact_name) -> void
+        {
+            auto const location = std::find_if(
+                artifacts.begin(),
+                artifacts.end(),
+                [&](Artifact const& artifact) -> bool { return artifact.name == artifact_name; }
+            );
+            if (location != artifacts.end())
+                return;
+
+            std::optional<std::filesystem::path> const artifact_file_path = iris::compiler::get_artifact_location(repositories, artifact_name);
+            if (!artifact_file_path.has_value())
+            {
+                iris::common::print_message_and_exit(
+                    std::format("Could not find dependency '{}'", artifact_name)
+                );
+            }
+
+            Artifact const artifact = get_artifact(artifact_file_path.value());
+
+            add_artifact_dependencies(
+                artifacts,
+                artifact,
+                repositories,
+                output_allocator,
+                temporaries_allocator
+            );
+
+            artifacts.push_back(artifact);
+        };
+        
         if (is_test_mode)
         {
-            auto const location = std::find_if(artifacts.begin(), artifacts.end(), [](Artifact const& artifact) -> bool { return artifact.name == "Cpp_standard_library"; });
-            if (location == artifacts.end())
-            {
-                std::optional<std::filesystem::path> const cpp_standard_library_artifact_file_path = iris::compiler::get_artifact_location(repositories, "Cpp_standard_library");
-                if (!cpp_standard_library_artifact_file_path.has_value())
-                    iris::common::print_message_and_exit("Could not find dependency 'Cpp_standard_library'");
-
-                Artifact const artifact = get_artifact(cpp_standard_library_artifact_file_path.value());
-
-                add_artifact_dependencies(
-                    artifacts,
-                    artifact,
-                    repositories,
-                    output_allocator,
-                    temporaries_allocator
-                );
-                
-                artifacts.push_back(artifact);
-            }
+            add_required_artifact("C_standard_library");
+            add_required_artifact("Cpp_standard_library");
         }
 
         for (std::filesystem::path const& artifact_file_path : artifact_file_paths)
@@ -353,6 +368,7 @@ namespace iris::compiler
 
     std::pmr::vector<std::filesystem::path> get_artifacts_source_files(
         std::span<Artifact const> const artifacts,
+        bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -360,7 +376,11 @@ namespace iris::compiler
         std::pmr::vector<std::filesystem::path> source_files{temporaries_allocator};
 
         source_files.push_back(iris::common::get_builtin_module_file_path());
-        source_files.push_back(iris::common::get_json_module_file_path());
+        
+        if (is_test_mode)
+        {
+            source_files.push_back(iris::common::get_json_module_file_path());
+        }
 
         for (Artifact const& artifact : artifacts)
         {
@@ -1043,6 +1063,31 @@ namespace iris::compiler
         return true;
     }
 
+    static void add_module_dependency(
+        iris::Module& core_module,
+        std::string_view const module_name,
+        std::string_view const alias_name
+    )
+    {
+        if (core_module.name == module_name)
+            return;
+
+        auto const location = std::find_if(
+            core_module.dependencies.alias_imports.begin(),
+            core_module.dependencies.alias_imports.end(),
+            [&](iris::Import_module_with_alias const& import_module) -> bool { return import_module.module_name == module_name; }
+        );
+        if (location != core_module.dependencies.alias_imports.end())
+            return;
+
+        core_module.dependencies.alias_imports.push_back({
+            .module_name = std::pmr::string{module_name},
+            .alias = std::pmr::string{alias_name},
+            .usages = {},
+            .source_range = std::nullopt,
+        });
+    }
+
     std::pmr::vector<iris::Module> parse_source_files_and_cache(
         Builder& builder,
         std::span<std::filesystem::path const> const source_files_paths,
@@ -1116,6 +1161,13 @@ namespace iris::compiler
         }
 
         iris::parser::destroy_parser(std::move(parser));
+
+        for (iris::Module& core_module : core_modules)
+        {
+            add_module_dependency(core_module, "iris.builtin", "iris");
+            if (builder.is_test_mode && core_module.name != "iris.builtin")
+                add_module_dependency(core_module, "iris.json", "iris_json");
+        }
 
         end_timer(get_profiler(builder), "parse_source_files_and_cache");
 

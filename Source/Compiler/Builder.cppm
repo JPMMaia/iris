@@ -62,6 +62,7 @@ namespace iris::compiler
 
     export std::pmr::vector<std::filesystem::path> get_artifacts_source_files(
         std::span<Artifact const> const artifacts,
+        bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
