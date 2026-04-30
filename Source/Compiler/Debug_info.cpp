@@ -73,6 +73,16 @@ namespace iris::compiler
         llvm_builder.SetCurrentDebugLocation(debug_location);
     }
 
+    void set_debug_location(
+        llvm::IRBuilder<>& llvm_builder,
+        Debug_info& debug_info,
+        std::optional<iris::Source_position> const& position
+    )
+    {
+        if (position.has_value())
+            set_debug_location(llvm_builder, debug_info, position->line, position->column);
+    }
+
     void unset_debug_location(
         llvm::IRBuilder<>& llvm_builder
     )

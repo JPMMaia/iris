@@ -1356,7 +1356,7 @@ namespace iris::compiler
         );
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
         
         Expression const left_hand_side_expression = statement.expressions[expression.left_hand_side.expression_index];
         if (left_hand_side.value != nullptr && std::holds_alternative<Access_expression>(left_hand_side_expression.data))
@@ -2175,7 +2175,7 @@ namespace iris::compiler
     {
         std::span<Statement const> statements = block_expression.statements;
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             push_debug_lexical_block_scope(*parameters.debug_info, *parameters.source_position);
 
         std::pmr::vector<Block_info> all_block_infos{ parameters.blocks.begin(), parameters.blocks.end() };
@@ -2192,7 +2192,7 @@ namespace iris::compiler
             true
         );
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             pop_debug_scope(*parameters.debug_info);
 
         return Value_and_type
@@ -2224,7 +2224,7 @@ namespace iris::compiler
         create_instructions_pop_blocks(parameters, blocks_to_pop_count);
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         llvm_builder.CreateBr(target_block);
 
@@ -2246,7 +2246,7 @@ namespace iris::compiler
     )
     {
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         llvm::Value* call_instruction = generate_function_call(
             is_expression_address_of,
@@ -3108,7 +3108,25 @@ namespace iris::compiler
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{"Can only create calls inside functions!"};
+        {
+            std::string position = "unknown";
+            if (parameters.source_position.has_value())
+            {
+                position = std::format(
+                    "{}:{}",
+                    parameters.source_position->line,
+                    parameters.source_position->column
+                );
+            }
+
+            throw std::runtime_error{
+                std::format(
+                    "Can only create calls inside functions! module='{}' position='{}'",
+                    parameters.core_module.name,
+                    position
+                )
+            };
+        }
 
         {
             std::optional<Value_and_type> const value = create_builtin_call_expression_value(expression, statement, parameters);
@@ -3921,7 +3939,7 @@ namespace iris::compiler
         create_instructions_pop_blocks(parameters, blocks_to_pop_count);
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         llvm_builder.CreateBr(target_block);
 
@@ -4020,13 +4038,13 @@ namespace iris::compiler
         std::span<Block_info const> block_infos = parameters.blocks;
         std::span<Value_and_type const> const local_variables = parameters.local_variables;
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             push_debug_lexical_block_scope(*parameters.debug_info, *parameters.source_position);
 
         Value_and_type const& range_begin_temporary = create_loaded_expression_value(expression.range_begin.expression_index, statement, parameters);
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         // Loop variable declaration:
         Type_reference const& variable_type = range_begin_temporary.type.value();
@@ -4054,7 +4072,7 @@ namespace iris::compiler
             );
 
             if (parameters.debug_info != nullptr)
-                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
             Value_and_type const loaded_variable_value
             {
@@ -4115,7 +4133,7 @@ namespace iris::compiler
                 create_constant_expression_value(default_step_constant, llvm_context, llvm_data_layout, llvm_module, core_module, parameters.declaration_database, type_database);
 
             if (parameters.debug_info != nullptr)
-                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
             llvm::Value* const loaded_value_value = create_load_instruction(llvm_builder, llvm_data_layout, variable_llvm_type, variable_value.value);
             llvm::Value* new_variable_value = llvm_builder.CreateAdd(loaded_value_value, step_by_value.value);
@@ -4124,7 +4142,7 @@ namespace iris::compiler
             llvm_builder.CreateBr(condition_block);
         }
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             pop_debug_scope(*parameters.debug_info);
 
         // After the loop:
@@ -4224,7 +4242,7 @@ namespace iris::compiler
 
                 llvm_builder.SetInsertPoint(then_block);
 
-                if (parameters.debug_info != nullptr)
+                if (parameters.debug_info != nullptr && serie.block_source_range.has_value())
                     push_debug_lexical_block_scope(*parameters.debug_info, serie.block_source_range->start);
 
                 create_statement_values(
@@ -4236,14 +4254,14 @@ namespace iris::compiler
                 if (!ends_with_terminator_statement(serie.then_statements))
                     llvm_builder.CreateBr(end_if_block);
 
-                if (parameters.debug_info != nullptr)
+                if (parameters.debug_info != nullptr && serie.block_source_range.has_value())
                     pop_debug_scope(*parameters.debug_info);
 
                 llvm_builder.SetInsertPoint(else_block);
             }
             else
             {
-                if (parameters.debug_info != nullptr)
+                if (parameters.debug_info != nullptr && serie.block_source_range.has_value())
                     push_debug_lexical_block_scope(*parameters.debug_info, serie.block_source_range->start);
 
                 create_statement_values(
@@ -4255,7 +4273,7 @@ namespace iris::compiler
                 if (!ends_with_terminator_statement(serie.then_statements))
                     llvm_builder.CreateBr(end_if_block);
 
-                if (parameters.debug_info != nullptr)
+                if (parameters.debug_info != nullptr && serie.block_source_range.has_value())
                     pop_debug_scope(*parameters.debug_info);
 
                 llvm_builder.SetInsertPoint(end_if_block);
@@ -4938,7 +4956,7 @@ namespace iris::compiler
             create_instructions_at_return(parameters);
 
             if (parameters.debug_info != nullptr)
-                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
             llvm::Value* const instruction = llvm_builder.CreateRetVoid();
 
@@ -4990,7 +5008,7 @@ namespace iris::compiler
         }
         
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         iris::Expression const& expression_to_return = statement.expressions[expression.expression->expression_index];
         bool const is_taking_address_of = is_taking_address_of_expression(statement, expression_to_return);
@@ -5055,7 +5073,7 @@ namespace iris::compiler
         std::uint64_t const number_of_cases = static_cast<std::uint64_t>(expression.cases.size());
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         Value_and_type const& switch_value = create_loaded_expression_value(expression.value.expression_index, statement, parameters);
 
@@ -5405,7 +5423,7 @@ namespace iris::compiler
         Value_and_type const& right_hand_side = create_loaded_expression_value(expression.right_hand_side.expression_index, statement, parameters);
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         llvm::AllocaInst* const alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, right_hand_side.value->getType(), expression.name.c_str());
         if (alloca == nullptr)
@@ -5459,7 +5477,7 @@ namespace iris::compiler
         if (is_right_side_instantiate_expression)
         {
             if (parameters.debug_info != nullptr)
-                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
         }
 
         Expression_parameters new_parameters = parameters;
@@ -5498,7 +5516,7 @@ namespace iris::compiler
         if (store_value)
         {
             if (parameters.debug_info != nullptr)
-                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
             
             create_store_instruction(llvm_builder, llvm_data_layout, loaded_value, alloca);
         }
@@ -5771,7 +5789,7 @@ namespace iris::compiler
 
         llvm_builder.SetInsertPoint(then_block);
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             push_debug_lexical_block_scope(*parameters.debug_info, *parameters.source_position);
 
         create_statement_values(
@@ -5788,7 +5806,7 @@ namespace iris::compiler
             llvm_builder.CreateBr(condition_block);
         }
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             pop_debug_scope(*parameters.debug_info);
 
         llvm_builder.SetInsertPoint(after_block);

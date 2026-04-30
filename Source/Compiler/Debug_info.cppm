@@ -41,6 +41,12 @@ namespace iris::compiler
         unsigned const column
     );
 
+    export void set_debug_location(
+        llvm::IRBuilder<>& llvm_builder,
+        Debug_info& debug_info,
+        std::optional<Source_position> const& position
+    );
+
     export void unset_debug_location(
         llvm::IRBuilder<>& llvm_builder
     );
