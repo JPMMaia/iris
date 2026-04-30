@@ -977,6 +977,18 @@ namespace iris
     export std::optional<Struct_declaration const*> find_struct_declaration(Module const& module, std::string_view name);
     export std::optional<Union_declaration const*> find_union_declaration(Module const& module, std::string_view name);
 
+    export void add_import_usage(
+        iris::Module_dependencies& dependencies,
+        std::string_view const module_name,
+        std::string_view const usage
+    );
+
+    export void add_import_usage_with_alias(
+        iris::Module_dependencies& dependencies,
+        std::string_view const alias,
+        std::string_view const usage
+    );
+
     export Import_module_with_alias const* find_import_module_with_alias(
         iris::Module_dependencies const& dependencies,
         std::string_view const alias_name
@@ -996,6 +1008,10 @@ namespace iris
         iris::Statement& destination_statement,
         iris::Statement const& source_statement,
         iris::Expression_index const source_expression_index
+    );
+
+    export bool is_builtin_module_type(
+        std::string_view const name
     );
 
     export bool is_builtin_function_name(

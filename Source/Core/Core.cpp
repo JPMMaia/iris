@@ -352,6 +352,64 @@ namespace iris
         return get_value(name, module.export_declarations.union_declarations, module.internal_declarations.union_declarations, module.instanced_declarations.union_declarations);
     }
 
+    void add_import_usage(
+        iris::Module_dependencies& dependencies,
+        std::string_view const module_name,
+        std::string_view const usage
+    )
+    {
+        if (module_name.empty())
+            return;
+
+        auto const location = std::find_if(
+            dependencies.alias_imports.begin(),
+            dependencies.alias_imports.end(),
+            [&](Import_module_with_alias const& import_alias) -> bool { return import_alias.module_name == module_name; }
+        );
+        if (location != dependencies.alias_imports.end())
+        {
+            Import_module_with_alias& import_alias = *location;
+
+            auto const usage_location = std::find(
+                import_alias.usages.begin(),
+                import_alias.usages.end(),
+                usage
+            );
+            if (usage_location == import_alias.usages.end())
+                import_alias.usages.push_back(std::pmr::string{ usage });
+        }
+        else
+        {
+            std::pmr::string alias = std::pmr::string{module_name};
+            std::replace(alias.begin(), alias.end(), '.', '_');
+
+            dependencies.alias_imports.push_back({
+                .module_name = std::pmr::string{module_name},
+                .alias = std::move(alias),
+                .usages = { std::pmr::string{usage} },
+            });
+        }
+    }
+
+    void add_import_usage_with_alias(
+        iris::Module_dependencies& dependencies,
+        std::string_view const alias,
+        std::string_view const usage
+    )
+    {
+        iris::Import_module_with_alias* import_module = iris::find_import_module_with_alias(dependencies, alias);
+        if (import_module != nullptr)
+        {
+            auto const location = std::find_if(
+                import_module->usages.begin(),
+                import_module->usages.end(),
+                [&](std::pmr::string const& current_usage) -> bool { return current_usage == usage; }
+            );
+            if (location == import_module->usages.end())
+                import_module->usages.push_back(std::pmr::string{usage});
+        }
+    }
+
     Import_module_with_alias const* find_import_module_with_alias(
         iris::Module_dependencies const& dependencies,
         std::string_view const alias_name
@@ -598,6 +656,13 @@ namespace iris
             return std::nullopt;
 
         return std::get<iris::Type_expression>(type_expression.data).type;
+    }
+
+    bool is_builtin_module_type(
+        std::string_view const name
+    )
+    {
+        return name == "Type_kind";
     }
 
     bool is_builtin_function_name(

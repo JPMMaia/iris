@@ -312,7 +312,7 @@ namespace iris::compiler
                     if (implicit_function.has_value())
                     {
                         if (implicit_function->import_alias.has_value())
-                            add_import_usage(dependencies, implicit_function->import_alias.value(), implicit_function->function_name);
+                            add_import_usage_with_alias(dependencies, implicit_function->import_alias.value(), implicit_function->function_name);
 
                         iris::Statement new_statement = transform_statement_with_implicit_function(
                             statement,

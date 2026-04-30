@@ -2377,25 +2377,6 @@ namespace iris::compiler
         return members;
     }
 
-    void add_import_usage(
-        iris::Module_dependencies& dependencies,
-        std::string_view const alias,
-        std::string_view const usage
-    )
-    {
-        iris::Import_module_with_alias* import_module = iris::find_import_module_with_alias(dependencies, alias);
-        if (import_module != nullptr)
-        {
-            auto const location = std::find_if(
-                import_module->usages.begin(),
-                import_module->usages.end(),
-                [&](std::pmr::string const& current_usage) -> bool { return current_usage == usage; }
-            );
-            if (location == import_module->usages.end())
-                import_module->usages.push_back(std::pmr::string{usage});
-        }
-    }
-
     std::optional<Scope> calculate_scope(
         iris::Module const& core_module,
         iris::Function_declaration const& function_declaration,

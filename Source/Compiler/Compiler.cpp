@@ -1608,36 +1608,13 @@ namespace iris::compiler
         for (Import_module_with_alias& alias_import : core_module.dependencies.alias_imports)
             alias_import.usages.clear();
 
-        auto const add_unique_usage = [&](std::string_view const module_name, std::string_view const usage) -> void
-        {
-            if (module_name.empty())
-                return;
-    
-            auto const location = std::find_if(
-                core_module.dependencies.alias_imports.begin(),
-                core_module.dependencies.alias_imports.end(),
-                [&](Import_module_with_alias const& import_alias) -> bool { return import_alias.module_name == module_name; }
-            );
-            if (location != core_module.dependencies.alias_imports.end())
-            {
-                Import_module_with_alias& import_alias = *location;
-
-                auto const usage_location = std::find(
-                    import_alias.usages.begin(),
-                    import_alias.usages.end(),
-                    usage
-                );
-                if (usage_location == import_alias.usages.end())
-                    import_alias.usages.push_back(std::pmr::string{ usage, std::move(output_allocator) });
-            }
-        };
-
         auto const process_type = [&](iris::Type_reference const& type_reference) -> bool
         {
             if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
             {
                 iris::Custom_type_reference const& custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.data);
-                add_unique_usage(custom_type_reference.module_reference.name, custom_type_reference.name);
+                if (custom_type_reference.module_reference.name != core_module.name)
+                    add_import_usage(core_module.dependencies, custom_type_reference.module_reference.name, custom_type_reference.name);
             }
 
             return false;
@@ -1661,6 +1638,13 @@ namespace iris::compiler
 
                     std::string_view const left_hand_side_name = variable_expression.name;
 
+                    if (is_builtin_module_type(left_hand_side_name))
+                    {
+                        if (core_module.name != "iris.builtin")
+                            add_import_usage(core_module.dependencies, "iris.builtin", left_hand_side_name);
+                        return false;
+                    }
+
                     auto const location = std::find_if(
                         core_module.dependencies.alias_imports.begin(),
                         core_module.dependencies.alias_imports.end(),
@@ -1669,7 +1653,8 @@ namespace iris::compiler
                     if (location != core_module.dependencies.alias_imports.end())
                     {
                         Import_module_with_alias& import_alias = *location;
-                        add_unique_usage(import_alias.module_name, access_expression.member_name);
+                        if (import_alias.module_name != core_module.name)
+                            add_import_usage(core_module.dependencies, import_alias.module_name, access_expression.member_name);
                     }
                 }
             }

@@ -211,12 +211,6 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 
-    export void add_import_usage(
-        iris::Module_dependencies& dependencies,
-        std::string_view const alias,
-        std::string_view const usage
-    );
-
     export void add_parameters_to_scope(
         Scope& scope,
         std::span<std::pmr::string const> const parameter_names,
