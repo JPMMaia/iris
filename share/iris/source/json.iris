@@ -1,7 +1,6 @@
 module iris.json;
 
-import iris.builtin as iris_builtin;
-
+import c.inttypes as cinttypes;
 import c.stdio as cstdio;
 import c.string as cstring;
 
@@ -20,123 +19,121 @@ export function_constructor to_json(value_type: Type)
             return;
         }
 
-        var kind = @get_type_kind::<value_type>();
-        var size_in_bytes = @size_of::<value_type>();
+        compile_time var kind = @get_type_kind::<value_type>();
+        compile_time var size_in_bytes = @size_of::<value_type>();
 
-        var is_numeric_value = true;
-
-        if kind == iris_builtin.Type_kind.Bool
+        compile_time if kind == Type_kind.Bool
         {
-            stream.write(value ? "true"c : "false"c);
+            stream.write(*value ? "true"c : "false"c);
         }
-        else if kind == iris_builtin.Type_kind.Struct
+        else if kind == Type_kind.Struct
         {
             // TODO if object, go through members
             stream.write("??"c);
         }
-        else if kind == iris_builtin.Type_kind.Union
+        else if kind == Type_kind.Union
         {
             // TODO
             stream.write("??"c);
         }
-        else if kind == iris_builtin.Type_kind.Enum
+        else if kind == Type_kind.Enum
         {
             // TODO
             stream.write("??"c);
         }
-        else if kind == iris_builtin.Type_kind.Pointer
+        else if kind == Type_kind.Pointer
         {
             // TODO
             stream.write("pointer"c);
         }
-        else if kind == iris_builtin.Type_kind.Array_slice
+        else if kind == Type_kind.Array_slice
         {
             // TODO
             stream.write("Array_slice"c);
         }
-        else if kind == iris_builtin.Type_kind.Constant_array
+        else if kind == Type_kind.Constant_array
         {
             // TODO
             stream.write("Constant_array"c);
         }
-        else if kind == iris_builtin.Type_kind.Function_pointer
+        else if kind == Type_kind.Function_pointer
         {
             // TODO
             stream.write("Function_pointer"c);
         }
-        else if kind == iris_builtin.Type_kind.Builtin
+        else if kind == Type_kind.Builtin
         {
             // TODO
             stream.write("Builtin"c);
         }
-        else if kind == iris_builtin.Type_kind.Builtin
+        else if kind == Type_kind.Builtin
         {
             // TODO
             stream.write("Builtin"c);
         }
-        else if kind == iris_builtin.Type_kind.Null_pointer
+        else if kind == Type_kind.Null_pointer
         {
             stream.write("null"c);
         }
-        else if is_numeric_value
+        else if (kind == Type_kind.Int) || (kind == Type_kind.Uint) || (kind == Type_kind.Float)
         {
             mutable format_specifier_buffer: Constant_array::<C_char, 16> = [];
             var format_specifier = create_format_specifier(format_specifier_buffer, kind, size_in_bytes);
             
             mutable format_buffer: Constant_array::<C_char, 64> = [];
-            cstdio.snprintf(&format_buffer[0], 64, format_specifier, *value);
+            cstdio.snprintf(&format_buffer[0], 64 as cstdio.rsize_t, format_specifier, *value);
 
             stream.write(&format_buffer[0]);
         }
     };
 }
 
-function create_format_specifier(buffer: Array_slice::<mutable C_char>, kind: Type_kind, size_in_bytes: Uint64) -> (*C_char)
+function create_format_specifier(buffer: Array_slice::<mutable C_char>, kind: Type_kind, size_in_bytes: Uint64) -> (result: *mutable C_char)
 {
     var specifier = get_format_specifier(kind, size_in_bytes);
     write_format_specifier(buffer, specifier);
     return buffer.data;
 }
 
-function get_format_specifier(kind: Type_kind, size_in_bytes: Uint64) -> (*C_char)
+function get_format_specifier(kind: Type_kind, size_in_bytes: Uint64) -> (result: *C_char)
 {
-    if kind == iris_builtin.Type_kind.Int
+    if kind == Type_kind.Int
     {
         switch size_in_bytes
         {
-            case 1: return stdio.PRIi8;
-            case 2: return stdio.PRIi16;
-            case 4: return stdio.PRIi32;
-            default: return stdio.PRIi64;
+            case 1u64: return cinttypes.PRIi8;
+            case 2u64: return cinttypes.PRIi16;
+            case 4u64: return cinttypes.PRIi32;
+            default: return cinttypes.PRIi64;
         }
     }
-    else if kind == iris_builtin.Type_kind.Uint
+    else if kind == Type_kind.Uint
     {
         switch size_in_bytes
         {
-            case 1: return stdio.PRIu8;
-            case 2: return stdio.PRIu16;
-            case 4: return stdio.PRIu32;
-            default: return stdio.PRIu64;
+            case 1u64: return cinttypes.PRIu8;
+            case 2u64: return cinttypes.PRIu16;
+            case 4u64: return cinttypes.PRIu32;
+            default: return cinttypes.PRIu64;
         }
     }
-    else if kind == iris_builtin.Type_kind.Float
+    else if kind == Type_kind.Float
     {
         return "f"c;
     }
 
-    return stdio.PRIi64;
+    return "lld"c;
 }
 
-function write_format_specifier(buffer: Array_slice::<mutable C_char>, specifier: *C_char) -> (*C_char)
+function write_format_specifier(buffer: Array_slice::<mutable C_char>, specifier: *C_char) -> ()
 {
     buffer[0] = '%';
     var length = cstring.strlen(specifier) as Uint64;
     for index in 0u64 to length
     {
-        buffer[1 + index] = specifier[index];
+        buffer[1u64 + index] = specifier[index];
     }
-    buffer[length] = 0 as C_char;
+    buffer[1u64 + length] = 0 as C_char;
 }
 
 export function_constructor print_json(value_type: Type)
@@ -153,7 +150,7 @@ export function_constructor print_json(value_type: Type)
 
 function print_to_stdout(value: *C_char) -> ()
 {
-    cstdio.printf("%s", value);
+    cstdio.printf("%s"c, value);
 }
 
 export function_constructor print_json_difference(value_type: Type)
@@ -161,7 +158,7 @@ export function_constructor print_json_difference(value_type: Type)
     return function(lhs: *value_type, rhs: *value_type) -> ()
     {
         print_json::<value_type>(lhs);
-        cstdio.printf(" == ");
+        cstdio.printf(" == "c);
         print_json::<value_type>(rhs);
     };
 }
