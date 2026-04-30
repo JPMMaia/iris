@@ -809,7 +809,7 @@ namespace iris::compiler
             std::filesystem::path const builtin_file_path = iris::common::get_builtin_module_file_path();
             std::optional<iris::Module> builtin_module = parse_and_convert(builtin_file_path);
             if (!builtin_module.has_value())
-                throw std::runtime_error{"Failed to read builtin module!"};
+                throw std::runtime_error{"Failed to read iris.builtin module!"};
             core_module_dependencies.insert(std::make_pair(builtin_module->name, std::move(builtin_module.value())));
         }
 
