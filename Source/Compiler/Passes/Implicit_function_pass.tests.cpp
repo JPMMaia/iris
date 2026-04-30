@@ -51,6 +51,98 @@ namespace iris::compiler
 
     TEST_CASE("Replaces implicit dot call with explicit function call", "[Implicit_function_pass][Passes]")
     {
+        std::string_view const input = R"(module Implicit_arguments;
+
+export struct My_struct
+{
+    v0: Int32 = 1;
+    v1: Int32 = 2;
+}
+
+export function get_v0(instance: *My_struct) -> (result: Int32)
+{
+    return instance->v0;
+}
+
+function run() -> ()
+{
+    mutable instance: My_struct = {};
+    var a = instance.get_v0();
+}
+)";
+
+        std::string_view const expected = R"(module Implicit_arguments;
+
+export struct My_struct
+{
+    v0: Int32 = 1;
+    v1: Int32 = 2;
+}
+
+export function get_v0(instance: *My_struct) -> (result: Int32)
+{
+    return instance->v0;
+}
+
+function run() -> ()
+{
+    mutable instance: My_struct = {};
+    var a = get_v0(&instance);
+}
+)";
+
+        test_implicit_function_pass_on_function(input, {}, "run", expected);
+    }
+
+    TEST_CASE("Replaces implicit pointer call with explicit function call", "[Implicit_function_pass][Passes]")
+    {
+        std::string_view const input = R"(module Implicit_arguments;
+
+export struct My_struct
+{
+    v0: Int32 = 1;
+    v1: Int32 = 2;
+}
+
+export function get_v0(instance: *My_struct) -> (result: Int32)
+{
+    return instance->v0;
+}
+
+function run() -> ()
+{
+    mutable instance: My_struct = {};
+    var instance_pointer = &instance;
+    var b = instance_pointer->get_v0();
+}
+)";
+
+        std::string_view const expected = R"(module Implicit_arguments;
+
+export struct My_struct
+{
+    v0: Int32 = 1;
+    v1: Int32 = 2;
+}
+
+export function get_v0(instance: *My_struct) -> (result: Int32)
+{
+    return instance->v0;
+}
+
+function run() -> ()
+{
+    mutable instance: My_struct = {};
+    var instance_pointer = &instance;
+    var b = get_v0(instance_pointer);
+}
+)";
+
+        test_implicit_function_pass_on_function(input, {}, "run", expected);
+    }
+
+    TEST_CASE("Replaces implicit dot call with explicit function call for imported module", "[Implicit_function_pass][Passes]")
+    {
         std::string_view const dependency_text = R"(module Implicit_arguments;
 
 export struct My_struct
@@ -91,7 +183,7 @@ function run() -> ()
         test_implicit_function_pass_on_function(input, dependencies, "run", expected);
     }
 
-    TEST_CASE("Replaces implicit pointer call with explicit function call", "[Implicit_function_pass][Passes]")
+    TEST_CASE("Replaces implicit pointer call with explicit function call for imported module", "[Implicit_function_pass][Passes]")
     {
         std::string_view const dependency_text = R"(module Implicit_arguments;
 
