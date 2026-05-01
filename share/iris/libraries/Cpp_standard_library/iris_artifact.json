@@ -8,7 +8,7 @@
         }
     ],
     "library": {
-        "external_library": {
+        "external_libraries": {
             "windows-dynamic-debug": [
                 "msvcprtd.lib"
             ],

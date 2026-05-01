@@ -30,7 +30,7 @@
         }
     ],
     "library": {
-        "external_library": {
+        "external_libraries": {
             "windows-dynamic-debug": ["legacy_stdio_definitions.lib", "ucrtd.lib", "kernel32.lib", "ntdll.lib", "vcruntimed.lib"],
             "windows-dynamic-release": ["legacy_stdio_definitions.lib", "ucrt.lib", "kernel32.lib", "ntdll.lib", "vcruntime.lib"]
         }

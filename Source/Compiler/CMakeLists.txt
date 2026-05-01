@@ -116,7 +116,9 @@ if(BUILD_TESTING)
       "Passes/Compile_time_pass.tests.cpp"
       "Passes/Instantiate_pass.tests.cpp"
       "Passes/Implicit_function_pass.tests.cpp"
+      "Project/Artifacts.tests.cpp"
       "Project/Presets.tests.cpp"
+      "Project/Repository.tests.cpp"
       "Validation.tests.cpp"
    )
 

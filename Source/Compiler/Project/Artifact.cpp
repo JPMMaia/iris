@@ -230,8 +230,8 @@ namespace iris::compiler
     {
         Library_info library_info;
 
-        if (json.contains("external_library"))
-            library_info.external_libraries = parse_external_library(json.at("external_library"));
+        if (json.contains("external_libraries"))
+            library_info.external_libraries = parse_external_library(json.at("external_libraries"));
 
         return library_info;
     }
@@ -516,12 +516,7 @@ namespace iris::compiler
 
                     for (auto const& pair : library_info.external_libraries)
                     {
-                        nlohmann::json values_json;
-
-                        for (auto const& value : pair.second)
-                            values_json.push_back(value);
-
-                        external_libraries_json[pair.first.c_str()] = values_json;
+                        external_libraries_json[pair.first.c_str()].push_back(pair.second);
                     }
 
                     library_json["external_libraries"] = std::move(external_libraries_json);
