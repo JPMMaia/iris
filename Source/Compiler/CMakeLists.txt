@@ -86,45 +86,83 @@ else()
 endif()
 
 if(BUILD_TESTING)
-   add_executable(Iris_compiler_tests)
-   target_link_libraries(Iris_compiler_tests PRIVATE Iris::C_header_importer Iris::Compiler Iris::JSON_serializer Iris::Parser)
+   find_package(Catch2 CONFIG REQUIRED)
+   include(Catch)
 
-   target_sources(Iris_compiler_tests
+   set(iris_test_link_libraries
+      Iris::C_header_importer
+      Iris::Compiler
+      Iris::JSON_serializer
+      Iris::Parser
+      Catch2::Catch2
+      Catch2::Catch2WithMain
+   )
+
+   set(iris_test_compile_definitions
+      EXAMPLES_DIRECTORY="${CMAKE_SOURCE_DIR}/Examples"
+      TEST_SOURCE_FILES_PATH="${CMAKE_SOURCE_DIR}/Examples/txt"
+      TESTS_OUTPUT_DIRECTORY_PATH="${CMAKE_BINARY_DIR}/Temp/Tests/Compiler"
+      C_STANDARD_LIBRARY_PATH="${CMAKE_BINARY_DIR}/C_standard_library"
+      STANDARD_REPOSITORY_FILE_PATH="${CMAKE_SOURCE_DIR}/share/iris/libraries/iris_repository.json"
+   )
+
+   # Builder tests
+   add_executable(Iris_builder_tests)
+   target_link_libraries(Iris_builder_tests PRIVATE ${iris_test_link_libraries})
+   target_compile_definitions(Iris_builder_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_builder_tests PRIVATE
+      "main.tests.cpp"
+      "Builder.tests.cpp"
+   )
+   catch_discover_tests(Iris_builder_tests)
+
+   # Passes tests
+   add_executable(Iris_passes_tests)
+   target_link_libraries(Iris_passes_tests PRIVATE ${iris_test_link_libraries})
+   target_compile_definitions(Iris_passes_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_passes_tests
       PUBLIC FILE_SET modules TYPE CXX_MODULES
          FILES
             "Passes/Pass_test_helpers.cppm"
-   )
-
-   find_package(Catch2 CONFIG REQUIRED)
-   target_link_libraries(Iris_compiler_tests PRIVATE Catch2::Catch2 Catch2::Catch2WithMain)
-
-   target_compile_definitions(
-      Iris_compiler_tests
       PRIVATE
-         EXAMPLES_DIRECTORY="${CMAKE_SOURCE_DIR}/Examples"
-         TEST_SOURCE_FILES_PATH="${CMAKE_SOURCE_DIR}/Examples/txt"
-         TESTS_OUTPUT_DIRECTORY_PATH="${CMAKE_BINARY_DIR}/Temp/Tests/Compiler"
-         C_STANDARD_LIBRARY_PATH="${CMAKE_BINARY_DIR}/C_standard_library"
-         STANDARD_REPOSITORY_FILE_PATH="${CMAKE_SOURCE_DIR}/share/iris/libraries/iris_repository.json"
+         "main.tests.cpp"
+         "Passes/All_passes.tests.cpp"
+         "Passes/Compile_time_pass.tests.cpp"
+         "Passes/Instantiate_pass.tests.cpp"
+         "Passes/Implicit_function_pass.tests.cpp"
    )
+   catch_discover_tests(Iris_passes_tests)
 
-   target_sources(Iris_compiler_tests PRIVATE
+   # Project tests
+   add_executable(Iris_project_tests)
+   target_link_libraries(Iris_project_tests PRIVATE ${iris_test_link_libraries})
+   target_compile_definitions(Iris_project_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_project_tests PRIVATE
       "main.tests.cpp"
-      "Builder.tests.cpp"
-      "Compiler.tests.cpp"
-      "Passes/All_passes.tests.cpp"
-      "Passes/Compile_time_pass.tests.cpp"
-      "Passes/Instantiate_pass.tests.cpp"
-      "Passes/Implicit_function_pass.tests.cpp"
       "Project/Artifacts.tests.cpp"
       "Project/Presets.tests.cpp"
       "Project/Repository.tests.cpp"
+   )
+   catch_discover_tests(Iris_project_tests)
+
+   # Validation tests
+   add_executable(Iris_validation_tests)
+   target_link_libraries(Iris_validation_tests PRIVATE ${iris_test_link_libraries})
+   target_compile_definitions(Iris_validation_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_validation_tests PRIVATE
+      "main.tests.cpp"
       "Validation.tests.cpp"
    )
+   catch_discover_tests(Iris_validation_tests)
 
-   # add_dependencies(Iris_compiler_tests C_standard_library)
-
-   include(Catch)
+   # Compiler tests
+   add_executable(Iris_compiler_tests)
+   target_link_libraries(Iris_compiler_tests PRIVATE ${iris_test_link_libraries})
+   target_compile_definitions(Iris_compiler_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_compiler_tests PRIVATE
+      "main.tests.cpp"
+      "Compiler.tests.cpp"
+   )
    catch_discover_tests(Iris_compiler_tests)
 
 endif()
