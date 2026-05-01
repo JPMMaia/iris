@@ -74,6 +74,14 @@
     ],
     "jsonValidation": [
       {
+        "fileMatch": "**/iris_artifact.json",
+        "url": "./schemas/iris_artifact.schema.json"
+      },
+      {
+        "fileMatch": "**/iris_repository.json",
+        "url": "./schemas/iris_repository.schema.json"
+      },
+      {
         "fileMatch": "**/iris_presets.json",
         "url": "./schemas/iris_presets.schema.json"
       }
