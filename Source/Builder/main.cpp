@@ -12,6 +12,7 @@ import iris.compiler.artifact;
 import iris.compiler.builder;
 import iris.compiler.expressions;
 import iris.compiler.linker;
+import iris.compiler.presets;
 import iris.compiler.repository;
 import iris.compiler.target;
 import iris.core;
@@ -125,6 +126,115 @@ iris::compiler::Contract_options get_function_contract_options_argument(argparse
         return iris::compiler::Contract_options::Disabled;
 
     return iris::compiler::Contract_options::Log_error_and_abort;
+}
+
+static constexpr std::string_view g_default_build_directory = "build";
+static constexpr std::string_view g_default_function_contracts = "log_error_and_abort";
+
+std::optional<iris::compiler::Presets> get_local_presets()
+{
+    std::filesystem::path const presets_file_path = std::filesystem::current_path() / "iris_presets.json";
+    return iris::compiler::try_get_presets(presets_file_path);
+}
+
+std::pmr::vector<std::filesystem::path> merge_paths_with_dedup(
+    std::span<std::filesystem::path const> const presets_paths,
+    std::span<std::filesystem::path const> const command_paths
+)
+{
+    std::pmr::vector<std::filesystem::path> merged_paths;
+    std::pmr::set<std::pmr::string> seen_paths;
+
+    auto append_unique = [&](std::span<std::filesystem::path const> const source)
+    {
+        for (std::filesystem::path const& path : source)
+        {
+            std::filesystem::path const normalized = path.lexically_normal();
+            std::pmr::string key = std::pmr::string{ normalized.generic_string() };
+            if (seen_paths.contains(key))
+                continue;
+
+            seen_paths.insert(std::move(key));
+            merged_paths.push_back(normalized);
+        }
+    };
+
+    append_unique(presets_paths);
+    append_unique(command_paths);
+
+    return merged_paths;
+}
+
+std::filesystem::path get_effective_build_directory_argument(
+    argparse::ArgumentParser const& subprogram,
+    std::optional<iris::compiler::Presets> const& presets
+)
+{
+    std::filesystem::path const build_directory = subprogram.get<std::string>("--build-directory");
+    if (
+        std::string_view{ build_directory.generic_string() } == g_default_build_directory &&
+        presets.has_value() &&
+        presets->build_directory_path.has_value()
+    )
+    {
+        return presets->build_directory_path.value();
+    }
+
+    return build_directory;
+}
+
+std::pmr::vector<std::filesystem::path> get_effective_header_search_paths_argument(
+    argparse::ArgumentParser const& subprogram,
+    std::optional<iris::compiler::Presets> const& presets
+)
+{
+    std::pmr::vector<std::filesystem::path> const command_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--header-search-path"));
+    if (!presets.has_value())
+        return command_paths;
+
+    return merge_paths_with_dedup(presets->header_search_paths, command_paths);
+}
+
+std::pmr::vector<std::filesystem::path> get_effective_repository_paths_argument(
+    argparse::ArgumentParser const& subprogram,
+    std::optional<iris::compiler::Presets> const& presets
+)
+{
+    std::pmr::vector<std::filesystem::path> const command_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
+    if (!presets.has_value())
+        return command_paths;
+
+    return merge_paths_with_dedup(presets->repository_paths, command_paths);
+}
+
+iris::compiler::Contract_options get_effective_function_contract_options_argument(
+    argparse::ArgumentParser const& subprogram,
+    std::optional<iris::compiler::Presets> const& presets
+)
+{
+    std::string const command_value = subprogram.get<std::string>("--function-contracts");
+    if (command_value != g_default_function_contracts)
+        return get_function_contract_options_argument(subprogram);
+
+    if (presets.has_value() && presets->function_contract_options.has_value())
+        return presets->function_contract_options.value();
+
+    return get_function_contract_options_argument(subprogram);
+}
+
+bool get_effective_output_llvm_ir_argument(
+    argparse::ArgumentParser const& subprogram,
+    std::optional<iris::compiler::Presets> const& presets
+)
+{
+    bool const command_value = subprogram.get<bool>("--output-llvm-ir");
+    if (command_value)
+        return true;
+
+    if (presets.has_value() && presets->output_llvm_ir.has_value())
+        return presets->output_llvm_ir.value();
+
+    return false;
 }
 
 argparse::Argument& add_target_triple_argument(argparse::ArgumentParser& command)
@@ -401,19 +511,20 @@ int main(int const argc, char const* const* argv)
         print_arguments(argc, argv);
 
         argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("build");
+        std::optional<iris::compiler::Presets> const presets = get_local_presets();
 
-        std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
-        std::pmr::vector<std::filesystem::path> const header_search_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--header-search-path"));
-        std::pmr::vector<std::filesystem::path> const repository_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
+        std::filesystem::path const build_directory_path = get_effective_build_directory_argument(subprogram, presets);
+        std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
+        std::pmr::vector<std::filesystem::path> const repository_paths = get_effective_repository_paths_argument(subprogram, presets);
         bool const no_debug = subprogram.get<bool>("--no-debug");
-        iris::compiler::Contract_options const contract_options = get_function_contract_options_argument(subprogram);
+        iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
         iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options);
 
         iris::compiler::Builder_options const builder_options =
         {
-            .output_llvm_ir = subprogram.get<bool>("--output-llvm-ir"),
+            .output_llvm_ir = get_effective_output_llvm_ir_argument(subprogram, presets),
         };
 
         iris::compiler::Builder builder = iris::compiler::create_builder(
@@ -444,19 +555,20 @@ int main(int const argc, char const* const* argv)
         print_arguments(argc, argv);
 
         argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("build-tests");
+        std::optional<iris::compiler::Presets> const presets = get_local_presets();
 
-        std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
-        std::pmr::vector<std::filesystem::path> const header_search_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--header-search-path"));
-        std::pmr::vector<std::filesystem::path> repository_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
+        std::filesystem::path const build_directory_path = get_effective_build_directory_argument(subprogram, presets);
+        std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
+        std::pmr::vector<std::filesystem::path> repository_paths = get_effective_repository_paths_argument(subprogram, presets);
         bool const no_debug = subprogram.get<bool>("--no-debug");
-        iris::compiler::Contract_options const contract_options = get_function_contract_options_argument(subprogram);
+        iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
         iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options);
 
         iris::compiler::Builder_options const builder_options =
         {
-            .output_llvm_ir = subprogram.get<bool>("--output-llvm-ir"),
+            .output_llvm_ir = get_effective_output_llvm_ir_argument(subprogram, presets),
             .is_test_mode = true,
         };
 
@@ -488,19 +600,20 @@ int main(int const argc, char const* const* argv)
         print_arguments(argc, argv);
 
         argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("test");
+        std::optional<iris::compiler::Presets> const presets = get_local_presets();
 
-        std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
-        std::pmr::vector<std::filesystem::path> const header_search_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--header-search-path"));
-        std::pmr::vector<std::filesystem::path> repository_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
+        std::filesystem::path const build_directory_path = get_effective_build_directory_argument(subprogram, presets);
+        std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
+        std::pmr::vector<std::filesystem::path> repository_paths = get_effective_repository_paths_argument(subprogram, presets);
         bool const no_debug = subprogram.get<bool>("--no-debug");
-        iris::compiler::Contract_options const contract_options = get_function_contract_options_argument(subprogram);
+        iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
         iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options);
 
         iris::compiler::Builder_options const builder_options =
         {
-            .output_llvm_ir = subprogram.get<bool>("--output-llvm-ir"),
+            .output_llvm_ir = get_effective_output_llvm_ir_argument(subprogram, presets),
             .is_test_mode = true,
         };
 
@@ -600,12 +713,13 @@ int main(int const argc, char const* const* argv)
     else if (program.is_subcommand_used("generate-compile-commands"))
     {
         argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("generate-compile-commands");
+        std::optional<iris::compiler::Presets> const presets = get_local_presets();
 
         std::filesystem::path const artifact_file_path = subprogram.get<std::string>("--artifact-file");
         std::filesystem::path const output_file_path = subprogram.get<std::string>("--output-file");
-        std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
-        std::pmr::vector<std::filesystem::path> const header_search_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--header-search-path"));
-        std::pmr::vector<std::filesystem::path> const repository_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
+        std::filesystem::path const build_directory_path = get_effective_build_directory_argument(subprogram, presets);
+        std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
+        std::pmr::vector<std::filesystem::path> const repository_paths = get_effective_repository_paths_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
         iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, false, iris::compiler::Contract_options::Log_error_and_abort);

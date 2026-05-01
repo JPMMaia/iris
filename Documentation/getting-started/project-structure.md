@@ -6,6 +6,8 @@ sidebar_position: 3
 
 Iris projects are described by two JSON configuration files: **artifact files** and **repository files**.
 
+Optionally, you can also create a local `iris_presets.json` to store default CLI arguments such as build directory, repository paths, and header search paths.
+
 ## Artifact File — `iris_artifact.json`
 
 An artifact is a single build target: either a **library** or an **executable**. The artifact file lives in the root of the artifact's source directory.
@@ -100,6 +102,7 @@ A repository indicates the location of artifacts.
 
 ```
 my_project/
+├── iris_presets.json (optional, local defaults)
 ├── iris_repository.json
 ├── my_library/
 │   ├── iris_artifact.json

@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Iris Presets",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "build_directory": {
+      "type": "string",
+      "description": "Build directory. Relative paths are resolved from the presets file location."
+    },
+    "repository_paths": {
+      "type": "array",
+      "description": "Repository file paths. Relative paths are resolved from the presets file location.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "header_search_paths": {
+      "type": "array",
+      "description": "C header include search paths. Relative paths are resolved from the presets file location.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "function_contracts": {
+      "type": "string",
+      "description": "Function contract behavior mode.",
+      "enum": [
+        "disabled",
+        "log_error_and_abort"
+      ]
+    },
+    "output_llvm_ir": {
+      "type": "boolean",
+      "description": "When true, output LLVM IR to a .ll file."
+    }
+  }
+}

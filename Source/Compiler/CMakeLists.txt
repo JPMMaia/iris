@@ -46,6 +46,7 @@ target_sources(Iris_compiler
          "Passes/Implicit_function_pass.cppm"
          "Passes/Instantiate_pass.cppm"
          "Project/Artifact.cppm"
+         "Project/Presets.cppm"
          "Project/Repository.cppm"
          "Project/Target.cppm"
    PRIVATE
@@ -68,6 +69,7 @@ target_sources(Iris_compiler
       "Passes/Implicit_function_pass.cpp"
       "Passes/Instantiate_pass.cpp"
       "Project/Artifact.cpp"
+      "Project/Presets.cpp"
       "Project/Repository.cpp"
 )
 
@@ -114,6 +116,7 @@ if(BUILD_TESTING)
       "Passes/Compile_time_pass.tests.cpp"
       "Passes/Instantiate_pass.tests.cpp"
       "Passes/Implicit_function_pass.tests.cpp"
+      "Project/Presets.tests.cpp"
       "Validation.tests.cpp"
    )
 

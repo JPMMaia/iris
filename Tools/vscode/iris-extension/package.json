@@ -71,6 +71,12 @@
         ],
         "configuration": "./language_configuration.json"
       }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "**/iris_presets.json",
+        "url": "./schemas/iris_presets.schema.json"
+      }
     ]
   },
   "scripts": {
