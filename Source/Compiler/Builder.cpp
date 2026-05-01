@@ -1844,11 +1844,63 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        return iris::common::search_files(
+        std::pmr::vector<std::filesystem::path> found_files{temporaries_allocator};
+
+        std::error_code error;
+        std::filesystem::recursive_directory_iterator iterator(
             path,
-            "iris_artifact.json",
-            temporaries_allocator,
-            output_allocator
+            std::filesystem::directory_options::skip_permission_denied,
+            error
         );
+        std::filesystem::recursive_directory_iterator const end{};
+
+        if (error)
+        {
+            return std::pmr::vector<std::filesystem::path>{std::move(found_files), output_allocator};
+        }
+
+        for (; iterator != end; iterator.increment(error))
+        {
+            if (error)
+            {
+                error.clear();
+                continue;
+            }
+
+            std::filesystem::directory_entry const& entry = *iterator;
+
+            if (entry.is_directory(error))
+            {
+                if (error)
+                {
+                    error.clear();
+                    continue;
+                }
+
+                std::string const filename = entry.path().filename().generic_string();
+                bool const is_hidden_directory = !filename.empty() && filename[0] == '.';
+                if (filename == "build" || is_hidden_directory)
+                {
+                    iterator.disable_recursion_pending();
+                }
+
+                continue;
+            }
+
+            if (!entry.is_regular_file(error))
+            {
+                if (error)
+                    error.clear();
+
+                continue;
+            }
+
+            if (entry.path().filename().generic_string() == "iris_artifact.json")
+            {
+                found_files.push_back(entry.path());
+            }
+        }
+
+        return std::pmr::vector<std::filesystem::path>{std::move(found_files), output_allocator};
     }
 }

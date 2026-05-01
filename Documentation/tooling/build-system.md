@@ -9,10 +9,13 @@ The Iris build system is driven by two JSON configuration files: `iris_artifact.
 ## CLI Usage
 
 ```powershell
-iris build-artifact --artifact-file path/to/iris_artifact.json --build-directory build [--repository /path/to/repository --repository ...]
+iris build [artifact_name] --build-directory build [--repository /path/to/repository --repository ...]
+iris list --build-directory build
 ```
 
-You can specify multiple repository files and these indicate where the dependencies specified in `iris_artifact.json` are located.
+`artifact_name` is optional. If omitted, Iris discovers all `iris_artifact.json` files recursively from the current directory while skipping `build` and hidden subdirectories.
+
+You can specify multiple repository files and these indicate where dependencies are resolved.
 
 ---
 

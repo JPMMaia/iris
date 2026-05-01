@@ -75,35 +75,21 @@
 				"cwd": "${workspaceFolder}",
 			},
 			{
-				"name": "iris build-artifact",
-				"type": "lldb-dap",
-				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
-				"args": [
-					"build-artifact",
-					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/iris_artifact.json",
-					"--build-directory=${workspaceFolder}/../MythologyEngine/build",
-					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/Libraries/iris_repository.json"
-				],
-				"cwd": "${workspaceFolder}/build",
-			},
-			{
-				"name": "iris build-artifact rts-game",
+				"name": "iris build rts-game",
 				"type": "cppvsdbg",
 				"request": "launch",
 				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
-					"build-artifact",
+					"build",
+					"game",
 					"--output-llvm-ir",
-					"--artifact-file=${workspaceFolder}/../rts-game/source/game/iris_artifact.json",
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
 					"--repository=${workspaceFolder}/share/iris/libraries/iris_repository.json",
 					"--repository=${workspaceFolder}/../iris_local_repository/iris_repository.json",
 					"--repository=${workspaceFolder}/../rts-game/source/iris_repository.json"
 				],
-				"cwd": "${workspaceFolder}/build",
+				"cwd": "${workspaceFolder}/../rts-game",
 			},
 			{
 				"name": "iris build-tests rts-game",
@@ -112,21 +98,21 @@
 				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"build-tests",
+					"game",
 					"--output-llvm-ir",
-					"--artifact-file=${workspaceFolder}/../rts-game/source/game/iris_artifact.json",
 					"--build-directory=${workspaceFolder}/../rts-game/build",
 					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
 					"--repository=${workspaceFolder}/share/iris/libraries/iris_repository.json",
 					"--repository=${workspaceFolder}/../iris_local_repository/iris_repository.json",
 					"--repository=${workspaceFolder}/../rts-game/source/iris_repository.json"
 				],
-				"cwd": "${workspaceFolder}/build",
+				"cwd": "${workspaceFolder}/../rts-game",
 			},
 			{
 				"name": "Debug rts-game tests",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/../rts-game/build/bin/game.test.exe",
+				"program": "${workspaceFolder}/../rts-game/build/bin/game.iris.test.exe",
 				"args": [
 					"--list-tests",
 					"--output-format=json:${workspaceFolder}/test.json"

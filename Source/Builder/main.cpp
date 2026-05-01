@@ -8,6 +8,7 @@ import std.compat;
 import iris.c_header_converter;
 import iris.common;
 import iris.compiler;
+import iris.compiler.artifact;
 import iris.compiler.builder;
 import iris.compiler.expressions;
 import iris.compiler.linker;
@@ -173,31 +174,151 @@ iris::compiler::Compilation_options create_compilation_options(
     return compilation_options;
 }
 
+std::pmr::vector<std::filesystem::path> find_discovered_artifact_paths()
+{
+    return iris::compiler::find_artifact_file_paths(std::filesystem::current_path(), {}, {});
+}
+
+std::pmr::vector<std::filesystem::path> select_artifact_paths(std::optional<std::string> const& artifact_name)
+{
+    std::pmr::vector<std::filesystem::path> const discovered_paths = find_discovered_artifact_paths();
+    if (discovered_paths.empty())
+        throw std::runtime_error("Could not find any iris_artifact.json files in the current directory tree.");
+
+    if (!artifact_name.has_value())
+        return discovered_paths;
+
+    std::pmr::vector<std::filesystem::path> selected_paths;
+    for (std::filesystem::path const& artifact_path : discovered_paths)
+    {
+        iris::compiler::Artifact const artifact = iris::compiler::get_artifact(artifact_path);
+        if (std::string_view{artifact.name} == std::string_view{artifact_name.value()})
+            selected_paths.push_back(artifact_path);
+    }
+
+    if (selected_paths.empty())
+    {
+        throw std::runtime_error(std::format("Could not find artifact named '{}'.", artifact_name.value()));
+    }
+
+    if (selected_paths.size() > 1)
+    {
+        std::stringstream stream;
+        stream << std::format("Found more than one artifact named '{}':", artifact_name.value()) << '\n';
+        for (std::filesystem::path const& selected_path : selected_paths)
+            stream << std::format("- {}", selected_path.generic_string()) << '\n';
+
+        throw std::runtime_error(stream.str());
+    }
+
+    return selected_paths;
+}
+
+std::filesystem::path get_artifact_output_path(
+    iris::compiler::Artifact const& artifact,
+    std::filesystem::path const& build_directory_path,
+    iris::compiler::Target const& target
+)
+{
+    if (!iris::compiler::contains_any_compilable_source(artifact))
+        return {};
+
+    if (artifact.type == iris::compiler::Artifact_type::Library)
+    {
+        std::filesystem::path output_path = build_directory_path / "lib" / artifact.name;
+        output_path += (target.operating_system == "windows") ? ".lib" : ".a";
+        return output_path;
+    }
+
+    if (artifact.info.has_value() && std::holds_alternative<iris::compiler::Executable_info>(*artifact.info))
+    {
+        std::filesystem::path output_path = build_directory_path / "bin" / artifact.name;
+        if (target.operating_system == "windows")
+            output_path += ".exe";
+        return output_path;
+    }
+
+    return {};
+}
+
+std::filesystem::path get_test_output_path(
+    iris::compiler::Artifact const& artifact,
+    std::filesystem::path const& build_directory_path,
+    iris::compiler::Target const& target
+)
+{
+    std::filesystem::path output_path = build_directory_path / "bin" / (artifact.name + ".iris.test");
+    if (target.operating_system == "windows")
+        output_path += ".exe";
+
+    return output_path;
+}
+
+int run_test_executables(
+    std::span<std::filesystem::path const> const artifact_paths,
+    std::filesystem::path const& build_directory_path,
+    iris::compiler::Target const& target
+)
+{
+    std::pmr::set<std::pmr::string> seen_artifact_names;
+    int failed_count = 0;
+    int executed_count = 0;
+
+    for (std::filesystem::path const& artifact_path : artifact_paths)
+    {
+        iris::compiler::Artifact const artifact = iris::compiler::get_artifact(artifact_path);
+
+        if (seen_artifact_names.contains(artifact.name))
+            continue;
+
+        seen_artifact_names.insert(artifact.name);
+
+        std::filesystem::path const test_output_path = get_test_output_path(artifact, build_directory_path, target);
+        if (!std::filesystem::exists(test_output_path))
+            continue;
+
+        ++executed_count;
+        std::string const command = std::format("\"{}\"", test_output_path.generic_string());
+        std::printf("Running tests '%s'\n", test_output_path.generic_string().c_str());
+        int const exit_code = std::system(command.c_str());
+        if (exit_code != 0)
+            ++failed_count;
+    }
+
+    if (executed_count == 0)
+    {
+        std::puts("No test executables were generated for the selected artifacts.");
+    }
+
+    return failed_count;
+}
+
 int main(int const argc, char const* const* argv)
 {
     iris::common::install_abort_handlers();
 
     argparse::ArgumentParser program("iris");
 
-    // iris build-artifact [--artifact-file=<artifact_file>] [--build-directory=<build_directory>] [--header-search-path=<header_search_path>]... [--repository=<repository_path>]...
-    argparse::ArgumentParser build_artifact_command("build-artifact");
-    build_artifact_command.add_description("Build an artifact");
-    add_artifact_file_argument(build_artifact_command);
-    add_build_directory_argument(build_artifact_command);
-    add_header_search_path_argument(build_artifact_command);
-    add_repository_argument(build_artifact_command);
-    add_no_debug_argument(build_artifact_command);
-    add_output_llvm_ir_argument(build_artifact_command);
-    add_function_contract_options_argument(build_artifact_command);
-    program.add_subparser(build_artifact_command);
+    // iris build [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header_search_path>]... [--repository=<repository_path>]...
+    argparse::ArgumentParser build_command("build");
+    build_command.add_description("Build one or more artifacts. If no artifact name is provided all artifacts are discovered recursively.");
+    build_command.add_argument("artifact_name")
+        .help("Optional artifact name")
+        .nargs(argparse::nargs_pattern::optional);
+    add_build_directory_argument(build_command);
+    add_header_search_path_argument(build_command);
+    add_repository_argument(build_command);
+    add_no_debug_argument(build_command);
+    add_output_llvm_ir_argument(build_command);
+    add_function_contract_options_argument(build_command);
+    program.add_subparser(build_command);
     
-    // iris build-tests [--artifact-file=<artifact_file>]... [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
+    // iris build-tests [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
     argparse::ArgumentParser build_tests_command("build-tests");
-    build_tests_command.add_description("Build one or more artifacts in test mode. If no artifacts are specified the current working directory is searched for iris_artifact.json files.");
-    build_tests_command.add_argument("--artifact-file")
-        .help("Path to an artifact file")
-        .default_value<std::vector<std::string>>({})
-        .append();
+    build_tests_command.add_description("Build one or more artifacts in test mode. If no artifact name is provided all artifacts are discovered recursively.");
+    build_tests_command.add_argument("artifact_name")
+        .help("Optional artifact name")
+        .nargs(argparse::nargs_pattern::optional);
     add_build_directory_argument(build_tests_command);
     add_header_search_path_argument(build_tests_command);
     add_repository_argument(build_tests_command);
@@ -205,6 +326,26 @@ int main(int const argc, char const* const* argv)
     add_output_llvm_ir_argument(build_tests_command);
     add_function_contract_options_argument(build_tests_command);
     program.add_subparser(build_tests_command);
+
+    // iris test [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
+    argparse::ArgumentParser test_command("test");
+    test_command.add_description("Build tests and execute test binaries. If no artifact name is provided all artifacts are discovered recursively.");
+    test_command.add_argument("artifact_name")
+        .help("Optional artifact name")
+        .nargs(argparse::nargs_pattern::optional);
+    add_build_directory_argument(test_command);
+    add_header_search_path_argument(test_command);
+    add_repository_argument(test_command);
+    add_no_debug_argument(test_command);
+    add_output_llvm_ir_argument(test_command);
+    add_function_contract_options_argument(test_command);
+    program.add_subparser(test_command);
+
+    // iris list [--build-directory=<build_directory>]
+    argparse::ArgumentParser list_command("list");
+    list_command.add_description("List all discovered artifacts and the output path where each will be built.");
+    add_build_directory_argument(list_command);
+    program.add_subparser(list_command);
 
     // iris import-c-header <module_name> <header> <output>
     argparse::ArgumentParser import_c_header_command("import-c-header");
@@ -255,13 +396,12 @@ int main(int const argc, char const* const* argv)
         std::exit(1);
     }
 
-    if (program.is_subcommand_used("build-artifact"))
+    if (program.is_subcommand_used("build"))
     {
         print_arguments(argc, argv);
 
-        argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("build-artifact");
+        argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("build");
 
-        std::filesystem::path const artifact_file_path = subprogram.get<std::string>("--artifact-file");
         std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
         std::pmr::vector<std::filesystem::path> const header_search_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--header-search-path"));
         std::pmr::vector<std::filesystem::path> const repository_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
@@ -288,7 +428,9 @@ int main(int const argc, char const* const* argv)
 
         try
         {
-            iris::compiler::build_artifact(builder, artifact_file_path);
+            std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
+            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name);
+            iris::compiler::build_artifacts(builder, artifact_paths);
         }
         catch (std::exception const& error)
         {
@@ -303,7 +445,6 @@ int main(int const argc, char const* const* argv)
 
         argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("build-tests");
 
-        std::vector<std::string> const artifact_strings = subprogram.get<std::vector<std::string>>("--artifact-file");
         std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
         std::pmr::vector<std::filesystem::path> const header_search_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--header-search-path"));
         std::pmr::vector<std::filesystem::path> repository_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
@@ -329,13 +470,10 @@ int main(int const argc, char const* const* argv)
             {}
         );
 
-        std::pmr::vector<std::filesystem::path> artifact_paths =
-            artifact_strings.empty() ?
-            iris::compiler::find_artifact_file_paths(std::filesystem::current_path(), {}, {}) :
-            convert_to_path(artifact_strings);
-
         try
         {
+            std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
+            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name);
             iris::compiler::build_artifacts(builder, artifact_paths);
         }
         catch (std::exception const& error)
@@ -343,6 +481,80 @@ int main(int const argc, char const* const* argv)
             std::cerr << error.what() << std::endl;
             std::cerr << program;
             std::exit(1);
+        }
+    }
+    else if (program.is_subcommand_used("test"))
+    {
+        print_arguments(argc, argv);
+
+        argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("test");
+
+        std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
+        std::pmr::vector<std::filesystem::path> const header_search_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--header-search-path"));
+        std::pmr::vector<std::filesystem::path> repository_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
+        bool const no_debug = subprogram.get<bool>("--no-debug");
+        iris::compiler::Contract_options const contract_options = get_function_contract_options_argument(subprogram);
+
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options);
+
+        iris::compiler::Builder_options const builder_options =
+        {
+            .output_llvm_ir = subprogram.get<bool>("--output-llvm-ir"),
+            .is_test_mode = true,
+        };
+
+        iris::compiler::Builder builder = iris::compiler::create_builder(
+            target,
+            build_directory_path,
+            header_search_paths,
+            repository_paths,
+            compilation_options,
+            builder_options,
+            {}
+        );
+
+        try
+        {
+            std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
+            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name);
+            iris::compiler::build_artifacts(builder, artifact_paths);
+            int const failed_tests = run_test_executables(artifact_paths, build_directory_path, target);
+            if (failed_tests != 0)
+            {
+                std::cerr << std::format("{} test executable(s) failed.\n", failed_tests);
+                return 1;
+            }
+        }
+        catch (std::exception const& error)
+        {
+            std::cerr << error.what() << std::endl;
+            std::cerr << program;
+            std::exit(1);
+        }
+    }
+    else if (program.is_subcommand_used("list"))
+    {
+        print_arguments(argc, argv);
+
+        argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("list");
+
+        std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
+        std::pmr::vector<std::filesystem::path> const artifact_paths = find_discovered_artifact_paths();
+        if (artifact_paths.empty())
+        {
+            std::puts("No artifacts found.");
+            return 0;
+        }
+
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        for (std::filesystem::path const& artifact_path : artifact_paths)
+        {
+            iris::compiler::Artifact const artifact = iris::compiler::get_artifact(artifact_path);
+            std::filesystem::path const output_path = get_artifact_output_path(artifact, build_directory_path, target);
+
+            std::printf("%s -> %s\n", artifact.name.c_str(), output_path.empty() ? "<no build output>" : output_path.generic_string().c_str());
         }
     }
     else if (program.is_subcommand_used("import-c-header"))

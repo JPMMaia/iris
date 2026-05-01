@@ -394,9 +394,15 @@ namespace iris::compiler
         std::filesystem::path const root = std::filesystem::temp_directory_path() / "builder_artifact_search";
         std::filesystem::remove_all(root);
         std::filesystem::create_directories(root / "subdir");
+        std::filesystem::create_directories(root / "build" / "nested");
+        std::filesystem::create_directories(root / ".hidden" / "nested");
         {
             std::ofstream{ root / "iris_artifact.json" };
             std::ofstream{ root / "subdir" / "iris_artifact.json" };
+            std::ofstream{ root / "build" / "iris_artifact.json" };
+            std::ofstream{ root / "build" / "nested" / "iris_artifact.json" };
+            std::ofstream{ root / ".hidden" / "iris_artifact.json" };
+            std::ofstream{ root / ".hidden" / "nested" / "iris_artifact.json" };
         }
 
         std::pmr::vector<std::filesystem::path> const found = iris::compiler::find_artifact_file_paths(root, {}, {});

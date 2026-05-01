@@ -32,7 +32,13 @@ function test_addition() -> ()
 Build the tests using:
 
 ```powershell
-iris build-tests --build-directory build [--repository path/to/repository]
+iris build-tests [artifact_name] --build-directory build [--repository path/to/repository]
 ```
 
-This will create an test executable for each artifact that has tests in `build/bin/*.tests*`.
+Run the built tests using:
+
+```powershell
+iris test [artifact_name] --build-directory build [--repository path/to/repository]
+```
+
+If `artifact_name` is omitted, all discovered artifacts are processed. Test executables are generated in `build/bin/*.iris.test*`.
