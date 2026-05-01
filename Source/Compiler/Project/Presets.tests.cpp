@@ -47,7 +47,11 @@ namespace iris::compiler
     "./include"
   ],
   "function_contracts": "disabled",
-  "output_llvm_ir": true
+  "output_llvm_ir": true,
+  "environment_variables": {
+    "VULKAN_SDK": "C:/SDK/Vulkan",
+    "PROJECT_ROOT": "C:/src/my_project"
+  }
 })";
         file.close();
 
@@ -68,6 +72,12 @@ namespace iris::compiler
 
         REQUIRE(presets->output_llvm_ir.has_value());
         CHECK(presets->output_llvm_ir.value());
+
+        REQUIRE(presets->environment_variables.size() == 2);
+        CHECK(presets->environment_variables.contains("VULKAN_SDK"));
+        CHECK(presets->environment_variables.at("VULKAN_SDK") == "C:/SDK/Vulkan");
+        CHECK(presets->environment_variables.contains("PROJECT_ROOT"));
+        CHECK(presets->environment_variables.at("PROJECT_ROOT") == "C:/src/my_project");
     }
 
     TEST_CASE("Presets parser rejects invalid schema", "[Presets]")
@@ -82,4 +92,47 @@ namespace iris::compiler
 
         CHECK_THROWS(try_get_presets(presets_path));
     }
+
+      TEST_CASE("Presets parser defaults environment_variables to empty", "[Presets]")
+      {
+        std::filesystem::path const temporary_directory = create_clean_temporary_directory("iris_presets_tests_empty_environment_variables");
+        std::filesystem::path const presets_path = temporary_directory / "iris_presets.json";
+        std::ofstream file{ presets_path };
+        file << R"({
+      "build_directory": "build"
+    })";
+        file.close();
+
+        std::optional<Presets> const presets = try_get_presets(presets_path);
+        REQUIRE(presets.has_value());
+        CHECK(presets->environment_variables.empty());
+      }
+
+      TEST_CASE("Presets parser rejects invalid environment_variables schema", "[Presets]")
+      {
+        std::filesystem::path const temporary_directory = create_clean_temporary_directory("iris_presets_tests_invalid_environment_variables");
+        std::filesystem::path const presets_path = temporary_directory / "iris_presets.json";
+
+        {
+          std::ofstream file{ presets_path };
+          file << R"({
+      "environment_variables": "invalid"
+    })";
+          file.close();
+
+          CHECK_THROWS(try_get_presets(presets_path));
+        }
+
+        {
+          std::ofstream file{ presets_path };
+          file << R"({
+      "environment_variables": {
+      "VULKAN_SDK": true
+      }
+    })";
+          file.close();
+
+          CHECK_THROWS(try_get_presets(presets_path));
+        }
+      }
 }

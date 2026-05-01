@@ -49,7 +49,11 @@ Supported commands that read presets are:
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/"
     ],
     "function_contracts": "log_error_and_abort",
-    "output_llvm_ir": false
+    "output_llvm_ir": false,
+    "environment_variables": {
+        "PROJECT_ROOT": "C:/src/my_project",
+        "VULKAN_SDK": "C:/VulkanSDK/1.4.321.1"
+    }
 }
 ```
 
@@ -60,6 +64,30 @@ Supported commands that read presets are:
 | `header_search_paths` | array of strings | Default C header include search paths |
 | `function_contracts` | string | One of `"disabled"`, `"log_error_and_abort"` |
 | `output_llvm_ir` | boolean | Default for LLVM-IR output flag |
+| `environment_variables` | object of string to string | Variables usable in `iris_artifact.json` as `${NAME}` |
+
+### Environment Variable Substitution in Artifacts
+
+- Artifact files can reference presets variables with `${NAME}`.
+- Variables are resolved only from `iris_presets.json.environment_variables`.
+- Missing variables are a hard error.
+- There is no fallback to process or system environment variables.
+
+Supported substitution fields in `iris_artifact.json`:
+
+- `public_include_directories[]`
+- `executable.source`
+- `copy[].source`
+- `copy[].destination`
+- `sources[type=import_c_header].search_paths[]`
+- `sources[type=import_c_header].headers[].header`
+- `sources[type=export_c_header].output_directory`
+- `sources[].additional_flags[]`
+- `library.external_libraries` keys and values
+
+Not substituted:
+
+- `sources[].include`
 
 ---
 

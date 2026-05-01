@@ -99,6 +99,29 @@ namespace iris::compiler
         return value.get<bool>();
     }
 
+    static Environment_variables parse_environment_variables(nlohmann::json const& root)
+    {
+        if (!root.contains("environment_variables"))
+            return {};
+
+        nlohmann::json const& value = root.at("environment_variables");
+        if (!value.is_object())
+            throw std::runtime_error("'environment_variables' must be an object.");
+
+        Environment_variables output;
+        output.reserve(value.size());
+
+        for (auto const& [key, item] : value.items())
+        {
+            if (!item.is_string())
+                throw std::runtime_error(std::format("'environment_variables.{}' must be a string.", key));
+
+            output.insert_or_assign(std::pmr::string{ key }, std::pmr::string{ item.get<std::string>() });
+        }
+
+        return output;
+    }
+
     std::optional<Presets> try_get_presets(std::filesystem::path const& presets_file_path)
     {
         if (!std::filesystem::exists(presets_file_path))
@@ -121,6 +144,7 @@ namespace iris::compiler
             .header_search_paths = parse_path_array(root, "header_search_paths", presets_directory),
             .function_contract_options = parse_function_contract_options(root),
             .output_llvm_ir = parse_output_llvm_ir(root),
+            .environment_variables = parse_environment_variables(root),
         };
 
         return presets;

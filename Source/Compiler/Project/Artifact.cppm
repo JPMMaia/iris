@@ -3,6 +3,7 @@ export module iris.compiler.artifact;
 import std;
 
 import iris.compiler.target;
+import iris.compiler.presets;
 import iris.core;
 
 namespace iris::compiler
@@ -100,6 +101,11 @@ namespace iris::compiler
     };
 
     export Artifact get_artifact(std::filesystem::path const& artifact_file_path);
+
+    export Artifact get_artifact(
+        std::filesystem::path const& artifact_file_path,
+        Environment_variables const& environment_variables
+    );
 
     export void write_artifact_to_file(Artifact const& artifact, std::filesystem::path const& artifact_file_path);
 

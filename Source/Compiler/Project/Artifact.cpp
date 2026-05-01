@@ -10,11 +10,47 @@ import std;
 
 import iris.common;
 import iris.compiler.common;
+import iris.compiler.presets;
 import iris.compiler.target;
 import iris.core;
 
 namespace iris::compiler
 {
+    static std::pmr::string substitute_variables(std::string_view const value, Environment_variables const& environment_variables, std::string_view const field_name)
+    {
+        std::pmr::string output;
+
+        std::size_t index = 0;
+        while (index < value.size())
+        {
+            std::size_t const start = value.find("${", index);
+            if (start == std::string_view::npos)
+            {
+                output.append(value.substr(index));
+                break;
+            }
+
+            output.append(value.substr(index, start - index));
+
+            std::size_t const end = value.find('}', start + 2);
+            if (end == std::string_view::npos)
+                throw std::runtime_error(std::format("Missing '}}' in variable expression for field '{}'.", field_name));
+
+            std::string_view const variable_name = value.substr(start + 2, end - (start + 2));
+            if (variable_name.empty())
+                throw std::runtime_error(std::format("Empty variable name in field '{}'.", field_name));
+
+            auto const location = environment_variables.find(std::pmr::string{ variable_name });
+            if (location == environment_variables.end())
+                throw std::runtime_error(std::format("Missing environment variable '{}' in field '{}'.", variable_name, field_name));
+
+            output.append(location->second);
+            index = end + 1;
+        }
+
+        return output;
+    }
+
     Version parse_version(std::string_view const string)
     {
         std::string_view::size_type const first_dot = string.find(".");
@@ -114,6 +150,28 @@ namespace iris::compiler
         return includes;
     }
 
+    std::pmr::vector<std::pmr::string> parse_string_array_with_substitution(
+        nlohmann::json const& json,
+        Environment_variables const& environment_variables,
+        std::string_view const field_name
+    )
+    {
+        std::pmr::vector<std::pmr::string> values;
+        values.reserve(json.size());
+
+        for (nlohmann::json const& element : json)
+        {
+            if (!element.is_string())
+                throw std::runtime_error(std::format("'{}' must contain only strings.", field_name));
+
+            values.push_back(
+                substitute_variables(element.get<std::string>(), environment_variables, field_name)
+            );
+        }
+
+        return values;
+    }
+
     std::pmr::vector<std::pmr::string> parse_string_array_at(nlohmann::json const& json, std::string_view const key)
     {
         if (!json.contains(key))
@@ -136,6 +194,28 @@ namespace iris::compiler
         }
 
         return includes;
+    }
+
+    std::pmr::vector<std::filesystem::path> parse_path_array_with_substitution(
+        nlohmann::json const& json,
+        Environment_variables const& environment_variables,
+        std::string_view const field_name
+    )
+    {
+        std::pmr::vector<std::filesystem::path> values;
+        values.reserve(json.size());
+
+        for (nlohmann::json const& element : json)
+        {
+            if (!element.is_string())
+                throw std::runtime_error(std::format("'{}' must contain only strings.", field_name));
+
+            values.push_back(
+                std::filesystem::path{substitute_variables(element.get<std::string>(), environment_variables, field_name)}
+            );
+        }
+
+        return values;
     }
 
     std::pmr::vector<std::filesystem::path> parse_path_array_at(nlohmann::json const& json, std::string_view const key)
@@ -171,12 +251,12 @@ namespace iris::compiler
     }
 
 
-    Executable_info parse_executable_info(nlohmann::json const& json)
+    Executable_info parse_executable_info(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         Executable_info info{};
 
         if (json.contains("source"))
-            info.source = json.at("source").get<std::pmr::string>();
+            info.source = std::filesystem::path{substitute_variables(json.at("source").get<std::string>(), environment_variables, "executable.source")};
         
         if (json.contains("entry_point"))
             info.source = json.at("entry_point").get<std::pmr::string>();
@@ -184,7 +264,7 @@ namespace iris::compiler
         return info;
     }
 
-    std::pmr::vector<C_header> parse_c_headers(nlohmann::json const& json)
+    std::pmr::vector<C_header> parse_c_headers(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         std::pmr::vector<C_header> headers;
         headers.reserve(json.size());
@@ -194,7 +274,7 @@ namespace iris::compiler
             C_header header
             {
                 .module_name = element.at("name").get<std::pmr::string>(),
-                .header = element.at("header").get<std::pmr::string>(),
+                .header = substitute_variables(element.at("header").get<std::string>(), environment_variables, "sources.headers.header"),
                 .dependencies = parse_string_array_at(element, "dependencies"),
             };
 
@@ -207,36 +287,36 @@ namespace iris::compiler
         return headers;
     }
 
-    std::pmr::unordered_multimap<std::pmr::string, std::pmr::string> parse_external_library(nlohmann::json const& json)
+    std::pmr::unordered_multimap<std::pmr::string, std::pmr::string> parse_external_library(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         std::pmr::unordered_multimap<std::pmr::string, std::pmr::string> map;
         map.reserve(json.size());
 
         for (auto const& pair : json.items())
         {
-            std::pmr::string const key = std::pmr::string{ pair.key() };
+            std::pmr::string const key = substitute_variables(pair.key(), environment_variables, "library.external_libraries.key");
             
             nlohmann::json const& values = pair.value();
             for (auto const& value : values)
             {
-                map.insert(std::make_pair(key, value.get<std::pmr::string>()));
+                map.insert(std::make_pair(key, substitute_variables(value.get<std::string>(), environment_variables, "library.external_libraries.value")));
             }
         }
 
         return map;
     }
 
-    Library_info parse_library_info(nlohmann::json const& json)
+    Library_info parse_library_info(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         Library_info library_info;
 
         if (json.contains("external_libraries"))
-            library_info.external_libraries = parse_external_library(json.at("external_libraries"));
+            library_info.external_libraries = parse_external_library(json.at("external_libraries"), environment_variables);
 
         return library_info;
     }
 
-    std::optional<Source_group::Data_type> parse_source_group_data(nlohmann::json const& json)
+    std::optional<Source_group::Data_type> parse_source_group_data(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         std::pmr::string const type = json.at("type").get<std::pmr::string>();
 
@@ -245,10 +325,10 @@ namespace iris::compiler
             Import_c_header_source_group data = {};
 
             if (json.contains("headers"))
-                data.c_headers = parse_c_headers(json.at("headers"));
+                data.c_headers = parse_c_headers(json.at("headers"), environment_variables);
 
             if (json.contains("search_paths"))
-                data.search_paths = parse_path_array(json.at("search_paths"));
+                data.search_paths = parse_path_array_with_substitution(json.at("search_paths"), environment_variables, "sources.search_paths");
 
             if (json.contains("public_prefixes"))
                 data.public_prefixes = parse_string_array(json.at("public_prefixes"));
@@ -263,7 +343,7 @@ namespace iris::compiler
             Export_c_header_source_group data{};
 
             if (json.contains("output_directory"))
-                data.output_directory = std::filesystem::path{json.at("output_directory").get<std::string>()};
+                data.output_directory = std::filesystem::path{substitute_variables(json.at("output_directory").get<std::string>(), environment_variables, "sources.output_directory")};
 
             return data;
         }
@@ -281,7 +361,7 @@ namespace iris::compiler
         }
     }
 
-    std::pmr::vector<Source_group> parse_source_groups(nlohmann::json const& json)
+    std::pmr::vector<Source_group> parse_source_groups(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         if (!json.contains("sources"))
             return {};
@@ -298,9 +378,9 @@ namespace iris::compiler
             if (!group_json.contains("type"))
                 continue;
 
-            std::optional<Source_group::Data_type> data = parse_source_group_data(group_json);
+            std::optional<Source_group::Data_type> data = parse_source_group_data(group_json, environment_variables);
             std::pmr::vector<std::pmr::string> include = parse_string_array_at(group_json, "include");
-            std::pmr::vector<std::pmr::string> additional_flags = parse_string_array_at(group_json, "additional_flags");
+            std::pmr::vector<std::pmr::string> additional_flags = parse_string_array_with_substitution(group_json.contains("additional_flags") ? group_json.at("additional_flags") : nlohmann::json::array(), environment_variables, "sources.additional_flags");
 
             groups.push_back(
                 Source_group
@@ -315,15 +395,15 @@ namespace iris::compiler
         return groups;
     }
 
-    std::optional<std::variant<Executable_info, Library_info>> parse_info(nlohmann::json const& json)
+    std::optional<std::variant<Executable_info, Library_info>> parse_info(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         if (json.contains("executable"))
         {
-            return parse_executable_info(json.at("executable"));
+            return parse_executable_info(json.at("executable"), environment_variables);
         }
         else if (json.contains("library"))
         {
-            return parse_library_info(json.at("library"));
+            return parse_library_info(json.at("library"), environment_variables);
         }
         else
         {
@@ -331,7 +411,7 @@ namespace iris::compiler
         }
     }
 
-    std::pmr::vector<Copy_entry> parse_copy_entries(nlohmann::json const& json)
+    std::pmr::vector<Copy_entry> parse_copy_entries(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         if (!json.contains("copy"))
             return {};
@@ -346,8 +426,8 @@ namespace iris::compiler
             entries.push_back(
                 Copy_entry
                 {
-                    .source = entry_json.at("source").get<std::string>(),
-                    .destination = entry_json.at("destination").get<std::string>(),
+                    .source = std::filesystem::path{substitute_variables(entry_json.at("source").get<std::string>(), environment_variables, "copy.source")},
+                    .destination = std::filesystem::path{substitute_variables(entry_json.at("destination").get<std::string>(), environment_variables, "copy.destination")},
                 }
             );
         }
@@ -356,6 +436,15 @@ namespace iris::compiler
     }
 
     Artifact get_artifact(std::filesystem::path const& artifact_file_path)
+    {
+        Environment_variables const environment_variables;
+        return get_artifact(artifact_file_path, environment_variables);
+    }
+
+    Artifact get_artifact(
+        std::filesystem::path const& artifact_file_path,
+        Environment_variables const& environment_variables
+    )
     {
         std::optional<std::pmr::string> const json_data = iris::common::get_file_contents(artifact_file_path.c_str());
         if (!json_data.has_value())
@@ -371,13 +460,15 @@ namespace iris::compiler
 
         std::pmr::vector<Dependency> dependencies = parse_dependencies(json);
 
-        std::pmr::vector<Source_group> source_groups = parse_source_groups(json);
+        std::pmr::vector<Source_group> source_groups = parse_source_groups(json, environment_variables);
 
-        std::pmr::vector<std::filesystem::path> public_include_directories = parse_path_array_at(json, "public_include_directories");
+        std::pmr::vector<std::filesystem::path> public_include_directories = json.contains("public_include_directories")
+            ? parse_path_array_with_substitution(json.at("public_include_directories"), environment_variables, "public_include_directories")
+            : std::pmr::vector<std::filesystem::path>{};
 
-        std::optional<std::variant<Executable_info, Library_info>> info = parse_info(json);
+        std::optional<std::variant<Executable_info, Library_info>> info = parse_info(json, environment_variables);
 
-        std::pmr::vector<Copy_entry> copy_entries = parse_copy_entries(json);
+        std::pmr::vector<Copy_entry> copy_entries = parse_copy_entries(json, environment_variables);
 
         std::filesystem::path const root_directory = artifact_file_path.parent_path();
         for (Copy_entry& entry : copy_entries)

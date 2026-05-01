@@ -104,6 +104,7 @@ namespace iris::compiler
             .output_module_json = false,
             .output_llvm_ir = builder_options.output_llvm_ir,
             .is_test_mode = builder_options.is_test_mode,
+            .environment_variables = builder_options.environment_variables,
         };
     }
 
@@ -134,6 +135,7 @@ namespace iris::compiler
             artifact_file_paths,
             builder.repositories,
             builder.is_test_mode,
+            builder.environment_variables,
             output_allocator,
             temporaries_allocator
         );
@@ -267,6 +269,7 @@ namespace iris::compiler
         std::pmr::vector<Artifact>& dependencies,
         Artifact const& artifact,
         std::span<Repository const> repositories,
+        Environment_variables const& environment_variables,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -290,12 +293,13 @@ namespace iris::compiler
 
             std::filesystem::path const dependency_configuration_file_path = dependency_location.value();
 
-            Artifact dependency_artifact = iris::compiler::get_artifact(dependency_configuration_file_path);
+            Artifact dependency_artifact = iris::compiler::get_artifact(dependency_configuration_file_path, environment_variables);
             
             add_artifact_dependencies(
                 dependencies,
                 dependency_artifact,
                 repositories,
+                environment_variables,
                 output_allocator,
                 temporaries_allocator
             );
@@ -308,6 +312,26 @@ namespace iris::compiler
         std::span<std::filesystem::path const> const artifact_file_paths,
         std::span<Repository const> repositories,
         bool const is_test_mode,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        Environment_variables const environment_variables;
+        return get_sorted_artifacts(
+            artifact_file_paths,
+            repositories,
+            is_test_mode,
+            environment_variables,
+            output_allocator,
+            temporaries_allocator
+        );
+    }
+
+    std::pmr::vector<Artifact> get_sorted_artifacts(
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        std::span<Repository const> repositories,
+        bool const is_test_mode,
+        Environment_variables const& environment_variables,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -332,12 +356,13 @@ namespace iris::compiler
                 );
             }
 
-            Artifact const artifact = get_artifact(artifact_file_path.value());
+            Artifact const artifact = get_artifact(artifact_file_path.value(), environment_variables);
 
             add_artifact_dependencies(
                 artifacts,
                 artifact,
                 repositories,
+                environment_variables,
                 output_allocator,
                 temporaries_allocator
             );
@@ -353,12 +378,13 @@ namespace iris::compiler
 
         for (std::filesystem::path const& artifact_file_path : artifact_file_paths)
         {
-            Artifact const artifact = get_artifact(artifact_file_path);
+            Artifact const artifact = get_artifact(artifact_file_path, environment_variables);
 
             add_artifact_dependencies(
                 artifacts,
                 artifact,
                 repositories,
+                environment_variables,
                 output_allocator,
                 temporaries_allocator
             );
@@ -1873,6 +1899,7 @@ namespace iris::compiler
             { &artifact_file_path, 1 },
             builder.repositories,
             false,
+            builder.environment_variables,
             temporaries_allocator,
             temporaries_allocator
         );

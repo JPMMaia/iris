@@ -7,6 +7,7 @@ import iris.core.declarations;
 import iris.compiler;
 import iris.compiler.artifact;
 import iris.compiler.profiler;
+import iris.compiler.presets;
 import iris.compiler.repository;
 import iris.compiler.target;
 
@@ -16,6 +17,7 @@ namespace iris::compiler
     {
         bool output_llvm_ir = false;
         bool is_test_mode = false;
+        Environment_variables environment_variables = {};
     };
 
     export struct Builder
@@ -30,6 +32,7 @@ namespace iris::compiler
         bool output_module_json = false;
         bool output_llvm_ir = false;
         bool is_test_mode = false;
+        Environment_variables environment_variables = {};
     };
 
     export Builder create_builder(
@@ -56,6 +59,15 @@ namespace iris::compiler
         std::span<std::filesystem::path const> const artifact_file_paths,
         std::span<Repository const> repositories,
         bool const is_test_mode,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    export std::pmr::vector<Artifact> get_sorted_artifacts(
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        std::span<Repository const> repositories,
+        bool const is_test_mode,
+        Environment_variables const& environment_variables,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );

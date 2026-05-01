@@ -137,6 +137,16 @@ std::optional<iris::compiler::Presets> get_local_presets()
     return iris::compiler::try_get_presets(presets_file_path);
 }
 
+iris::compiler::Environment_variables get_effective_environment_variables(
+    std::optional<iris::compiler::Presets> const& presets
+)
+{
+    if (presets.has_value())
+        return presets->environment_variables;
+
+    return {};
+}
+
 std::pmr::vector<std::filesystem::path> merge_paths_with_dedup(
     std::span<std::filesystem::path const> const presets_paths,
     std::span<std::filesystem::path const> const command_paths
@@ -289,7 +299,10 @@ std::pmr::vector<std::filesystem::path> find_discovered_artifact_paths()
     return iris::compiler::find_artifact_file_paths(std::filesystem::current_path(), {}, {});
 }
 
-std::pmr::vector<std::filesystem::path> select_artifact_paths(std::optional<std::string> const& artifact_name)
+std::pmr::vector<std::filesystem::path> select_artifact_paths(
+    std::optional<std::string> const& artifact_name,
+    iris::compiler::Environment_variables const& environment_variables
+)
 {
     std::pmr::vector<std::filesystem::path> const discovered_paths = find_discovered_artifact_paths();
     if (discovered_paths.empty())
@@ -301,7 +314,7 @@ std::pmr::vector<std::filesystem::path> select_artifact_paths(std::optional<std:
     std::pmr::vector<std::filesystem::path> selected_paths;
     for (std::filesystem::path const& artifact_path : discovered_paths)
     {
-        iris::compiler::Artifact const artifact = iris::compiler::get_artifact(artifact_path);
+        iris::compiler::Artifact const artifact = iris::compiler::get_artifact(artifact_path, environment_variables);
         if (std::string_view{artifact.name} == std::string_view{artifact_name.value()})
             selected_paths.push_back(artifact_path);
     }
@@ -367,7 +380,8 @@ std::filesystem::path get_test_output_path(
 int run_test_executables(
     std::span<std::filesystem::path const> const artifact_paths,
     std::filesystem::path const& build_directory_path,
-    iris::compiler::Target const& target
+    iris::compiler::Target const& target,
+    iris::compiler::Environment_variables const& environment_variables
 )
 {
     std::pmr::set<std::pmr::string> seen_artifact_names;
@@ -376,7 +390,7 @@ int run_test_executables(
 
     for (std::filesystem::path const& artifact_path : artifact_paths)
     {
-        iris::compiler::Artifact const artifact = iris::compiler::get_artifact(artifact_path);
+        iris::compiler::Artifact const artifact = iris::compiler::get_artifact(artifact_path, environment_variables);
 
         if (seen_artifact_names.contains(artifact.name))
             continue;
@@ -512,6 +526,7 @@ int main(int const argc, char const* const* argv)
 
         argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("build");
         std::optional<iris::compiler::Presets> const presets = get_local_presets();
+        iris::compiler::Environment_variables const environment_variables = get_effective_environment_variables(presets);
 
         std::filesystem::path const build_directory_path = get_effective_build_directory_argument(subprogram, presets);
         std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
@@ -525,6 +540,7 @@ int main(int const argc, char const* const* argv)
         iris::compiler::Builder_options const builder_options =
         {
             .output_llvm_ir = get_effective_output_llvm_ir_argument(subprogram, presets),
+            .environment_variables = environment_variables,
         };
 
         iris::compiler::Builder builder = iris::compiler::create_builder(
@@ -540,7 +556,7 @@ int main(int const argc, char const* const* argv)
         try
         {
             std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
-            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name);
+            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name, environment_variables);
             iris::compiler::build_artifacts(builder, artifact_paths);
         }
         catch (std::exception const& error)
@@ -556,6 +572,7 @@ int main(int const argc, char const* const* argv)
 
         argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("build-tests");
         std::optional<iris::compiler::Presets> const presets = get_local_presets();
+        iris::compiler::Environment_variables const environment_variables = get_effective_environment_variables(presets);
 
         std::filesystem::path const build_directory_path = get_effective_build_directory_argument(subprogram, presets);
         std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
@@ -570,6 +587,7 @@ int main(int const argc, char const* const* argv)
         {
             .output_llvm_ir = get_effective_output_llvm_ir_argument(subprogram, presets),
             .is_test_mode = true,
+            .environment_variables = environment_variables,
         };
 
         iris::compiler::Builder builder = iris::compiler::create_builder(
@@ -585,7 +603,7 @@ int main(int const argc, char const* const* argv)
         try
         {
             std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
-            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name);
+            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name, environment_variables);
             iris::compiler::build_artifacts(builder, artifact_paths);
         }
         catch (std::exception const& error)
@@ -601,6 +619,7 @@ int main(int const argc, char const* const* argv)
 
         argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("test");
         std::optional<iris::compiler::Presets> const presets = get_local_presets();
+        iris::compiler::Environment_variables const environment_variables = get_effective_environment_variables(presets);
 
         std::filesystem::path const build_directory_path = get_effective_build_directory_argument(subprogram, presets);
         std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
@@ -615,6 +634,7 @@ int main(int const argc, char const* const* argv)
         {
             .output_llvm_ir = get_effective_output_llvm_ir_argument(subprogram, presets),
             .is_test_mode = true,
+            .environment_variables = environment_variables,
         };
 
         iris::compiler::Builder builder = iris::compiler::create_builder(
@@ -630,9 +650,9 @@ int main(int const argc, char const* const* argv)
         try
         {
             std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
-            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name);
+            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name, environment_variables);
             iris::compiler::build_artifacts(builder, artifact_paths);
-            int const failed_tests = run_test_executables(artifact_paths, build_directory_path, target);
+            int const failed_tests = run_test_executables(artifact_paths, build_directory_path, target, environment_variables);
             if (failed_tests != 0)
             {
                 std::cerr << std::format("{} test executable(s) failed.\n", failed_tests);
@@ -653,6 +673,8 @@ int main(int const argc, char const* const* argv)
         argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("list");
 
         std::filesystem::path const build_directory_path = subprogram.get<std::string>("--build-directory");
+        std::optional<iris::compiler::Presets> const presets = get_local_presets();
+        iris::compiler::Environment_variables const environment_variables = get_effective_environment_variables(presets);
         std::pmr::vector<std::filesystem::path> const artifact_paths = find_discovered_artifact_paths();
         if (artifact_paths.empty())
         {
@@ -664,7 +686,7 @@ int main(int const argc, char const* const* argv)
 
         for (std::filesystem::path const& artifact_path : artifact_paths)
         {
-            iris::compiler::Artifact const artifact = iris::compiler::get_artifact(artifact_path);
+            iris::compiler::Artifact const artifact = iris::compiler::get_artifact(artifact_path, environment_variables);
             std::filesystem::path const output_path = get_artifact_output_path(artifact, build_directory_path, target);
 
             std::printf("%s -> %s\n", artifact.name.c_str(), output_path.empty() ? "<no build output>" : output_path.generic_string().c_str());
@@ -714,6 +736,7 @@ int main(int const argc, char const* const* argv)
     {
         argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("generate-compile-commands");
         std::optional<iris::compiler::Presets> const presets = get_local_presets();
+        iris::compiler::Environment_variables const environment_variables = get_effective_environment_variables(presets);
 
         std::filesystem::path const artifact_file_path = subprogram.get<std::string>("--artifact-file");
         std::filesystem::path const output_file_path = subprogram.get<std::string>("--output-file");
@@ -727,6 +750,7 @@ int main(int const argc, char const* const* argv)
         iris::compiler::Builder_options const builder_options =
         {
             .output_llvm_ir = false,
+            .environment_variables = environment_variables,
         };
 
         iris::compiler::Builder builder = iris::compiler::create_builder(
