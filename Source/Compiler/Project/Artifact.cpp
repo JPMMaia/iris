@@ -331,6 +331,30 @@ namespace iris::compiler
         }
     }
 
+    std::pmr::vector<Copy_entry> parse_copy_entries(nlohmann::json const& json)
+    {
+        if (!json.contains("copy"))
+            return {};
+
+        nlohmann::json const& copy_json = json.at("copy");
+
+        std::pmr::vector<Copy_entry> entries;
+        entries.reserve(copy_json.size());
+
+        for (nlohmann::json const& entry_json : copy_json)
+        {
+            entries.push_back(
+                Copy_entry
+                {
+                    .source = entry_json.at("source").get<std::string>(),
+                    .destination = entry_json.at("destination").get<std::string>(),
+                }
+            );
+        }
+
+        return entries;
+    }
+
     Artifact get_artifact(std::filesystem::path const& artifact_file_path)
     {
         std::optional<std::pmr::string> const json_data = iris::common::get_file_contents(artifact_file_path.c_str());
@@ -353,6 +377,15 @@ namespace iris::compiler
 
         std::optional<std::variant<Executable_info, Library_info>> info = parse_info(json);
 
+        std::pmr::vector<Copy_entry> copy_entries = parse_copy_entries(json);
+
+        std::filesystem::path const root_directory = artifact_file_path.parent_path();
+        for (Copy_entry& entry : copy_entries)
+        {
+            if (!entry.source.is_absolute())
+                entry.source = (root_directory / entry.source).lexically_normal();
+        }
+
         return Artifact
         {
             .file_path = artifact_file_path,
@@ -363,6 +396,7 @@ namespace iris::compiler
             .sources = std::move(source_groups),
             .public_include_directories = std::move(public_include_directories),
             .info = std::move(info),
+            .copy_entries = std::move(copy_entries),
         };
     }
 
@@ -525,6 +559,24 @@ namespace iris::compiler
                 if (!library_json.empty())
                     json["library"] = std::move(library_json);
             }
+        }
+
+        if (!artifact.copy_entries.empty())
+        {
+            nlohmann::json copy_json;
+
+            for (Copy_entry const& entry : artifact.copy_entries)
+            {
+                copy_json.push_back(
+                    nlohmann::json
+                    {
+                        { "source", entry.source.generic_string() },
+                        { "destination", entry.destination.generic_string() },
+                    }
+                );
+            }
+
+            json["copy"] = std::move(copy_json);
         }
 
         std::string const json_string = json.dump(4);

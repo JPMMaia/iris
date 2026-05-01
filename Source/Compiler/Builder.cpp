@@ -36,6 +36,8 @@ import iris.parser.parser;
 
 namespace iris::compiler
 {
+    void copy_files_from_artifacts(Builder const& builder, std::span<Artifact const> const artifacts);
+
     static std::filesystem::path get_hl_build_directory(
         std::filesystem::path const& build_directory_path
     )
@@ -253,6 +255,8 @@ namespace iris::compiler
                 temporaries_allocator
             );
         }
+
+        copy_files_from_artifacts(builder, artifacts);
 
         end_timer(get_profiler(builder), "build_artifact");
 
@@ -1757,6 +1761,53 @@ namespace iris::compiler
         std::filesystem::file_time_type first_time = std::filesystem::last_write_time(first);
         std::filesystem::file_time_type second_time = std::filesystem::last_write_time(second);
         return first_time > second_time;
+    }
+
+    static void copy_file_if_different(
+        std::filesystem::path const& source,
+        std::filesystem::path const& destination
+    )
+    {
+        if (std::filesystem::exists(destination) && !is_file_newer_than(source, destination))
+            return;
+
+        std::filesystem::path const parent = destination.parent_path();
+        if (!parent.empty())
+            create_directory_if_it_does_not_exist(parent);
+
+        std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing);
+    }
+
+    void copy_files_from_artifacts(
+        Builder const& builder,
+        std::span<Artifact const> const artifacts
+    )
+    {
+        for (Artifact const& artifact : artifacts)
+        {
+            for (Copy_entry const& entry : artifact.copy_entries)
+            {
+                std::filesystem::path const destination_base = builder.build_directory_path / entry.destination;
+
+                if (std::filesystem::is_directory(entry.source))
+                {
+                    for (auto const& directory_entry : std::filesystem::recursive_directory_iterator(entry.source))
+                    {
+                        if (!directory_entry.is_regular_file())
+                            continue;
+
+                        std::filesystem::path const relative = std::filesystem::relative(directory_entry.path(), entry.source);
+                        std::filesystem::path const destination = destination_base / relative;
+
+                        copy_file_if_different(directory_entry.path(), destination);
+                    }
+                }
+                else if (std::filesystem::is_regular_file(entry.source))
+                {
+                    copy_file_if_different(entry.source, destination_base);
+                }
+            }
+        }
     }
 
     void print_struct_layout(

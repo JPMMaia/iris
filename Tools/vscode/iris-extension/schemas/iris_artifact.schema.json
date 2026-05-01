@@ -79,9 +79,31 @@
           }
         }
       }
+    },
+    "copy": {
+      "type": "array",
+      "description": "Files or directories to copy into the build directory. Source paths are relative to the artifact file location; destination paths are relative to the build directory.",
+      "items": {
+        "$ref": "#/definitions/copy_entry"
+      }
     }
   },
   "definitions": {
+    "copy_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "destination"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Path to a source file or directory to copy. Relative paths are resolved from the artifact file location."
+        },
+        "destination": {
+          "type": "string",
+          "description": "Destination path in the build directory. Relative paths are resolved from the build directory root."
+        }
+      }
+    },
     "source_group_common": {
       "properties": {
         "type": {

@@ -1,0 +1,10 @@
+module copy_files;
+
+import c.stdio as stdio;
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    stdio.puts("Copy files example!"c);
+    return 0;
+}

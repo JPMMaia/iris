@@ -80,6 +80,12 @@ namespace iris::compiler
         std::pmr::unordered_multimap<std::pmr::string, std::pmr::string> external_libraries;
     };
 
+    export struct Copy_entry
+    {
+        std::filesystem::path source;
+        std::filesystem::path destination;
+    };
+
     export struct Artifact
     {
         std::filesystem::path file_path;
@@ -90,6 +96,7 @@ namespace iris::compiler
         std::pmr::vector<Source_group> sources;
         std::pmr::vector<std::filesystem::path> public_include_directories;
         std::optional<std::variant<Executable_info, Library_info>> info;
+        std::pmr::vector<Copy_entry> copy_entries;
     };
 
     export Artifact get_artifact(std::filesystem::path const& artifact_file_path);

@@ -389,6 +389,25 @@ namespace iris::compiler
         test_builder("Test_framework", {"empty_app/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_3", {.is_test_mode = true});
     }
 
+    TEST_CASE("Build Copy_files", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_standard_repository_file_path
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("Copy_files", target),
+            std::filesystem::path{"bin"} / "assets" / "config.txt",
+            std::filesystem::path{"bin"} / "assets" / "data" / "record.txt",
+        };
+
+        test_builder("Copy_files", {"iris_artifact.json"}, target, repository_paths, expected_output_paths);
+    }
+
     TEST_CASE("Locate artifacts in a directory", "[Builder]")
     {
         std::filesystem::path const root = std::filesystem::temp_directory_path() / "builder_artifact_search";
