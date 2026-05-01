@@ -120,35 +120,6 @@
 				"cwd": "${workspaceFolder}/build",
 			},
 			{
-				"name": "iris run-with-jit",
-				"type": "lldb-dap",
-				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
-				"args": [
-					"run-with-jit",
-					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/iris_artifact.json",
-					"--build-directory=${workspaceFolder}/build/tmp",
-					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/share/libraries/iris_repository.json"
-				],
-				"cwd": "${workspaceFolder}/build/tmp",
-			},
-			{
-				"name": "iris run-with-jit MythologyEngine",
-				"type": "lldb-dap",
-				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
-				"args": [
-					"run-with-jit",
-					"--artifact-file=${workspaceFolder}/../MythologyEngine/Source/Application/iris_artifact.json",
-					"--build-directory=${workspaceFolder}/../MythologyEngine/build",
-					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/share/libraries/iris_repository.json",
-					"--repository=${workspaceFolder}/../iris_local_repository/iris_repository.json"
-				],
-				"cwd": "${workspaceFolder}/../MythologyEngine",
-			},
-			{
 				"name": "iris import-c-header",
 				"type": "lldb-dap",
 				"request": "launch",
