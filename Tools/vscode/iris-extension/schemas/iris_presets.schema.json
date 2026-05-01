@@ -33,6 +33,13 @@
     "output_llvm_ir": {
       "type": "boolean",
       "description": "When true, output LLVM IR to a .ll file."
+    },
+    "environment_variables": {
+      "type": "object",
+      "description": "Variables that can be referenced from iris_artifact.json using ${NAME}.",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   }
 }

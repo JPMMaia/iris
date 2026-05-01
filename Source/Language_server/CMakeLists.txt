@@ -67,6 +67,7 @@ if(BUILD_TESTING)
    target_link_libraries(Iris_language_server_tests PRIVATE Catch2::Catch2 Catch2::Catch2WithMain)
 
    target_sources(Iris_language_server_tests PRIVATE
+      "Server.tests.cpp"
       "Signature_help.tests.cpp"
    )
 

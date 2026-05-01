@@ -6,7 +6,7 @@ sidebar_position: 3
 
 Iris projects are described by two JSON configuration files: **artifact files** and **repository files**.
 
-Optionally, you can also create a local `iris_presets.json` to store default CLI arguments such as build directory, repository paths, and header search paths.
+Optionally, you can also create a local `iris_presets.json` to store default CLI arguments such as build directory, repository paths, header search paths, and artifact substitution variables. The VS Code language server also reads this workspace-root file.
 
 ## Artifact File — `iris_artifact.json`
 

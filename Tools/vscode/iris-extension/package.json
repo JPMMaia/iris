@@ -37,12 +37,6 @@
           "default": "iris_language_server",
           "description": "Specify the file path to the iris language server executable."
         },
-        "iris.repositories": {
-          "scope": "resource",
-          "type": "array",
-          "default": [],
-          "description": "Specify repositories that specify additional projects that can be added as dependencies to your project."
-        },
         "iris.trace.server": {
           "scope": "window",
           "type": "string",

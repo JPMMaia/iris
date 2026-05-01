@@ -18,6 +18,7 @@ import iris.compiler;
 import iris.compiler.artifact;
 import iris.compiler.builder;
 import iris.compiler.diagnostic;
+import iris.compiler.presets;
 import iris.compiler.target;
 import iris.core;
 import iris.core.declarations;
@@ -277,60 +278,117 @@ namespace iris::language_server
         return stream.str();
     }
 
-    static std::pmr::vector<std::filesystem::path> get_header_search_paths_from_configuration(
-        lsp::json::Any const& configuration
+    static std::pmr::vector<std::filesystem::path> merge_paths_with_dedup(
+        std::span<std::filesystem::path const> const first,
+        std::span<std::filesystem::path const> const second
     )
     {
-        std::pmr::vector<std::filesystem::path> header_search_paths = iris::common::get_default_header_search_directories();
+        std::pmr::vector<std::filesystem::path> merged_paths;
+        std::pmr::set<std::pmr::string> seen_paths;
 
-        return header_search_paths;
+        auto append_unique = [&](std::span<std::filesystem::path const> const source)
+        {
+            for (std::filesystem::path const& path : source)
+            {
+                std::filesystem::path const normalized = path.lexically_normal();
+                std::pmr::string const key{ normalized.generic_string() };
+                if (seen_paths.contains(key))
+                    continue;
+
+                seen_paths.insert(key);
+                merged_paths.push_back(normalized);
+            }
+        };
+
+        append_unique(first);
+        append_unique(second);
+        return merged_paths;
     }
 
-    static std::pmr::vector<std::filesystem::path> get_repository_paths_from_configuration(
-        std::filesystem::path const& workspace_folder_path,
-        lsp::json::Any const& configuration
+    static std::optional<iris::compiler::Presets> try_get_workspace_presets(
+        Server& server,
+        std::filesystem::path const& workspace_folder_path
     )
     {
-        if (!configuration.isObject())
-            return {};
-
-        lsp::json::Any const& extension_settings = configuration.object().get("iris");
-        if (!extension_settings.isObject())
-            return {};
-
-        lsp::json::Any const& repositories_json = extension_settings.object().get("repositories");
-        if (!repositories_json.isArray())
-            return {};
-
-        lsp::json::Array const& repositories = repositories_json.array();
-
-        std::pmr::vector<std::filesystem::path> repository_paths;
-        repository_paths.reserve(repositories.size());
-
-        for (lsp::json::Any const repository_json : repositories)
+        std::filesystem::path const presets_file_path = workspace_folder_path / "iris_presets.json";
+        try
         {
-            if (!repository_json.isString())
-                continue;
-
-            std::pmr::string const resolved_repository_path_string = resolve_vscode_variables(
-                workspace_folder_path,
-                repository_json.string()
-            );
-
-            std::filesystem::path repository_path = resolved_repository_path_string;
-
-            if (repository_path.is_absolute())
-            {
-                repository_paths.push_back(std::move(repository_path));
-            }
-            else
-            {
-                std::filesystem::path repository_absolute_path = workspace_folder_path / ".vscode" / repository_path;
-                repository_paths.push_back(std::move(repository_absolute_path));
-            }
+            return iris::compiler::try_get_presets(presets_file_path);
         }
+        catch (std::exception const& error)
+        {
+            server.logger.window_show_message(
+                lsp::ShowMessageParams{
+                    .type = lsp::MessageType::Error,
+                    .message = std::format(
+                        "Failed to parse '{}': {}",
+                        presets_file_path.generic_string(),
+                        error.what()
+                    ),
+                }
+            );
+            return std::nullopt;
+        }
+    }
 
-        return repository_paths;
+    static std::filesystem::path get_build_directory_path(
+        std::filesystem::path const& workspace_folder_path,
+        std::optional<iris::compiler::Presets> const& presets
+    )
+    {
+        if (presets.has_value() && presets->build_directory_path.has_value())
+            return presets->build_directory_path.value();
+
+        return workspace_folder_path / "build";
+    }
+
+    static std::pmr::vector<std::filesystem::path> get_header_search_paths(
+        std::optional<iris::compiler::Presets> const& presets
+    )
+    {
+        std::pmr::vector<std::filesystem::path> const default_header_search_paths = iris::common::get_default_header_search_directories();
+        if (!presets.has_value())
+            return default_header_search_paths;
+
+        return merge_paths_with_dedup(default_header_search_paths, presets->header_search_paths);
+    }
+
+    static std::pmr::vector<std::filesystem::path> get_repository_paths(
+        std::optional<iris::compiler::Presets> const& presets
+    )
+    {
+        if (!presets.has_value())
+            return {};
+
+        return presets->repository_paths;
+    }
+
+    static iris::compiler::Compilation_options get_compilation_options(
+        std::optional<iris::compiler::Presets> const& presets
+    )
+    {
+        return
+        {
+            .target_triple = std::nullopt,
+            .is_optimized = false,
+            .debug = true,
+            .contract_options =
+                presets.has_value() && presets->function_contract_options.has_value()
+                ? presets->function_contract_options.value()
+                : iris::compiler::Contract_options::Log_error_and_abort,
+        };
+    }
+
+    static iris::compiler::Builder_options get_builder_options(
+        std::optional<iris::compiler::Presets> const& presets
+    )
+    {
+        return
+        {
+            .output_llvm_ir = presets.has_value() && presets->output_llvm_ir.value_or(false),
+            .is_test_mode = false,
+            .environment_variables = presets.has_value() ? presets->environment_variables : iris::compiler::Environment_variables{},
+        };
     }
 
     static bool validate_paths(
@@ -450,17 +508,16 @@ namespace iris::language_server
         for (std::size_t index = 0; index < configurations.size(); ++index)
         {
             lsp::WorkspaceFolder const& workspace_folder = server.workspace_folders[index];
-            lsp::json::Any const& workspace_configuration = configurations[index];
 
             std::filesystem::path const workspace_folder_path = to_filesystem_path(
                 target,
                 workspace_folder.uri
             );
 
-            std::filesystem::path const build_directory_path = workspace_folder_path / "build";
-
-            std::pmr::vector<std::filesystem::path> const header_search_paths = get_header_search_paths_from_configuration(workspace_configuration);
-            std::pmr::vector<std::filesystem::path> const repository_paths = get_repository_paths_from_configuration(workspace_folder_path, workspace_configuration);
+            std::optional<iris::compiler::Presets> const presets = try_get_workspace_presets(server, workspace_folder_path);
+            std::filesystem::path const build_directory_path = get_build_directory_path(workspace_folder_path, presets);
+            std::pmr::vector<std::filesystem::path> const header_search_paths = get_header_search_paths(presets);
+            std::pmr::vector<std::filesystem::path> const repository_paths = get_repository_paths(presets);
 
             if (!validate_paths(server, header_search_paths))
                 return;
@@ -468,17 +525,8 @@ namespace iris::language_server
             if (!validate_paths(server, repository_paths))
                 return;
 
-            iris::compiler::Compilation_options const compilation_options
-            {
-                .target_triple = std::nullopt,
-                .is_optimized = false,
-                .debug = true,
-                .contract_options = iris::compiler::Contract_options::Log_error_and_abort,
-            };
-
-            iris::compiler::Builder_options const builder_options
-            {
-            };
+            iris::compiler::Compilation_options const compilation_options = get_compilation_options(presets);
+            iris::compiler::Builder_options const builder_options = get_builder_options(presets);
 
             iris::compiler::Builder builder = iris::compiler::create_builder(
                 target,
@@ -501,6 +549,7 @@ namespace iris::language_server
                 artifact_file_paths,
                 builder.repositories,
                 false,
+                builder.environment_variables,
                 output_allocator,
                 temporaries_allocator
             );

@@ -6,7 +6,7 @@ sidebar_position: 1
 
 The Iris build system is driven by two JSON configuration files: `iris_artifact.json` and `iris_repository.json`. The command-line entry point is the `iris` binary.
 
-You can also define optional local defaults in `iris_presets.json` to reduce repeated CLI arguments.
+You can also define optional local defaults in `iris_presets.json` to reduce repeated CLI arguments. The VS Code language server reads the workspace root presets file too, including repository paths and artifact substitution variables.
 
 ## CLI Usage
 
@@ -29,7 +29,7 @@ Supported commands that read presets are:
 
 ## `iris_presets.json` — Local Defaults
 
-`iris_presets.json` is optional and intended to be local-only (typically not committed). Iris looks for this file in the current working directory.
+`iris_presets.json` is optional and intended to be local-only (typically not committed). The CLI looks for this file in the current working directory, and the VS Code language server looks for it in each workspace folder root.
 
 ### Merge Rules
 
