@@ -287,7 +287,7 @@ namespace iris::compiler
             std::optional<std::filesystem::path> const dependency_location = iris::compiler::get_artifact_location(repositories, dependency.artifact_name);
             if (!dependency_location.has_value())
             {
-                std::fprintf(stderr, "Could not find dependency '%s'.", dependency.artifact_name.c_str());
+                std::fprintf(stderr, "Error: Could not find dependency '%s'.\n", dependency.artifact_name.c_str());
                 continue;
             }
 
@@ -352,7 +352,7 @@ namespace iris::compiler
             if (!artifact_file_path.has_value())
             {
                 iris::common::print_message_and_exit(
-                    std::format("Could not find dependency '{}'", artifact_name)
+                    std::format("Error: Could not find dependency '{}'.\n", artifact_name)
                 );
             }
 
@@ -1800,6 +1800,10 @@ namespace iris::compiler
         std::filesystem::path const parent = destination.parent_path();
         if (!parent.empty())
             create_directory_if_it_does_not_exist(parent);
+
+        std::string const source_string = source.generic_string();
+        std::string const destination_string = destination.generic_string();
+        std::printf("Copy '%s' to '%s'.\n", source_string.c_str(), destination_string.c_str());
 
         std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing);
     }
