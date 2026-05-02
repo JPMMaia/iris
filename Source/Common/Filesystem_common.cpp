@@ -63,6 +63,10 @@ namespace iris::common
         if (std::filesystem::exists(executable_directory_include_path))
             return executable_directory_include_path;
 
+        std::filesystem::path const executable_directory_parent_include_path = get_executable_directory().parent_path().parent_path().parent_path() / "share" / "iris" / relative_path;
+        if (std::filesystem::exists(executable_directory_parent_include_path))
+            return executable_directory_parent_include_path;
+
         std::filesystem::path const current_directory_include_path = std::filesystem::current_path() / "share" / "iris" / relative_path;
         if (std::filesystem::exists(current_directory_include_path))
             return current_directory_include_path;
