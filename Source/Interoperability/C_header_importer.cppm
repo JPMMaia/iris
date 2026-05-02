@@ -11,6 +11,7 @@ namespace iris::c
     {
         std::pmr::string name;
         bool is_function_like = false;
+        std::optional<std::pmr::string> replacement_text;
         iris::Source_range_location source_location;
     };
 

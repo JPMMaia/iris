@@ -85,7 +85,7 @@ namespace iris::compiler
     {
         if (global_variable_declaration.global_type == Global_variable_type::Macro)
         {
-            Expression_parameters new_parameters = parameters;
+            Expression_parameters new_parameters = set_core_module(parameters, global_variable_module);
             new_parameters.expression_type = global_variable_declaration.type;
 
             Value_and_type const value = create_statement_value(
@@ -93,12 +93,26 @@ namespace iris::compiler
                 new_parameters
             );
 
-            llvm::Constant* const constant = fold_constant(value.value, parameters.llvm_data_layout);
+            if (parameters.llvm_parent_function == nullptr)
+            {
+                llvm::Constant* const constant = fold_constant(value.value, parameters.llvm_data_layout);
+
+                return Value_and_type
+                {
+                    .name = global_variable_declaration.name,
+                    .value = constant,
+                    .type = value.type
+                };
+            }
+
+            llvm::Value* folded_or_runtime_value = value.value;
+            if (llvm::BinaryOperator::classof(value.value) || llvm::Constant::classof(value.value))
+                folded_or_runtime_value = fold_constant(value.value, parameters.llvm_data_layout);
 
             return Value_and_type
             {
                 .name = global_variable_declaration.name,
-                .value = constant,
+                .value = folded_or_runtime_value,
                 .type = value.type
             };
         }
@@ -5648,11 +5662,40 @@ namespace iris::compiler
 
         // Search for functions in this module:
         {
-            llvm::Function* const llvm_function = get_llvm_function(parameters.core_module, parameters.llvm_module, variable_name);
-            if (llvm_function != nullptr)
+            std::optional<Function_declaration const*> const function_declaration = find_function_declaration(parameters.core_module, variable_name);
+            if (function_declaration.has_value())
             {
-                std::optional<Function_declaration const*> const function_declaration = find_function_declaration(parameters.core_module, variable_name);
-                Function_declaration const* function_declaration_value = function_declaration.value();
+                Function_declaration const* const function_declaration_value = function_declaration.value();
+
+                llvm::Function* llvm_function = get_llvm_function(parameters.core_module, parameters.llvm_module, variable_name);
+                if (llvm_function == nullptr)
+                {
+                    Type_reference const function_type_reference = create_function_type_type_reference(
+                        function_declaration_value->type,
+                        function_declaration_value->input_parameter_names,
+                        function_declaration_value->output_parameter_names
+                    );
+
+                    Function_pointer_type const& function_pointer_type = std::get<Function_pointer_type>(function_type_reference.data);
+                    llvm::FunctionType* const llvm_function_type = convert_to_llvm_function_type(
+                        parameters.clang_module_data,
+                        parameters.declaration_database,
+                        function_pointer_type.type
+                    );
+
+                    std::string const mangled_name = mangle_name(
+                        parameters.core_module,
+                        function_declaration_value->name,
+                        function_declaration_value->unique_name
+                    );
+
+                    llvm_function = llvm::Function::Create(
+                        llvm_function_type,
+                        llvm::GlobalValue::ExternalLinkage,
+                        mangled_name,
+                        &parameters.llvm_module
+                    );
+                }
 
                 Type_reference type = create_function_type_type_reference(function_declaration_value->type, function_declaration_value->input_parameter_names, function_declaration_value->output_parameter_names);
 

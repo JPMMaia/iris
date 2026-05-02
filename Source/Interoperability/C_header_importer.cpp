@@ -10,6 +10,7 @@ module iris.c_header_converter;
 import std;
 
 import iris.binary_serializer;
+import iris.c_macro_parser;
 import iris.core;
 import iris.core.declarations;
 import iris.core.expressions;
@@ -1040,7 +1041,8 @@ namespace iris::c
         C_macro_declaration macro
         {
             .name = std::pmr::string{ macro_name },
-            .is_function_like = false,
+            .is_function_like = is_function_like,
+            .replacement_text = get_macro_replacement_text(macro_name, cursor_location.source_location),
             .source_location = cursor_location.source_location,
         };
 
@@ -2563,7 +2565,16 @@ namespace iris::c
 
                         auto const macro_location = std::find_if(declarations->macro_declarations.begin(), declarations->macro_declarations.end(), [&](C_macro_declaration const& macro_declaration) -> bool { return macro_declaration.name == declaration->name; });
                         if (macro_location != declarations->macro_declarations.end())
+                        {
                             declaration->source_location = macro_location->source_location;
+
+                            if (declaration->initial_value == iris::Statement{} && macro_location->replacement_text.has_value())
+                            {
+                                std::optional<iris::Statement> const parsed_statement = parse_macro_replacement_text_to_statement(*macro_location->replacement_text);
+                                if (parsed_statement.has_value())
+                                    declaration->initial_value = *parsed_statement;
+                            }
+                        }
 
                         declarations->global_variable_declarations.push_back(std::move(*declaration));
                     }

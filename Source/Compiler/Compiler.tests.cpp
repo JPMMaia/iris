@@ -4426,6 +4426,42 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Input Output Macros", "[LLVM_IR]")
+  {
+    char const* const input_file = "input_output_macros.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "c.stdio", import_c_header_and_get_file_path("c.stdio", "stdio.h") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+@global_0 = internal constant [4 x i8] c"%s\0A\00"
+@global_1 = internal constant [13 x i8] c"Hello world!\00"
+@global_2 = internal constant [4 x i8] c"%s\0A\00"
+@global_3 = internal constant [13 x i8] c"Hello error!\00"
+
+; Function Attrs: convergent
+declare i32 @fprintf(ptr noundef, ptr noundef, ...) #0
+
+; Function Attrs: convergent
+define private void @Input_output_macros_run() #0 {
+entry:
+  %0 = call ptr @__acrt_iob_func(i32 noundef 1)
+  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_0, ptr noundef @global_1)
+  %2 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %3 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %2, ptr noundef @global_2, ptr noundef @global_3)
+  ret void
+}
+
+declare ptr @__acrt_iob_func(i32)
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Implicit Arguments", "[LLVM_IR]")
   {
     char const* const input_file = "implicit_arguments.iris";

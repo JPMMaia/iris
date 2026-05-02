@@ -1,0 +1,9 @@
+module Input_output_macros;
+
+import c.stdio as stdio;
+
+function run() -> ()
+{
+    stdio.fprintf(stdio.stdout, "%s\n"c, "Hello world!"c);
+    stdio.fprintf(stdio.stderr, "%s\n"c, "Hello error!"c);
+}

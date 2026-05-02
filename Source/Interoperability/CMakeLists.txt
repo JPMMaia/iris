@@ -34,8 +34,10 @@ endif()
 target_sources(Iris_C_header_importer
    PUBLIC FILE_SET modules TYPE CXX_MODULES
       FILES
+         "C_macro_parser.cppm"
          "C_header_importer.cppm"
    PRIVATE
+      "C_macro_parser.cpp"
       "C_header_importer.cpp"
 )
 

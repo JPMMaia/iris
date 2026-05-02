@@ -205,6 +205,31 @@ namespace iris::c
         CHECK(actual.linkage == Linkage::External);
     }
 
+    TEST_CASE("Import stdio.h C header imports stream macros as parsed global variable macros")
+    {
+        std::pmr::vector<std::filesystem::path> const header_search_directories =
+            iris::common::get_default_header_search_directories();
+
+        std::filesystem::path const stdio_header_path = find_c_header_path("stdio.h", header_search_directories);
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.stdio", stdio_header_path, {});
+        REQUIRE(header_module_optional.has_value());
+        iris::Module const& header_module = header_module_optional.value();
+
+        auto const check_stream_macro = [&](std::string_view const macro_name)
+        {
+            iris::Global_variable_declaration const& declaration = iris::c::find_global_variable_declaration(header_module, macro_name);
+            CHECK(declaration.global_type == iris::Global_variable_type::Macro);
+            CHECK(!declaration.initial_value.expressions.empty());
+            CHECK(declaration.initial_value != iris::create_statement({ iris::create_null_pointer_expression() }));
+            CHECK(!std::holds_alternative<iris::Null_pointer_expression>(declaration.initial_value.expressions[0].data));
+        };
+
+        check_stream_macro("stdin");
+        check_stream_macro("stdout");
+        check_stream_macro("stderr");
+    }
+
     TEST_CASE("Import time.h C header creates 'time_t' typedef")
     {
         std::pmr::vector<std::filesystem::path> const header_search_directories = 
