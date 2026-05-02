@@ -110,6 +110,8 @@ static std::pmr::vector<std::uint64_t> filter_tests(int const argc, char const* 
                 }
             }
         }
+
+        return filtered_tests;
     }
 
     std::pmr::vector<std::uint64_t> filtered_tests;
