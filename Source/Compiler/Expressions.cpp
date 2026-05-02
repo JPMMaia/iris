@@ -2972,7 +2972,8 @@ namespace iris::compiler
                     std::pmr::string{parameters.core_module.source_file_path->generic_string()} :
                     std::pmr::string{};
 
-                std::uint64_t const line = parameters.source_position.has_value() ? parameters.source_position->line : 0;
+                std::optional<Source_position> const statement_source_position = get_statement_source_position(statement);
+                std::uint64_t const line = statement_source_position.has_value() ? statement_source_position->line : 0;
                 
                 iris::Function_pointer_type const function_pointer_type = create_test_check_function_pointer_type();
                 

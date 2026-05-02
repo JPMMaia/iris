@@ -717,4 +717,17 @@ namespace iris
             || std::holds_alternative<iris::Switch_expression>(expression.data)
             || std::holds_alternative<iris::While_loop_expression>(expression.data);
     }
+
+    std::optional<Source_position> get_statement_source_position(
+        iris::Statement const& statement
+    )
+    {
+        for (iris::Expression const& expression : statement.expressions)
+        {
+            if (expression.source_range.has_value())
+                return expression.source_range->start;
+        }
+
+        return std::nullopt;
+    }
 }

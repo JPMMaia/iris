@@ -1030,4 +1030,8 @@ namespace iris
     export bool is_add_scope_expression(
         iris::Expression const& expression
     );
+
+    export std::optional<Source_position> get_statement_source_position(
+        iris::Statement const& statement
+    );
 }
