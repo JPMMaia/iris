@@ -1046,6 +1046,7 @@ namespace iris::compiler
 
     Transformed_arguments transform_arguments(
         std::pmr::vector<bool> const& is_expression_address_of,
+        std::span<std::optional<Type_reference> const> const original_argument_types,
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
@@ -1227,6 +1228,8 @@ namespace iris::compiler
 
         if (function_info.isVariadic())
         {
+            static constexpr unsigned c_varargs_int_promotion_bits = 32;
+
             std::size_t const start_index = argument_infos.size();
 
             for (std::size_t argument_index = start_index; argument_index < original_arguments.size(); ++argument_index)
@@ -1234,12 +1237,52 @@ namespace iris::compiler
                 llvm::Value* const original_argument = original_arguments[argument_index];
                 bool const is_taking_adress_of_value = is_expression_address_of[argument_index];
 
-                llvm::Value* const loaded_value = create_load_instruction_if_needed(
+                llvm::Value* loaded_value = create_load_instruction_if_needed(
                     llvm_builder,
                     llvm_data_layout,
                     original_argument,
                     is_taking_adress_of_value
                 );
+
+                if (argument_index < original_argument_types.size())
+                {
+                    std::optional<Type_reference> const& original_argument_type = original_argument_types[argument_index];
+
+                    if (original_argument_type.has_value())
+                    {
+                        // When the argument is an indirection expression (e.g. *y where y: *Float32),
+                        // the value has already been loaded once (from y's alloca to get the pointer),
+                        // but the actual pointee value still needs to be loaded before promotion.
+                        if (loaded_value->getType()->isPointerTy() && !is_non_void_pointer(*original_argument_type))
+                        {
+                            llvm::Type* const original_argument_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, *original_argument_type, type_database);
+                            loaded_value = create_load_instruction(llvm_builder, llvm_data_layout, original_argument_llvm_type, loaded_value);
+                        }
+
+                        if (is_floating_point(*original_argument_type) && loaded_value->getType()->isFloatTy())
+                        {
+                            loaded_value = llvm_builder.CreateFPExt(loaded_value, llvm::Type::getDoubleTy(llvm_context));
+                        }
+                        else if ((is_integer(*original_argument_type) || is_bool(*original_argument_type) || is_c_bool(*original_argument_type)) && loaded_value->getType()->isIntegerTy())
+                        {
+                            unsigned const source_bits = loaded_value->getType()->getIntegerBitWidth();
+
+                            if (source_bits < c_varargs_int_promotion_bits)
+                            {
+                                llvm::Type* const promoted_type = llvm::Type::getIntNTy(llvm_context, c_varargs_int_promotion_bits);
+
+                                if (is_signed_integer(*original_argument_type))
+                                {
+                                    loaded_value = llvm_builder.CreateSExt(loaded_value, promoted_type);
+                                }
+                                else
+                                {
+                                    loaded_value = llvm_builder.CreateZExt(loaded_value, promoted_type);
+                                }
+                            }
+                        }
+                    }
+                }
 
                 std::pmr::vector<llvm::Attribute> attributes;
                 attributes.reserve(1);
@@ -1318,6 +1361,7 @@ namespace iris::compiler
 
     llvm::Value* generate_function_call(
         std::pmr::vector<bool> const& is_expression_address_of,
+        std::span<std::optional<Type_reference> const> const original_argument_types,
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
@@ -1335,7 +1379,7 @@ namespace iris::compiler
     {
         clang::CodeGen::CGFunctionInfo const& function_info = create_clang_function_info(clang_module_data, function_type, declaration_database);
 
-        Transformed_arguments const transformed_arguments = transform_arguments(is_expression_address_of, llvm_context, llvm_builder, llvm_data_layout, llvm_module, llvm_parent_function, core_module, function_type, function_info, llvm_arguments, type_database);
+        Transformed_arguments const transformed_arguments = transform_arguments(is_expression_address_of, original_argument_types, llvm_context, llvm_builder, llvm_data_layout, llvm_module, llvm_parent_function, core_module, function_type, function_info, llvm_arguments, type_database);
 
         llvm::CallInst* call_instruction = llvm_builder.CreateCall(&llvm_function_type, &llvm_function_callee, transformed_arguments.values);
 

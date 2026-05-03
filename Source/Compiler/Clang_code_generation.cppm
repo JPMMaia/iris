@@ -107,6 +107,7 @@ namespace iris::compiler
 
     export llvm::Value* generate_function_call(
         std::pmr::vector<bool> const& is_expression_address_of,
+        std::span<std::optional<Type_reference> const> const original_argument_types,
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,

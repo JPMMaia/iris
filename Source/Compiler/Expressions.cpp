@@ -2252,6 +2252,7 @@ namespace iris::compiler
 
     Value_and_type create_call_expression_value_common(
         std::pmr::vector<bool> const& is_expression_address_of,
+        std::span<std::optional<Type_reference> const> const argument_types,
         llvm::Value* const llvm_function_callee,
         llvm::FunctionType* const llvm_function_type,
         std::span<llvm::Value* const> const llvm_arguments,
@@ -2265,6 +2266,7 @@ namespace iris::compiler
 
         llvm::Value* call_instruction = generate_function_call(
             is_expression_address_of,
+            argument_types,
             parameters.llvm_context,
             parameters.llvm_builder,
             parameters.llvm_data_layout,
@@ -3007,12 +3009,16 @@ namespace iris::compiler
                 std::pmr::vector<llvm::Value*> llvm_arguments{parameters.temporaries_allocator};
                 llvm_arguments.resize(3);
 
+                std::pmr::vector<std::optional<Type_reference>> argument_types{parameters.temporaries_allocator};
+                argument_types.resize(3);
+
                 {
                     Expression_parameters new_parameters = parameters;
                     new_parameters.expression_type = iris::create_bool_type_reference();
                     new_parameters.source_position = statement_source_position;
                     Value_and_type const condition_value = create_expression_value(expression.arguments[0].expression_index, statement, new_parameters);
                     llvm_arguments[0] = condition_value.value;
+                    argument_types[0] = condition_value.type;
                 }
                                 
                 llvm_arguments[1] = create_c_string_constant(parameters.llvm_context, parameters.llvm_module, source_file_path, "iris_test_source_file_path");
@@ -3020,6 +3026,7 @@ namespace iris::compiler
 
                 Value_and_type result = create_call_expression_value_common(
                     is_expression_address_of,
+                    argument_types,
                     llvm_function_callee,
                     llvm_function_type,
                     llvm_arguments,
@@ -3172,6 +3179,9 @@ namespace iris::compiler
         std::pmr::vector<llvm::Value*> llvm_arguments{ temporaries_allocator };
         llvm_arguments.resize(expression.arguments.size());
 
+        std::pmr::vector<std::optional<Type_reference>> argument_types{temporaries_allocator};
+        argument_types.resize(expression.arguments.size());
+
         for (unsigned i = 0; i < expression.arguments.size(); ++i)
         {
             std::uint64_t const expression_index = expression.arguments[i].expression_index;
@@ -3183,6 +3193,7 @@ namespace iris::compiler
 
             std::size_t const output_index = i;
             llvm_arguments[output_index] = temporary.value;
+            argument_types[output_index] = temporary.type;
         }
 
         std::pmr::vector<bool> const is_taking_address_of_array = create_is_taking_address_of_expressions_array(
@@ -3192,6 +3203,7 @@ namespace iris::compiler
 
         return create_call_expression_value_common(
             is_taking_address_of_array,
+            argument_types,
             left_hand_side.value,
             llvm_function_type,
             llvm_arguments,

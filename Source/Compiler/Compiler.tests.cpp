@@ -5970,11 +5970,12 @@ if_s1_after:                                      ; preds = %entry
   %array_element_pointer = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
   %16 = load ptr, ptr %value, align 8
   %17 = load ptr, ptr %format_specifier, align 8
-  %18 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 64, ptr noundef %17, ptr noundef %16)
-  %19 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
-  %20 = load ptr, ptr %19, align 8
+  %18 = load i32, ptr %16, align 4
+  %19 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 64, ptr noundef %17, i32 noundef %18)
+  %20 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %21 = load ptr, ptr %20, align 8
   %array_element_pointer2 = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
-  call void %20(ptr noundef %array_element_pointer2)
+  call void %21(ptr noundef %array_element_pointer2)
   ret void
 }}
 
@@ -6154,6 +6155,85 @@ entry:
   store i32 1, ptr %a, align 4
   %0 = load i32, ptr %a, align 4
   %1 = call i32 (ptr, ...) @printf(ptr noundef @global_0, i32 noundef %0, ptr noundef %a)
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Use Printf Variadic Promotions", "[LLVM_IR]")
+  {
+    char const* const input_file = "use_printf_variadic_promotions.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "c.stdio", import_c_header_and_get_file_path("c.stdio", "stdio.h") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+@global_0 = internal constant [13 x i8] c"%f %d %u %d\0A\00"
+
+; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
+define void @Use_printf_variadic_promotions_run() #0 {
+entry:
+  %f = alloca float, align 4
+  %s = alloca i8, align 1
+  %u = alloca i8, align 1
+  %sh = alloca i16, align 2
+  store float 1.500000e+00, ptr %f, align 4
+  store i8 -2, ptr %s, align 1
+  store i8 3, ptr %u, align 1
+  store i16 4, ptr %sh, align 2
+  %0 = load float, ptr %f, align 4
+  %1 = fpext float %0 to double
+  %2 = load i8, ptr %s, align 1
+  %3 = sext i8 %2 to i32
+  %4 = load i8, ptr %u, align 1
+  %5 = zext i8 %4 to i32
+  %6 = load i16, ptr %sh, align 2
+  %7 = sext i16 %6 to i32
+  %8 = call i32 (ptr, ...) @printf(ptr noundef @global_0, double noundef %1, i32 noundef %3, i32 noundef %5, i32 noundef %7)
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Use Printf Variadic Promotions Indirection", "[LLVM_IR]")
+  {
+    char const* const input_file = "use_printf_variadic_promotions_indirection.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "c.stdio", import_c_header_and_get_file_path("c.stdio", "stdio.h") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+@global_0 = internal constant [4 x i8] c"%f\0A\00"
+
+; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
+define void @Use_printf_variadic_promotions_indirection_run() #0 {
+entry:
+  %x = alloca float, align 4
+  %y = alloca ptr, align 8
+  store float 3.000000e+00, ptr %x, align 4
+  store ptr %x, ptr %y, align 8
+  %0 = load ptr, ptr %y, align 8
+  %1 = load float, ptr %0, align 4
+  %2 = fpext float %1 to double
+  %3 = call i32 (ptr, ...) @printf(ptr noundef @global_0, double noundef %2)
   ret void
 }
 

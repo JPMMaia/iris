@@ -1,0 +1,13 @@
+module Use_printf_variadic_promotions;
+
+import c.stdio as stdio;
+
+export function run() -> ()
+{
+    var f = 1.5f32;
+    var s = -2i8;
+    var u = 3u8;
+    var sh = 4i16;
+
+    stdio.printf("%f %d %u %d\n"c, f, s, u, sh);
+}
