@@ -141,16 +141,16 @@ export function_constructor print_json(value_type: Type)
     return function(value: *value_type) -> ()
     {
         var stream: Write_stream = explicit {
-            write: print_to_stdout
+            write: print_to_stderr
         };
 
         to_json::<value_type>(stream, value);
     };
 }
 
-function print_to_stdout(value: *C_char) -> ()
+function print_to_stderr(value: *C_char) -> ()
 {
-    cstdio.printf("%s"c, value);
+    cstdio.fprintf(cstdio.stderr, "%s"c, value);
 }
 
 export function_constructor print_json_difference(value_type: Type)
@@ -158,7 +158,9 @@ export function_constructor print_json_difference(value_type: Type)
     return function(lhs: *value_type, rhs: *value_type) -> ()
     {
         print_json::<value_type>(lhs);
-        cstdio.printf(" == "c);
+        cstdio.fprintf(cstdio.stderr, " == "c);
         print_json::<value_type>(rhs);
+        cstdio.fprintf(cstdio.stderr, "\n"c);
+        cstdio.fflush(cstdio.stderr);
     };
 }
