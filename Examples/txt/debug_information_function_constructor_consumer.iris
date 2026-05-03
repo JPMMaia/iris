@@ -1,0 +1,9 @@
+module Debug_information_function_constructor_consumer;
+
+import Debug_information_function_constructor_provider as Provider;
+
+export function run() -> (result: Int32)
+{
+    var value = Provider.add::<Int32>(1, 2);
+    return value;
+}

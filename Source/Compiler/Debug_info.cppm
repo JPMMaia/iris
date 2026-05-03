@@ -14,6 +14,7 @@ namespace iris::compiler
         Debug_type_database type_database;
         llvm::DICompileUnit* main_llvm_compile_unit;
         std::pmr::vector<llvm::DIScope*> llvm_scopes;
+        std::unordered_map<std::filesystem::path, llvm::DIFile*> llvm_debug_files;
     };
 
     export llvm::DIScope* get_debug_scope(

@@ -1,0 +1,9 @@
+module Debug_information_function_constructor_provider;
+
+export function_constructor add(value_type: Type)
+{
+    return function (lhs: value_type, rhs: value_type) -> (result: value_type)
+    {
+        return lhs + rhs;
+    };
+}

@@ -131,6 +131,28 @@ namespace iris
     return llvm_ir.substr(current_index, llvm_ir.size());
   }
 
+  std::optional<std::string_view> find_metadata_id_for_file(
+    std::string_view const llvm_ir,
+    std::string_view const filename
+  )
+  {
+    std::string const token = std::format("= !DIFile(filename: \"{}\"", filename);
+    std::size_t const location = llvm_ir.find(token);
+    if (location == std::string_view::npos)
+      return std::nullopt;
+
+    std::size_t const line_start = llvm_ir.rfind('\n', location);
+    if (line_start == std::string_view::npos)
+      return std::nullopt;
+
+    std::size_t const id_start = line_start + 1;
+    std::size_t const id_end = llvm_ir.find(' ', id_start);
+    if (id_end == std::string_view::npos || id_end <= id_start)
+      return std::nullopt;
+
+    return llvm_ir.substr(id_start, id_end - id_start);
+  }
+
   struct Test_options
   {
     bool debug = false;
@@ -151,10 +173,9 @@ namespace iris
     core_module.dependencies.alias_imports.push_back({"iris.json", "iris_json"});
   }
 
-  void test_create_llvm_module(
+  std::string create_llvm_ir_body(
     std::string_view const input_file,
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> module_name_to_file_path_map,
-    std::string_view const expected_llvm_ir,
     Test_options const test_options = {}
   )
   {
@@ -194,12 +215,26 @@ namespace iris
     iris::compiler::LLVM_module_data llvm_module_data = iris::compiler::create_llvm_module(llvm_data, core_module.value(), module_name_to_file_path_map, compilation_options);
     std::string const llvm_ir = iris::compiler::to_string(*llvm_module_data.module);
 
-    std::string_view const llvm_ir_body = exclude_header(llvm_ir);
-
-    CHECK(llvm_ir_body == expected_llvm_ir);
-
     iris::parser::destroy_tree(std::move(parse_tree));
     iris::parser::destroy_parser(std::move(parser));
+
+    return std::string{exclude_header(llvm_ir)};
+  }
+
+  void test_create_llvm_module(
+    std::string_view const input_file,
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> module_name_to_file_path_map,
+    std::string_view const expected_llvm_ir,
+    Test_options const test_options = {}
+  )
+  {
+    std::string const llvm_ir_body = create_llvm_ir_body(
+      input_file,
+      std::move(module_name_to_file_path_map),
+      test_options
+    );
+
+    CHECK(llvm_ir_body == expected_llvm_ir);
   }
 
   TEST_CASE("Compile Address Of", "[LLVM_IR]")
@@ -2706,6 +2741,48 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 )", g_test_source_files_path.generic_string());
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
+  }
+
+  TEST_CASE("Compile Debug Information Imported Function Constructor", "[LLVM_IR]")
+  {
+    char const* const input_file = "debug_information_function_constructor_consumer.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "Debug_information_function_constructor_provider", parse_and_get_file_path(g_test_source_files_path / "debug_information_function_constructor_provider.iris") },
+    };
+
+    std::string const llvm_ir_body = create_llvm_ir_body(
+      input_file,
+      module_name_to_file_path_map,
+      { .debug = true }
+    );
+
+    std::optional<std::string_view> const consumer_file_id = find_metadata_id_for_file(llvm_ir_body, "debug_information_function_constructor_consumer.iris");
+    std::optional<std::string_view> const provider_file_id = find_metadata_id_for_file(llvm_ir_body, "debug_information_function_constructor_provider.iris");
+
+    REQUIRE(consumer_file_id.has_value());
+    REQUIRE(provider_file_id.has_value());
+
+    std::size_t const run_subprogram_location = llvm_ir_body.find("!DISubprogram(name: \"run\", linkageName: \"Debug_information_function_constructor_consumer_run\"");
+    REQUIRE(run_subprogram_location != std::string_view::npos);
+    std::size_t const run_subprogram_line_end = llvm_ir_body.find('\n', run_subprogram_location);
+    REQUIRE(run_subprogram_line_end != std::string_view::npos);
+    std::string_view const run_subprogram_line = llvm_ir_body.substr(run_subprogram_location, run_subprogram_line_end - run_subprogram_location);
+    CHECK(run_subprogram_line.find(std::format("file: {}", consumer_file_id.value())) != std::string_view::npos);
+
+    std::size_t const instantiated_subprogram_location = llvm_ir_body.find("!DISubprogram(name: \"Debug_information_function_constructor_provider@add@");
+    REQUIRE(instantiated_subprogram_location != std::string_view::npos);
+
+    std::size_t const instantiated_subprogram_end = llvm_ir_body.find(")", instantiated_subprogram_location);
+    REQUIRE(instantiated_subprogram_end != std::string_view::npos);
+
+    std::string_view const instantiated_subprogram_metadata = llvm_ir_body.substr(
+      instantiated_subprogram_location,
+      instantiated_subprogram_end - instantiated_subprogram_location
+    );
+
+    CHECK(instantiated_subprogram_metadata.find(std::format("file: {}", provider_file_id.value())) != std::string_view::npos);
   }
 
   TEST_CASE("Compile Debug Information If", "[LLVM_IR]")

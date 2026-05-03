@@ -433,6 +433,26 @@ namespace iris::compiler
 
         if (debug_info != nullptr)
         {
+            llvm::DIFile* llvm_function_debug_file = debug_info->main_llvm_compile_unit->getFile();
+            if (function_declaration.source_location.has_value() && function_declaration.source_location->file_path.has_value())
+            {
+                std::filesystem::path const& source_file_path = *function_declaration.source_location->file_path;
+
+                auto const location = debug_info->llvm_debug_files.find(source_file_path);
+                if (location != debug_info->llvm_debug_files.end())
+                {
+                    llvm_function_debug_file = location->second;
+                }
+                else
+                {
+                    llvm_function_debug_file = debug_info->llvm_builder->createFile(
+                        source_file_path.filename().generic_string(),
+                        source_file_path.parent_path().generic_string()
+                    );
+                    debug_info->llvm_debug_files.emplace(source_file_path, llvm_function_debug_file);
+                }
+            }
+
             llvm::DISubroutineType* const llvm_function_debug_type = create_debug_function_type(
                 *debug_info->llvm_builder,
                 *get_debug_scope(*debug_info),
@@ -457,7 +477,7 @@ namespace iris::compiler
                 debug_info->main_llvm_compile_unit,
                 function_name,
                 mangled_function_name,
-                debug_info->main_llvm_compile_unit->getFile(),
+                llvm_function_debug_file,
                 line,
                 llvm_function_debug_type,
                 scope_line,
@@ -1104,7 +1124,7 @@ namespace iris::compiler
                 continue;
 
             llvm::DIFile* const llvm_dependency_debug_file = llvm_debug_builder->createFile(module_dependency->source_file_path->filename().generic_string(), module_dependency->source_file_path->parent_path().generic_string());
-            llvm_debug_files.emplace(*core_module.source_file_path, llvm_dependency_debug_file);
+            llvm_debug_files.emplace(*module_dependency->source_file_path, llvm_dependency_debug_file);
 
             add_module_debug_types(
                 debug_type_database,
@@ -1141,7 +1161,9 @@ namespace iris::compiler
         return std::make_unique<Debug_info>(
             std::move(llvm_debug_builder),
             std::move(debug_type_database),
-            llvm_debug_compile_unit
+            llvm_debug_compile_unit,
+            std::pmr::vector<llvm::DIScope*>{},
+            std::move(llvm_debug_files)
         );
     }
 

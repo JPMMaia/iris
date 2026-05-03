@@ -1,0 +1,15 @@
+module Debug_information;
+
+export function_constructor add(value_type: Type)
+{
+    return function (lhs: value_type, rhs: value_type) -> (result: value_type)
+    {
+        return lhs + rhs;
+    };
+}
+
+export function run() -> (result: Int32)
+{
+    var value = add::<Int32>(1, 2);
+    return value;
+}
