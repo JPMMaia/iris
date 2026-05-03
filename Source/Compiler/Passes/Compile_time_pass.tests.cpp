@@ -562,11 +562,12 @@ import iris.json as iris_json;
 function run(lhs: Int32, rhs: Int32) -> ()
 {
     {
-        if lhs != rhs
+        var __condition = lhs == rhs;
+        check(__condition);
+        if !__condition
         {
             iris_json.print_json_difference::<Int32>(&lhs, &rhs);
         }
-        check(lhs == rhs);
     }
 }
 )";
@@ -595,11 +596,12 @@ function run(lhs: Int32, rhs: Int32) -> ()
     {
         var __lhs = (1 + 2);
         var __rhs = (3 + 4);
-        if __lhs != __rhs
+        var __condition = __lhs == __rhs;
+        check(__condition);
+        if !__condition
         {
             iris_json.print_json_difference::<Int32>(&__lhs, &__rhs);
         }
-        check(__lhs == __rhs);
     }
 }
 )";

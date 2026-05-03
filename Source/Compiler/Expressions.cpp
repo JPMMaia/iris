@@ -2256,11 +2256,12 @@ namespace iris::compiler
         llvm::FunctionType* const llvm_function_type,
         std::span<llvm::Value* const> const llvm_arguments,
         Function_pointer_type const& function_pointer_type,
+        std::optional<Source_position> const& source_position,
         Expression_parameters const& parameters
     )
     {
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, source_position);
 
         llvm::Value* call_instruction = generate_function_call(
             is_expression_address_of,
@@ -3009,6 +3010,7 @@ namespace iris::compiler
                 {
                     Expression_parameters new_parameters = parameters;
                     new_parameters.expression_type = iris::create_bool_type_reference();
+                    new_parameters.source_position = statement_source_position;
                     Value_and_type const condition_value = create_expression_value(expression.arguments[0].expression_index, statement, new_parameters);
                     llvm_arguments[0] = condition_value.value;
                 }
@@ -3022,6 +3024,7 @@ namespace iris::compiler
                     llvm_function_type,
                     llvm_arguments,
                     function_pointer_type,
+                    statement_source_position,
                     parameters
                 );
 
@@ -3193,6 +3196,7 @@ namespace iris::compiler
             llvm_function_type,
             llvm_arguments,
             function_pointer_type,
+            parameters.source_position,
             parameters
         );
     }

@@ -30,10 +30,11 @@ extern "C" void iris_test_check(bool const condition, char const* const source_f
         return;
 
     if (!condition)
+    {
         g_iris_current_test_context->success = false;
-
-    std::fprintf(stderr, "Test check failed @ \"%s:%llu\"\n", source_file_path, line);
-    std::fflush(stderr);
+        std::fprintf(stderr, "Test check failed @ \"%s:%llu\"\n", source_file_path, line);
+        std::fflush(stderr);
+    }
 }
 
 static std::span<char const* const> get_all_test_names()

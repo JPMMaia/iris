@@ -157,10 +157,11 @@ export function_constructor print_json_difference(value_type: Type)
 {
     return function(lhs: *value_type, rhs: *value_type) -> ()
     {
-        print_json::<value_type>(lhs);
-        cstdio.fprintf(cstdio.stderr, " == "c);
+        cstdio.fprintf(cstdio.stderr, "Expected vs Actual (Right-hand side vs Left-hand side)\n    '"c);
         print_json::<value_type>(rhs);
-        cstdio.fprintf(cstdio.stderr, "\n"c);
+        cstdio.fprintf(cstdio.stderr, "' vs '"c);
+        print_json::<value_type>(lhs);
+        cstdio.fprintf(cstdio.stderr, "'\n"c);
         cstdio.fflush(cstdio.stderr);
     };
 }

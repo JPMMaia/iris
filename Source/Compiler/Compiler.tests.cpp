@@ -5609,9 +5609,13 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_11 = internal constant [5 x i8] c"null\00"
 @global_12 = internal constant [3 x i8] c"%s\00"
 @global_13 = internal constant [5 x i8] c" == \00"
+@global_14 = internal constant [2 x i8] c"\0A\00"
 
 ; Function Attrs: convergent
-declare i32 @printf(ptr noundef, ...) #0
+declare i32 @fflush(ptr noundef) #0
+
+; Function Attrs: convergent
+declare i32 @fprintf(ptr noundef, ptr noundef, ...) #0
 
 ; Function Attrs: convergent
 declare i32 @snprintf(ptr noundef, i64 noundef, ptr noundef, ...) #0
@@ -5637,42 +5641,50 @@ define void @Test_framework_test_addition() #0 {{
 entry:
   %__lhs = alloca i32, align 4
   %__rhs = alloca i32, align 4
+  %__condition = alloca i1, align 1
   %__lhs1 = alloca i32, align 4
   %__rhs2 = alloca i32, align 4
+  %__condition3 = alloca i1, align 1
   %0 = call i32 @Test_framework_add(i32 noundef 1, i32 noundef 2)
   store i32 %0, ptr %__lhs, align 4
   store i32 3, ptr %__rhs, align 4
   %1 = load i32, ptr %__lhs, align 4
   %2 = load i32, ptr %__rhs, align 4
-  %3 = icmp ne i32 %1, %2
-  br i1 %3, label %if_s0_then, label %if_s1_after
+  %3 = icmp eq i32 %1, %2
+  store i1 %3, ptr %__condition, align 1
+  %4 = load i8, ptr %__condition, align 1
+  %5 = trunc i8 %4 to i1
+  call void @iris_test_check(i1 noundef zeroext %5, ptr noundef @iris_test_source_file_path, i64 noundef 0)
+  %6 = load i8, ptr %__condition, align 1
+  %7 = xor i8 %6, -1
+  %8 = trunc i8 %7 to i1
+  br i1 %8, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
   call void @"iris.json@print_json_difference@16983553210230134252"(ptr noundef %__lhs, ptr noundef %__rhs)
   br label %if_s1_after
 
 if_s1_after:                                      ; preds = %if_s0_then, %entry
-  %4 = load i32, ptr %__lhs, align 4
-  %5 = load i32, ptr %__rhs, align 4
-  %6 = icmp eq i32 %4, %5
-  call void @iris_test_check(i1 noundef zeroext %6, ptr noundef @iris_test_source_file_path, i64 noundef 0)
-  %7 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
-  store i32 %7, ptr %__lhs1, align 4
+  %9 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
+  store i32 %9, ptr %__lhs1, align 4
   store i32 5, ptr %__rhs2, align 4
-  %8 = load i32, ptr %__lhs1, align 4
-  %9 = load i32, ptr %__rhs2, align 4
-  %10 = icmp ne i32 %8, %9
-  br i1 %10, label %if_s0_then3, label %if_s1_after4
+  %10 = load i32, ptr %__lhs1, align 4
+  %11 = load i32, ptr %__rhs2, align 4
+  %12 = icmp eq i32 %10, %11
+  store i1 %12, ptr %__condition3, align 1
+  %13 = load i8, ptr %__condition3, align 1
+  %14 = trunc i8 %13 to i1
+  call void @iris_test_check(i1 noundef zeroext %14, ptr noundef @iris_test_source_file_path, i64 noundef 0)
+  %15 = load i8, ptr %__condition3, align 1
+  %16 = xor i8 %15, -1
+  %17 = trunc i8 %16 to i1
+  br i1 %17, label %if_s0_then4, label %if_s1_after5
 
-if_s0_then3:                                      ; preds = %if_s1_after
+if_s0_then4:                                      ; preds = %if_s1_after
   call void @"iris.json@print_json_difference@16983553210230134252"(ptr noundef %__lhs1, ptr noundef %__rhs2)
-  br label %if_s1_after4
+  br label %if_s1_after5
 
-if_s1_after4:                                     ; preds = %if_s0_then3, %if_s1_after
-  %11 = load i32, ptr %__lhs1, align 4
-  %12 = load i32, ptr %__rhs2, align 4
-  %13 = icmp eq i32 %11, %12
-  call void @iris_test_check(i1 noundef zeroext %13, ptr noundef @iris_test_source_file_path, i64 noundef 0)
+if_s1_after5:                                     ; preds = %if_s0_then4, %if_s1_after
   ret void
 }}
 
@@ -5889,12 +5901,13 @@ if_s1_after:                                      ; preds = %entry
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json.print_to_stdout(ptr noundef %"arguments[0].value") #0 {{
+define private void @iris.json.print_to_stderr(ptr noundef %"arguments[0].value") #0 {{
 entry:
   %value = alloca ptr, align 8
   store ptr %"arguments[0].value", ptr %value, align 8
-  %0 = load ptr, ptr %value, align 8
-  %1 = call i32 (ptr, ...) @printf(ptr noundef @global_12, ptr noundef %0)
+  %0 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %1 = load ptr, ptr %value, align 8
+  %2 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_12, ptr noundef %1)
   ret void
 }}
 
@@ -5905,7 +5918,7 @@ entry:
   %stream = alloca %struct.iris_json_Write_stream, align 8
   store ptr %"arguments[0].value", ptr %value, align 8
   %0 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
-  store ptr @iris.json.print_to_stdout, ptr %0, align 8
+  store ptr @iris.json.print_to_stderr, ptr %0, align 8
   %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
   %2 = load ptr, ptr %1, align 8
   %3 = load ptr, ptr %value, align 8
@@ -5922,9 +5935,14 @@ entry:
   store ptr %"arguments[1].rhs", ptr %rhs, align 8
   %0 = load ptr, ptr %lhs, align 8
   call void @"iris.json@print_json@9753731967319569499"(ptr noundef %0)
-  %1 = call i32 (ptr, ...) @printf(ptr noundef @global_13)
-  %2 = load ptr, ptr %rhs, align 8
-  call void @"iris.json@print_json@9753731967319569499"(ptr noundef %2)
+  %1 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %2 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %1, ptr noundef @global_13)
+  %3 = load ptr, ptr %rhs, align 8
+  call void @"iris.json@print_json@9753731967319569499"(ptr noundef %3)
+  %4 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %5 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %4, ptr noundef @global_14)
+  %6 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %7 = call i32 @fflush(ptr noundef %6)
   ret void
 }}
 
@@ -5933,6 +5951,8 @@ declare void @iris_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
 declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+
+declare ptr @__acrt_iob_func(i32)
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
 attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}

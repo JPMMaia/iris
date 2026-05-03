@@ -293,6 +293,28 @@ namespace iris::compiler
         return output;
     }
 
+    // Builds "<op><value>" where value_source is a single-expression statement.
+    static iris::Statement create_unary_expression_statement(
+        iris::Statement const& value_source,
+        iris::Unary_operation const operation
+    )
+    {
+        iris::Statement output = {};
+
+        std::size_t const unary_index = output.expressions.size();
+        output.expressions.push_back(iris::Expression{.data = iris::Unary_expression{}});
+
+        iris::Expression_index const copied_value = copy_expressions_to_new_statement(output, value_source, {.expression_index = 0});
+
+        std::get<iris::Unary_expression>(output.expressions[unary_index].data) =
+        {
+            .expression = copied_value,
+            .operation = operation,
+        };
+
+        return output;
+    }
+
     // Builds: iris_json.print_json_difference::<T>(&left, &right)
     // left_source and right_source are single-expression statements whose expression at
     // index 0 must be an addressable lvalue (Variable_expression or access chain).
@@ -370,10 +392,10 @@ namespace iris::compiler
         return output;
     }
 
-    // Builds: check(left == right) where left/right are single-expression statements.
-    static iris::Statement create_check_equality_statement(
-        iris::Statement const& left_source,
-        iris::Statement const& right_source,
+    // Builds: check(value) where value_source is a single-expression statement.
+    static iris::Statement create_check_statement(
+        iris::Statement const& value_source,
+        std::optional<iris::Source_range> const& source_range,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
@@ -384,7 +406,8 @@ namespace iris::compiler
             .data = iris::Call_expression{
                 .expression = {},
                 .arguments = std::pmr::vector<iris::Expression_index>{output_allocator},
-            }
+            },
+            .source_range = source_range
         });
 
         std::size_t const callee_index = output.expressions.size();
@@ -394,22 +417,11 @@ namespace iris::compiler
             }
         });
 
-        std::size_t const binary_index = output.expressions.size();
-        output.expressions.push_back(iris::Expression{.data = iris::Binary_expression{}});
-
-        iris::Expression_index const copied_left = copy_expressions_to_new_statement(output, left_source, {.expression_index = 0});
-        iris::Expression_index const copied_right = copy_expressions_to_new_statement(output, right_source, {.expression_index = 0});
-
-        std::get<iris::Binary_expression>(output.expressions[binary_index].data) =
-        {
-            .left_hand_side = copied_left,
-            .right_hand_side = copied_right,
-            .operation = iris::Binary_operation::Equal,
-        };
+        iris::Expression_index const copied_value = copy_expressions_to_new_statement(output, value_source, {.expression_index = 0});
 
         iris::Call_expression& call_expr = std::get<iris::Call_expression>(output.expressions[call_expression_index].data);
         call_expr.expression = {.expression_index = callee_index};
-        call_expr.arguments.push_back({.expression_index = binary_index});
+        call_expr.arguments.push_back(copied_value);
 
         return output;
     }
@@ -546,11 +558,22 @@ namespace iris::compiler
             parameters.output_allocator
         );
 
-        iris::Statement condition_statement = create_binary_expression_statement(
+        iris::Statement condition_value_statement = create_binary_expression_statement(
             left_operand.expression,
             right_operand.expression,
-            iris::Binary_operation::Not_equal
+            iris::Binary_operation::Equal
         );
+        iris::Statement condition_declaration_statement = create_variable_declaration_statement(
+            "__condition",
+            condition_value_statement,
+            {.expression_index = 0},
+            parameters.output_allocator
+        );
+        iris::Statement condition_expression_statement = create_variable_expression_statement(
+            "__condition",
+            parameters.output_allocator
+        );
+
         iris::Statement print_difference_statement = create_print_json_difference_statement(
             json_import.alias,
             left_hand_side_type.value(),
@@ -558,15 +581,19 @@ namespace iris::compiler
             right_operand.expression,
             parameters.output_allocator
         );
+        iris::Statement condition_statement = create_unary_expression_statement(
+            condition_expression_statement,
+            iris::Unary_operation::Not
+        );
         iris::Statement if_statement = create_if_statement(
             std::move(condition_statement),
             std::move(print_difference_statement),
             parameters.output_allocator
         );
 
-        iris::Statement check_statement = create_check_equality_statement(
-            left_operand.expression,
-            right_operand.expression,
+        iris::Statement check_statement = create_check_statement(
+            condition_expression_statement,
+            statement.expressions[0].source_range,
             parameters.output_allocator
         );
 
@@ -575,8 +602,9 @@ namespace iris::compiler
             block_statements.push_back(std::move(*left_operand.spill_declaration));
         if (right_operand.spill_declaration.has_value())
             block_statements.push_back(std::move(*right_operand.spill_declaration));
-        block_statements.push_back(std::move(if_statement));
+        block_statements.push_back(std::move(condition_declaration_statement));
         block_statements.push_back(std::move(check_statement));
+        block_statements.push_back(std::move(if_statement));
 
         statement = create_block_statement(std::move(block_statements), parameters.output_allocator);
     }
