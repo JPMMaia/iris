@@ -2988,6 +2988,9 @@ namespace iris::compiler
 
                 std::optional<Source_position> const statement_source_position = get_statement_source_position(statement);
                 std::uint64_t const line = statement_source_position.has_value() ? statement_source_position->line : 0;
+
+                if (parameters.debug_info != nullptr)
+                    set_debug_location(parameters.llvm_builder, *parameters.debug_info, statement_source_position);
                 
                 iris::Function_pointer_type const function_pointer_type = create_test_check_function_pointer_type();
                 
@@ -5957,6 +5960,10 @@ namespace iris::compiler
         {
             Source_position const source_position = expression.source_range->start;
             new_parameters.source_position = source_position;
+        }
+        else
+        {
+            new_parameters.source_position = std::nullopt;
         }
 
         if (std::holds_alternative<Access_expression>(expression.data))
