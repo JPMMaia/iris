@@ -87,7 +87,7 @@ namespace iris::common
 
     std::filesystem::path get_json_module_file_path()
     {
-        return get_share_path("source/json.iris");
+        return get_share_path("libraries/Iris_standard_library/json.iris");
     }
 
     std::filesystem::path get_tests_main_file_path()

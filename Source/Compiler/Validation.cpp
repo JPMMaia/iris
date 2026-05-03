@@ -353,6 +353,13 @@ namespace iris::compiler
         return {};
     }
 
+    static bool is_builtin_import(
+        std::string_view const module_name
+    )
+    {
+        return module_name == "iris.builtin" || module_name == "iris.json";
+    }
+
     std::pmr::vector<iris::compiler::Diagnostic> validate_imports(
         iris::Module const& core_module,
         Declaration_database const& declaration_database,
@@ -383,6 +390,9 @@ namespace iris::compiler
             {
                 all_names.insert(import_module.alias);
             }
+
+            if (is_builtin_import(import_module.module_name))
+                continue;
 
             auto const location = declaration_database.map.find(import_module.module_name);
             if (location == declaration_database.map.end())

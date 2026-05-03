@@ -545,10 +545,12 @@ namespace iris::language_server
                 temporaries_allocator
             );
 
+            bool const is_test_mode = true;
+
             std::pmr::vector<iris::compiler::Artifact> artifacts = iris::compiler::get_sorted_artifacts(
                 artifact_file_paths,
                 builder.repositories,
-                false,
+                is_test_mode,
                 builder.environment_variables,
                 output_allocator,
                 temporaries_allocator
@@ -556,7 +558,7 @@ namespace iris::language_server
 
             std::pmr::vector<std::filesystem::path> core_module_source_file_paths = get_artifacts_source_files(
                 artifacts,
-                false,
+                is_test_mode,
                 output_allocator,
                 temporaries_allocator
             );

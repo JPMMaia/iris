@@ -8,6 +8,10 @@
         {
             "name": "Cpp_standard_library",
             "location": "Cpp_standard_library/iris_artifact.json"
+        },
+        {
+            "name": "Iris_standard_library",
+            "location": "Iris_standard_library/iris_artifact.json"
         }
     ]
 }

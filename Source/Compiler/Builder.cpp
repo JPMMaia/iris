@@ -374,6 +374,7 @@ namespace iris::compiler
         {
             add_required_artifact("C_standard_library");
             add_required_artifact("Cpp_standard_library");
+            add_required_artifact("Iris_standard_library");
         }
 
         for (std::filesystem::path const& artifact_file_path : artifact_file_paths)
@@ -1902,7 +1903,7 @@ namespace iris::compiler
         std::pmr::vector<Artifact> const artifacts = get_sorted_artifacts(
             { &artifact_file_path, 1 },
             builder.repositories,
-            false,
+            true,
             builder.environment_variables,
             temporaries_allocator,
             temporaries_allocator

@@ -5608,8 +5608,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_10 = internal constant [4 x i8] c"lld\00"
 @global_11 = internal constant [5 x i8] c"null\00"
 @global_12 = internal constant [3 x i8] c"%s\00"
-@global_13 = internal constant [5 x i8] c" == \00"
-@global_14 = internal constant [2 x i8] c"\0A\00"
+@global_13 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
+@global_14 = internal constant [7 x i8] c"' vs '\00"
+@global_15 = internal constant [3 x i8] c"'\0A\00"
 
 ; Function Attrs: convergent
 declare i32 @fflush(ptr noundef) #0
@@ -5654,7 +5655,7 @@ entry:
   store i1 %3, ptr %__condition, align 1
   %4 = load i8, ptr %__condition, align 1
   %5 = trunc i8 %4 to i1
-  call void @iris_test_check(i1 noundef zeroext %5, ptr noundef @iris_test_source_file_path, i64 noundef 0)
+  call void @iris_test_check(i1 noundef zeroext %5, ptr noundef @iris_test_source_file_path, i64 noundef 11)
   %6 = load i8, ptr %__condition, align 1
   %7 = xor i8 %6, -1
   %8 = trunc i8 %7 to i1
@@ -5674,7 +5675,7 @@ if_s1_after:                                      ; preds = %if_s0_then, %entry
   store i1 %12, ptr %__condition3, align 1
   %13 = load i8, ptr %__condition3, align 1
   %14 = trunc i8 %13 to i1
-  call void @iris_test_check(i1 noundef zeroext %14, ptr noundef @iris_test_source_file_path, i64 noundef 0)
+  call void @iris_test_check(i1 noundef zeroext %14, ptr noundef @iris_test_source_file_path, i64 noundef 12)
   %15 = load i8, ptr %__condition3, align 1
   %16 = xor i8 %15, -1
   %17 = trunc i8 %16 to i1
@@ -5933,16 +5934,18 @@ entry:
   %rhs = alloca ptr, align 8
   store ptr %"arguments[0].lhs", ptr %lhs, align 8
   store ptr %"arguments[1].rhs", ptr %rhs, align 8
-  %0 = load ptr, ptr %lhs, align 8
-  call void @"iris.json@print_json@9753731967319569499"(ptr noundef %0)
-  %1 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %2 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %1, ptr noundef @global_13)
-  %3 = load ptr, ptr %rhs, align 8
-  call void @"iris.json@print_json@9753731967319569499"(ptr noundef %3)
-  %4 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %5 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %4, ptr noundef @global_14)
+  %0 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_13)
+  %2 = load ptr, ptr %rhs, align 8
+  call void @"iris.json@print_json@9753731967319569499"(ptr noundef %2)
+  %3 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_14)
+  %5 = load ptr, ptr %lhs, align 8
+  call void @"iris.json@print_json@9753731967319569499"(ptr noundef %5)
   %6 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %7 = call i32 @fflush(ptr noundef %6)
+  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_15)
+  %8 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %9 = call i32 @fflush(ptr noundef %8)
   ret void
 }}
 
