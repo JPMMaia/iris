@@ -1,0 +1,23 @@
+module Type_constructors;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+export using Vector3f32 = Vector3::<Float32>;
+
+export function get_one() -> (value: Vector3f32)
+{
+    return
+    {
+        x: 1.0f32,
+        y: 1.0f32,
+        z: 1.0f32
+    };
+}

@@ -408,6 +408,23 @@ namespace iris::compiler
         test_builder("Copy_files", {"iris_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
+    TEST_CASE("Build Type_constructors", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_standard_repository_file_path
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"lib"} / get_static_library_name("Type_constructors", target),
+        };
+
+        test_builder("Type_constructors", {"iris_artifact.json"}, target, repository_paths, expected_output_paths);
+    }
+
     TEST_CASE("Locate artifacts in a directory", "[Builder]")
     {
         std::filesystem::path const root = std::filesystem::temp_directory_path() / "builder_artifact_search";

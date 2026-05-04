@@ -1852,6 +1852,12 @@ namespace iris::compiler
         Compilation_options const& compilation_options
     )
     {
+        // We are making a copy of the core_module, so we need to erase it and add it back so that when we change the module the declaration database 
+        // points to the modified declarations.
+        declaration_database.map.erase(core_module.name);
+        declaration_database.dependencies.erase(core_module.name);
+        add_declarations(declaration_database, core_module);
+
         std::pmr::unordered_map<std::pmr::string, iris::Module> core_module_dependencies = create_dependency_core_modules(
             core_module,
             module_name_to_file_path_map
