@@ -382,4 +382,63 @@ struct Array_slice_my_namespace_My_struct
 
         test_c_exporter(input, dependencies, dependencies_c_file_paths, expected);
     }
+
+    TEST_CASE("Exports instantiated types")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+export using Vector3f32 = Vector3::<Float32>;
+
+export struct Transformf32
+{
+    translation: Vector3f32 = {};
+}
+)RAW";
+
+        std::pmr::unordered_map<std::pmr::string, std::string_view> const dependencies
+        {
+        };
+
+        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const dependencies_c_file_paths
+        {
+        };
+
+        std::string_view const expected = R"RAW(
+struct my_namespace_Vector3f32
+{
+    float x;
+    float y;
+    float z;
+};
+
+struct Array_slice_my_namespace_Vector3f32
+{
+    struct my_namespace_Vector3f32* data;
+    uint64_t size;
+};
+
+struct my_namespace_Transformf32
+{
+    struct my_namespace_Vector3f32 translation;
+};
+
+struct Array_slice_my_namespace_Transformf32
+{
+    struct my_namespace_Transformf32* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(input, dependencies, dependencies_c_file_paths, expected);
+    }
 }

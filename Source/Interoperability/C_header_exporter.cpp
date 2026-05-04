@@ -515,10 +515,20 @@ namespace iris::c
         {
             iris::Custom_type_reference const& data = std::get<iris::Custom_type_reference>(type_reference.data);
             std::optional<Declaration> const declaration = find_declaration(declaration_database, data.module_reference.name, data.name);
+            std::optional<Declaration> const underlying_declaration = find_underlying_declaration(declaration_database, data.module_reference.name, data.name);
 
-            if (declaration.has_value())
+            if (
+                declaration.has_value() &&
+                std::holds_alternative<iris::Alias_type_declaration const*>(declaration->data)
+            )
             {
-                std::optional<std::string_view> const declaration_type = get_declaration_type(declaration.value());
+                iris::Alias_type_declaration const& alias_type_declaration = *std::get<iris::Alias_type_declaration const*>(declaration->data);
+                if (!alias_type_declaration.type.empty() && std::holds_alternative<iris::Type_instance>(alias_type_declaration.type[0].data))
+                    stream << "struct ";
+            }
+            else if (underlying_declaration.has_value())
+            {
+                std::optional<std::string_view> const declaration_type = get_declaration_type(underlying_declaration.value());
                 if (declaration_type.has_value())
                     stream << declaration_type.value() << " ";
             }
@@ -658,7 +668,22 @@ namespace iris::c
         if (std::holds_alternative<iris::Alias_type_declaration const*>(declaration.data))
         {
             iris::Alias_type_declaration const& alias_type_declaration = *std::get<iris::Alias_type_declaration const*>(declaration.data);
-            // TODO
+            if (!alias_type_declaration.type.empty() && std::holds_alternative<iris::Type_instance>(alias_type_declaration.type[0].data))
+            {
+                iris::Type_instance const& type_instance = std::get<iris::Type_instance>(alias_type_declaration.type[0].data);
+                iris::Declaration_instance_storage const storage = iris::instantiate_type_instance(declaration_database, type_instance);
+                iris::Struct_declaration const& instantiated = std::get<iris::Struct_declaration>(storage.data);
+                write_c_struct_or_union_declaration(
+                    stream,
+                    declaration_database,
+                    "struct",
+                    core_module_name,
+                    alias_type_declaration.name,
+                    std::nullopt,
+                    instantiated.member_names,
+                    instantiated.member_types
+                );
+            }
         }
         else if (std::holds_alternative<iris::Struct_declaration const*>(declaration.data))
         {
