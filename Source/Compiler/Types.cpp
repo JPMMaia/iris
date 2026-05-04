@@ -1121,7 +1121,7 @@ namespace iris::compiler
         case Fundamental_type::C_ulonglong:
             return llvm_data_layout.getSmallestLegalIntType(llvm_context, 64);
         default:
-            throw std::runtime_error{ "Not implemented." };
+            throw std::runtime_error{ "fundamental_type_to_llvm_type: Not implemented." };
         }
     }
 
@@ -1174,7 +1174,7 @@ namespace iris::compiler
         case Fundamental_type::C_longdouble:
             return llvm_debug_builder.createBasicType(type_name.data(), 128, llvm::dwarf::DW_ATE_float);
         default:
-            throw std::runtime_error{ "Not implemented." };
+            throw std::runtime_error{ "fundamental_type_to_llvm_debug_type: Not implemented." };
         }
     }
 
@@ -1324,7 +1324,7 @@ namespace iris::compiler
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             // Builtin_type_reference const& data = std::get<Builtin_type_reference>(type_reference.data);
-            throw std::runtime_error{ "Not implemented." };
+            throw std::runtime_error{ "type_reference_to_llvm_type builtin type not implemented." };
         }
         else if (std::holds_alternative<Constant_array_type>(type_reference.data))
         {
@@ -1380,7 +1380,7 @@ namespace iris::compiler
             return pointer_type_to_llvm_type(llvm_context, llvm_data_layout, data, type_database);
         }
 
-        throw std::runtime_error{ "Not implemented." };
+        throw std::runtime_error{ "type_reference_to_llvm_type: Not implemented." };
     }
 
     static llvm::Type* pointer_type_to_llvm_type_on_demand(
@@ -1469,7 +1469,7 @@ namespace iris::compiler
             throw std::runtime_error{ std::format("Cannot evaluate reflection for unresolved type instance '{}'.", mangled_name) };
         }
 
-        throw std::runtime_error{ "Not implemented." };
+        throw std::runtime_error{ "type_reference_to_llvm_type_on_demand: Not implemented." };
     }
 
     llvm::Type* type_reference_to_llvm_type(
@@ -1537,7 +1537,7 @@ namespace iris::compiler
         if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             // Builtin_type_reference const& data = std::get<Builtin_type_reference>(type_reference.data);
-            throw std::runtime_error{ "Not implemented." };
+            throw std::runtime_error{ "type_reference_to_llvm_debug_type builtin type not implemented." };
         }
         else if (std::holds_alternative<Constant_array_type>(type_reference.data))
         {
@@ -1593,7 +1593,7 @@ namespace iris::compiler
             return pointer_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
         }
 
-        throw std::runtime_error{ "Not implemented." };
+        throw std::runtime_error{ "type_reference_to_llvm_debug_type: Not implemented." };
     }
 
     llvm::DIType* type_reference_to_llvm_debug_type(
