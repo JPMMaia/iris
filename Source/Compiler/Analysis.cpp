@@ -977,6 +977,37 @@ namespace iris::compiler
             else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.value().data))
             {
                 iris::Custom_type_reference const custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.value().data);
+
+                std::optional<Type_reference> const underlying_type = get_underlying_type(
+                    declaration_database,
+                    type_reference.value()
+                );
+                if (underlying_type.has_value() && std::holds_alternative<iris::Type_instance>(underlying_type->data))
+                {
+                    Type_instance const& type_instance = std::get<iris::Type_instance>(underlying_type->data);
+                    Declaration_instance_storage const storage = instantiate_type_instance(declaration_database, type_instance);
+                    if (std::holds_alternative<iris::Struct_declaration>(storage.data))
+                    {
+                        Struct_declaration const& struct_declaration = std::get<iris::Struct_declaration>(storage.data);
+
+                        auto const location = std::find_if(
+                            struct_declaration.member_names.begin(),
+                            struct_declaration.member_names.end(),
+                            [&](std::pmr::string const& member_name) -> bool {
+                                return member_name == data.member_name;
+                            }
+                        );
+                        if (location != struct_declaration.member_names.end())
+                        {
+                            std::size_t const member_index = std::distance(struct_declaration.member_names.begin(), location);
+                            return Type_info
+                            {
+                                .type = struct_declaration.member_types[member_index],
+                                .is_mutable = type_info->is_mutable,
+                            };
+                        }
+                    }
+                }
                 
                 std::optional<Declaration> const declaration = find_underlying_declaration(
                     declaration_database,

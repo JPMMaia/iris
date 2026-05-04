@@ -11,6 +11,12 @@ import iris.core.types;
 
 namespace iris::compiler
 {
+    std::optional<Declaration> find_declaration_to_instantiate(
+        Declaration_database const& declaration_database,
+        iris::Type_reference const& type_to_instantiate,
+        std::pmr::vector<iris::Declaration_instance_storage>& temporary_storage
+    );
+
     iris::compiler::Diagnostic create_error_diagnostic(
         std::optional<std::filesystem::path> const source_file_path,
         std::optional<Source_range> const range,
@@ -1711,10 +1717,34 @@ namespace iris::compiler
 
         if (left_hand_side_type.has_value())
         {
-            std::optional<Declaration> const declaration_optional = iris::find_underlying_declaration(
+            std::pmr::vector<iris::Declaration_instance_storage> temporary_storage{parameters.temporaries_allocator};
+
+            std::optional<Declaration> declaration_optional = iris::find_underlying_declaration(
                 parameters.declaration_database,
                 left_hand_side_type.value()
             );
+
+            std::optional<iris::Type_reference> const underlying_left_hand_side_type = get_underlying_type(
+                parameters.declaration_database,
+                left_hand_side_type.value()
+            );
+
+            // Alias-backed type instances (e.g. using V = Vector3::<Float32>) can resolve to
+            // the type constructor declaration when no concrete instance declaration exists.
+            // Prefer a materialized declaration for member validation in this case.
+            if (underlying_left_hand_side_type.has_value() && std::holds_alternative<iris::Type_instance>(underlying_left_hand_side_type->data))
+            {
+                std::optional<Declaration> const declaration_to_instantiate = find_declaration_to_instantiate(
+                    parameters.declaration_database,
+                    left_hand_side_type.value(),
+                    temporary_storage
+                );
+                if (declaration_to_instantiate.has_value())
+                {
+                    declaration_optional = declaration_to_instantiate;
+                }
+            }
+
             if (declaration_optional.has_value())
             {
                 Declaration const& declaration = declaration_optional.value();
@@ -3106,14 +3136,19 @@ namespace iris::compiler
     std::optional<Declaration> find_declaration_to_instantiate(
         Declaration_database const& declaration_database,
         iris::Type_reference const& type_to_instantiate,
-        std::pmr::vector<iris::Struct_declaration>& temporary_storage
+        std::pmr::vector<iris::Declaration_instance_storage>& temporary_storage
     )
     {
         if (std::holds_alternative<iris::Array_slice_type>(type_to_instantiate.data))
         {
             iris::Array_slice_type const& array_slice = std::get<iris::Array_slice_type>(type_to_instantiate.data);
-            temporary_storage.push_back(create_array_slice_type_struct_declaration(array_slice.element_type));
-            return Declaration{ .data = &temporary_storage[0], .module_name = "iris.builtin", .is_export = true };
+            temporary_storage.push_back(
+                Declaration_instance_storage
+                {
+                    .data = create_array_slice_type_struct_declaration(array_slice.element_type)
+                }
+            );
+            return Declaration{ .data = &std::get<iris::Struct_declaration>(temporary_storage.back().data), .module_name = "iris.builtin", .is_export = true };
         }
 
         if (std::holds_alternative<iris::Soa_array_type>(type_to_instantiate.data))
@@ -3138,6 +3173,39 @@ namespace iris::compiler
                 declaration_database,
                 soa_array_view_type.value_type.front()
             );
+        }
+
+        std::optional<Type_reference> const underlying_type_to_instantiate = get_underlying_type(
+            declaration_database,
+            type_to_instantiate
+        );
+        if (underlying_type_to_instantiate.has_value() && std::holds_alternative<iris::Type_instance>(underlying_type_to_instantiate->data))
+        {
+            Type_instance const& type_instance = std::get<iris::Type_instance>(underlying_type_to_instantiate->data);
+            temporary_storage.push_back(instantiate_type_instance(declaration_database, type_instance));
+
+            Declaration_instance_storage const& declaration_instance_storage = temporary_storage.back();
+            if (std::holds_alternative<iris::Struct_declaration>(declaration_instance_storage.data))
+            {
+                return Declaration
+                {
+                    .data = &std::get<iris::Struct_declaration>(declaration_instance_storage.data),
+                    .module_name = std::pmr::string{type_instance.type_constructor.module_reference.name},
+                    .is_export = true,
+                };
+            }
+
+            if (std::holds_alternative<iris::Union_declaration>(declaration_instance_storage.data))
+            {
+                return Declaration
+                {
+                    .data = &std::get<iris::Union_declaration>(declaration_instance_storage.data),
+                    .module_name = std::pmr::string{type_instance.type_constructor.module_reference.name},
+                    .is_export = true,
+                };
+            }
+
+            return std::nullopt;
         }
 
         std::optional<Declaration> const declaration_optional = find_underlying_declaration(
@@ -3210,7 +3278,7 @@ namespace iris::compiler
             };
         }
 
-        std::pmr::vector<iris::Struct_declaration> temporary_storage{parameters.temporaries_allocator};
+        std::pmr::vector<iris::Declaration_instance_storage> temporary_storage{parameters.temporaries_allocator};
         std::optional<Declaration> const declaration_optional = find_declaration_to_instantiate(
             parameters.declaration_database,
             type_to_instantiate.value(),

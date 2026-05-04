@@ -1170,6 +1170,121 @@ function foo() -> (result: My_alias)
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+
+    TEST_CASE("Validates that instantiated types can be used correctly through alias", "[Validation][Function_constructors]")
+    {
+        std::string_view const input = R"(module Test;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+export using Vector3f32 = Vector3::<Float32>;
+
+export function get_vector3f32() -> (value: Vector3f32)
+{
+    return
+    {
+        x: 1.0f32,
+        y: 2.0f32,
+        z: 3.0f32,
+    };
+}
+
+export function use_vector3f32(value: Vector3f32) -> ()
+{
+    var x = value.x;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that alias to instantiated type can be initialized in local scope", "[Validation][Function_constructors]")
+    {
+        std::string_view const input = R"(module Test;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+using Vector3f32 = Vector3::<Float32>;
+
+function run() -> ()
+{
+    var value: Vector3f32 = {
+        x: 1.0f32,
+        y: 2.0f32,
+        z: 3.0f32,
+    };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that alias to instantiated type enforces member assignment types", "[Validation][Function_constructors]")
+    {
+        std::string_view const input = R"(module Test;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+using Vector3f32 = Vector3::<Float32>;
+
+function run() -> ()
+{
+    var value: Vector3f32 = {
+        x: 1,
+        y: 2.0f32,
+        z: 3.0f32,
+    };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(18, 12, 18, 13),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Cannot assign value of type 'Int32' to member 'Vector3f32.x' of type 'Float32'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     
     TEST_CASE("Validates that left hand side is either a module alias, a variable of type struct/union or an enum type", "[Validation][Access_expression]")
     {
