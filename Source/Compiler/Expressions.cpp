@@ -924,6 +924,20 @@ namespace iris::compiler
                                     enum_value_constants
                                 );
                             }
+                            else if (std::holds_alternative<Struct_declaration const*>(underlying_declaration.value().data))
+                            {
+                                if (left_hand_side.value != nullptr)
+                                {
+                                    Struct_declaration const& struct_declaration = *std::get<Struct_declaration const*>(underlying_declaration.value().data);
+                                    return create_access_struct_member(
+                                        left_hand_side,
+                                        expression.member_name,
+                                        underlying_declaration->module_name,
+                                        struct_declaration,
+                                        parameters
+                                    );
+                                }
+                            }
                         }
                     }
                     else if (std::holds_alternative<Enum_declaration const*>(declaration_value.data))

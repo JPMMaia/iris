@@ -6893,6 +6893,52 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Using Type Constructors 2", "[LLVM_IR]")
+  {
+    char const* const input_file = "using_type_constructors_2.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%"struct.Using_type_constructors_2@Vector3@5571078378519863159" = type { float, float, float }
+
+; Function Attrs: convergent
+define { <2 x float>, float } @Using_type_constructors_2_get_one() #0 {
+entry:
+  %0 = alloca %"struct.Using_type_constructors_2@Vector3@5571078378519863159", align 4
+  %1 = getelementptr inbounds %"struct.Using_type_constructors_2@Vector3@5571078378519863159", ptr %0, i32 0, i32 0
+  store float 1.000000e+00, ptr %1, align 4
+  %2 = getelementptr inbounds %"struct.Using_type_constructors_2@Vector3@5571078378519863159", ptr %0, i32 0, i32 1
+  store float 1.000000e+00, ptr %2, align 4
+  %3 = getelementptr inbounds %"struct.Using_type_constructors_2@Vector3@5571078378519863159", ptr %0, i32 0, i32 2
+  store float 1.000000e+00, ptr %3, align 4
+  %4 = load { <2 x float>, float }, ptr %0, align 4
+  ret { <2 x float>, float } %4
+}
+
+; Function Attrs: convergent
+define void @Using_type_constructors_2_use(<2 x float> %"arguments[0].value_0", float %"arguments[0].value_1") #0 {
+entry:
+  %value = alloca %"struct.Using_type_constructors_2@Vector3@5571078378519863159", align 4
+  %x = alloca float, align 4
+  %0 = getelementptr inbounds { <2 x float>, float }, ptr %value, i32 0, i32 0
+  store <2 x float> %"arguments[0].value_0", ptr %0, align 4
+  %1 = getelementptr inbounds { <2 x float>, float }, ptr %value, i32 0, i32 1
+  store float %"arguments[0].value_1", ptr %1, align 4
+  %2 = getelementptr inbounds %"struct.Using_type_constructors_2@Vector3@5571078378519863159", ptr %value, i32 0, i32 0
+  %3 = load float, ptr %2, align 4
+  store float %3, ptr %x, align 4
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Using Unions", "[LLVM_IR]")
   {
     char const* const input_file = "using_unions.iris";
