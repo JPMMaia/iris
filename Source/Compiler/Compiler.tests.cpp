@@ -2752,37 +2752,68 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
       { "Debug_information_function_constructor_provider", parse_and_get_file_path(g_test_source_files_path / "debug_information_function_constructor_provider.iris") },
     };
 
-    std::string const llvm_ir_body = create_llvm_ir_body(
-      input_file,
-      module_name_to_file_path_map,
-      { .debug = true }
-    );
+    std::string const expected_llvm_ir = std::format(R"(
+; Function Attrs: convergent
+define i32 @Debug_information_function_constructor_consumer_run() #0 !dbg !3 {{
+entry:
+  %value = alloca i32, align 4, !dbg !8
+  %0 = call i32 @"Debug_information_function_constructor_provider@add@489334907677298949"(i32 noundef 1, i32 noundef 2), !dbg !9
+  call void @llvm.dbg.declare(metadata ptr %value, metadata !10, metadata !DIExpression()), !dbg !8
+  store i32 %0, ptr %value, align 4, !dbg !8
+  %1 = load i32, ptr %value, align 4, !dbg !11
+  ret i32 %1, !dbg !11
+}}
 
-    std::optional<std::string_view> const consumer_file_id = find_metadata_id_for_file(llvm_ir_body, "debug_information_function_constructor_consumer.iris");
-    std::optional<std::string_view> const provider_file_id = find_metadata_id_for_file(llvm_ir_body, "debug_information_function_constructor_provider.iris");
+; Function Attrs: convergent
+define private i32 @"Debug_information_function_constructor_provider@add@489334907677298949"(i32 noundef %"arguments[0].lhs", i32 noundef %"arguments[1].rhs") #0 !dbg !12 {{
+entry:
+  %lhs = alloca i32, align 4
+  %rhs = alloca i32, align 4
+  store i32 %"arguments[0].lhs", ptr %lhs, align 4
+  call void @llvm.dbg.declare(metadata ptr %lhs, metadata !17, metadata !DIExpression()), !dbg !19
+  store i32 %"arguments[1].rhs", ptr %rhs, align 4
+  call void @llvm.dbg.declare(metadata ptr %rhs, metadata !18, metadata !DIExpression()), !dbg !20
+  %0 = load i32, ptr %lhs, align 4, !dbg !21
+  %1 = load i32, ptr %rhs, align 4, !dbg !21
+  %2 = add i32 %0, %1, !dbg !21
+  ret i32 %2, !dbg !22
+}}
 
-    REQUIRE(consumer_file_id.has_value());
-    REQUIRE(provider_file_id.has_value());
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
 
-    std::size_t const run_subprogram_location = llvm_ir_body.find("!DISubprogram(name: \"run\", linkageName: \"Debug_information_function_constructor_consumer_run\"");
-    REQUIRE(run_subprogram_location != std::string_view::npos);
-    std::size_t const run_subprogram_line_end = llvm_ir_body.find('\n', run_subprogram_location);
-    REQUIRE(run_subprogram_line_end != std::string_view::npos);
-    std::string_view const run_subprogram_line = llvm_ir_body.substr(run_subprogram_location, run_subprogram_line_end - run_subprogram_location);
-    CHECK(run_subprogram_line.find(std::format("file: {}", consumer_file_id.value())) != std::string_view::npos);
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
-    std::size_t const instantiated_subprogram_location = llvm_ir_body.find("!DISubprogram(name: \"Debug_information_function_constructor_provider@add@");
-    REQUIRE(instantiated_subprogram_location != std::string_view::npos);
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
 
-    std::size_t const instantiated_subprogram_end = llvm_ir_body.find(")", instantiated_subprogram_location);
-    REQUIRE(instantiated_subprogram_end != std::string_view::npos);
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_function_constructor_consumer.iris", directory: "{0}")
+!3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_function_constructor_consumer_run", scope: null, file: !2, line: 5, type: !4, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
+!4 = !DISubroutineType(types: !5)
+!5 = !{{!6}}
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
+!7 = !{{}}
+!8 = !DILocation(line: 7, column: 5, scope: !3)
+!9 = !DILocation(line: 7, column: 17, scope: !3)
+!10 = !DILocalVariable(name: "value", scope: !3, file: !2, line: 7, type: !6)
+!11 = !DILocation(line: 8, column: 5, scope: !3)
+!12 = distinct !DISubprogram(name: "Debug_information_function_constructor_provider@add@489334907677298949", linkageName: "Debug_information_function_constructor_provider@add@489334907677298949", scope: null, file: !13, line: 5, type: !14, scopeLine: 5, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !16)
+!13 = !DIFile(filename: "debug_information_function_constructor_provider.iris", directory: "{0}")
+!14 = !DISubroutineType(types: !15)
+!15 = !{{!6, !6, !6}}
+!16 = !{{!17, !18}}
+!17 = !DILocalVariable(name: "lhs", arg: 1, scope: !12, file: !13, line: 5, type: !6)
+!18 = !DILocalVariable(name: "rhs", arg: 2, scope: !12, file: !13, line: 5, type: !6)
+!19 = !DILocation(line: 5, column: 22, scope: !12)
+!20 = !DILocation(line: 5, column: 39, scope: !12)
+!21 = !DILocation(line: 5, column: 12, scope: !12)
+!22 = !DILocation(line: 7, column: 9, scope: !12)
+)", g_test_source_files_path.generic_string());
 
-    std::string_view const instantiated_subprogram_metadata = llvm_ir_body.substr(
-      instantiated_subprogram_location,
-      instantiated_subprogram_end - instantiated_subprogram_location
-    );
-
-    CHECK(instantiated_subprogram_metadata.find(std::format("file: {}", provider_file_id.value())) != std::string_view::npos);
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
   }
 
   TEST_CASE("Compile Debug Information If", "[LLVM_IR]")
