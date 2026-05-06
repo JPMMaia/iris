@@ -955,7 +955,7 @@ namespace iris::compiler
 
         std::function<bool(std::filesystem::path)> predicate = [&found_paths](std::filesystem::path const& file_path) -> bool
         {
-            found_paths.push_back(file_path);
+            found_paths.push_back(file_path.lexically_normal());
             return false;
         };
 

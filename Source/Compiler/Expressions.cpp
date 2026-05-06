@@ -59,13 +59,13 @@ namespace iris::compiler
         };
     }
 
-    std::optional<Module const*> get_module(std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies, std::string_view const name)
+    std::optional<Module const*> get_module(std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies, std::string_view const name)
     {
         auto const location = core_module_dependencies.find(name.data());
         if (location == core_module_dependencies.end())
             return std::nullopt;
 
-        return &location->second;
+        return location->second;
     }
 
     std::optional<std::string_view> get_module_name_from_alias(Module const& module, std::string_view const alias_name)
@@ -461,7 +461,7 @@ namespace iris::compiler
         Value_and_type const& left_hand_side,
         Statement const& statement,
         Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies
     )
     {
         if (left_hand_side.value == nullptr)
@@ -721,7 +721,7 @@ namespace iris::compiler
     )
     {
         Module const& core_module = parameters.core_module;
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies = parameters.core_module_dependencies;
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies = parameters.core_module_dependencies;
         llvm::Module& llvm_module = parameters.llvm_module;
         Declaration_database const& declaration_database = parameters.declaration_database;
         Enum_value_constants const& enum_value_constants = parameters.enum_value_constants;
@@ -2710,7 +2710,7 @@ namespace iris::compiler
         iris::Module const& struct_core_module =
             soa_info.module_name == parameters.core_module.name ?
             parameters.core_module :
-            parameters.core_module_dependencies.at(soa_info.module_name.data());
+            *parameters.core_module_dependencies.at(soa_info.module_name.data());
 
         for (std::uint64_t element_index = 0; element_index < soa_info.soa_array_type->size; ++element_index)
         {
@@ -4509,7 +4509,7 @@ namespace iris::compiler
                     iris::Module const& struct_core_module =
                         module_name == parameters.core_module.name ?
                         parameters.core_module :
-                        parameters.core_module_dependencies.at(module_name.data());
+                        *parameters.core_module_dependencies.at(module_name.data());
                     Expression_parameters new_parameters = set_core_module(parameters, struct_core_module);
                     new_parameters.expression_type = member_type;
 

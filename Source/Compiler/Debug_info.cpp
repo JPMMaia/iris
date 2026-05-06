@@ -138,7 +138,7 @@ namespace iris::compiler
     }
 
     static Module const* find_debug_module(
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         std::string_view const module_name,
         std::pmr::polymorphic_allocator<> const& allocator
     )
@@ -147,13 +147,13 @@ namespace iris::compiler
         if (location == core_module_dependencies.end())
             return nullptr;
 
-        return &location->second;
+        return location->second;
     }
 
     static void add_nested_requested_debug_types(
         Module const& owner_module,
         Type_reference const& type_reference,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         Debug_type_names_per_module& requested_debug_types,
         std::pmr::unordered_set<std::pmr::string>& visited_debug_types,
         std::pmr::polymorphic_allocator<> const& allocator
@@ -162,7 +162,7 @@ namespace iris::compiler
     static void expand_requested_debug_type(
         std::string_view const module_name,
         std::string_view const type_name,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         Debug_type_names_per_module& requested_debug_types,
         std::pmr::unordered_set<std::pmr::string>& visited_debug_types,
         std::pmr::polymorphic_allocator<> const& allocator
@@ -202,7 +202,7 @@ namespace iris::compiler
     static void add_nested_requested_debug_types(
         Module const& owner_module,
         Type_reference const& type_reference,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         Debug_type_names_per_module& requested_debug_types,
         std::pmr::unordered_set<std::pmr::string>& visited_debug_types,
         std::pmr::polymorphic_allocator<> const& allocator
@@ -229,7 +229,7 @@ namespace iris::compiler
 
     Debug_type_names_per_module create_requested_dependency_debug_types(
         Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         std::pmr::polymorphic_allocator<> const& allocator
     )
     {

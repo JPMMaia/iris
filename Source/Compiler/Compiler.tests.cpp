@@ -212,8 +212,58 @@ namespace iris
 
     iris::compiler::LLVM_data llvm_data = iris::compiler::initialize_llvm(compilation_options);
 
-    iris::compiler::LLVM_module_data llvm_module_data = iris::compiler::create_llvm_module(llvm_data, core_module.value(), module_name_to_file_path_map, compilation_options);
-    std::string const llvm_ir = iris::compiler::to_string(*llvm_module_data.module);
+    // Read header/dependency modules from the file-path map.
+    std::pmr::vector<iris::Module> core_modules;
+    core_modules.reserve(module_name_to_file_path_map.size());
+    iris::compiler::add_builtin_module(core_modules);
+    
+    std::pmr::vector<iris::Module> header_modules;
+    header_modules.reserve(module_name_to_file_path_map.size());
+    
+    for (auto const& [name, path] : module_name_to_file_path_map)
+    {
+      std::optional<iris::Module> dependency = iris::compiler::read_core_module(path);
+      if (dependency.has_value())
+      {
+        if (path.extension().generic_string() == ".h")
+          header_modules.push_back(std::move(dependency.value()));
+        else
+          core_modules.push_back(std::move(dependency.value()));
+      }
+    }
+    core_modules.push_back(core_module.value());
+
+    std::pmr::vector<iris::Module const*> header_module_pointers;
+    header_module_pointers.reserve(header_modules.size());
+    for (iris::Module const& header_module : header_modules)
+      header_module_pointers.push_back(&header_module);
+
+    iris::compiler::Preprocessed_modules preprocessed = iris::compiler::preprocess_modules(
+      llvm_data,
+      header_module_pointers,
+      core_modules,
+      compilation_options,
+      {},
+      {}
+    );
+
+    auto const transformed_location = std::find_if(
+      preprocessed.transformed_core_modules.begin(),
+      preprocessed.transformed_core_modules.end(),
+      [&](iris::Module const& transformed) -> bool { return transformed.name == core_module->name; }
+    );
+    REQUIRE(transformed_location != preprocessed.transformed_core_modules.end());
+    iris::Module const& transformed_core_module = *transformed_location;
+
+    std::unique_ptr<llvm::Module> llvm_module = iris::compiler::create_llvm_module(
+      llvm_data,
+      transformed_core_module,
+      preprocessed.sorted_modules,
+      module_name_to_file_path_map,
+      preprocessed.declaration_database,
+      compilation_options
+    );
+    std::string const llvm_ir = iris::compiler::to_string(*llvm_module);
 
     iris::parser::destroy_tree(std::move(parse_tree));
     iris::parser::destroy_parser(std::move(parser));
@@ -6961,6 +7011,28 @@ entry:
   %2 = getelementptr inbounds %"struct.Using_type_constructors_2@Vector3@5571078378519863159", ptr %value, i32 0, i32 0
   %3 = load float, ptr %2, align 4
   store float %3, ptr %x, align 4
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Using Type Constructors 3", "[LLVM_IR]")
+  {
+    char const* const input_file = "using_type_constructors_3.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "Using_type_constructors_2", parse_and_get_file_path(g_test_source_files_path / "using_type_constructors_2.iris") },
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define void @Using_type_constructors_3_run() #0 {
+entry:
   ret void
 }
 

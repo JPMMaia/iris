@@ -60,6 +60,23 @@ namespace iris::compiler
         }
     }
 
+    static std::pmr::vector<iris::Module const*> filter_empty(
+        std::span<iris::Module const> const header_modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::vector<iris::Module const*> filtered{output_allocator};
+        filtered.reserve(header_modules.size());
+
+        for (iris::Module const& header_module : header_modules)
+        {
+            if (!header_module.name.empty())
+                filtered.push_back(&header_module);
+        }
+
+        return filtered;
+    }
+
     Profiler* get_profiler(Builder& builder)
     {
         return builder.use_profiler ? &builder.profiler : nullptr;
@@ -159,12 +176,15 @@ namespace iris::compiler
 
         if (builder.is_test_mode)
         {
+            iris::compiler::Compilation_options test_compilation_options = builder.compilation_options;
+            test_compilation_options.is_test_mode = true;
+
             std::pmr::vector<iris::Module> const test_artifact_modules = create_test_artifact_modules(
                 builder,
                 artifact_file_paths,
                 artifacts,
                 core_modules,
-                builder.compilation_options,
+                test_compilation_options,
                 temporaries_allocator
             );
             assert(core_modules.size() + test_artifact_modules.size() <= core_modules.capacity());
@@ -179,8 +199,7 @@ namespace iris::compiler
             output_allocator,
             temporaries_allocator
         );
-        std::span<iris::Module const> const header_modules = modules_and_declaration_database.header_modules;
-        std::span<iris::Module const* const> const sorted_modules = modules_and_declaration_database.sorted_modules;
+        std::pmr::vector<iris::Module const*> const header_modules = filter_empty(modules_and_declaration_database.header_modules, output_allocator);
 
         validate_modules_and_exit_if_needed(core_modules, modules_and_declaration_database.declaration_database, temporaries_allocator);
 
@@ -193,20 +212,32 @@ namespace iris::compiler
         if (!compile_cpp_and_write_to_bitcode_files(builder, artifacts, llvm_data, compilation_options, temporaries_allocator))
             iris::common::print_message_and_exit(std::format("Failed to compile c++."));
 
+        iris::compiler::Preprocessed_modules preprocessed = iris::compiler::preprocess_modules(
+            llvm_data,
+            header_modules,
+            non_test_modules,
+            compilation_options,
+            output_allocator,
+            temporaries_allocator
+        );
+
+        std::span<iris::Module const* const> const all_sorted_modules = preprocessed.sorted_modules;
+
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map = create_module_name_to_file_path_map(
             builder,
             header_modules,
-            core_modules,
+            preprocessed.transformed_core_modules,
             output_allocator,
             temporaries_allocator
         );
 
         compile_and_write_to_bitcode_files(
             builder,
-            non_test_modules,
+            preprocessed.transformed_core_modules,
             module_name_to_file_path_map,
             llvm_data,
-            modules_and_declaration_database.declaration_database,
+            all_sorted_modules,
+            preprocessed.declaration_database,
             compilation_options,
             false
         );
@@ -215,12 +246,24 @@ namespace iris::compiler
         {
             iris::compiler::Compilation_options test_compilation_options = compilation_options;
             test_compilation_options.is_test_mode = true;
+
+            // Preprocess all modules with test mode enabled.
+            iris::compiler::Preprocessed_modules preprocessed_test = iris::compiler::preprocess_modules(
+                llvm_data,
+                header_modules,
+                core_modules,
+                test_compilation_options,
+                output_allocator,
+                temporaries_allocator
+            );
+
             compile_and_write_to_bitcode_files(
                 builder,
-                core_modules,
+                preprocessed_test.transformed_core_modules,
                 module_name_to_file_path_map,
                 llvm_data,
-                modules_and_declaration_database.declaration_database,
+                preprocessed_test.sorted_modules,
+                preprocessed_test.declaration_database,
                 test_compilation_options,
                 true
             );
@@ -396,6 +439,17 @@ namespace iris::compiler
         return std::pmr::vector<Artifact>{std::move(artifacts), output_allocator};
     }
 
+    static bool are_chars_case_insensitive_equal(char const a, char const b)
+    {
+        return std::tolower(static_cast<unsigned char>(a)) ==
+            std::tolower(static_cast<unsigned char>(b));
+    }
+
+    static bool are_strings_case_insensitive_equal(const std::string& a, const std::string& b)
+    {
+        return a.size() == b.size() &&
+            std::equal(a.begin(), a.end(), b.begin(), are_chars_case_insensitive_equal);
+    }
 
     std::pmr::vector<std::filesystem::path> get_artifacts_source_files(
         std::span<Artifact const> const artifacts,
@@ -407,11 +461,6 @@ namespace iris::compiler
         std::pmr::vector<std::filesystem::path> source_files{temporaries_allocator};
 
         source_files.push_back(iris::common::get_builtin_module_file_path());
-        
-        if (is_test_mode)
-        {
-            source_files.push_back(iris::common::get_json_module_file_path());
-        }
 
         for (Artifact const& artifact : artifacts)
         {
@@ -422,6 +471,18 @@ namespace iris::compiler
             );
 
             source_files.insert(source_files.end(), artifact_source_files.begin(), artifact_source_files.end());
+        }
+
+        if (is_test_mode)
+        {
+            std::filesystem::path const json_module_file_path = iris::common::get_json_module_file_path();
+            auto const location = std::find_if(
+                source_files.begin(),
+                source_files.end(),
+                [&](std::filesystem::path const& path) -> bool { return are_strings_case_insensitive_equal(path.generic_string(), json_module_file_path.generic_string()); }
+            );
+            if (location == source_files.end())
+                source_files.push_back(json_module_file_path);
         }
 
         return std::pmr::vector<std::filesystem::path>{std::move(source_files), output_allocator};
@@ -667,6 +728,25 @@ namespace iris::compiler
         std::pmr::vector<Source_file_graph_rank_range> ranks;
     };
 
+    static bool is_c_header_used(
+        std::string_view const header_module_name,
+        std::span<iris::Module const> const core_modules
+    )
+    {
+        for (std::size_t index = 0; index < core_modules.size(); ++index)
+        {
+            iris::Module const& core_module = core_modules[index];
+            Import_module_with_alias const* const import_module = find_import_module_with_module_name(
+                core_module.dependencies,
+                header_module_name
+            );
+            if (import_module != nullptr)
+                return true;
+        }
+
+        return false;
+    }
+
     Source_file_graph create_source_file_graph(
         std::span<C_header const> const c_headers,
         std::span<iris::Module const> const core_modules,
@@ -681,6 +761,10 @@ namespace iris::compiler
         for (std::size_t index = 0; index < c_headers.size(); ++index)
         {
             C_header const& c_header = c_headers[index];
+            
+            bool const is_used = is_c_header_used(c_header.module_name, core_modules);
+            if (!is_used)
+                continue;
 
             Source_file_node const node
             {
@@ -711,7 +795,10 @@ namespace iris::compiler
 
         for (iris::compiler::C_header const& c_header : c_headers)
         {
-            std::size_t const source_node_index = module_name_to_node_index.at(c_header.module_name);
+            auto const source_node_index_location = module_name_to_node_index.find(c_header.module_name);
+            if (source_node_index_location == module_name_to_node_index.end())
+                continue;
+            std::size_t const source_node_index = source_node_index_location->second;
             for (std::string_view const dependency : c_header.dependencies)
             {
                 std::size_t const destination_node_index = module_name_to_node_index.at(dependency);
@@ -1285,7 +1372,7 @@ namespace iris::compiler
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> create_module_name_to_file_path_map(
         Builder const& builder,
-        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module const* const> const header_modules,
         std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -1305,8 +1392,25 @@ namespace iris::compiler
             }
         };
 
-        insert_entries(header_modules);
-        insert_entries(core_modules);
+        for (iris::Module const* const header_module : header_modules)
+        {
+            std::string_view const module_name = header_module->name;
+
+            std::filesystem::path const module_filename = std::format("{}.irisb", module_name);
+            std::filesystem::path const output_module_path = get_hl_build_directory(builder.build_directory_path) / module_filename;
+
+            map.insert(std::make_pair(std::pmr::string{ module_name }, output_module_path));
+        }
+
+        for (iris::Module const& core_module : core_modules)
+        {
+            std::string_view const module_name = core_module.name;
+
+            std::filesystem::path const module_filename = std::format("{}.irisb", module_name);
+            std::filesystem::path const output_module_path = get_hl_build_directory(builder.build_directory_path) / module_filename;
+
+            map.insert(std::make_pair(std::pmr::string{ module_name }, output_module_path));
+        }
 
         return std::pmr::unordered_map<std::pmr::string, std::filesystem::path>{std::move(map), output_allocator};
     }
@@ -1316,6 +1420,7 @@ namespace iris::compiler
         iris::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         LLVM_data& llvm_data,
+        std::span<iris::Module const* const> const all_sorted_modules,
         Declaration_database const& declaration_database,
         Compilation_options const& compilation_options,
         bool const is_test_mode
@@ -1351,6 +1456,7 @@ namespace iris::compiler
         std::unique_ptr<llvm::Module> llvm_module = create_llvm_module(
             llvm_data,
             core_module,
+            all_sorted_modules,
             module_name_to_file_path_map,
             declaration_database,
             compilation_options
@@ -1370,6 +1476,7 @@ namespace iris::compiler
         std::span<iris::Module const> const core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         LLVM_data& llvm_data,
+        std::span<iris::Module const* const> const all_sorted_modules,
         Declaration_database const& declaration_database,
         Compilation_options const& compilation_options,
         bool is_test_mode
@@ -1387,6 +1494,7 @@ namespace iris::compiler
                 core_module,
                 module_name_to_file_path_map,
                 llvm_data,
+                all_sorted_modules,
                 declaration_database,
                 compilation_options,
                 is_test_mode

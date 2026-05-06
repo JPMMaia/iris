@@ -731,16 +731,15 @@ namespace iris::language_server
             {
                 workspace_data.core_modules[core_module_index] = core_module.value();
 
-                std::pmr::vector<iris::Module const*> const sorted_core_modules = iris::compiler::sort_core_modules(
-                    workspace_data.core_modules,
-                    temporaries_allocator,
-                    temporaries_allocator
-                );
+                iris::compiler::Declaration_database_and_sorted_modules result =
+                    iris::compiler::create_declaration_database_and_sorted_modules(
+                        workspace_data.header_modules,
+                        workspace_data.core_modules,
+                        temporaries_allocator,
+                        temporaries_allocator
+                    );
 
-                workspace_data.declaration_database = iris::compiler::create_declaration_database_and_add_modules(
-                    workspace_data.header_modules,
-                    sorted_core_modules
-                );
+                workspace_data.declaration_database = std::move(result.declaration_database);
             }
 
             workspace_data.core_module_diagnostic_dirty_flags[core_module_index] = true;

@@ -51,7 +51,7 @@ namespace iris::compiler
         llvm::Module& llvm_module;
         Clang_module_data const& clang_module_data;
         Module const& core_module;
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies;
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies;
         Declaration_database& declaration_database;
         Type_database& type_database;
         Enum_value_constants const& enum_value_constants;

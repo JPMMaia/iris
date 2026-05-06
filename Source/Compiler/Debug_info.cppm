@@ -69,7 +69,7 @@ namespace iris::compiler
 
     export Debug_type_names_per_module create_requested_dependency_debug_types(
         Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         std::pmr::polymorphic_allocator<> const& allocator
     );
 }

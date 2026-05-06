@@ -118,7 +118,7 @@ namespace iris::compiler
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> create_module_name_to_file_path_map(
         Builder const& builder,
-        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module const* const> const header_modules,
         std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -129,6 +129,7 @@ namespace iris::compiler
         std::span<iris::Module const> const core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         LLVM_data& llvm_data,
+        std::span<iris::Module const* const> const all_sorted_modules,
         Declaration_database const& declaration_database,
         Compilation_options const& compilation_options,
         bool const is_test_mode

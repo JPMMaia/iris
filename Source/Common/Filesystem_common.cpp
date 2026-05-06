@@ -77,31 +77,31 @@ namespace iris::common
 
     std::filesystem::path get_builtin_include_directory()
     {
-        return get_share_path("include");
+        return get_share_path("include").lexically_normal();
     }
 
     std::filesystem::path get_builtin_module_file_path()
     {
-        return get_share_path("source/Builtin.iris");
+        return get_share_path("source/Builtin.iris").lexically_normal();
     }
 
     std::filesystem::path get_json_module_file_path()
     {
-        return get_share_path("libraries/Iris_standard_library/json.iris");
+        return get_share_path("libraries/Iris_standard_library/json.iris").lexically_normal();
     }
 
     std::filesystem::path get_tests_main_file_path()
     {
-        return get_share_path("source/tests_main.cpp");
+        return get_share_path("source/tests_main.cpp").lexically_normal();
     }
 
     std::filesystem::path get_standard_repository_file_path()
     {
-        return get_share_path("libraries/iris_repository.json");
+        return get_share_path("libraries/iris_repository.json").lexically_normal();
     }
 
     std::filesystem::path get_visualizers_file_path()
     {
-        return get_share_path("visualizers");
+        return get_share_path("visualizers").lexically_normal();
     }
 }

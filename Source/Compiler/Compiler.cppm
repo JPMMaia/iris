@@ -60,28 +60,6 @@ namespace iris::compiler
         Compilation_options const& compilation_options
     );
 
-    export std::unique_ptr<llvm::Module> create_llvm_module(
-        LLVM_data& llvm_data,
-        Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
-        std::optional<std::span<std::string_view const>> const functions_to_compile,
-        Compilation_options const& compilation_options
-    );
-
-    export std::unique_ptr<llvm::Module> create_llvm_module(
-        LLVM_data& llvm_data,
-        Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
-        Compilation_options const& compilation_options
-    );
-
-    export LLVM_module_data create_llvm_module(
-        LLVM_data& llvm_data,
-        Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        Compilation_options const& compilation_options
-    );
-
     export std::pmr::vector<iris::Module const*> sort_core_modules(
         std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
@@ -89,7 +67,7 @@ namespace iris::compiler
     );
 
     std::pmr::vector<iris::Module const*> sort_core_modules(
-        std::pmr::unordered_map<std::pmr::string, iris::Module> const& core_module_dependencies,
+        std::pmr::unordered_map<std::pmr::string, iris::Module const*> const& core_module_dependencies,
         iris::Module const* const core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -107,6 +85,13 @@ namespace iris::compiler
         std::pmr::vector<iris::compiler::Diagnostic> diagnostics;
     };
 
+    export Declaration_database_and_sorted_modules create_declaration_database_and_sorted_modules(
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module> const core_modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     export void print_diagnostics_and_exit_if_needed(
         std::span<iris::compiler::Diagnostic const> const diagnostics,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -122,17 +107,9 @@ namespace iris::compiler
         LLVM_data& llvm_data,
         Clang_context_pointer&& clang_context,
         std::span<iris::Module const* const> const sorted_modules,
-        Declaration_database& declaration_database,
+        Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
-    );
-
-    export std::unique_ptr<llvm::Module> create_llvm_module(
-        LLVM_data& llvm_data,
-        iris::Module core_module,
-        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        Declaration_database declaration_database,
-        Compilation_options const& compilation_options
     );
 
     export void optimize_llvm_module(
@@ -161,15 +138,37 @@ namespace iris::compiler
         std::filesystem::path const& output_file_path
     );
 
-    export void generate_object_file(
-        std::filesystem::path const& output_file_path,
-        Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        Compilation_options const& compilation_options
-    );
-
     export void add_import_usages(
         iris::Module& core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator
+    );
+
+    export void add_builtin_module(
+        std::pmr::vector<iris::Module>& core_modules
+    );
+
+    export struct Preprocessed_modules
+    {
+        std::pmr::vector<iris::Module> transformed_core_modules;
+        std::pmr::vector<iris::Module const*> sorted_modules;
+        Declaration_database declaration_database;
+    };
+
+    export Preprocessed_modules preprocess_modules(
+        LLVM_data& llvm_data,
+        std::span<iris::Module const* const> const header_modules,
+        std::span<iris::Module const> const core_modules,
+        Compilation_options const& compilation_options,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    export std::unique_ptr<llvm::Module> create_llvm_module(
+        LLVM_data& llvm_data,
+        iris::Module const& core_module,
+        std::span<iris::Module const* const> const all_sorted_modules,
+        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
+        Declaration_database const& declaration_database,
+        Compilation_options const& compilation_options
     );
 }
