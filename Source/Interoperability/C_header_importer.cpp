@@ -69,6 +69,15 @@ namespace iris::c
         iris::Source_range_location source_location;
     };
 
+    using Macro_replacement_text_entries = std::pmr::vector<Macro_replacement_text_entry>;
+    using Macro_replacement_text_entries_cache = std::unordered_map<std::filesystem::path, std::optional<Macro_replacement_text_entries>>;
+
+    struct Import_visitor_context
+    {
+        C_declarations* declarations;
+        Macro_replacement_text_entries_cache* macro_replacement_text_entries_cache;
+    };
+
     Header_source_location get_cursor_source_location(
         CXCursor const cursor
     )
@@ -1027,7 +1036,45 @@ namespace iris::c
         };
     }
 
-    C_macro_declaration create_macro_declaration(CXCursor const cursor)
+    std::optional<std::pmr::string> get_cached_macro_replacement_text(
+        std::string_view const macro_name,
+        iris::Source_range_location const& source_location,
+        Macro_replacement_text_entries_cache& replacement_text_entries_cache
+    )
+    {
+        if (!source_location.file_path.has_value())
+            return std::nullopt;
+
+        std::filesystem::path const& file_path = source_location.file_path.value();
+
+        auto location = replacement_text_entries_cache.find(file_path);
+        if (location == replacement_text_entries_cache.end())
+        {
+            auto const loaded_entries = get_macro_replacement_text_entries(file_path);
+            location = replacement_text_entries_cache.insert_or_assign(file_path, loaded_entries).first;
+        }
+
+        if (!location->second.has_value())
+            return get_macro_replacement_text(macro_name, source_location);
+
+        for (Macro_replacement_text_entry const& entry : *location->second)
+        {
+            if (entry.line != source_location.range.start.line || entry.name != macro_name)
+                continue;
+
+            if (!entry.replacement_text.has_value())
+                return std::nullopt;
+
+            return entry.replacement_text;
+        }
+
+        return std::nullopt;
+    }
+
+    C_macro_declaration create_macro_declaration(
+        CXCursor const cursor,
+        Macro_replacement_text_entries_cache& replacement_text_entries_cache
+    )
     {
         String const macro_spelling = { clang_getCursorSpelling(cursor) };
         std::string_view const macro_name = macro_spelling.string_view();
@@ -1042,7 +1089,7 @@ namespace iris::c
         {
             .name = std::pmr::string{ macro_name },
             .is_function_like = is_function_like,
-            .replacement_text = get_macro_replacement_text(macro_name, cursor_location.source_location),
+            .replacement_text = get_cached_macro_replacement_text(macro_name, cursor_location.source_location, replacement_text_entries_cache),
             .source_location = cursor_location.source_location,
         };
 
@@ -2607,7 +2654,8 @@ namespace iris::c
     {
         auto const visitor = [](CXCursor current_cursor, CXCursor parent, CXClientData client_data) -> CXChildVisitResult
         {
-            C_declarations* const declarations = reinterpret_cast<C_declarations*>(client_data);
+            Import_visitor_context* const context = reinterpret_cast<Import_visitor_context*>(client_data);
+            C_declarations* const declarations = context->declarations;
 
             CXCursorKind const cursor_kind = clang_getCursorKind(current_cursor);
 
@@ -2642,7 +2690,7 @@ namespace iris::c
             }
             else if (cursor_kind == CXCursor_MacroDefinition)
             {
-                declarations->macro_declarations.push_back(create_macro_declaration(current_cursor));
+                declarations->macro_declarations.push_back(create_macro_declaration(current_cursor, *context->macro_replacement_text_entries_cache));
             }
             else if (cursor_kind == CXCursor_StructDecl)
             {
@@ -2678,13 +2726,20 @@ namespace iris::c
 
         C_declarations declarations;
         declarations.module_name = header_name;
+        Macro_replacement_text_entries_cache macro_replacement_text_entries_cache;
+
+        Import_visitor_context visitor_context
+        {
+            .declarations = &declarations,
+            .macro_replacement_text_entries_cache = &macro_replacement_text_entries_cache
+        };
 
         CXCursor cursor = clang_getTranslationUnitCursor(unit);
 
         clang_visitChildren(
             cursor,
             visitor,
-            &declarations
+            &visitor_context
         );
 
         convert_macro_constants_to_global_constant_variables(

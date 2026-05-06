@@ -57,46 +57,21 @@ namespace iris::c
         return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_';
     }
 
-    std::optional<std::pmr::string> get_macro_replacement_text(
-        std::string_view const macro_name,
-        iris::Source_range_location const& source_location
-    )
+    void normalize_line_ending(std::string& line)
     {
-        if (!source_location.file_path.has_value())
-            return std::nullopt;
-
-        std::ifstream file{source_location.file_path.value()};
-        if (!file.good())
-            return std::nullopt;
-
-        std::string line;
-        std::uint32_t current_line = 0;
-        std::uint32_t const target_line = source_location.range.start.line;
-        while (current_line < target_line && std::getline(file, line))
-            ++current_line;
-
-        if (current_line != target_line)
-            return std::nullopt;
-
         if (!line.empty() && line.back() == '\r')
             line.pop_back();
+    }
 
-        std::string combined_line = line;
-        while (ends_with_backslash(combined_line))
-        {
-            std::string const line_without_backslash = remove_trailing_backslash(combined_line);
+    struct Parsed_macro_definition
+    {
+        std::string_view name;
+        std::optional<std::string_view> replacement_text;
+    };
 
-            std::string next_line;
-            if (!std::getline(file, next_line))
-                break;
-
-            if (!next_line.empty() && next_line.back() == '\r')
-                next_line.pop_back();
-
-            combined_line = line_without_backslash + " " + next_line;
-        }
-
-        std::string_view const text = trim_text(combined_line);
+    std::optional<Parsed_macro_definition> parse_macro_definition(std::string_view const line)
+    {
+        std::string_view const text = trim_text(line);
         if (!text.starts_with("#define"))
             return std::nullopt;
 
@@ -112,15 +87,110 @@ namespace iris::c
         while (index < text.size() && is_identifier_character(text[index]))
             ++index;
 
-        std::string_view const parsed_macro_name = text.substr(macro_name_begin, index - macro_name_begin);
-        if (parsed_macro_name != macro_name)
-            return std::nullopt;
-
         std::string_view const replacement_text = trim_text(text.substr(index));
-        if (replacement_text.empty())
+        return Parsed_macro_definition
+        {
+            .name = text.substr(macro_name_begin, index - macro_name_begin),
+            .replacement_text = replacement_text.empty() ? std::nullopt : std::optional<std::string_view>{replacement_text}
+        };
+    }
+
+    std::pmr::vector<Macro_replacement_text_entry> parse_macro_replacement_text_entries(
+        std::istream& stream
+    )
+    {
+        std::pmr::vector<Macro_replacement_text_entry> entries;
+
+        std::string line;
+        std::uint32_t current_line = 0;
+        while (std::getline(stream, line))
+        {
+            ++current_line;
+            normalize_line_ending(line);
+
+            std::uint32_t const definition_line = current_line;
+            std::string combined_line = line;
+            while (ends_with_backslash(combined_line))
+            {
+                std::string const line_without_backslash = remove_trailing_backslash(combined_line);
+
+                std::string next_line;
+                if (!std::getline(stream, next_line))
+                    break;
+
+                ++current_line;
+                normalize_line_ending(next_line);
+                combined_line = line_without_backslash + " " + next_line;
+            }
+
+            std::optional<Parsed_macro_definition> const parsed_definition = parse_macro_definition(combined_line);
+            if (!parsed_definition.has_value())
+                continue;
+
+            Macro_replacement_text_entry entry
+            {
+                .line = definition_line,
+                .name = std::pmr::string{parsed_definition->name},
+                .replacement_text = std::nullopt
+            };
+
+            if (parsed_definition->replacement_text.has_value())
+                entry.replacement_text = std::pmr::string{*parsed_definition->replacement_text};
+
+            entries.push_back(std::move(entry));
+        }
+
+        return entries;
+    }
+
+    std::optional<Macro_replacement_text_entry> find_macro_replacement_text_entry(
+        std::span<Macro_replacement_text_entry const> const entries,
+        std::string_view const macro_name,
+        std::uint32_t const line
+    )
+    {
+        for (Macro_replacement_text_entry const& entry : entries)
+        {
+            if (entry.line == line && entry.name == macro_name)
+                return entry;
+        }
+
+        return std::nullopt;
+    }
+
+    std::optional<std::pmr::vector<Macro_replacement_text_entry>> get_macro_replacement_text_entries(
+        std::filesystem::path const& file_path
+    )
+    {
+        std::ifstream file{file_path};
+        if (!file.good())
             return std::nullopt;
 
-        return std::pmr::string{replacement_text};
+        return parse_macro_replacement_text_entries(file);
+    }
+
+    std::optional<std::pmr::string> get_macro_replacement_text(
+        std::string_view const macro_name,
+        iris::Source_range_location const& source_location
+    )
+    {
+        if (!source_location.file_path.has_value())
+            return std::nullopt;
+
+        std::optional<std::pmr::vector<Macro_replacement_text_entry>> const entries =
+            get_macro_replacement_text_entries(source_location.file_path.value());
+        if (!entries.has_value())
+            return std::nullopt;
+
+        std::optional<Macro_replacement_text_entry> const macro_entry = find_macro_replacement_text_entry(
+            *entries,
+            macro_name,
+            source_location.range.start.line
+        );
+        if (!macro_entry.has_value() || !macro_entry->replacement_text.has_value())
+            return std::nullopt;
+
+        return macro_entry->replacement_text;
     }
 
     enum class Macro_expression_token_type

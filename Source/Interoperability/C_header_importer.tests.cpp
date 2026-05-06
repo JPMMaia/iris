@@ -6,6 +6,7 @@ import iris.core;
 import iris.core.expressions;
 import iris.core.types;
 import iris.c_header_converter;
+import iris.c_macro_parser;
 import iris.json_serializer.operators;
 
 using iris::json::operators::operator<<;
@@ -1143,6 +1144,49 @@ Sint32 my_global_2 = 0;
 
             CHECK(*declaration.source_location == iris::create_source_range_location(header_file_path, 9, 8, 9, 9));
         }
+    }
+
+    TEST_CASE("Macro parser extracts continuation text with CRLF line endings")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "macro_parser_continuation";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
+        {
+            std::ofstream file{header_file_path, std::ios::binary};
+            REQUIRE(file.good());
+
+            file << "#define MY_UINT64 (unsigned long long) \\\r\n";
+            file << "    20ULL\r\n";
+        }
+
+        std::optional<std::pmr::string> const replacement_text = iris::c::get_macro_replacement_text(
+            "MY_UINT64",
+            iris::create_source_range_location(header_file_path, 1, 9, 1, 10)
+        );
+        REQUIRE(replacement_text.has_value());
+
+        std::optional<iris::Statement> const parsed_statement = iris::c::parse_macro_replacement_text_to_statement(*replacement_text);
+        REQUIRE(parsed_statement.has_value());
+
+        iris::Type_reference const c_int_type = iris::create_fundamental_type_type_reference(iris::Fundamental_type::C_int);
+        CHECK(*parsed_statement == iris::create_statement({ iris::create_constant_expression(c_int_type, "20") }));
+    }
+
+    TEST_CASE("Macro parser returns nullopt for empty replacement text")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "macro_parser_empty_replacement";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::filesystem::path const header_file_path = root_directory_path / "My_data.h";
+        iris::common::write_to_file(header_file_path, "#define MY_EMPTY\n");
+
+        std::optional<std::pmr::string> const replacement_text = iris::c::get_macro_replacement_text(
+            "MY_EMPTY",
+            iris::create_source_range_location(header_file_path, 1, 9, 1, 10)
+        );
+
+        CHECK(!replacement_text.has_value());
     }
 
     TEST_CASE("Macros constants are imported as global variable macros")
