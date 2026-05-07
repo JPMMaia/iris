@@ -289,7 +289,7 @@ namespace iris::compiler
 
     static bool is_name_mangled(std::string_view const name)
     {
-        return name.find('@') != std::string_view::npos;
+        return name.find(iris::get_mangled_instance_separator()) != std::string_view::npos;
     }
 
     static std::pmr::string create_unique_import_alias(

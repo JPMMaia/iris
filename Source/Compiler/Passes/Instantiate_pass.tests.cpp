@@ -197,29 +197,29 @@ export function_constructor add(value_type: Type)
     };
 }
 
-@unique_name("Function_constructor@add@10481941949038830817")
-function Function_constructor@add@10481941949038830817(first: Int32, second: Int32) -> (result: Int32)
+@unique_name("Function_constructor__at__add__at__10481941949038830817")
+function Function_constructor__at__add__at__10481941949038830817(first: Int32, second: Int32) -> (result: Int32)
 {
     return first + second;
 }
 
-@unique_name("Function_constructor@add@4195550094456234142")
-function Function_constructor@add@4195550094456234142(first: Float32, second: Float32) -> (result: Float32)
+@unique_name("Function_constructor__at__add__at__4195550094456234142")
+function Function_constructor__at__add__at__4195550094456234142(first: Float32, second: Float32) -> (result: Float32)
 {
     return first + second;
 }
 
-@unique_name("Function_constructor@add@3937835667124936396")
-function Function_constructor@add@3937835667124936396(first: Uint32, second: Uint32) -> (result: Uint32)
+@unique_name("Function_constructor__at__add__at__3937835667124936396")
+function Function_constructor__at__add__at__3937835667124936396(first: Uint32, second: Uint32) -> (result: Uint32)
 {
     return first + second;
 }
 
 function run() -> ()
 {
-    var a = Function_constructor@add@10481941949038830817(1, 2);
-    var b = Function_constructor@add@4195550094456234142(3.0f32, 4.0f32);
-    var c = Function_constructor@add@3937835667124936396(1u32, 2u32);
+    var a = Function_constructor__at__add__at__10481941949038830817(1, 2);
+    var b = Function_constructor__at__add__at__4195550094456234142(3.0f32, 4.0f32);
+    var c = Function_constructor__at__add__at__3937835667124936396(1u32, 2u32);
 }
 )";
 
@@ -258,23 +258,23 @@ export type_constructor Dynamic_array(element_type: Type)
     };
 }
 
-@unique_name("Type_constructor@Dynamic_array@9266664480299747837")
-struct Type_constructor@Dynamic_array@9266664480299747837
+@unique_name("Type_constructor__at__Dynamic_array__at__9266664480299747837")
+struct Type_constructor__at__Dynamic_array__at__9266664480299747837
 {
     data: *Float16 = null;
     length: Uint64 = 0u64;
 }
 
-@unique_name("Type_constructor@Dynamic_array@12246575587352456780")
-struct Type_constructor@Dynamic_array@12246575587352456780
+@unique_name("Type_constructor__at__Dynamic_array__at__12246575587352456780")
+struct Type_constructor__at__Dynamic_array__at__12246575587352456780
 {
     data: *Int32 = null;
     length: Uint64 = 0u64;
 }
 
-function run(instance_0: Type_constructor@Dynamic_array@9266664480299747837) -> ()
+function run(instance_0: Type_constructor__at__Dynamic_array__at__9266664480299747837) -> ()
 {
-    var instance_1: Type_constructor@Dynamic_array@12246575587352456780 = {};
+    var instance_1: Type_constructor__at__Dynamic_array__at__12246575587352456780 = {};
 }
 )";
 
@@ -313,8 +313,8 @@ export type_constructor Dynamic_array(element_type: Type)
     };
 }
 
-@unique_name("Type_constructor@Dynamic_array@12246575587352456780")
-struct Type_constructor@Dynamic_array@12246575587352456780
+@unique_name("Type_constructor__at__Dynamic_array__at__12246575587352456780")
+struct Type_constructor__at__Dynamic_array__at__12246575587352456780
 {
     data: *Int32 = null;
     length: Uint64 = 0u64;
@@ -322,7 +322,7 @@ struct Type_constructor@Dynamic_array@12246575587352456780
 
 struct My_array
 {
-    data: Type_constructor@Dynamic_array@12246575587352456780 = {};
+    data: Type_constructor__at__Dynamic_array__at__12246575587352456780 = {};
 }
 )";
 
@@ -377,7 +377,7 @@ import another_module as am;
 
 function run(value: *Int32) -> ()
 {
-    iris.json@print_json@9753731967319569499(value);
+    iris.json__at__print_json__at__9753731967319569499(value);
 }
 
 @unique_name("iris.json.use_internal")
@@ -385,17 +385,17 @@ function iris.json.use_internal() -> ()
 {
 }
 
-@unique_name("iris.json@to_json@3489948734076117284")
-function iris.json@to_json@3489948734076117284(value: *Int32) -> ()
+@unique_name("iris.json__at__to_json__at__3489948734076117284")
+function iris.json__at__to_json__at__3489948734076117284(value: *Int32) -> ()
 {
     iris.json.use_internal();
     am.foo();
 }
 
-@unique_name("iris.json@print_json@9753731967319569499")
-function iris.json@print_json@9753731967319569499(value: *Int32) -> ()
+@unique_name("iris.json__at__print_json__at__9753731967319569499")
+function iris.json__at__print_json__at__9753731967319569499(value: *Int32) -> ()
 {
-    iris.json@to_json@3489948734076117284(value);
+    iris.json__at__to_json__at__3489948734076117284(value);
 }
 )";
         std::array<std::string_view, 1> const dependencies = { dependency };
@@ -438,8 +438,8 @@ function_constructor to_json(value_type: Type)
     };
 }
 
-@unique_name("json_usage@to_json@8192659410663046636")
-function json_usage@to_json@8192659410663046636(value: *Int32) -> ()
+@unique_name("json_usage__at__to_json__at__8192659410663046636")
+function json_usage__at__to_json__at__8192659410663046636(value: *Int32) -> ()
 {
 }
 
@@ -451,15 +451,15 @@ function_constructor print_json(value_type: Type)
     };
 }
 
-@unique_name("json_usage@print_json@8253239461601449526")
-function json_usage@print_json@8253239461601449526(value: *Int32) -> ()
+@unique_name("json_usage__at__print_json__at__8253239461601449526")
+function json_usage__at__print_json__at__8253239461601449526(value: *Int32) -> ()
 {
-    json_usage@to_json@8192659410663046636(value);
+    json_usage__at__to_json__at__8192659410663046636(value);
 }
 
 export function run(value: *Int32) -> ()
 {
-    json_usage@print_json@8253239461601449526(value);
+    json_usage__at__print_json__at__8253239461601449526(value);
 }
 )";
 
@@ -509,11 +509,11 @@ function iris.json_nested.use_internal() -> ()
 
 function run(value: *Int32) -> ()
 {
-    iris.json_nested@to_json@217872819520902618(value);
+    iris.json_nested__at__to_json__at__217872819520902618(value);
 }
 
-@unique_name("iris.json_nested@to_json@217872819520902618")
-function iris.json_nested@to_json@217872819520902618(value: *Int32) -> ()
+@unique_name("iris.json_nested__at__to_json__at__217872819520902618")
+function iris.json_nested__at__to_json__at__217872819520902618(value: *Int32) -> ()
 {
     if true
     {
@@ -570,7 +570,7 @@ function iris.json_recursive.private_leaf() -> ()
 
 function run(value: *Int32) -> ()
 {
-    iris.json_recursive@to_json@1271315375365545525(value);
+    iris.json_recursive__at__to_json__at__1271315375365545525(value);
 }
 
 @unique_name("iris.json_recursive.private_mid")
@@ -579,8 +579,8 @@ function iris.json_recursive.private_mid() -> ()
     iris.json_recursive.private_leaf();
 }
 
-@unique_name("iris.json_recursive@to_json@1271315375365545525")
-function iris.json_recursive@to_json@1271315375365545525(value: *Int32) -> ()
+@unique_name("iris.json_recursive__at__to_json__at__1271315375365545525")
+function iris.json_recursive__at__to_json__at__1271315375365545525(value: *Int32) -> ()
 {
     iris.json_recursive.private_mid();
 }
@@ -631,7 +631,7 @@ import iris.json_nested as json_nested;
 
 function run(value: *Int32) -> ()
 {
-    iris.json_nested@print_json@11451538589209302994(value);
+    iris.json_nested__at__print_json__at__11451538589209302994(value);
 }
 
 @unique_name("iris.json_nested.print_to_stdout")
@@ -639,8 +639,8 @@ function iris.json_nested.print_to_stdout(value: *C_char) -> ()
 {
 }
 
-@unique_name("iris.json_nested@print_json@11451538589209302994")
-function iris.json_nested@print_json@11451538589209302994(value: *Int32) -> ()
+@unique_name("iris.json_nested__at__print_json__at__11451538589209302994")
+function iris.json_nested__at__print_json__at__11451538589209302994(value: *Int32) -> ()
 {
     var stream: json_nested.Write_stream = explicit {
         write: iris.json_nested.print_to_stdout
@@ -764,12 +764,12 @@ export function_constructor foo(Value_type: Type)
     };
 }
 
-@unique_name("Test@foo@11244309519708856224")
-function Test@foo@11244309519708856224(value: Float32) -> ()
+@unique_name("Test__at__foo__at__11244309519708856224")
+function Test__at__foo__at__11244309519708856224(value: Float32) -> ()
 {
 }
 
-var bar = Test@foo@11244309519708856224;
+var bar = Test__at__foo__at__11244309519708856224;
 )";
 
         CHECK(expected == actual);
@@ -801,10 +801,10 @@ var bar = fns.to_json::<Int32>;
 
 import iris.functions as fns;
 
-var bar = iris.functions@to_json@2824829538199830437;
+var bar = iris.functions__at__to_json__at__2824829538199830437;
 
-@unique_name("iris.functions@to_json@2824829538199830437")
-function iris.functions@to_json@2824829538199830437(value: *Int32) -> ()
+@unique_name("iris.functions__at__to_json__at__2824829538199830437")
+function iris.functions__at__to_json__at__2824829538199830437(value: *Int32) -> ()
 {
 }
 )";
@@ -837,12 +837,12 @@ export function_constructor foo(Value_type: Type)
     };
 }
 
-@unique_name("Test@foo@11244309519708856224")
-function Test@foo@11244309519708856224(value: Float32) -> ()
+@unique_name("Test__at__foo__at__11244309519708856224")
+function Test__at__foo__at__11244309519708856224(value: Float32) -> ()
 {
 }
 
-var bar: function<(value: Float32) -> ()> = Test@foo@11244309519708856224;
+var bar: function<(value: Float32) -> ()> = Test__at__foo__at__11244309519708856224;
 )";
 
         CHECK(expected == actual);
@@ -874,10 +874,10 @@ var bar: function<(value: *Int32) -> ()> = fns.to_json::<Int32>;
 
 import iris.functions as fns;
 
-var bar: function<(value: *Int32) -> ()> = iris.functions@to_json@2824829538199830437;
+var bar: function<(value: *Int32) -> ()> = iris.functions__at__to_json__at__2824829538199830437;
 
-@unique_name("iris.functions@to_json@2824829538199830437")
-function iris.functions@to_json@2824829538199830437(value: *Int32) -> ()
+@unique_name("iris.functions__at__to_json__at__2824829538199830437")
+function iris.functions__at__to_json__at__2824829538199830437(value: *Int32) -> ()
 {
 }
 )";

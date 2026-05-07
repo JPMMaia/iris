@@ -150,8 +150,8 @@ export function_constructor add(value_type: Type)
     };
 }
 
-@unique_name("All_passes_test_1@add@3510542370392782654")
-function All_passes_test_1@add@3510542370392782654(first: Int32, second: Int32) -> (result: Int32)
+@unique_name("All_passes_test_1__at__add__at__3510542370392782654")
+function All_passes_test_1__at__add__at__3510542370392782654(first: Int32, second: Int32) -> (result: Int32)
 {
     return first + second;
 }
@@ -159,7 +159,7 @@ function All_passes_test_1@add@3510542370392782654(first: Int32, second: Int32) 
 function run() -> ()
 {
     {
-        var a = All_passes_test_1@add@3510542370392782654(1, 2);
+        var a = All_passes_test_1__at__add__at__3510542370392782654(1, 2);
     }
 }
 )";
@@ -203,8 +203,8 @@ export type_constructor Box(element_type: Type)
     };
 }
 
-@unique_name("All_passes_test_2@Box@8186224852659227827")
-struct All_passes_test_2@Box@8186224852659227827
+@unique_name("All_passes_test_2__at__Box__at__8186224852659227827")
+struct All_passes_test_2__at__Box__at__8186224852659227827
 {
     value: Int32 = ;
 }
@@ -216,7 +216,7 @@ export function get_value(instance: *Box::<element_type>, element_type: Type) ->
 
 function run() -> ()
 {
-    mutable b: All_passes_test_2@Box@8186224852659227827 = {};
+    mutable b: All_passes_test_2__at__Box__at__8186224852659227827 = {};
     var v = get_value(&b);
 }
 )";
@@ -272,8 +272,8 @@ export type_constructor Box(element_type: Type)
     };
 }
 
-@unique_name("All_passes_test_3@Box@16743479164112415117")
-struct All_passes_test_3@Box@16743479164112415117
+@unique_name("All_passes_test_3__at__Box__at__16743479164112415117")
+struct All_passes_test_3__at__Box__at__16743479164112415117
 {
     value: Int32 = ;
 }
@@ -286,7 +286,7 @@ export function get_value(instance: *Box::<element_type>, element_type: Type) ->
 function run() -> ()
 {
     {
-        mutable b: All_passes_test_3@Box@16743479164112415117 = {};
+        mutable b: All_passes_test_3__at__Box__at__16743479164112415117 = {};
         var v = get_value(&b);
     }
 }
@@ -388,14 +388,14 @@ import containers.dynamic_array as da;
 function run() -> ()
 {
     var allocator: da.Allocator = {};
-    var instance = containers.dynamic_array@create@2530642789161636205(allocator);
+    var instance = containers.dynamic_array__at__create__at__2530642789161636205(allocator);
 
-    containers.dynamic_array@push_back@11054321879898878598(&instance, 1);
-    var element = containers.dynamic_array@get@9219431704710098038(&instance, 0u64);
+    containers.dynamic_array__at__push_back__at__11054321879898878598(&instance, 1);
+    var element = containers.dynamic_array__at__get__at__9219431704710098038(&instance, 0u64);
 }
 
-@unique_name("containers.dynamic_array@Dynamic_array@5865945007316310718")
-struct containers.dynamic_array@Dynamic_array@5865945007316310718
+@unique_name("containers.dynamic_array__at__Dynamic_array__at__5865945007316310718")
+struct containers.dynamic_array__at__Dynamic_array__at__5865945007316310718
 {
     data: *mutable Int32 = null;
     length: Uint64 = 0u64;
@@ -403,8 +403,8 @@ struct containers.dynamic_array@Dynamic_array@5865945007316310718
     allocator: da.Allocator = {};
 }
 
-@unique_name("containers.dynamic_array@create@2530642789161636205")
-function containers.dynamic_array@create@2530642789161636205(allocator: da.Allocator) -> (instance: da.containers.dynamic_array@Dynamic_array@5865945007316310718)
+@unique_name("containers.dynamic_array__at__create__at__2530642789161636205")
+function containers.dynamic_array__at__create__at__2530642789161636205(allocator: da.Allocator) -> (instance: da.containers.dynamic_array__at__Dynamic_array__at__5865945007316310718)
     precondition "allocator.allocate != null" { allocator.allocate != null }
     precondition "allocator.deallocate != null" { allocator.deallocate != null }
 {
@@ -416,8 +416,8 @@ function containers.dynamic_array@create@2530642789161636205(allocator: da.Alloc
     };
 }
 
-@unique_name("containers.dynamic_array@push_back@11054321879898878598")
-function containers.dynamic_array@push_back@11054321879898878598(instance: *mutable da.containers.dynamic_array@Dynamic_array@5865945007316310718, element: Int32) -> ()
+@unique_name("containers.dynamic_array__at__push_back__at__11054321879898878598")
+function containers.dynamic_array__at__push_back__at__11054321879898878598(instance: *mutable da.containers.dynamic_array__at__Dynamic_array__at__5865945007316310718, element: Int32) -> ()
     precondition "instance != null" { instance != null }
 {
     if instance->length == instance->capacity
@@ -437,8 +437,8 @@ function containers.dynamic_array@push_back@11054321879898878598(instance: *muta
     instance->length += 1u64;
 }
 
-@unique_name("containers.dynamic_array@get@9219431704710098038")
-function containers.dynamic_array@get@9219431704710098038(instance: *mutable da.containers.dynamic_array@Dynamic_array@5865945007316310718, index: Uint64) -> (result: Int32)
+@unique_name("containers.dynamic_array__at__get__at__9219431704710098038")
+function containers.dynamic_array__at__get__at__9219431704710098038(instance: *mutable da.containers.dynamic_array__at__Dynamic_array__at__5865945007316310718, index: Uint64) -> (result: Int32)
     precondition "instance != null" { instance != null }
     precondition "index < instance->length" { index < instance->length }
 {

@@ -9,6 +9,32 @@ import iris.core.types;
 
 namespace iris
 {
+    static constexpr std::string_view mangled_instance_separator = "__at__";
+
+    static std::optional<std::pair<std::string_view, std::string_view>> parse_mangled_instance_name(
+        std::string_view const name
+    )
+    {
+        std::size_t const first_location = name.find(mangled_instance_separator);
+        if (first_location == std::string_view::npos)
+            return std::nullopt;
+
+        std::size_t const second_location = name.find(
+            mangled_instance_separator,
+            first_location + mangled_instance_separator.size()
+        );
+        if (second_location == std::string_view::npos)
+            return std::nullopt;
+
+        std::string_view const module_name = name.substr(0, first_location);
+        std::string_view const declaration_name = name.substr(
+            first_location + mangled_instance_separator.size(),
+            second_location - first_location - mangled_instance_separator.size()
+        );
+
+        return std::make_pair(module_name, declaration_name);
+    }
+
     bool are_type_instances_equivalent(Type_instance const& lhs, Type_instance const& rhs)
     {
         if (lhs.type_constructor != rhs.type_constructor)
@@ -524,30 +550,32 @@ namespace iris
     )
     {
         std::size_t const type_instance_hash = Type_instance_hash{}(type_instance);
-        return std::pmr::string{std::format("{}@{}@{}", type_instance.type_constructor.module_reference.name, type_instance.type_constructor.name, type_instance_hash)};
+        return std::pmr::string{std::format(
+            "{}{}{}{}{}",
+            type_instance.type_constructor.module_reference.name,
+            mangled_instance_separator,
+            type_instance.type_constructor.name,
+            mangled_instance_separator,
+            type_instance_hash
+        )};
+    }
+
+    std::string_view get_mangled_instance_separator()
+    {
+        return mangled_instance_separator;
     }
 
     std::optional<iris::Custom_type_reference> unmangle_type_instance_name(
         std::string_view const name
     )
     {
-        auto const first_location = std::find(name.begin(), name.end(), '@');
-        if (first_location == name.end())
+        std::optional<std::pair<std::string_view, std::string_view>> const parsed_name = parse_mangled_instance_name(name);
+        if (!parsed_name.has_value())
             return std::nullopt;
-
-        auto const second_location = std::find(first_location + 1, name.end(), '@');
-        if (second_location == name.end())
-            return std::nullopt;
-
-        std::size_t const module_name_length = std::distance(name.begin(), first_location);
-        std::string_view const module_name = name.substr(0, module_name_length);
-
-        std::size_t const type_constructor_name_length = std::distance(first_location + 1, second_location);
-        std::string_view const type_constructor_name = name.substr(module_name_length + 1, type_constructor_name_length);
 
         return iris::Custom_type_reference{
-            .module_reference { .name = std::pmr::string{module_name} },
-            .name = std::pmr::string{type_constructor_name}
+            .module_reference { .name = std::pmr::string{parsed_name->first} },
+            .name = std::pmr::string{parsed_name->second}
         };
     }
 
@@ -702,30 +730,27 @@ namespace iris
     )
     {
         std::size_t const instance_call_hash = Instance_call_key_hash{}(key);
-        return std::format("{}@{}@{}", key.module_name, key.function_constructor_name, instance_call_hash);
+        return std::format(
+            "{}{}{}{}{}",
+            key.module_name,
+            mangled_instance_separator,
+            key.function_constructor_name,
+            mangled_instance_separator,
+            instance_call_hash
+        );
     }
 
     std::optional<iris::Custom_type_reference> unmangle_instance_call_name(
         std::string_view const name
     )
     {
-        auto const first_location = std::find(name.begin(), name.end(), '@');
-        if (first_location == name.end())
+        std::optional<std::pair<std::string_view, std::string_view>> const parsed_name = parse_mangled_instance_name(name);
+        if (!parsed_name.has_value())
             return std::nullopt;
-
-        auto const second_location = std::find(first_location + 1, name.end(), '@');
-        if (second_location == name.end())
-            return std::nullopt;
-
-        std::size_t const module_name_length = std::distance(name.begin(), first_location);
-        std::string_view const module_name = name.substr(0, module_name_length);
-
-        std::size_t const function_constructor_name_length = std::distance(first_location + 1, second_location);
-        std::string_view const function_constructor_name = name.substr(module_name_length + 1, function_constructor_name_length);
 
         return iris::Custom_type_reference{
-            .module_reference { .name = std::pmr::string{module_name} },
-            .name = std::pmr::string{function_constructor_name}
+            .module_reference { .name = std::pmr::string{parsed_name->first} },
+            .name = std::pmr::string{parsed_name->second}
         };
     }
 

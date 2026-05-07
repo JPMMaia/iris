@@ -195,6 +195,8 @@ namespace iris
         Type_instance const& type_instance
     );
 
+    export std::string_view get_mangled_instance_separator();
+
     export std::optional<iris::Custom_type_reference> unmangle_type_instance_name(
         std::string_view const name
     );
