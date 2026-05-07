@@ -737,6 +737,43 @@ namespace iris::c
         stream << ");\n";
     }
 
+    static void write_c_global_variable_declaration(
+        String_stream& stream,
+        iris::Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Global_variable_declaration const& declaration
+    )
+    {
+        for (iris::Expression const& expr : declaration.initial_value.expressions)
+        {
+            if (!std::holds_alternative<iris::Instance_call_expression>(expr.data))
+                continue;
+
+            iris::Instance_call_expression const& instance_call = std::get<iris::Instance_call_expression>(expr.data);
+            auto [key, function_expression] = iris::create_instance_call_expression_value(
+                declaration_database,
+                core_module.name,
+                instance_call,
+                declaration.initial_value
+            );
+
+            // Emit the global as an extern function pointer
+            stream << "extern ";
+            write_c_type_name(stream, declaration_database, function_expression.declaration.type.output_parameter_types, std::nullopt);
+            stream << "(*";
+            write_c_declaration_name(stream, core_module.name, declaration.name, declaration.unique_name);
+            stream << ")(";
+            for (std::size_t index = 0; index < function_expression.declaration.input_parameter_names.size(); ++index)
+            {
+                write_c_type_name(stream, declaration_database, function_expression.declaration.type.input_parameter_types[index], function_expression.declaration.input_parameter_names[index]);
+                if (index + 1 < function_expression.declaration.input_parameter_names.size())
+                    stream << ", ";
+            }
+            stream << ");\n";
+            return;
+        }
+    }
+
     Exported_c_header export_module_as_c_header(
         iris::Module const& core_module,
         iris::Declaration_database const& declaration_database,
@@ -760,6 +797,12 @@ namespace iris::c
             write_c_function_declaration(stream, declaration_database, core_module.name, declaration);
 
         if (!core_module.export_declarations.function_declarations.empty())
+            stream << '\n';
+
+        for (iris::Global_variable_declaration const& declaration : core_module.export_declarations.global_variable_declarations)
+            write_c_global_variable_declaration(stream, declaration_database, core_module, declaration);
+
+        if (!core_module.export_declarations.global_variable_declarations.empty())
             stream << '\n';
 
         write_extern_c_end(stream);
@@ -1001,6 +1044,24 @@ namespace iris::c
         stream << "\n";
     }
 
+    static void write_cpp_global_variable_declaration(
+        String_stream& stream,
+        std::string_view const core_module_name,
+        iris::Global_variable_declaration const& declaration
+    )
+    {
+        for (iris::Expression const& expr : declaration.initial_value.expressions)
+        {
+            if (!std::holds_alternative<iris::Instance_call_expression>(expr.data))
+                continue;
+
+            stream << "    inline auto& " << declaration.name << " = ::";
+            write_c_declaration_name(stream, core_module_name, declaration.name, declaration.unique_name);
+            stream << ";\n";
+            return;
+        }
+    }
+
     Exported_cpp_header export_module_as_cpp_header(
         iris::Module const& core_module,
         std::filesystem::path const& c_header_file_path,
@@ -1036,6 +1097,12 @@ namespace iris::c
 
         for (iris::Function_declaration const& declaration : core_module.export_declarations.function_declarations)
             write_cpp_function_declaration(stream, core_module.name, declaration);
+
+        if (!core_module.export_declarations.global_variable_declarations.empty())
+            stream << '\n';
+
+        for (iris::Global_variable_declaration const& declaration : core_module.export_declarations.global_variable_declarations)
+            write_cpp_global_variable_declaration(stream, core_module.name, declaration);
 
         stream << "}\n\n";
 

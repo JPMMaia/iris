@@ -255,9 +255,9 @@ namespace iris
 
     export std::pair<Instance_call_key, Function_expression> create_instance_call_expression_value(
         Declaration_database const& declaration_database,
+        std::string_view const module_name,
         Instance_call_expression const& expression,
-        Statement const& statement,
-        std::string_view const current_module_name
+        Statement const& statement
     );
 
     export std::optional<std::string_view> get_declaration_unique_name(

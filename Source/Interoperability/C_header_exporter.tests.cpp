@@ -441,4 +441,42 @@ struct Array_slice_my_namespace_Transformf32
 
         test_c_exporter(input, dependencies, dependencies_c_file_paths, expected);
     }
+
+    TEST_CASE("Exports function constructor globals as C function pointers")
+    {
+        std::string_view const input = R"RAW(module my_namespace;
+
+export function_constructor foo(Value_type: Type)
+{
+    return function(value: Value_type) -> ()
+    {
+    };
+}
+
+export var bar = foo::<Float32>;
+)RAW";
+
+        std::pmr::unordered_map<std::pmr::string, std::string_view> const dependencies
+        {
+        };
+
+        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const dependencies_c_file_paths
+        {
+        };
+
+        std::string_view const expected = R"RAW(
+extern void(*my_namespace_bar)(float value);
+)RAW";
+
+        std::string_view const cpp_expected = R"RAW(
+namespace my_namespace
+{
+
+    inline auto& bar = ::my_namespace_bar;
+}
+)RAW";
+
+        test_c_exporter(input, dependencies, dependencies_c_file_paths, expected);
+        test_cpp_exporter(input, "input.h", cpp_expected);
+    }
 }
