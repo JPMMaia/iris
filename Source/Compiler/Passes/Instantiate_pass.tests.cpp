@@ -738,4 +738,150 @@ function run(value: *Int32) -> ()
         CHECK(!has_import_usage(core_module.dependencies, "iris_json", "use_internal"));
         CHECK(has_import_usage_for_module(core_module.dependencies, "another_module", "foo"));
     }
+
+    TEST_CASE("Instantiates function constructors assigned to global variables", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function_constructor foo(Value_type: Type)
+{
+    return function (value: Value_type) -> ()
+    {
+    };
+}
+
+var bar = foo::<Float32>;
+)";
+
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, {});
+
+        std::string_view const expected = R"(module Test;
+
+export function_constructor foo(Value_type: Type)
+{
+    return function (value: Value_type) -> ()
+    {
+    };
+}
+
+@unique_name("Test@foo@11244309519708856224")
+function Test@foo@11244309519708856224(value: Float32) -> ()
+{
+}
+
+var bar = Test@foo@11244309519708856224;
+)";
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Instantiates function constructors assigned to global variables across module boundary", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const dependency = R"(module iris.functions;
+
+export function_constructor to_json(Value_type: Type)
+{
+    return function (value: *Value_type) -> ()
+    {
+    };
+}
+)";
+
+        std::string_view const input = R"(module Test;
+
+import iris.functions as fns;
+
+var bar = fns.to_json::<Int32>;
+)";
+
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies);
+
+        std::string_view const expected = R"(module Test;
+
+import iris.functions as fns;
+
+var bar = iris.functions@to_json@2824829538199830437;
+
+@unique_name("iris.functions@to_json@2824829538199830437")
+function iris.functions@to_json@2824829538199830437(value: *Int32) -> ()
+{
+}
+)";
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Instantiates typed function constructors assigned to global variables", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function_constructor foo(Value_type: Type)
+{
+    return function (value: Value_type) -> ()
+    {
+    };
+}
+
+var bar: function<(value: Float32) -> ()> = foo::<Float32>;
+)";
+
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, {});
+
+        std::string_view const expected = R"(module Test;
+
+export function_constructor foo(Value_type: Type)
+{
+    return function (value: Value_type) -> ()
+    {
+    };
+}
+
+@unique_name("Test@foo@11244309519708856224")
+function Test@foo@11244309519708856224(value: Float32) -> ()
+{
+}
+
+var bar: function<(value: Float32) -> ()> = Test@foo@11244309519708856224;
+)";
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Instantiates typed function constructors assigned to global variables across module boundary", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const dependency = R"(module iris.functions;
+
+export function_constructor to_json(Value_type: Type)
+{
+    return function (value: *Value_type) -> ()
+    {
+    };
+}
+)";
+
+        std::string_view const input = R"(module Test;
+
+import iris.functions as fns;
+
+var bar: function<(value: *Int32) -> ()> = fns.to_json::<Int32>;
+)";
+
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies);
+
+        std::string_view const expected = R"(module Test;
+
+import iris.functions as fns;
+
+var bar: function<(value: *Int32) -> ()> = iris.functions@to_json@2824829538199830437;
+
+@unique_name("iris.functions@to_json@2824829538199830437")
+function iris.functions@to_json@2824829538199830437(value: *Int32) -> ()
+{
+}
+)";
+
+        CHECK(expected == actual);
+    }
 }

@@ -985,6 +985,86 @@ namespace iris::compiler
         }
     }
 
+    static void instantiate_functions_in_global_variable(
+        std::string_view const module_name,
+        iris::Global_variable_declaration& declaration,
+        All_passes_parameters const& parameters
+    )
+    {
+        auto const instantiate_all = [&](iris::Expression const& expression, iris::Statement const& current_statement) -> bool
+        {
+            if (!std::holds_alternative<Instance_call_expression>(expression.data))
+                return false;
+
+            Instance_call_expression const& instance_call_expression = std::get<Instance_call_expression>(expression.data);
+            if (is_builtin_instance_call(current_statement, instance_call_expression))
+                return false;
+
+            Instance_call_key const key = create_instance_call_key(
+                parameters.declaration_database,
+                module_name,
+                instance_call_expression,
+                current_statement
+            );
+
+            iris::Statement& mutable_statement = const_cast<iris::Statement&>(current_statement);
+            instantiate_function(module_name, mutable_statement, expression, key, parameters);
+            return false;
+        };
+
+        iris::visit_expressions(declaration.initial_value, instantiate_all);
+
+        std::pmr::vector<Replace_instantiate_function_parameters> replace_parameters;
+        auto const gather_replacements = [&](iris::Expression const& expression, iris::Statement const& current_statement) -> bool
+        {
+            if (!std::holds_alternative<Instance_call_expression>(expression.data))
+                return false;
+
+            Instance_call_expression const& instance_call_expression = std::get<Instance_call_expression>(expression.data);
+            if (is_builtin_instance_call(current_statement, instance_call_expression))
+                return false;
+
+            Instance_call_key const key = create_instance_call_key(
+                parameters.declaration_database,
+                module_name,
+                instance_call_expression,
+                current_statement
+            );
+
+            iris::Statement& mutable_statement = const_cast<iris::Statement&>(current_statement);
+            replace_parameters.push_back({
+                mutable_statement,
+                find_expression_index(mutable_statement, expression),
+                key
+            });
+
+            return false;
+        };
+
+        iris::visit_expressions(declaration.initial_value, gather_replacements);
+
+        for (Replace_instantiate_function_parameters const& value : replace_parameters)
+        {
+            replace_instantiate_function(value, parameters);
+        }
+    }
+
+    static void instantiate_all_global_variables(
+        iris::Module& core_module,
+        All_passes_parameters const& parameters
+    )
+    {
+        for (iris::Global_variable_declaration& declaration : core_module.export_declarations.global_variable_declarations)
+        {
+            instantiate_functions_in_global_variable(core_module.name, declaration, parameters);
+        }
+
+        for (iris::Global_variable_declaration& declaration : core_module.internal_declarations.global_variable_declarations)
+        {
+            instantiate_functions_in_global_variable(core_module.name, declaration, parameters);
+        }
+    }
+
     static void verify_no_instance_calls(
         std::string_view const module_name,
         iris::Function_declaration const& function_declaration,
@@ -1169,6 +1249,7 @@ namespace iris::compiler
     )
     {
         instantiate_all_functions(core_module, parameters);
+        instantiate_all_global_variables(core_module, parameters);
         instantiate_all_types(core_module, parameters.declaration_database, parameters.instanced_declarations);
 
         verify_no_instance_calls_in_module(core_module, parameters.declaration_database, parameters.is_test_mode);

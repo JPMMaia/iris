@@ -1285,6 +1285,102 @@ function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that function constructors can be assigned to global variables", "[Validation][Function_constructors]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function_constructor foo(Value_type: Type)
+{
+    return function (value: Value_type) -> ()
+    {
+    };
+}
+
+var bar = foo::<Float32>;
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that function constructors from imported modules can be assigned to global variables", "[Validation][Function_constructors]")
+    {
+        std::string_view const dependency = R"(module iris.functions;
+
+export function_constructor to_json(Value_type: Type)
+{
+    return function (value: *Value_type) -> ()
+    {
+    };
+}
+)";
+
+        std::string_view const input = R"(module Test;
+
+import iris.functions as fns;
+
+var bar = fns.to_json::<Int32>;
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        test_validate_module(input, dependencies, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that typed function constructors can be assigned to global variables", "[Validation][Function_constructors]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function_constructor foo(Value_type: Type)
+{
+    return function (value: Value_type) -> ()
+    {
+    };
+}
+
+var bar: function<(value: Float32) -> ()> = foo::<Float32>;
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that typed imported function constructors can be assigned to global variables", "[Validation][Function_constructors]")
+    {
+        std::string_view const dependency = R"(module iris.functions;
+
+export function_constructor to_json(Value_type: Type)
+{
+    return function (value: *Value_type) -> ()
+    {
+    };
+}
+)";
+
+        std::string_view const input = R"(module Test;
+
+import iris.functions as fns;
+
+var bar: function<(value: *Int32) -> ()> = fns.to_json::<Int32>;
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        test_validate_module(input, dependencies, expected_diagnostics);
+    }
+
     
     TEST_CASE("Validates that left hand side is either a module alias, a variable of type struct/union or an enum type", "[Validation][Access_expression]")
     {

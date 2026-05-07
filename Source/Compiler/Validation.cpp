@@ -4511,6 +4511,44 @@ namespace iris::compiler
 
             return true;
         }
+        else if (std::holds_alternative<iris::Instance_call_expression>(expression.data))
+        {
+            iris::Instance_call_expression const& instance_call_expression = std::get<iris::Instance_call_expression>(expression.data);
+            iris::Expression const& left_hand_side = statement.expressions[instance_call_expression.left_hand_side.expression_index];
+
+            if (std::holds_alternative<iris::Variable_expression>(left_hand_side.data))
+            {
+                iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_hand_side.data);
+                std::optional<Declaration> const declaration = find_declaration(
+                    declaration_database,
+                    core_module.name,
+                    variable_expression.name
+                );
+
+                if (declaration.has_value() && std::holds_alternative<iris::Function_constructor const*>(declaration->data))
+                    return true;
+            }
+            else if (std::holds_alternative<iris::Access_expression>(left_hand_side.data))
+            {
+                iris::Access_expression const& access_expression = std::get<iris::Access_expression>(left_hand_side.data);
+                iris::Expression const& module_alias = statement.expressions[access_expression.expression.expression_index];
+                if (std::holds_alternative<iris::Variable_expression>(module_alias.data))
+                {
+                    iris::Variable_expression const& alias_variable = std::get<iris::Variable_expression>(module_alias.data);
+                    std::optional<Declaration> const declaration = find_declaration_using_import_alias(
+                        declaration_database,
+                        core_module.name,
+                        alias_variable.name,
+                        access_expression.member_name
+                    );
+
+                    if (declaration.has_value() && std::holds_alternative<iris::Function_constructor const*>(declaration->data))
+                        return true;
+                }
+            }
+
+            return false;
+        }
         else if (std::holds_alternative<iris::Unary_expression>(expression.data))
         {
             iris::Unary_expression const& unary_expression = std::get<iris::Unary_expression>(expression.data);
