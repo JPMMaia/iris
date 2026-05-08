@@ -448,12 +448,100 @@ namespace iris::c
         write_array_slice_element_type(array_slice_element_type);
     }
 
+    static std::pmr::string create_c_type_instance_name(
+        iris::Type_instance const& type_instance
+    )
+    {
+        std::pmr::string const mangled_name = iris::mangle_type_instance_name(type_instance);
+        std::string_view const separator = iris::get_mangled_instance_separator();
+
+        std::string_view suffix = mangled_name;
+        std::size_t const first_separator_location = mangled_name.find(separator);
+        if (first_separator_location != std::string_view::npos)
+        {
+            suffix = std::string_view{mangled_name}.substr(first_separator_location + separator.size());
+        }
+
+        std::pmr::string result;
+        result.reserve(type_instance.type_constructor.module_reference.name.size() + 1 + suffix.size());
+
+        for (char const character : type_instance.type_constructor.module_reference.name)
+        {
+            result.push_back(character == '.' ? '_' : character);
+        }
+
+        result.push_back('_');
+
+        for (char const character : suffix)
+        {
+            result.push_back(character == '.' ? '_' : character);
+        }
+
+        return result;
+    }
+
+    static std::optional<iris::Declaration> find_alias_for_type_instance(
+        iris::Declaration_database const& declaration_database,
+        iris::Type_instance const& type_instance
+    )
+    {
+        for (auto const& module_pair : declaration_database.map)
+        {
+            for (auto const& declaration_pair : module_pair.second)
+            {
+                iris::Declaration const& declaration = declaration_pair.second;
+                if (!std::holds_alternative<iris::Alias_type_declaration const*>(declaration.data))
+                    continue;
+
+                iris::Alias_type_declaration const& alias_type_declaration = *std::get<iris::Alias_type_declaration const*>(declaration.data);
+                if (alias_type_declaration.type.empty())
+                    continue;
+
+                if (!std::holds_alternative<iris::Type_instance>(alias_type_declaration.type[0].data))
+                    continue;
+
+                iris::Type_instance const& alias_type_instance = std::get<iris::Type_instance>(alias_type_declaration.type[0].data);
+                if (alias_type_instance == type_instance)
+                    return declaration;
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    static void write_c_type_instance_name(
+        String_stream& stream,
+        iris::Declaration_database const declaration_database,
+        iris::Type_instance const& type_instance
+    )
+    {
+        std::optional<iris::Declaration> const alias_declaration = find_alias_for_type_instance(declaration_database, type_instance);
+        if (alias_declaration.has_value())
+        {
+            iris::Alias_type_declaration const& alias_type_declaration = *std::get<iris::Alias_type_declaration const*>(alias_declaration->data);
+            std::optional<std::string_view> const unique_name = iris::get_declaration_unique_name(alias_declaration.value());
+            write_c_declaration_name(stream, alias_declaration->module_name, alias_type_declaration.name, unique_name);
+            return;
+        }
+
+        std::pmr::string const type_instance_name = create_c_type_instance_name(type_instance);
+        stream << type_instance_name;
+    }
+
     static void write_c_array_slice_type_name(
         String_stream& stream,
         iris::Declaration_database const& declaration_database,
         std::span<iris::Type_reference const> const array_slice_element_type
     )
     {
+        if (!array_slice_element_type.empty() && std::holds_alternative<iris::Type_instance>(array_slice_element_type[0].data))
+        {
+            iris::Type_instance const& type_instance = std::get<iris::Type_instance>(array_slice_element_type[0].data);
+            stream << "Array_slice_";
+            write_c_type_instance_name(stream, declaration_database, type_instance);
+            return;
+        }
+
         auto const write_declaration_name = [&](String_stream& stream, std::string_view const module_name, std::string_view const declaration_name) -> void 
         {
             std::optional<Declaration> const declaration = find_declaration(declaration_database, module_name, declaration_name);
@@ -598,7 +686,11 @@ namespace iris::c
         else if (std::holds_alternative<iris::Type_instance>(type_reference.data))
         {
             iris::Type_instance const& data = std::get<iris::Type_instance>(type_reference.data);
-            // TODO
+            stream << "struct ";
+            write_c_type_instance_name(stream, declaration_database, data);
+
+            if (variable_name.has_value())
+                stream << ' ' << variable_name.value();
         }
 
         // TODO
@@ -845,6 +937,14 @@ namespace iris::c
         std::span<iris::Type_reference const> const array_slice_element_type
     )
     {
+        if (!array_slice_element_type.empty() && std::holds_alternative<iris::Type_instance>(array_slice_element_type[0].data))
+        {
+            iris::Type_instance const& type_instance = std::get<iris::Type_instance>(array_slice_element_type[0].data);
+            stream << "Array_slice_";
+            stream << create_c_type_instance_name(type_instance);
+            return;
+        }
+
         auto const write_declaration_name = [&](String_stream& stream, std::string_view const module_name, std::string_view const declaration_name) -> void 
         {
             iris::Type_reference const type_reference = iris::create_custom_type_reference(module_name, declaration_name);
@@ -965,7 +1065,10 @@ namespace iris::c
         else if (std::holds_alternative<iris::Type_instance>(type_reference.data))
         {
             iris::Type_instance const& data = std::get<iris::Type_instance>(type_reference.data);
-            // TODO
+            stream << create_c_type_instance_name(data);
+
+            if (variable_name.has_value())
+                stream << ' ' << variable_name.value();
         }
 
         // TODO

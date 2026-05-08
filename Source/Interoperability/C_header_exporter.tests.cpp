@@ -89,6 +89,61 @@ namespace iris::c
         CHECK(exported_c_header.content == full_expected_content);
     }
 
+    static std::pmr::string export_c_header_content(
+        std::string_view const source,
+        std::pmr::unordered_map<std::pmr::string, std::string_view> const dependencies,
+        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const dependencies_c_file_paths
+    )
+    {
+        std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(source, std::nullopt, {}, {});
+        REQUIRE(core_module.has_value());
+
+        std::pmr::unordered_map<std::pmr::string, iris::Module> core_module_dependencies;
+        core_module_dependencies.reserve(dependencies.size());
+
+        for (std::pair<std::pmr::string const, std::string_view> const& dependency : dependencies)
+        {
+            std::optional<iris::Module> core_module_dependency = iris::parser::parse_and_convert_to_module(dependency.second, std::nullopt, {}, {});
+            REQUIRE(core_module_dependency.has_value());
+
+            core_module_dependencies[dependency.first] = std::move(core_module_dependency.value());
+        }
+
+        iris::Declaration_database declaration_database = iris::create_declaration_database();
+        for (std::pair<std::pmr::string const, iris::Module> const& pair : core_module_dependencies)
+            iris::add_declarations(declaration_database, pair.second);
+        iris::add_declarations(declaration_database, core_module.value());
+
+        Exported_c_header const exported_c_header = export_module_as_c_header(core_module.value(), declaration_database, dependencies_c_file_paths, {}, {});
+        return exported_c_header.content;
+    }
+
+    static std::pmr::string create_c_type_instance_name_for_test(
+        iris::Type_instance const& type_instance
+    )
+    {
+        std::pmr::string const mangled_name = iris::mangle_type_instance_name(type_instance);
+        std::string_view const separator = iris::get_mangled_instance_separator();
+
+        std::string_view suffix = mangled_name;
+        std::size_t const first_separator_location = mangled_name.find(separator);
+        if (first_separator_location != std::string_view::npos)
+            suffix = std::string_view{mangled_name}.substr(first_separator_location + separator.size());
+
+        std::pmr::string result;
+        result.reserve(type_instance.type_constructor.module_reference.name.size() + 1 + suffix.size());
+
+        for (char const character : type_instance.type_constructor.module_reference.name)
+            result.push_back(character == '.' ? '_' : character);
+
+        result.push_back('_');
+
+        for (char const character : suffix)
+            result.push_back(character == '.' ? '_' : character);
+
+        return result;
+    }
+
     static std::pmr::string create_expected_cpp_header_content(
         std::string_view const module_name,
         std::filesystem::path const& c_header_file_path,
@@ -478,5 +533,172 @@ namespace my_namespace
 
         test_c_exporter(input, dependencies, dependencies_c_file_paths, expected);
         test_cpp_exporter(input, "input.h", cpp_expected);
+    }
+
+    TEST_CASE("Exports Type_instance in direct struct members")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+export struct Transformf32
+{
+    translation: Vector3::<Float32> = {};
+}
+)RAW";
+
+        std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(input, std::nullopt, {}, {});
+        REQUIRE(core_module.has_value());
+
+        iris::Type_instance const& type_instance = std::get<iris::Type_instance>(core_module->export_declarations.struct_declarations[0].member_types[0].data);
+        std::pmr::string const type_instance_name = create_c_type_instance_name_for_test(type_instance);
+
+        std::pmr::string const expected = std::pmr::string{std::format(
+            R"RAW(
+struct my_namespace_Transformf32
+{{
+    struct {} translation;
+}};
+
+struct Array_slice_my_namespace_Transformf32
+{{
+    struct my_namespace_Transformf32* data;
+    uint64_t size;
+}};
+)RAW",
+            type_instance_name
+        )};
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Exports Type_instance in function signatures")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+export function make_vector() -> (value: Vector3::<Float32>);
+export function process_vector(value: Vector3::<Float32>) -> (result: Vector3::<Float32>);
+)RAW";
+
+        std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(input, std::nullopt, {}, {});
+        REQUIRE(core_module.has_value());
+
+        iris::Type_instance const& type_instance = std::get<iris::Type_instance>(core_module->export_declarations.function_declarations[0].type.output_parameter_types[0].data);
+        std::pmr::string const type_instance_name = create_c_type_instance_name_for_test(type_instance);
+
+        std::pmr::string const expected = std::pmr::string{std::format(
+            R"RAW(
+struct {} my_namespace_make_vector();
+struct {} my_namespace_process_vector(struct {} value);
+)RAW",
+            type_instance_name,
+            type_instance_name,
+            type_instance_name
+        )};
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Exports Type_instance inside Array_slice")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+export struct Buffer
+{
+    elements: Array_slice::<Vector3::<Float32>> = {};
+}
+)RAW";
+
+        std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(input, std::nullopt, {}, {});
+        REQUIRE(core_module.has_value());
+
+        iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(core_module->export_declarations.struct_declarations[0].member_types[0].data);
+        iris::Type_instance const& type_instance = std::get<iris::Type_instance>(array_slice_type.element_type[0].data);
+        std::pmr::string const type_instance_name = create_c_type_instance_name_for_test(type_instance);
+
+        std::pmr::string const expected = std::pmr::string{std::format(
+            R"RAW(
+struct my_namespace_Buffer
+{{
+    struct Array_slice_{} elements;
+}};
+
+struct Array_slice_my_namespace_Buffer
+{{
+    struct my_namespace_Buffer* data;
+    uint64_t size;
+}};
+)RAW",
+            type_instance_name
+        )};
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Prefers alias name when Type_instance alias exists")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+export using Vector3f32 = Vector3::<Float32>;
+
+export function process_vector(value: Vector3f32) -> (result: Vector3f32);
+)RAW";
+
+        std::string_view const expected = R"RAW(
+struct my_namespace_Vector3f32
+{
+    float x;
+    float y;
+    float z;
+};
+
+struct Array_slice_my_namespace_Vector3f32
+{
+    struct my_namespace_Vector3f32* data;
+    uint64_t size;
+};
+
+struct my_namespace_Vector3f32 my_namespace_process_vector(struct my_namespace_Vector3f32 value);
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
     }
 }
