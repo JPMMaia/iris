@@ -300,4 +300,15 @@ namespace iris::compiler
     export Clang_declaration_database const& get_clang_declaration_database(Clang_module_data const& clang_module_data);
     export clang::ASTContext& get_clang_ast_context(Clang_module_data& clang_module_data);
     export clang::ASTContext const& get_clang_ast_context(Clang_module_data const& clang_module_data);
+
+    export llvm::Function& to_function(
+        llvm::LLVMContext& llvm_context,
+        llvm::DataLayout const& llvm_data_layout,
+        Clang_module_data const& clang_module_data,
+        std::string_view const module_name,
+        llvm::FunctionType& llvm_function_type,
+        Function_declaration const& function_declaration,
+        Type_database const& type_database,
+        Declaration_database const& declaration_database
+    );
 }

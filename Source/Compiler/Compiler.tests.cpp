@@ -4612,7 +4612,8 @@ entry:
   ret void
 }
 
-declare ptr @__acrt_iob_func(i32)
+; Function Attrs: convergent
+declare ptr @__acrt_iob_func(i32 noundef) #0
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
@@ -6114,7 +6115,8 @@ declare void @iris_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
 declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
 
-declare ptr @__acrt_iob_func(i32)
+; Function Attrs: convergent
+declare ptr @__acrt_iob_func(i32 noundef) #0
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
 attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
@@ -8740,6 +8742,59 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
 )";
 
     test_c_interoperability_common("c_interoperability_function_with_small_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Function Constructor Assigned to Global Variable Across Module Boundary", "[LLVM_IR]")
+  {
+    char const* const input_file = "function_constructor_global_consumer.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "Function_constructor_global_provider", parse_and_get_file_path(g_test_source_files_path / "function_constructor_global_provider.iris") },
+    };
+
+    char const* const expected_llvm_ir = R"(
+@Function_constructor_global_consumer_bar = constant ptr @Function_constructor_global_provider__at__to_json__at__7179855141281402803
+
+; Function Attrs: convergent
+define private void @Function_constructor_global_provider__at__to_json__at__7179855141281402803(ptr noundef %"arguments[0].value") #0 {
+entry:
+  %value = alloca ptr, align 8
+  store ptr %"arguments[0].value", ptr %value, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile using imported global variable assigned to function constructor instance", "[LLVM_IR]")
+  {
+    char const* const input_file = "function_constructor_global_consumer_2.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "Function_constructor_global_provider_2", parse_and_get_file_path(g_test_source_files_path / "function_constructor_global_provider_2.iris") },
+    };
+
+    char const* const expected_llvm_ir = R"(
+@Function_constructor_global_provider_2_to_json_int32 = external constant ptr
+
+; Function Attrs: convergent
+define private void @Function_constructor_global_consumer_2_run() #0 {
+entry:
+  %a = alloca i32, align 4
+  store i32 0, ptr %a, align 4
+  call void @Function_constructor_global_provider_2_to_json_int32(ptr noundef %a)
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 }
 

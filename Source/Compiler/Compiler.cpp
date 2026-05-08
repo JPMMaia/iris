@@ -69,24 +69,6 @@ namespace iris::compiler
         return output;
     }
 
-    static llvm::GlobalValue::LinkageTypes to_linkage(
-        Linkage const linkage,
-        bool const is_test
-    )
-    {
-        if (is_test)
-            return llvm::GlobalValue::LinkageTypes::ExternalLinkage;
-
-        switch (linkage)
-        {
-        case Linkage::External:
-            return llvm::GlobalValue::LinkageTypes::ExternalLinkage;
-        case Linkage::Private:
-        default:
-            return llvm::GlobalValue::LinkageTypes::PrivateLinkage;
-        }
-    }
-
     static llvm::DISubroutineType* create_debug_function_type(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
@@ -163,50 +145,6 @@ namespace iris::compiler
         return llvm_debug_builder.createSubroutineType(
             llvm_debug_builder.getOrCreateTypeArray(parameter_debug_types)
         );
-    }
-
-    llvm::Function& to_function(
-        llvm::LLVMContext& llvm_context,
-        llvm::DataLayout const& llvm_data_layout,
-        Clang_module_data const& clang_module_data,
-        std::string_view const module_name,
-        llvm::FunctionType& llvm_function_type,
-        Function_declaration const& function_declaration,
-        Type_database const& type_database,
-        Declaration_database const& declaration_database
-    )
-    {
-        llvm::GlobalValue::LinkageTypes const linkage = to_linkage(function_declaration.linkage, function_declaration.is_test);
-
-        std::string const mangled_name = mangle_name(module_name, function_declaration.name, function_declaration.unique_name);
-
-        llvm::Function* const llvm_function = llvm::Function::Create(
-            &llvm_function_type,
-            linkage,
-            mangled_name.c_str(),
-            nullptr
-        );
-
-        if (!llvm_function)
-        {
-            throw std::runtime_error{ "Could not create function." };
-        }
-
-        set_llvm_function_argument_names(
-            llvm_context,
-            llvm_data_layout,
-            clang_module_data,
-            function_declaration,
-            *llvm_function,
-            declaration_database,
-            type_database
-        );
-
-        llvm_function->setCallingConv(llvm::CallingConv::C);
-
-        set_function_definition_attributes(llvm_context, clang_module_data, *llvm_function);
-
-        return *llvm_function;
     }
 
     llvm::Function& create_function_declaration(
@@ -883,6 +821,17 @@ namespace iris::compiler
                         continue;
                 }
 
+                {
+                    llvm::Function* const llvm_function = get_llvm_function(
+                        core_module.name,
+                        llvm_module,
+                        function_declaration->name,
+                        function_declaration->unique_name
+                    );
+                    if (llvm_function != nullptr)
+                        continue;
+                }
+
                 llvm::Function& llvm_function = create_function_declaration(
                     llvm_context,
                     llvm_data_layout,
@@ -946,14 +895,14 @@ namespace iris::compiler
                     .temporaries_allocator = temporaries_allocator,
                 };
 
-                Value_and_type const statement_value = create_statement_value(
-                    global_variable_declaration.initial_value,
-                    expression_parameters
-                );
-
-                llvm::Constant* const initial_value = !is_dependency_module ? fold_constant(statement_value.value, llvm_data_layout) : nullptr;
+                llvm::Constant* const initial_value = !is_dependency_module ? fold_statement_constant(global_variable_declaration.initial_value, expression_parameters) : nullptr;
+        
+                Scope const scope;
+                std::optional<Type_reference> const type =
+                    global_variable_declaration.type.has_value() ?
+                    global_variable_declaration.type : 
+                    get_expression_type(core_module.name, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
                 
-                std::optional<Type_reference> const type = global_variable_declaration.type.has_value() ? global_variable_declaration.type : statement_value.type;
                 if (!type.has_value())
                     throw std::runtime_error{std::format("Cannot deduce type of '{}.{}'.", core_module.name, global_variable_declaration.name)};
 
@@ -1235,7 +1184,7 @@ namespace iris::compiler
         );
 
         add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, core_module, core_module_dependencies, enum_value_constants, compilation_options.is_test_mode, {});
-        
+
         {
             std::pmr::vector<Function_declaration const*> const function_declarations = get_vector_element_pointers(core_module.export_declarations.function_declarations, {});
             add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});

@@ -1,0 +1,9 @@
+module Function_constructor_global_consumer_2;
+
+import Function_constructor_global_provider_2 as fns;
+
+function run() -> ()
+{
+    var a = 0;
+    fns.to_json_int32(&a);
+}

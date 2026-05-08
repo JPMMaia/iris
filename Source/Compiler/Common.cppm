@@ -61,4 +61,9 @@ namespace iris::compiler
         iris::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, iris::Module> const& core_module_dependencies
     );
+
+    export llvm::GlobalValue::LinkageTypes to_linkage(
+        Linkage const linkage,
+        bool const is_test
+    );
 }

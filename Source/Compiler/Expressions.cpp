@@ -5695,6 +5695,7 @@ namespace iris::compiler
 
         // Search for functions in this module:
         {
+            // TODO review this...
             std::optional<Function_declaration const*> const function_declaration = find_function_declaration(parameters.core_module, variable_name);
             if (function_declaration.has_value())
             {
@@ -5716,18 +5717,18 @@ namespace iris::compiler
                         function_pointer_type.type
                     );
 
-                    std::string const mangled_name = mangle_name(
-                        parameters.core_module,
-                        function_declaration_value->name,
-                        function_declaration_value->unique_name
+                    llvm_function = &to_function(
+                        parameters.llvm_context,
+                        parameters.llvm_data_layout,
+                        parameters.clang_module_data,
+                        parameters.core_module.name,
+                        *llvm_function_type,
+                        *function_declaration.value(),
+                        parameters.type_database,
+                        parameters.declaration_database
                     );
 
-                    llvm_function = llvm::Function::Create(
-                        llvm_function_type,
-                        llvm::GlobalValue::ExternalLinkage,
-                        mangled_name,
-                        &parameters.llvm_module
-                    );
+                    parameters.llvm_module.getFunctionList().push_back(llvm_function);
                 }
 
                 Type_reference type = create_function_type_type_reference(function_declaration_value->type, function_declaration_value->input_parameter_names, function_declaration_value->output_parameter_names);

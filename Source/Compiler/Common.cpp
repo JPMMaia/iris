@@ -137,4 +137,22 @@ namespace iris::compiler
 
         return nullptr;
     }
+
+    llvm::GlobalValue::LinkageTypes to_linkage(
+        Linkage const linkage,
+        bool const is_test
+    )
+    {
+        if (is_test)
+            return llvm::GlobalValue::LinkageTypes::ExternalLinkage;
+
+        switch (linkage)
+        {
+        case Linkage::External:
+            return llvm::GlobalValue::LinkageTypes::ExternalLinkage;
+        case Linkage::Private:
+        default:
+            return llvm::GlobalValue::LinkageTypes::PrivateLinkage;
+        }
+    }
 }

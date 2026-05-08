@@ -1,0 +1,8 @@
+module Function_constructor_global_provider;
+
+export function_constructor to_json(Value_type: Type)
+{
+    return function (value: *Value_type) -> ()
+    {
+    };
+}

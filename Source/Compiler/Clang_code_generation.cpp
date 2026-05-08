@@ -2862,4 +2862,48 @@ namespace iris::compiler
     {
         return clang_module_data.ast_context;
     }
+
+    llvm::Function& to_function(
+        llvm::LLVMContext& llvm_context,
+        llvm::DataLayout const& llvm_data_layout,
+        Clang_module_data const& clang_module_data,
+        std::string_view const module_name,
+        llvm::FunctionType& llvm_function_type,
+        Function_declaration const& function_declaration,
+        Type_database const& type_database,
+        Declaration_database const& declaration_database
+    )
+    {
+        llvm::GlobalValue::LinkageTypes const linkage = to_linkage(function_declaration.linkage, function_declaration.is_test);
+
+        std::string const mangled_name = mangle_name(module_name, function_declaration.name, function_declaration.unique_name);
+
+        llvm::Function* const llvm_function = llvm::Function::Create(
+            &llvm_function_type,
+            linkage,
+            mangled_name.c_str(),
+            nullptr
+        );
+
+        if (!llvm_function)
+        {
+            throw std::runtime_error{ "Could not create function." };
+        }
+
+        set_llvm_function_argument_names(
+            llvm_context,
+            llvm_data_layout,
+            clang_module_data,
+            function_declaration,
+            *llvm_function,
+            declaration_database,
+            type_database
+        );
+
+        llvm_function->setCallingConv(llvm::CallingConv::C);
+
+        set_function_definition_attributes(llvm_context, clang_module_data, *llvm_function);
+
+        return *llvm_function;
+    }
 }

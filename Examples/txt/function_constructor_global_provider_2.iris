@@ -1,0 +1,10 @@
+module Function_constructor_global_provider_2;
+
+function_constructor to_json(Value_type: Type)
+{
+    return function (value: *Value_type) -> ()
+    {
+    };
+}
+
+export var to_json_int32 = to_json::<Int32>;

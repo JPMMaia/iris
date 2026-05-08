@@ -884,4 +884,88 @@ function iris.functions__at__to_json__at__2824829538199830437(value: *Int32) -> 
 
         CHECK(expected == actual);
     }
+
+    TEST_CASE("Does not instantiate functions using global variable that are already instantiated in imported modules", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const dependency = R"(module iris.functions;
+
+function_constructor to_json(Value_type: Type)
+{
+    return function (value: *Value_type) -> ()
+    {
+    };
+}
+
+export var to_json_int32 = to_json::<Int32>;
+)";
+
+        std::string_view const input = R"(module Test;
+
+import iris.functions as fns;
+
+function run() -> ()
+{
+    var a = 0;
+    fns.to_json_int32(&a);
+}
+)";
+
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies);
+
+        std::string_view const expected = R"(module Test;
+
+import iris.functions as fns;
+
+function run() -> ()
+{
+    var a = 0;
+    fns.to_json_int32(&a);
+}
+)";
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Does not instantiate types using alias that are already instantiated in imported modules", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const dependency = R"(module type_constructors;
+
+type_constructor Dynamic_array(element_type: Type)
+{
+    return struct
+    {
+        data: *element_type = null;
+        length: Uint64 = 0u64;
+    };
+}
+
+export using Dynamic_array_int32 = Dynamic_array::<Int32>;
+)";
+
+        std::string_view const input = R"(module Test;
+
+import type_constructors as type_constructors;
+
+function run() -> ()
+{
+    var a: type_constructors.Dynamic_array_int32 = {};
+}
+)";
+
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies);
+
+        std::string_view const expected = R"(module Test;
+
+import type_constructors as type_constructors;
+
+function run() -> ()
+{
+    var a: type_constructors.Dynamic_array_int32 = {};
+}
+)";
+
+        CHECK(expected == actual);
+    }
 }
