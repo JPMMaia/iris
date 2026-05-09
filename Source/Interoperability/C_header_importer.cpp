@@ -2911,6 +2911,26 @@ namespace iris::c
             .source_file_path = header_path
         };
 
+        std::pmr::unordered_set<std::pmr::string> dependency_names;
+        for (const auto& [c_name, metadata] : declarations_with_fixed_width_integers.metadata_by_c_name)
+        {
+            if (!metadata.module_name.empty() && metadata.module_name != header_module.name)
+            {
+                dependency_names.insert(metadata.module_name);
+            }
+        }
+
+        for (const auto& dependency_name : dependency_names)
+        {
+            iris::Import_module_with_alias dependency_import{
+                .module_name = dependency_name,
+                .alias = {},
+                .usages = {},
+                .source_range = std::nullopt
+            };
+            header_module.dependencies.alias_imports.push_back(std::move(dependency_import));
+        }
+
         group_declarations_by_visibility(declarations_with_fixed_width_integers, header_module.export_declarations, header_module.internal_declarations, options.public_prefixes);
 
         add_struct_member_default_values(header_module, header_module.export_declarations, declaration_database);

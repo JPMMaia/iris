@@ -291,6 +291,26 @@ namespace iris::compiler
         test_builder("Export_and_import_c_header", {"iris_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
+    TEST_CASE("Build Import_c_header_with_dependency", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "my_library.module_a.irisb",
+            std::filesystem::path{"artifacts"} / "my_library.module_b.irisb",
+            std::filesystem::path{"artifacts"} / "my_library.module_c.irisb",
+            std::filesystem::path{"include"} / "my_library" / "module_a.h",
+            std::filesystem::path{"include"} / "my_library" / "module_a.hpp",
+        };
+
+        test_builder("Import_c_header_with_dependency", {"iris_artifact.json"}, target, repository_paths, expected_output_paths);
+    }
+
     TEST_CASE("Build Test_framework my_app in non-test mode", "[Builder]")
     {
         iris::compiler::Target const target = iris::compiler::get_default_target();

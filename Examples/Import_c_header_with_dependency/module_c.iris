@@ -1,0 +1,9 @@
+module my_library.module_c;
+
+import my_library.module_b as mb;
+
+export function get_value() -> (result: Int32)
+{
+    var s = mb.get_struct();
+    return s.value;
+}

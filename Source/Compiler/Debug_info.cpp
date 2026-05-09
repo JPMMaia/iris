@@ -197,6 +197,15 @@ namespace iris::compiler
                 add_nested_requested_debug_types(*module, member_type, core_module_dependencies, requested_debug_types, visited_debug_types, allocator);
             return;
         }
+
+        if (std::optional<Function_declaration const*> const function_declaration = find_function_declaration(*module, type_name))
+        {
+            for (Type_reference const& parameter_type : function_declaration.value()->type.input_parameter_types)
+                add_nested_requested_debug_types(*module, parameter_type, core_module_dependencies, requested_debug_types, visited_debug_types, allocator);
+            for (Type_reference const& parameter_type : function_declaration.value()->type.output_parameter_types)
+                add_nested_requested_debug_types(*module, parameter_type, core_module_dependencies, requested_debug_types, visited_debug_types, allocator);
+            return;
+        }
     }
 
     static void add_nested_requested_debug_types(
@@ -227,13 +236,13 @@ namespace iris::compiler
         visit_type_references_recursively(type_reference, process_type);
     }
 
-    Debug_type_names_per_module create_requested_dependency_debug_types(
+    void create_requested_dependency_debug_types_auxiliary(
+        Debug_type_names_per_module& requested_debug_types,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         std::pmr::polymorphic_allocator<> const& allocator
     )
     {
-        Debug_type_names_per_module requested_debug_types{allocator};
         std::pmr::unordered_set<std::pmr::string> visited_debug_types{allocator};
 
         for (Import_module_with_alias const& alias_import : core_module.dependencies.alias_imports)
@@ -243,8 +252,22 @@ namespace iris::compiler
                 if (add_debug_type_name(requested_debug_types, alias_import.module_name, usage, allocator))
                     expand_requested_debug_type(alias_import.module_name, usage, core_module_dependencies, requested_debug_types, visited_debug_types, allocator);
             }
-        }
 
+            Module const* const dependency = core_module_dependencies.at(alias_import.module_name);
+            create_requested_dependency_debug_types_auxiliary(requested_debug_types, *dependency, core_module_dependencies, allocator);
+        }
+    }
+
+    Debug_type_names_per_module create_requested_dependency_debug_types(
+        Module const& core_module,
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
+        std::pmr::polymorphic_allocator<> const& allocator
+    )
+    {
+        Debug_type_names_per_module requested_debug_types{allocator};
+
+        create_requested_dependency_debug_types_auxiliary(requested_debug_types, core_module, core_module_dependencies, allocator);
+        
         for (auto& [_, names] : requested_debug_types)
             std::sort(names.begin(), names.end());
 
