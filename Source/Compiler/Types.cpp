@@ -232,6 +232,22 @@ namespace iris::compiler
         }
     }
 
+    static bool is_requested_type(
+        std::string_view const name,
+        std::optional<std::span<std::pmr::string const>> const& requested_debug_types
+    )
+    {
+        if (!requested_debug_types.has_value())
+            return true;
+
+        auto const location = std::find_if(
+            requested_debug_types->begin(),
+            requested_debug_types->end(),
+            [&](std::pmr::string const& requested_name) -> bool { return requested_name == name; }
+        );
+        return location != requested_debug_types->end();
+    }
+
     void add_alias_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
@@ -283,6 +299,7 @@ namespace iris::compiler
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
         llvm::DataLayout const& llvm_data_layout,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         std::span<Alias_type_declaration const> const alias_type_declarations,
         Module const& core_module,
         Type_database const& type_database,
@@ -292,6 +309,9 @@ namespace iris::compiler
     {
         for (Alias_type_declaration const& alias_type_declaration : alias_type_declarations)
         {
+            if (!is_requested_type(alias_type_declaration.name, requested_debug_types))
+                continue;
+
             add_alias_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, alias_type_declaration, core_module, type_database, debug_type_database, llvm_debug_type_map);
         }
     }
@@ -316,6 +336,7 @@ namespace iris::compiler
         llvm::DIScope& llvm_debug_scope,
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         std::string_view const module_name,
         std::span<Enum_declaration const> const enum_declarations,
         std::pmr::unordered_map<std::pmr::string, std::pmr::vector<llvm::Constant*>> const& enum_value_constants,
@@ -324,6 +345,9 @@ namespace iris::compiler
     {
         for (Enum_declaration const& enum_declaration : enum_declarations)
         {
+            if (!is_requested_type(enum_declaration.name, requested_debug_types))
+                continue;
+
             // TODO figure out required number of bits
             unsigned const number_of_bits = 32;
             llvm::DIType* const underlying_type = llvm_debug_builder.createBasicType("Int32", 32, llvm::dwarf::DW_ATE_signed);
@@ -392,6 +416,7 @@ namespace iris::compiler
         llvm::DIScope& llvm_debug_scope,
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Module const& core_module,
         std::span<Struct_declaration const> const struct_declarations,
         LLVM_debug_type_map& llvm_debug_type_map
@@ -399,6 +424,9 @@ namespace iris::compiler
     {
         for (Struct_declaration const& struct_declaration : struct_declarations)
         {
+            if (!is_requested_type(struct_declaration.name, requested_debug_types))
+                continue;
+
             std::string const mangled_name = mangle_struct_name(core_module, struct_declaration.name);
 
             llvm::DIFile* const declaration_llvm_debug_file = get_or_create_llvm_debug_file(llvm_debug_builder, llvm_debug_file, llvm_debug_files, struct_declaration.source_location);
@@ -421,6 +449,7 @@ namespace iris::compiler
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
         llvm::DataLayout const& llvm_data_layout,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Clang_module_data const& clang_module_data,
         Module const& core_module,
         std::span<Struct_declaration const> const struct_declarations,
@@ -431,6 +460,9 @@ namespace iris::compiler
     {
         for (Struct_declaration const& struct_declaration : struct_declarations)
         {
+            if (!is_requested_type(struct_declaration.name, requested_debug_types))
+                continue;
+
             std::pmr::vector<llvm::DIType*> const llvm_member_debug_types = type_references_to_llvm_debug_types(
                 llvm_debug_builder,
                 llvm_debug_scope,
@@ -554,6 +586,7 @@ namespace iris::compiler
         llvm::DIScope& llvm_debug_scope,
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Module const& core_module,
         std::span<Union_declaration const> const union_declarations,
         LLVM_debug_type_map& llvm_debug_type_map
@@ -561,6 +594,9 @@ namespace iris::compiler
     {
         for (Union_declaration const& union_declaration : union_declarations)
         {
+            if (!is_requested_type(union_declaration.name, requested_debug_types))
+                continue;
+
             std::string const mangled_name = mangle_struct_name(core_module, union_declaration.name);
 
             llvm::DIFile* const declaration_llvm_debug_file = get_or_create_llvm_debug_file(llvm_debug_builder, llvm_debug_file, llvm_debug_files, union_declaration.source_location);
@@ -583,6 +619,7 @@ namespace iris::compiler
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
         llvm::DataLayout const& llvm_data_layout,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Module const& core_module,
         std::span<Union_declaration const> const union_declarations,
         Debug_type_database const& debug_type_database,
@@ -592,6 +629,9 @@ namespace iris::compiler
     {
         for (Union_declaration const& union_declaration : union_declarations)
         {
+            if (!is_requested_type(union_declaration.name, requested_debug_types))
+                continue;
+
             std::pmr::vector<llvm::DIType*> const llvm_member_debug_types = type_references_to_llvm_debug_types(
                 llvm_debug_builder,
                 llvm_debug_scope,
@@ -779,6 +819,7 @@ namespace iris::compiler
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
         llvm::DataLayout const& llvm_data_layout,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Clang_module_data const& clang_module_data,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::pmr::vector<llvm::Constant*>> const& enum_value_constants,
@@ -788,23 +829,23 @@ namespace iris::compiler
         LLVM_debug_type_map& llvm_debug_type_map = debug_type_database.name_to_llvm_debug_type[core_module.name];
         LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at(core_module.name);
 
-        add_enum_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module.name, core_module.export_declarations.enum_declarations, enum_value_constants, llvm_debug_type_map);
-        add_enum_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module.name, core_module.internal_declarations.enum_declarations, enum_value_constants, llvm_debug_type_map);
+        add_enum_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module.name, core_module.export_declarations.enum_declarations, enum_value_constants, llvm_debug_type_map);
+        add_enum_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module.name, core_module.internal_declarations.enum_declarations, enum_value_constants, llvm_debug_type_map);
 
-        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module, core_module.export_declarations.struct_declarations, llvm_debug_type_map);
-        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module, core_module.internal_declarations.struct_declarations, llvm_debug_type_map);
+        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, core_module.export_declarations.struct_declarations, llvm_debug_type_map);
+        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, core_module.internal_declarations.struct_declarations, llvm_debug_type_map);
 
-        add_union_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module, core_module.export_declarations.union_declarations, llvm_debug_type_map);
-        add_union_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module, core_module.internal_declarations.union_declarations, llvm_debug_type_map);
+        add_union_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, core_module.export_declarations.union_declarations, llvm_debug_type_map);
+        add_union_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, core_module.internal_declarations.union_declarations, llvm_debug_type_map);
 
-        add_alias_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module.export_declarations.alias_type_declarations, core_module, type_database, debug_type_database, llvm_debug_type_map);
-        add_alias_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module.internal_declarations.alias_type_declarations, core_module, type_database, debug_type_database, llvm_debug_type_map);
+        add_alias_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module.export_declarations.alias_type_declarations, core_module, type_database, debug_type_database, llvm_debug_type_map);
+        add_alias_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module.internal_declarations.alias_type_declarations, core_module, type_database, debug_type_database, llvm_debug_type_map);
 
-        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, clang_module_data, core_module, core_module.export_declarations.struct_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
-        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, clang_module_data, core_module, core_module.internal_declarations.struct_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
+        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, clang_module_data, core_module, core_module.export_declarations.struct_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
+        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, clang_module_data, core_module, core_module.internal_declarations.struct_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
 
-        set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module, core_module.export_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
-        set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module, core_module.internal_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
+        set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module, core_module.export_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
+        set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module, core_module.internal_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
     }
 
     llvm::DIType* create_void_type(
