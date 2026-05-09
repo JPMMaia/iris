@@ -7,6 +7,13 @@ import iris.core.struct_layout;
 
 namespace iris::c
 {
+    export struct Imported_declaration_metadata
+    {
+        std::pmr::string module_name;
+        std::pmr::string declaration_name;
+        std::pmr::string kind;
+    };
+
     export struct C_macro_declaration
     {
         std::pmr::string name;
@@ -26,6 +33,7 @@ namespace iris::c
         std::pmr::vector<iris::Union_declaration> union_declarations;
         std::pmr::vector<iris::Function_declaration> function_declarations;
         std::pmr::vector<C_macro_declaration> macro_declarations;
+        std::pmr::unordered_map<std::pmr::string, Imported_declaration_metadata> metadata_by_c_name;
         std::uint32_t unnamed_count = 0;
     };
 

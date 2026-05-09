@@ -1889,4 +1889,35 @@ typedef My_int My_alias;
             CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 3, 16, 3, 17));
         }
     }
+
+    TEST_CASE("IRIS_META recovers original module and declaration names")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "iris_meta_recovery";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+/** IRIS_META v=1 module=maia.runtime.scene name=Camera kind=struct */
+struct maia_runtime_scene_Camera
+{
+    int id;
+};
+
+/** IRIS_META v=1 module=maia.runtime.scene name=create_camera kind=function */
+struct maia_runtime_scene_Camera maia_runtime_scene_create_camera(void);
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "scene.h";
+        iris::common::write_to_file(header_file_path, header_content);
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("maia.runtime.usd.importer", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        iris::Module const& header_module = header_module_optional.value();
+
+        iris::Struct_declaration const& camera = iris::c::find_struct_declaration(header_module, "Camera");
+        CHECK(camera.name == "Camera");
+
+        iris::Function_declaration const& create_camera = iris::c::find_function_declaration(header_module, "create_camera");
+        REQUIRE(create_camera.type.output_parameter_types.size() == 1);
+        CHECK(create_camera.type.output_parameter_types[0] == iris::create_custom_type_reference("maia.runtime.scene", "Camera"));
+    }
 }

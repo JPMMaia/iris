@@ -117,6 +117,60 @@ namespace iris::c
         return {.line = header_source_location.source_location.range.start.line, .column = header_source_location.source_location.range.start.column };
     }
 
+    struct Iris_meta_comment
+    {
+        std::pmr::string module_name;
+        std::pmr::string declaration_name;
+        std::pmr::string kind;
+    };
+
+    std::optional<std::string_view> find_iris_meta_field(
+        std::string_view const raw_comment,
+        std::string_view const key
+    )
+    {
+        std::size_t const start = raw_comment.find(key);
+        if (start == std::string_view::npos)
+            return std::nullopt;
+
+        std::size_t value_begin = start + key.size();
+        std::size_t value_end = value_begin;
+        while (value_end < raw_comment.size())
+        {
+            char const character = raw_comment[value_end];
+            if (std::isspace(character) || character == '*' || character == '/')
+                break;
+
+            value_end += 1;
+        }
+
+        if (value_begin == value_end)
+            return std::nullopt;
+
+        return raw_comment.substr(value_begin, value_end - value_begin);
+    }
+
+    std::optional<Iris_meta_comment> parse_iris_meta_comment(CXCursor const cursor)
+    {
+        String const raw_comment_string = clang_Cursor_getRawCommentText(cursor);
+        std::string_view const raw_comment = raw_comment_string.string_view();
+        if (raw_comment.find("IRIS_META") == std::string_view::npos)
+            return std::nullopt;
+
+        std::optional<std::string_view> const module_name = find_iris_meta_field(raw_comment, "module=");
+        std::optional<std::string_view> const declaration_name = find_iris_meta_field(raw_comment, "name=");
+        std::optional<std::string_view> const kind = find_iris_meta_field(raw_comment, "kind=");
+        if (!module_name.has_value() || !declaration_name.has_value() || !kind.has_value())
+            return std::nullopt;
+
+        return Iris_meta_comment
+        {
+            .module_name = std::pmr::string{*module_name},
+            .declaration_name = std::pmr::string{*declaration_name},
+            .kind = std::pmr::string{*kind}
+        };
+    }
+
     std::optional<iris::Fundamental_type> to_fundamental_type(CXTypeKind const type_kind) noexcept
     {
         switch (type_kind)
@@ -414,6 +468,12 @@ namespace iris::c
 
             if (location == declarations.enum_declarations.end())
             {
+                auto const metadata_location = declarations.metadata_by_c_name.find(std::pmr::string{enum_type_name});
+                if (metadata_location != declarations.metadata_by_c_name.end())
+                {
+                    return iris::create_custom_type_reference(metadata_location->second.module_name, metadata_location->second.declaration_name);
+                }
+
                 std::string const message = std::format("Could not find enum with name '{}'\n", enum_type_name);
                 std::cerr << message;
                 throw std::runtime_error{ message };
@@ -460,6 +520,12 @@ namespace iris::c
 
             if (location == declarations.alias_type_declarations.end())
             {
+                auto const metadata_location = declarations.metadata_by_c_name.find(std::pmr::string{typedef_name});
+                if (metadata_location != declarations.metadata_by_c_name.end())
+                {
+                    return iris::create_custom_type_reference(metadata_location->second.module_name, metadata_location->second.declaration_name);
+                }
+
                 CXType const canonical_type = clang_getCanonicalType(type);
                 if (canonical_type.kind == CXType_Enum || canonical_type.kind == CXType_Record)
                     return create_type_reference(declarations, cursor, canonical_type);
@@ -497,6 +563,12 @@ namespace iris::c
             String const type_spelling = { clang_getTypeSpelling(type) };
             std::string_view const type_spelling_string = type_spelling.string_view();
             std::string_view type_name = remove_type(type_spelling_string);
+
+            auto const location = declarations.metadata_by_c_name.find(std::pmr::string{type_name});
+            if (location != declarations.metadata_by_c_name.end())
+            {
+                return iris::create_custom_type_reference(location->second.module_name, location->second.declaration_name);
+            }
 
             return iris::create_custom_type_reference(declarations.module_name, type_name);
         }
@@ -553,7 +625,7 @@ namespace iris::c
         }
     }
 
-    std::optional<iris::Alias_type_declaration> create_alias_type_declaration(C_declarations const& declarations, CXCursor const cursor)
+    std::optional<iris::Alias_type_declaration> create_alias_type_declaration(C_declarations& declarations, CXCursor const cursor)
     {
         CXType const type = clang_getCursorType(cursor);
         String const type_spelling = { clang_getTypeSpelling(type) };
@@ -565,6 +637,20 @@ namespace iris::c
 
         if (type_name == underlying_type_name)
             return std::nullopt;
+
+        std::pmr::string declaration_name = std::pmr::string{type_name};
+        std::optional<Iris_meta_comment> const metadata = parse_iris_meta_comment(cursor);
+        if (metadata.has_value())
+        {
+            declaration_name = metadata->declaration_name;
+
+            declarations.metadata_by_c_name[std::pmr::string{type_name}] = Imported_declaration_metadata
+            {
+                .module_name = std::pmr::string{metadata->module_name},
+                .declaration_name = std::pmr::string{metadata->declaration_name},
+                .kind = std::pmr::string{metadata->kind}
+            };
+        }
 
         std::optional<iris::Type_reference> underlying_type_reference = create_type_reference(declarations, cursor, underlying_type);
 
@@ -580,14 +666,14 @@ namespace iris::c
 
         return iris::Alias_type_declaration
         {
-            .name = std::pmr::string{type_name},
-            .unique_name = std::pmr::string{type_name},
+            .name = declaration_name,
+            .unique_name = declaration_name,
             .type = std::move(alias_type),
             .source_location = cursor_location.source_location,
         };
     }
 
-    iris::Enum_declaration create_enum_declaration(C_declarations const& declarations, CXCursor const cursor)
+    iris::Enum_declaration create_enum_declaration(C_declarations& declarations, CXCursor const cursor)
     {
         using Enum_values = std::pmr::vector<iris::Enum_value>;
 
@@ -595,6 +681,20 @@ namespace iris::c
 
         String const enum_type_spelling = clang_getTypeSpelling(enum_type);
         std::string_view const enum_type_name = find_enum_name(enum_type_spelling.string_view());
+
+        std::pmr::string declaration_name = std::pmr::string{enum_type_name};
+        std::optional<Iris_meta_comment> const metadata = parse_iris_meta_comment(cursor);
+        if (metadata.has_value())
+        {
+            declaration_name = metadata->declaration_name;
+
+            declarations.metadata_by_c_name[std::pmr::string{enum_type_name}] = Imported_declaration_metadata
+            {
+                .module_name = std::pmr::string{metadata->module_name},
+                .declaration_name = std::pmr::string{metadata->declaration_name},
+                .kind = std::pmr::string{metadata->kind}
+            };
+        }
 
         auto const visitor = [](CXCursor current_cursor, CXCursor parent, CXClientData client_data) -> CXChildVisitResult
         {
@@ -655,8 +755,8 @@ namespace iris::c
 
         return iris::Enum_declaration
         {
-            .name = std::pmr::string{enum_type_name},
-            .unique_name = std::pmr::string{enum_type_name},
+            .name = declaration_name,
+            .unique_name = declaration_name,
             .values = std::move(values),
             .source_location = cursor_location.source_location,
         };
@@ -883,6 +983,12 @@ namespace iris::c
             std::pmr::string const& line = lines[current_line_index];
             std::string_view const line_without_comments = get_line_without_comments(line, is_multi_line_comment);
 
+            if (line_without_comments.find("IRIS_META") != std::string_view::npos)
+            {
+                current_line_index += 1;
+                continue;
+            }
+
             if (is_empty_line(line_without_comments))
             {
                 current_line_index += 1;    
@@ -1000,9 +1106,12 @@ namespace iris::c
     iris::Function_declaration create_function_declaration(C_declarations const& declarations, CXCursor const cursor)
     {
         String const cursor_spelling = { clang_getCursorSpelling(cursor) };
-        std::string_view const function_name = cursor_spelling.string_view();
-        if (function_name == "puts") {
-            int i = 0;
+        std::pmr::string function_name = std::pmr::string{cursor_spelling.string_view()};
+
+        std::optional<Iris_meta_comment> const metadata = parse_iris_meta_comment(cursor);
+        if (metadata.has_value())
+        {
+            function_name = metadata->declaration_name;
         }
 
         Header_source_location const cursor_location = get_cursor_source_location(
@@ -1023,8 +1132,8 @@ namespace iris::c
 
         return iris::Function_declaration
         {
-            .name = std::pmr::string{function_name},
-            .unique_name = std::pmr::string{function_name},
+            .name = function_name,
+            .unique_name = function_name,
             .type = std::move(h_function_type),
             .input_parameter_names = std::move(input_parameter_names),
             .output_parameter_names = std::move(output_parameter_names),
@@ -1352,7 +1461,23 @@ namespace iris::c
             iris::Struct_declaration* struct_declaration;
         };
 
-        std::pmr::string const struct_name = create_declaration_name(declarations, cursor);
+        std::pmr::string struct_name = create_declaration_name(declarations, cursor);
+
+        String const cursor_spelling = { clang_getCursorSpelling(cursor) };
+        std::string_view const original_c_name = cursor_spelling.string_view();
+
+        std::optional<Iris_meta_comment> const metadata = parse_iris_meta_comment(cursor);
+        if (metadata.has_value())
+        {
+            struct_name = metadata->declaration_name;
+
+            declarations.metadata_by_c_name[std::pmr::string{original_c_name}] = Imported_declaration_metadata
+            {
+                .module_name = std::pmr::string{metadata->module_name},
+                .declaration_name = std::pmr::string{metadata->declaration_name},
+                .kind = std::pmr::string{metadata->kind}
+            };
+        }
 
         auto const visitor = [](CXCursor current_cursor, CXCursor parent, CXClientData client_data) -> CXChildVisitResult
         {

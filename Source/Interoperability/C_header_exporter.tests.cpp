@@ -187,6 +187,7 @@ export struct My_struct
 )RAW";
 
         std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=My_struct kind=struct */
 struct my_namespace_My_struct
 {
     int32_t a;
@@ -226,6 +227,7 @@ export function my_public_function_2() -> ();
 )RAW";
 
         std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=My_struct kind=struct */
 struct my_namespace_My_struct
 {
     int32_t a;
@@ -237,7 +239,9 @@ struct Array_slice_my_namespace_My_struct
     uint64_t size;
 };
 
+/** IRIS_META v=1 module=my.namespace name=my_public_function kind=function */
 struct my_namespace_My_struct my_namespace_my_public_function(struct my_namespace_My_struct a, struct my_namespace_My_struct const* b);
+/** IRIS_META v=1 module=my.namespace name=my_public_function_2 kind=function */
 void my_namespace_my_public_function_2();
 )RAW";
 
@@ -266,6 +270,7 @@ export struct My_struct
 )RAW";
 
         std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=My_struct kind=struct */
 struct my_namespace_My_struct
 {
     int32_t a[4];
@@ -292,6 +297,7 @@ export struct My_struct
 )RAW";
 
         std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=My_struct kind=struct */
 struct my_namespace_My_struct
 {
     struct Array_slice_Int32 elements;
@@ -319,6 +325,7 @@ export struct Allocator
 )RAW";
 
         std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Allocator kind=struct */
 struct my_namespace_Allocator
 {
     void*(*allocate)(uint64_t size, uint64_t alignment);
@@ -356,6 +363,7 @@ export struct My_struct_b
 )RAW";
 
         std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=My_node kind=struct */
 struct my_namespace_My_node
 {
     struct my_namespace_My_node const* parent;
@@ -367,6 +375,7 @@ struct Array_slice_my_namespace_My_node
     uint64_t size;
 };
 
+/** IRIS_META v=1 module=my.namespace name=My_struct_b kind=struct */
 struct my_namespace_My_struct_b
 {
     int32_t v;
@@ -378,6 +387,7 @@ struct Array_slice_my_namespace_My_struct_b
     uint64_t size;
 };
 
+/** IRIS_META v=1 module=my.namespace name=My_struct_a kind=struct */
 struct my_namespace_My_struct_a
 {
     struct my_namespace_My_struct_b b;
@@ -423,6 +433,7 @@ export struct My_struct
         };
 
         std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=My_struct kind=struct */
 struct my_namespace_My_struct
 {
     struct my_library_module_a_My_struct b;
@@ -469,6 +480,7 @@ export struct Transformf32
         };
 
         std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Vector3f32 kind=struct */
 struct my_namespace_Vector3f32
 {
     float x;
@@ -482,6 +494,7 @@ struct Array_slice_my_namespace_Vector3f32
     uint64_t size;
 };
 
+/** IRIS_META v=1 module=my.namespace name=Transformf32 kind=struct */
 struct my_namespace_Transformf32
 {
     struct my_namespace_Vector3f32 translation;
@@ -520,6 +533,7 @@ export var bar = foo::<Float32>;
         };
 
         std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my_namespace name=bar kind=global */
 extern void(*my_namespace_bar)(float value);
 )RAW";
 
@@ -563,6 +577,7 @@ export struct Transformf32
 
         std::pmr::string const expected = std::pmr::string{std::format(
             R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Transformf32 kind=struct */
 struct my_namespace_Transformf32
 {{
     struct {} translation;
@@ -606,7 +621,9 @@ export function process_vector(value: Vector3::<Float32>) -> (result: Vector3::<
 
         std::pmr::string const expected = std::pmr::string{std::format(
             R"RAW(
+/** IRIS_META v=1 module=my.namespace name=make_vector kind=function */
 struct {} my_namespace_make_vector();
+/** IRIS_META v=1 module=my.namespace name=process_vector kind=function */
 struct {} my_namespace_process_vector(struct {} value);
 )RAW",
             type_instance_name,
@@ -646,6 +663,7 @@ export struct Buffer
 
         std::pmr::string const expected = std::pmr::string{std::format(
             R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Buffer kind=struct */
 struct my_namespace_Buffer
 {{
     struct Array_slice_{} elements;
@@ -683,6 +701,7 @@ export function process_vector(value: Vector3f32) -> (result: Vector3f32);
 )RAW";
 
         std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Vector3f32 kind=struct */
 struct my_namespace_Vector3f32
 {
     float x;
@@ -696,7 +715,62 @@ struct Array_slice_my_namespace_Vector3f32
     uint64_t size;
 };
 
+/** IRIS_META v=1 module=my.namespace name=process_vector kind=function */
 struct my_namespace_Vector3f32 my_namespace_process_vector(struct my_namespace_Vector3f32 value);
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Exports IRIS_META comments for struct and function declarations")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export struct Camera
+{
+    id: Int32 = 0;
+}
+
+export function create_camera() -> (result: Camera);
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Camera kind=struct */
+struct my_namespace_Camera
+{
+    int32_t id;
+};
+
+struct Array_slice_my_namespace_Camera
+{
+    struct my_namespace_Camera* data;
+    uint64_t size;
+};
+
+/** IRIS_META v=1 module=my.namespace name=create_camera kind=function */
+struct my_namespace_Camera my_namespace_create_camera();
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Exports IRIS_META comments for global variables")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export function_constructor make_callback(Value_type: Type)
+{
+    return function(value: Value_type) -> ()
+    {
+    };
+}
+
+export var on_update = make_callback::<Float32>;
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=on_update kind=global */
+extern void(*my_namespace_on_update)(float value);
 )RAW";
 
         test_c_exporter(input, {}, {}, expected);

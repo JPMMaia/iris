@@ -281,6 +281,22 @@ namespace iris::c
         stream << declaration_name;
     }
 
+    static void write_iris_meta_comment(
+        String_stream& stream,
+        std::string_view const module_name,
+        std::string_view const declaration_name,
+        std::string_view const declaration_kind
+    )
+    {
+        stream << "/** IRIS_META v=1 module=";
+        stream << module_name;
+        stream << " name=";
+        stream << declaration_name;
+        stream << " kind=";
+        stream << declaration_kind;
+        stream << " */\n";
+    }
+
     static std::optional<std::string_view> get_declaration_type(iris::Declaration const& declaration)
     {
         if (std::holds_alternative<Struct_declaration const*>(declaration.data))
@@ -732,6 +748,7 @@ namespace iris::c
         std::span<iris::Type_reference const> const member_types
     )
     {
+        write_iris_meta_comment(stream, core_module_name, declaration_name, declaration_type);
         stream << declaration_type << " ";
         write_c_declaration_name(stream, core_module_name, declaration_name, unique_name);
         stream << "\n{\n";
@@ -814,6 +831,7 @@ namespace iris::c
         iris::Function_declaration const& declaration
     )
     {
+        write_iris_meta_comment(stream, core_module_name, declaration.name, "function");
         write_c_type_name(stream, declaration_database, declaration.type.output_parameter_types, std::nullopt);
 
         stream << " ";
@@ -850,6 +868,7 @@ namespace iris::c
             );
 
             // Emit the global as an extern function pointer
+            write_iris_meta_comment(stream, core_module.name, declaration.name, "global");
             stream << "extern ";
             write_c_type_name(stream, declaration_database, function_expression.declaration.type.output_parameter_types, std::nullopt);
             stream << "(*";
