@@ -158,6 +158,7 @@ namespace iris
     bool debug = false;
     std::string_view target_triple = "x86_64-pc-linux-gnu";
     iris::compiler::Contract_options contract_options = iris::compiler::Contract_options::Log_error_and_abort;
+    bool enable_bounds_checks = false;
     bool is_test_mode = false;
   };
 
@@ -207,6 +208,7 @@ namespace iris
       .is_optimized = false,
       .debug = test_options.debug,
       .contract_options = test_options.contract_options,
+      .enable_bounds_checks = test_options.enable_bounds_checks,
       .is_test_mode = test_options.is_test_mode,
     };
 
@@ -1806,6 +1808,422 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Array Bounds Checks 0", "[LLVM_IR]")
+  {
+    char const* const input_file = "bounds_check_0.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
+
+@function_contract_error_string = private unnamed_addr constant [67 x i8] c"Out-of-bounds array slice access in 'Bounds_check_0.access_slice'!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [76 x i8] c"Out-of-bounds constant array access in 'Bounds_check_0.access_fixed_array'!\00"
+
+; Function Attrs: convergent
+define i32 @Bounds_check_0_access_slice(ptr %"arguments[0].integers_0", i64 %"arguments[0].integers_1", i32 noundef %"arguments[1].index") #0 {
+entry:
+  %integers = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %index = alloca i32, align 4
+  %0 = getelementptr inbounds { ptr, i64 }, ptr %integers, i32 0, i32 0
+  store ptr %"arguments[0].integers_0", ptr %0, align 8
+  %1 = getelementptr inbounds { ptr, i64 }, ptr %integers, i32 0, i32 1
+  store i64 %"arguments[0].integers_1", ptr %1, align 8
+  store i32 %"arguments[1].index", ptr %index, align 4
+  %2 = load i32, ptr %index, align 4
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 1
+  %4 = load i64, ptr %3, align 8
+  %bounds_check_index = zext i32 %2 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0
+  %6 = load ptr, ptr %5, align 8
+  %array_slice_element_pointer = getelementptr i32, ptr %6, i32 %2
+  %7 = load i32, ptr %array_slice_element_pointer, align 4
+  ret i32 %7
+
+bounds_check_fail:                                ; preds = %entry
+  %8 = call i32 @puts(ptr @function_contract_error_string)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i32 @Bounds_check_0_access_fixed_array(i32 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %array = alloca [4 x i32], i64 4, align 4
+  %a = alloca [4 x i32], align 4
+  store i32 %"arguments[0].index", ptr %index, align 4
+  %array_element_pointer = getelementptr [4 x i32], ptr %array, i32 0, i32 0
+  store i32 0, ptr %array_element_pointer, align 4
+  %array_element_pointer1 = getelementptr [4 x i32], ptr %array, i32 0, i32 1
+  store i32 1, ptr %array_element_pointer1, align 4
+  %array_element_pointer2 = getelementptr [4 x i32], ptr %array, i32 0, i32 2
+  store i32 2, ptr %array_element_pointer2, align 4
+  %array_element_pointer3 = getelementptr [4 x i32], ptr %array, i32 0, i32 3
+  store i32 3, ptr %array_element_pointer3, align 4
+  %0 = load [4 x i32], ptr %array, align 4
+  store [4 x i32] %0, ptr %a, align 4
+  %1 = load i32, ptr %index, align 4
+  %bounds_check_index = zext i32 %1 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %array_element_pointer4 = getelementptr [4 x i32], ptr %a, i32 0, i32 %1
+  %2 = load i32, ptr %array_element_pointer4, align 4
+  ret i32 %2
+
+bounds_check_fail:                                ; preds = %entry
+  %3 = call i32 @puts(ptr @function_contract_error_string.1)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @puts(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_bounds_checks = true });
+  }
+
+  TEST_CASE("Compile Array Bounds Checks 1", "[LLVM_IR]")
+  {
+    char const* const input_file = "bounds_check_1.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%__hl_soa_array = type { ptr }
+%struct.Bounds_check_1_Particle = type { float, float }
+
+@function_contract_error_string = private unnamed_addr constant [77 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_element'!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [78 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_x'!\00"
+@function_contract_error_string.2 = private unnamed_addr constant [78 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_y'!\00"
+
+; Function Attrs: convergent
+define <2 x float> @Bounds_check_1_access_soa_array_element(i32 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %particles = alloca %__hl_soa_array, align 8
+  %soa_array_storage = alloca [32 x i8], align 4
+  %soa_element = alloca %struct.Bounds_check_1_Particle, align 4
+  store i32 %"arguments[0].index", ptr %index, align 4
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
+  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  store ptr %soa_array_data, ptr %0, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
+  %1 = load i32, ptr %index, align 4
+  %bounds_check_index = zext i32 %1 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %2 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 0
+  %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 %1
+  %4 = load float, ptr %soa_member_element_pointer16, align 4
+  %5 = getelementptr inbounds %struct.Bounds_check_1_Particle, ptr %soa_element, i32 0, i32 0
+  store float %4, ptr %5, align 4
+  %soa_member_base_pointer17 = getelementptr i8, ptr %3, i64 16
+  %soa_member_element_pointer18 = getelementptr float, ptr %soa_member_base_pointer17, i32 %1
+  %6 = load float, ptr %soa_member_element_pointer18, align 4
+  %7 = getelementptr inbounds %struct.Bounds_check_1_Particle, ptr %soa_element, i32 0, i32 1
+  store float %6, ptr %7, align 4
+  %8 = getelementptr inbounds %struct.Bounds_check_1_Particle, ptr %soa_element, i32 0, i32 0
+  %9 = load <2 x float>, ptr %8, align 4
+  ret <2 x float> %9
+
+bounds_check_fail:                                ; preds = %entry
+  %10 = call i32 @puts(ptr @function_contract_error_string)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define float @Bounds_check_1_access_soa_array_member_x(i32 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %particles = alloca %__hl_soa_array, align 8
+  %soa_array_storage = alloca [32 x i8], align 4
+  store i32 %"arguments[0].index", ptr %index, align 4
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
+  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  store ptr %soa_array_data, ptr %0, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
+  %1 = load i32, ptr %index, align 4
+  %2 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %bounds_check_index = zext i32 %1 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 0
+  %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 %1
+  %4 = load float, ptr %soa_member_element_pointer16, align 4
+  ret float %4
+
+bounds_check_fail:                                ; preds = %entry
+  %5 = call i32 @puts(ptr @function_contract_error_string.1)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define float @Bounds_check_1_access_soa_array_member_y(i32 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %particles = alloca %__hl_soa_array, align 8
+  %soa_array_storage = alloca [32 x i8], align 4
+  store i32 %"arguments[0].index", ptr %index, align 4
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
+  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  store ptr %soa_array_data, ptr %0, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
+  %1 = load i32, ptr %index, align 4
+  %2 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %bounds_check_index = zext i32 %1 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 16
+  %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 %1
+  %4 = load float, ptr %soa_member_element_pointer16, align 4
+  ret float %4
+
+bounds_check_fail:                                ; preds = %entry
+  %5 = call i32 @puts(ptr @function_contract_error_string.2)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @puts(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_bounds_checks = true });
+  }
+
+  TEST_CASE("Compile Array Bounds Checks 2", "[LLVM_IR]")
+  {
+    char const* const input_file = "bounds_check_2.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%__hl_soa_array_view = type { i64, i64, i64, ptr }
+%struct.Bounds_check_2_Particle = type { float, float }
+
+@function_contract_error_string = private unnamed_addr constant [87 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_element'!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [88 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_x'!\00"
+@function_contract_error_string.2 = private unnamed_addr constant [88 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_y'!\00"
+
+; Function Attrs: convergent
+define <2 x float> @Bounds_check_2_access_soa_array_view_element(ptr noundef byval(%__hl_soa_array_view) align 8 %"arguments[0].view", i32 noundef %"arguments[1].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %soa_element = alloca %struct.Bounds_check_2_Particle, align 4
+  store i32 %"arguments[1].index", ptr %index, align 4
+  %0 = load i32, ptr %index, align 4
+  %1 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %2 = load ptr, ptr %1, align 8
+  %3 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %4 = load i64, ptr %3, align 8
+  %bounds_check_index = zext i32 %0 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
+  %6 = load i64, ptr %5, align 8
+  %soa_index_i64 = zext i32 %0 to i64
+  %soa_adjusted_index = add i64 %6, %soa_index_i64
+  %soa_member_base_pointer = getelementptr i8, ptr %2, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 %soa_adjusted_index
+  %7 = load float, ptr %soa_member_element_pointer, align 4
+  %8 = getelementptr inbounds %struct.Bounds_check_2_Particle, ptr %soa_element, i32 0, i32 0
+  store float %7, ptr %8, align 4
+  %soa_member_block_size = mul i64 %4, 4
+  %soa_member_block_offset = add i64 0, %soa_member_block_size
+  %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
+  %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %2, i64 %soa_offset_aligned
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 %soa_adjusted_index
+  %9 = load float, ptr %soa_member_element_pointer2, align 4
+  %10 = getelementptr inbounds %struct.Bounds_check_2_Particle, ptr %soa_element, i32 0, i32 1
+  store float %9, ptr %10, align 4
+  %11 = getelementptr inbounds %struct.Bounds_check_2_Particle, ptr %soa_element, i32 0, i32 0
+  %12 = load <2 x float>, ptr %11, align 4
+  ret <2 x float> %12
+
+bounds_check_fail:                                ; preds = %entry
+  %13 = call i32 @puts(ptr @function_contract_error_string)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define float @Bounds_check_2_access_soa_array_view_member_x(ptr noundef byval(%__hl_soa_array_view) align 8 %"arguments[0].view", i32 noundef %"arguments[1].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  store i32 %"arguments[1].index", ptr %index, align 4
+  %0 = load i32, ptr %index, align 4
+  %1 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %2 = load ptr, ptr %1, align 8
+  %3 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %4 = load i64, ptr %3, align 8
+  %bounds_check_index = zext i32 %0 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
+  %6 = load i64, ptr %5, align 8
+  %soa_index_i64 = zext i32 %0 to i64
+  %soa_adjusted_index = add i64 %6, %soa_index_i64
+  %soa_member_base_pointer = getelementptr i8, ptr %2, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 %soa_adjusted_index
+  %7 = load float, ptr %soa_member_element_pointer, align 4
+  ret float %7
+
+bounds_check_fail:                                ; preds = %entry
+  %8 = call i32 @puts(ptr @function_contract_error_string.1)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define float @Bounds_check_2_access_soa_array_view_member_y(ptr noundef byval(%__hl_soa_array_view) align 8 %"arguments[0].view", i32 noundef %"arguments[1].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  store i32 %"arguments[1].index", ptr %index, align 4
+  %0 = load i32, ptr %index, align 4
+  %1 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %2 = load ptr, ptr %1, align 8
+  %3 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %4 = load i64, ptr %3, align 8
+  %bounds_check_index = zext i32 %0 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
+  %6 = load i64, ptr %5, align 8
+  %soa_index_i64 = zext i32 %0 to i64
+  %soa_adjusted_index = add i64 %6, %soa_index_i64
+  %soa_member_block_size = mul i64 %4, 4
+  %soa_member_block_offset = add i64 0, %soa_member_block_size
+  %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
+  %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
+  %soa_member_base_pointer = getelementptr i8, ptr %2, i64 %soa_offset_aligned
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 %soa_adjusted_index
+  %7 = load float, ptr %soa_member_element_pointer, align 4
+  ret float %7
+
+bounds_check_fail:                                ; preds = %entry
+  %8 = call i32 @puts(ptr @function_contract_error_string.2)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @puts(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_bounds_checks = true });
   }
 
   TEST_CASE("Compile Constant Arrays", "[LLVM_IR]")

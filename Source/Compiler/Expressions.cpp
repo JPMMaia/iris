@@ -54,6 +54,7 @@ namespace iris::compiler
             .expression_type = parameters.expression_type,
             .debug_info = parameters.debug_info,
             .contract_options = parameters.contract_options,
+            .enable_bounds_checks = parameters.enable_bounds_checks,
             .source_position = parameters.source_position,
             .temporaries_allocator = parameters.temporaries_allocator,
         };
@@ -1010,6 +1011,38 @@ namespace iris::compiler
         throw std::runtime_error{ "Could not process access expression!" };
     }
 
+    static void create_bounds_check_instructions(
+        llvm::Value* const index_value,
+        llvm::Value* const size_value,
+        std::string_view const error_message,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::LLVMContext& llvm_context = parameters.llvm_context;
+        llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+
+        llvm::Value* const index_i64 = llvm_builder.CreateIntCast(
+            index_value,
+            llvm::Type::getInt64Ty(llvm_context),
+            false,
+            "bounds_check_index"
+        );
+
+        llvm::Value* const in_bounds = llvm_builder.CreateICmpULT(index_i64, size_value, "bounds_check_in_bounds");
+
+        llvm::BasicBlock* const pass_block = llvm::BasicBlock::Create(llvm_context, "bounds_check_pass", parameters.llvm_parent_function);
+        llvm::BasicBlock* const fail_block = llvm::BasicBlock::Create(llvm_context, "bounds_check_fail", parameters.llvm_parent_function);
+
+        llvm_builder.CreateCondBr(in_bounds, pass_block, fail_block);
+
+        llvm_builder.SetInsertPoint(fail_block);
+        create_log_error_instruction(llvm_context, parameters.llvm_module, llvm_builder, error_message);
+        create_abort_instruction(llvm_context, parameters.llvm_module, llvm_builder);
+        llvm_builder.CreateUnreachable();
+
+        llvm_builder.SetInsertPoint(pass_block);
+    }
+
     Value_and_type create_access_array_expression_value(
         Access_array_expression const& expression,
         Statement const& statement,
@@ -1048,6 +1081,14 @@ namespace iris::compiler
                 llvm::Type* const member_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, member_type, type_database);
 
                 llvm::Value* const data_pointer = load_soa_data_pointer(soa_value, parameters);
+
+                if (parameters.enable_bounds_checks)
+                {
+                    llvm::Value* const size_value = llvm_builder.getInt64(soa_info.soa_array_type->size);
+                    std::string const error_message = std::format("Out-of-bounds SOA array access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                    create_bounds_check_instructions(index_llvm_value, size_value, error_message, parameters);
+                }
+
                 llvm::Value* const element_pointer = create_soa_member_element_pointer(
                     data_pointer,
                     soa_info.layout.members[member_index],
@@ -1081,6 +1122,13 @@ namespace iris::compiler
 
                 llvm::Value* const data_pointer = load_soa_array_view_data_pointer(soa_value, parameters);
                 llvm::Value* const length_value = load_soa_array_view_length(soa_value, parameters);
+
+                if (parameters.enable_bounds_checks)
+                {
+                    std::string const error_message = std::format("Out-of-bounds SOA array view access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                    create_bounds_check_instructions(index_llvm_value, length_value, error_message, parameters);
+                }
+
                 llvm::Value* const adjusted_index = create_soa_array_view_adjusted_index(soa_value, index_llvm_value, parameters);
                 llvm::Value* const element_pointer = create_soa_member_element_pointer(
                     data_pointer,
@@ -1108,6 +1156,14 @@ namespace iris::compiler
         if (std::holds_alternative<Soa_array_type>(left_hand_side_expression_value.type->data))
         {
             Soa_array_type_info const soa_info = get_soa_array_type_info(left_hand_side_expression_value.type.value(), parameters);
+
+            if (parameters.enable_bounds_checks)
+            {
+                llvm::Value* const size_value = llvm_builder.getInt64(soa_info.soa_array_type->size);
+                std::string const error_message = std::format("Out-of-bounds SOA array access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                create_bounds_check_instructions(index_llvm_value, size_value, error_message, parameters);
+            }
+
             llvm::Value* const data_pointer = load_soa_data_pointer(left_hand_side_expression_value, parameters);
 
             llvm::Type* const element_llvm_type = type_reference_to_llvm_type(
@@ -1170,6 +1226,13 @@ namespace iris::compiler
             Soa_array_view_type_info const soa_info = get_soa_array_view_type_info(left_hand_side_expression_value.type.value(), parameters);
             llvm::Value* const data_pointer = load_soa_array_view_data_pointer(left_hand_side_expression_value, parameters);
             llvm::Value* const length_value = load_soa_array_view_length(left_hand_side_expression_value, parameters);
+
+            if (parameters.enable_bounds_checks)
+            {
+                std::string const error_message = std::format("Out-of-bounds SOA array view access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                create_bounds_check_instructions(index_llvm_value, length_value, error_message, parameters);
+            }
+
             llvm::Value* const adjusted_index = create_soa_array_view_adjusted_index(left_hand_side_expression_value, index_llvm_value, parameters);
 
             llvm::Type* const element_llvm_type = type_reference_to_llvm_type(
@@ -1237,6 +1300,15 @@ namespace iris::compiler
         if (iris::is_array_slice_type_reference(*left_hand_side_expression_value.type))
         {
             llvm::Type* const array_slice_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, left_hand_side_expression_value.type.value(), type_database);
+
+            if (parameters.enable_bounds_checks)
+            {
+                llvm::Value* const pointer_to_length = llvm_builder.CreateStructGEP(array_slice_llvm_type, left_hand_side_expression_value.value, 1);
+                llvm::Value* const length = create_load_instruction(llvm_builder, llvm_data_layout, llvm::Type::getInt64Ty(llvm_context), pointer_to_length);
+                std::string const error_message = std::format("Out-of-bounds array slice access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                create_bounds_check_instructions(index_llvm_value, length, error_message, parameters);
+            }
+
             llvm::Value* const pointer_to_data_pointer = llvm_builder.CreateStructGEP(
                 array_slice_llvm_type,
                 left_hand_side_expression_value.value,
@@ -1263,6 +1335,15 @@ namespace iris::compiler
         }
 
         bool const using_pointer = is_pointer(*left_hand_side_expression_value.type);
+
+        if (parameters.enable_bounds_checks && !using_pointer)
+        {
+            Constant_array_type const& constant_array_type = std::get<Constant_array_type>(left_hand_side_expression_value.type->data);
+            llvm::Value* const size_value = llvm_builder.getInt64(constant_array_type.size);
+            std::string const error_message = std::format("Out-of-bounds constant array access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+            create_bounds_check_instructions(index_llvm_value, size_value, error_message, parameters);
+        }
+
         Type_reference const& type_reference_to_use =
             using_pointer ?
             element_type.value() :
@@ -1279,8 +1360,6 @@ namespace iris::compiler
             using_pointer ? llvm::ArrayRef<llvm::Value*>{index_llvm_value} : llvm::ArrayRef<llvm::Value*>{llvm_builder.getInt32(0), index_llvm_value},
             "array_element_pointer"
         );
-
-        // TODO add an option to the compiler to make access inbounds for safety. All out-of-bounds accesses will then cause an abort.
         
         return Value_and_type
         {

@@ -45,6 +45,7 @@ namespace iris::compiler
         bool debug = true;
         bool output_debug_code_view = false;
         Contract_options contract_options = Contract_options::Log_error_and_abort;
+        bool enable_bounds_checks = true;
         bool is_test_mode = false;
     };
 

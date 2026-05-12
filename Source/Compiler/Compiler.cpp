@@ -331,6 +331,7 @@ namespace iris::compiler
             .expression_type = std::nullopt,
             .debug_info = nullptr,
             .contract_options = Contract_options::Disabled,
+            .enable_bounds_checks = false,
             .source_position = {},
             .temporaries_allocator = temporaries_allocator,
         };
@@ -479,6 +480,7 @@ namespace iris::compiler
                 .expression_type = std::nullopt,
                 .debug_info = debug_info,
                 .contract_options = compilation_options.contract_options,
+                .enable_bounds_checks = compilation_options.enable_bounds_checks,
                 .source_position = std::nullopt,
                 .temporaries_allocator = temporaries_allocator,
             };
@@ -891,6 +893,7 @@ namespace iris::compiler
                     .expression_type = global_variable_declaration.type,
                     .debug_info = nullptr,
                     .contract_options = Contract_options::Disabled,
+                    .enable_bounds_checks = false,
                     .source_position = {},
                     .temporaries_allocator = temporaries_allocator,
                 };

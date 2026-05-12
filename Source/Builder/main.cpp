@@ -105,6 +105,13 @@ argparse::Argument& add_no_debug_argument(argparse::ArgumentParser& command)
         .flag();
 }
 
+argparse::Argument& add_no_bounds_checks_argument(argparse::ArgumentParser& command)
+{
+    return command.add_argument("--no-bounds-checks")
+        .help("Disable bounds checks")
+        .flag();
+}
+
 argparse::Argument& add_output_llvm_ir_argument(argparse::ArgumentParser& command)
 {
     return command.add_argument("--output-llvm-ir")
@@ -277,7 +284,8 @@ void print_arguments(int const argc, char const* const* argv)
 iris::compiler::Compilation_options create_compilation_options(
     iris::compiler::Target const& target,
     bool const no_debug,
-    iris::compiler::Contract_options const contract_options
+    iris::compiler::Contract_options const contract_options,
+    bool const no_bounds_checks
 )
 {
     bool const output_debug_code_view = !no_debug && target.operating_system == "windows";
@@ -289,6 +297,7 @@ iris::compiler::Compilation_options create_compilation_options(
         .debug = !no_debug,
         .output_debug_code_view = output_debug_code_view,
         .contract_options = contract_options,
+        .enable_bounds_checks = !no_bounds_checks,
     };
 
     return compilation_options;
@@ -433,6 +442,7 @@ int main(int const argc, char const* const* argv)
     add_header_search_path_argument(build_command);
     add_repository_argument(build_command);
     add_no_debug_argument(build_command);
+    add_no_bounds_checks_argument(build_command);
     add_output_llvm_ir_argument(build_command);
     add_function_contract_options_argument(build_command);
     program.add_subparser(build_command);
@@ -447,6 +457,7 @@ int main(int const argc, char const* const* argv)
     add_header_search_path_argument(build_tests_command);
     add_repository_argument(build_tests_command);
     add_no_debug_argument(build_tests_command);
+    add_no_bounds_checks_argument(build_tests_command);
     add_output_llvm_ir_argument(build_tests_command);
     add_function_contract_options_argument(build_tests_command);
     program.add_subparser(build_tests_command);
@@ -461,6 +472,7 @@ int main(int const argc, char const* const* argv)
     add_header_search_path_argument(test_command);
     add_repository_argument(test_command);
     add_no_debug_argument(test_command);
+    add_no_bounds_checks_argument(test_command);
     add_output_llvm_ir_argument(test_command);
     add_function_contract_options_argument(test_command);
     program.add_subparser(test_command);
@@ -532,10 +544,11 @@ int main(int const argc, char const* const* argv)
         std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
         std::pmr::vector<std::filesystem::path> const repository_paths = get_effective_repository_paths_argument(subprogram, presets);
         bool const no_debug = subprogram.get<bool>("--no-debug");
+        bool const no_bounds_checks = subprogram.get<bool>("--no-bounds-checks");
         iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks);
 
         iris::compiler::Builder_options const builder_options =
         {
@@ -578,10 +591,11 @@ int main(int const argc, char const* const* argv)
         std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
         std::pmr::vector<std::filesystem::path> repository_paths = get_effective_repository_paths_argument(subprogram, presets);
         bool const no_debug = subprogram.get<bool>("--no-debug");
+        bool const no_bounds_checks = subprogram.get<bool>("--no-bounds-checks");
         iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks);
 
         iris::compiler::Builder_options const builder_options =
         {
@@ -625,10 +639,11 @@ int main(int const argc, char const* const* argv)
         std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
         std::pmr::vector<std::filesystem::path> repository_paths = get_effective_repository_paths_argument(subprogram, presets);
         bool const no_debug = subprogram.get<bool>("--no-debug");
+        bool const no_bounds_checks = subprogram.get<bool>("--no-bounds-checks");
         iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks);
 
         iris::compiler::Builder_options const builder_options =
         {
@@ -745,7 +760,7 @@ int main(int const argc, char const* const* argv)
         std::pmr::vector<std::filesystem::path> const repository_paths = get_effective_repository_paths_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, false, iris::compiler::Contract_options::Log_error_and_abort);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, false, iris::compiler::Contract_options::Log_error_and_abort, false);
 
         iris::compiler::Builder_options const builder_options =
         {
