@@ -1201,6 +1201,11 @@ export function use_vector3f32(value: Vector3f32) -> ()
 {
     var x = value.x;
 }
+
+export function use_vector3f32_pointer(value: *Vector3f32) -> ()
+{
+    var x = value->x;
+}
 )";
 
         std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
