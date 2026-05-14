@@ -173,7 +173,7 @@ namespace iris::compiler
             return first_pointer_type.type == second_pointer_type.type;
         }
 
-        return first == second;
+        return first_underlying_type == second_underlying_type;
     }
 
     bool can_assign_type(

@@ -1386,6 +1386,134 @@ var bar: function<(value: *Int32) -> ()> = fns.to_json::<Int32>;
         test_validate_module(input, dependencies, expected_diagnostics);
     }
 
+    TEST_CASE("Alias type is interchangeable with raw instantiated type in member assignment", "[Validation][Function_constructors]")
+    {
+        std::string_view const input = R"(module Test;
+
+type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+using Vector3f64 = Vector3::<Float64>;
+
+struct Transformf64
+{
+    translation: Vector3::<Float64> = {};
+}
+
+function run() -> ()
+{
+    var v: Vector3f64 = {};
+    mutable t: Transformf64 = {
+        translation: v
+    };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Raw instantiated-type value is accepted by function expecting alias type parameter", "[Validation][Function_constructors]")
+    {
+        std::string_view const input = R"(module Test;
+
+type_constructor Quaternion(Value_type: Type)
+{
+    return struct
+    {
+        w: Value_type = 1 as Value_type;
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+using Quaternionf64 = Quaternion::<Float64>;
+
+struct Transformf64
+{
+    rotation: Quaternion::<Float64> = {};
+}
+
+function use_rotation(rotation: Quaternionf64) -> ()
+{
+}
+
+function run(t: Transformf64) -> ()
+{
+    use_rotation(t.rotation);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Instantiate expression type can be deduced for nested braces when member type is a raw instantiated type", "[Validation][Function_constructors]")
+    {
+        std::string_view const input = R"(module Test;
+
+type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+type_constructor Quaternion(Value_type: Type)
+{
+    return struct
+    {
+        w: Value_type = 1 as Value_type;
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+type_constructor Transform(Value_type: Type)
+{
+    return struct
+    {
+        translation: Vector3::<Value_type> = {};
+        rotation: Quaternion::<Value_type> = {};
+    };
+}
+
+using Transformf64 = Transform::<Float64>;
+
+function make_transform() -> (result: Transformf64)
+{
+    return {
+        translation: {},
+        rotation: {},
+    };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     
     TEST_CASE("Validates that left hand side is either a module alias, a variable of type struct/union or an enum type", "[Validation][Access_expression]")
     {

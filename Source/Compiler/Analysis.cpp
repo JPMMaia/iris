@@ -664,6 +664,36 @@ namespace iris::compiler
                         if (!current_expression_type.has_value())
                             return std::nullopt;
 
+                        {
+                            std::optional<iris::Type_reference> const underlying_expression_type = get_underlying_type(
+                                declaration_database,
+                                current_expression_type.value()
+                            );
+                            if (underlying_expression_type.has_value() && std::holds_alternative<iris::Type_instance>(underlying_expression_type->data))
+                            {
+                                iris::Type_instance const& type_instance = std::get<iris::Type_instance>(underlying_expression_type->data);
+                                iris::Declaration_instance_storage const storage = instantiate_type_instance(declaration_database, type_instance);
+                                if (std::holds_alternative<iris::Struct_declaration>(storage.data))
+                                {
+                                    iris::Struct_declaration const& struct_declaration = std::get<iris::Struct_declaration>(storage.data);
+
+                                    auto const location = std::find_if(
+                                        struct_declaration.member_names.begin(),
+                                        struct_declaration.member_names.end(),
+                                        [&](std::pmr::string const& member_name) -> bool {
+                                            return member_name == member.member_name;
+                                        }
+                                    );
+                                    if (location != struct_declaration.member_names.end())
+                                    {
+                                        std::size_t const member_index = std::distance(struct_declaration.member_names.begin(), location);
+                                        return struct_declaration.member_types[member_index];
+                                    }
+                                }
+                                return std::nullopt;
+                            }
+                        }
+
                         std::optional<Declaration> const& declaration = find_underlying_declaration(declaration_database, current_expression_type.value());
                         if (!declaration.has_value())
                             return std::nullopt;
