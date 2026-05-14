@@ -41,8 +41,19 @@ namespace iris::compiler
         {
             Struct_declaration& struct_declaration = std::get<Struct_declaration>(storage.data);
             instanced_declarations.struct_declarations.push_back(std::move(struct_declaration));
-            
+
             add_struct_declaration(declaration_database, type_instance.type_constructor.module_reference.name, false, instanced_declarations.struct_declarations.back());
+
+            Struct_declaration& added_struct = instanced_declarations.struct_declarations.back();
+            for (iris::Type_reference& member_type : added_struct.member_types)
+            {
+                if (std::holds_alternative<Type_instance>(member_type.data))
+                {
+                    Type_instance const nested_instance = std::get<Type_instance>(member_type.data);
+                    add_instantiated_type_to_module(declaration_database, nested_instance, instanced_declarations);
+                    member_type = iris::create_custom_type_reference(nested_instance.type_constructor.module_reference.name, mangle_type_instance_name(nested_instance));
+                }
+            }
         }
     }
 

@@ -968,4 +968,75 @@ function run() -> ()
 
         CHECK(expected == actual);
     }
+
+    TEST_CASE("Struct member types are also replaced", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const input = R"(module Test;
+
+type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+type_constructor Transform(Value_type: Type)
+{
+    return struct
+    {
+        translation: Vector3::<Value_type> = {};
+        scale: Vector3::<Value_type> = {};
+    };
+}
+
+using Transformf32 = Transform::<Float32>;
+)";
+
+        std::array<std::string_view, 0> const dependencies = {};
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies);
+
+        std::string_view const expected = R"(module Test;
+
+type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+@unique_name("Test__at__Vector3__at__2299159736035742639")
+struct Test__at__Vector3__at__2299159736035742639
+{
+    x: Float32 = 0 as Float32;
+    y: Float32 = 0 as Float32;
+    z: Float32 = 0 as Float32;
+}
+
+type_constructor Transform(Value_type: Type)
+{
+    return struct
+    {
+        translation: Vector3::<Value_type> = {};
+        scale: Vector3::<Value_type> = {};
+    };
+}
+
+@unique_name("Test__at__Transform__at__8125935347908839557")
+struct Test__at__Transform__at__8125935347908839557
+{
+    translation: Test__at__Vector3__at__2299159736035742639 = {};
+    scale: Test__at__Vector3__at__2299159736035742639 = {};
+}
+
+using Transformf32 = Test__at__Transform__at__8125935347908839557;
+)";
+
+        CHECK(expected == actual);
+    }
 }
