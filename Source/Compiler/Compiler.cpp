@@ -1830,6 +1830,14 @@ namespace iris::compiler
             iris::Module& modified = transformed_core_modules.back();
             sorted_so_far.push_back(&modified);
             add_declarations(declaration_database, modified);
+
+            if constexpr (g_debug)
+            {
+                iris::Format_options const format_options{ .output_allocator = output_allocator, .temporaries_allocator = temporaries_allocator };
+                std::pmr::string const module_string = format_module(modified, format_options);
+                std::fprintf(stdout, "%s\n", module_string.c_str());
+                std::fflush(stdout);
+            }
             
             All_passes_parameters const pass_parameters
             {
@@ -1850,6 +1858,14 @@ namespace iris::compiler
             run_all_passes_on_module(modified, pass_parameters);
             add_import_usages(modified, output_allocator);
             add_declarations(declaration_database, modified);
+
+            if constexpr (g_debug)
+            {
+                iris::Format_options const format_options{ .output_allocator = output_allocator, .temporaries_allocator = temporaries_allocator };
+                std::pmr::string const module_string = format_module(modified, format_options);
+                std::fprintf(stdout, "%s\n", module_string.c_str());
+                std::fflush(stdout);
+            }
         }
 
         return Preprocessed_modules
