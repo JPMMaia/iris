@@ -44,34 +44,10 @@
 			},
 			{
 				"name": "C Header Importer tests",
-				"type": "lldb-dap",
+				"type": "cppvsdbg",
 				"request": "launch",
 				"program": "${workspaceFolder}/build/Source/Interoperability/Iris_c_header_importer_tests.exe",
 				"args": [],
-				"cwd": "${workspaceFolder}",
-			},
-			{
-				"name": "Generate TypeScript interface",
-				"type": "lldb-dap",
-				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/Iris_Tools_Generate_JSON.exe",
-				"args": [
-					"typescript_interface",
-					"${workspaceFolder}/Source/Core/Core.cppm",
-					"${workspaceFolder}/Tools/vscode/iris-extension/src/core/Core_interface.ts"
-				],
-				"cwd": "${workspaceFolder}",
-			},
-			{
-				"name": "Generate TypeScript intermediate representation",
-				"type": "lldb-dap",
-				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/Iris_Tools_Generate_JSON.exe",
-				"args": [
-					"typescript_intermediate_representation",
-					"${workspaceFolder}/Source/Core/Core.cppm",
-					"${workspaceFolder}/Tools/vscode/iris-extension/src/core/Core_intermediate_representation.ts"
-				],
 				"cwd": "${workspaceFolder}",
 			},
 			{
@@ -81,13 +57,7 @@
 				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"build",
-					"game",
-					"--output-llvm-ir",
-					"--build-directory=${workspaceFolder}/../rts-game/build",
-					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/share/iris/libraries/iris_repository.json",
-					"--repository=${workspaceFolder}/../iris_local_repository/iris_repository.json",
-					"--repository=${workspaceFolder}/../rts-game/source/iris_repository.json"
+					"game"
 				],
 				"cwd": "${workspaceFolder}/../rts-game",
 			},
@@ -98,13 +68,7 @@
 				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
 					"build-tests",
-					"game",
-					"--output-llvm-ir",
-					"--build-directory=${workspaceFolder}/../rts-game/build",
-					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
-					"--repository=${workspaceFolder}/share/iris/libraries/iris_repository.json",
-					"--repository=${workspaceFolder}/../iris_local_repository/iris_repository.json",
-					"--repository=${workspaceFolder}/../rts-game/source/iris_repository.json"
+					"game"
 				],
 				"cwd": "${workspaceFolder}/../rts-game",
 			},
@@ -121,7 +85,7 @@
 			},
 			{
 				"name": "iris import-c-header",
-				"type": "lldb-dap",
+				"type": "cppvsdbg",
 				"request": "launch",
 				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
@@ -134,7 +98,7 @@
 			},
 			{
 				"name": "iris print-struct-layout",
-				"type": "lldb-dap",
+				"type": "cppvsdbg",
 				"request": "launch",
 				"program": "${workspaceFolder}/build/Source/Builder/iris.exe",
 				"args": [
@@ -171,7 +135,7 @@
 			},
 			{
 				"name": "Attach to Language Server",
-				"type": "lldb-dap",
+				"type": "cppvsdbg",
 				"request": "attach",
 				"program": "${workspaceFolder}/build/Source/Language_server/iris_language_server"
 			},
@@ -211,7 +175,7 @@
 			},
 			{
 				"name": "Compiler Tests",
-				"type": "lldb-dap",
+				"type": "cppvsdbg",
 				"request": "launch",
 				"program": "${workspaceFolder}/build/Source/Compiler/Iris_compiler_tests.exe",
 				"args": [
