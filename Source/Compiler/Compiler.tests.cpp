@@ -7434,6 +7434,19 @@ entry:
   ret void
 }
 
+; Function Attrs: convergent
+define void @Using_type_constructors_2_use_pointer(ptr noundef %"arguments[0].value") #0 {
+entry:
+  %value = alloca ptr, align 8
+  %x = alloca float, align 4
+  store ptr %"arguments[0].value", ptr %value, align 8
+  %0 = load ptr, ptr %value, align 8
+  %1 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %0, i32 0, i32 0
+  %2 = load float, ptr %1, align 4
+  store float %2, ptr %x, align 4
+  ret void
+}
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 

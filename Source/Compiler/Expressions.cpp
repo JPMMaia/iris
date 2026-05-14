@@ -4109,7 +4109,7 @@ namespace iris::compiler
                         std::string_view const module_name = find_module_name(parameters.core_module, custom_type_reference.module_reference);
                         std::string_view const declaration_name = custom_type_reference.name;
             
-                        std::optional<Declaration> const declaration = find_declaration(parameters.declaration_database, module_name, declaration_name);
+                        std::optional<Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, module_name, declaration_name);
             
                         if (declaration.has_value())
                         {

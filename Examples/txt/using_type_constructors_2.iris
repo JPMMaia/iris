@@ -26,3 +26,8 @@ export function use(value: Vector3f32) -> ()
 {
     var x = value.x;
 }
+
+export function use_pointer(value: *Vector3f32) -> ()
+{
+    var x = value->x;
+}
