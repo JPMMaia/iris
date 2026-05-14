@@ -2095,9 +2095,43 @@ namespace iris::compiler
             Alias_type_declaration const* const alias_declaration = std::get<iris::Alias_type_declaration const*>(declaration->data);
 
             if (!alias_declaration->type.empty())
-                visit_type_references_recursively(alias_declaration->type[0], ensure_nested_custom_type_declarations);
+            {
+                Type_reference const& alias_underlying_type = alias_declaration->type[0];
+                if (std::holds_alternative<iris::Type_instance>(alias_underlying_type.data))
+                {
+                    Type_instance const& type_instance = std::get<iris::Type_instance>(alias_underlying_type.data);
+                    Declaration_instance_storage storage = instantiate_type_instance(declaration_database, type_instance);
+                    if (std::holds_alternative<iris::Struct_declaration>(storage.data))
+                    {
+                        Struct_declaration const& struct_decl = std::get<iris::Struct_declaration>(storage.data);
+                        std::string_view const tc_module = type_instance.type_constructor.module_reference.name;
 
-            add_clang_alias_type_declaration(clang_declarations.alias_type_declarations, clang_ast_context, *alias_declaration, declaration_database, clang_declaration_database);
+                        for (Type_reference const& member_type : struct_decl.member_types)
+                            visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
+
+                        Clang_module_declarations& tc_clang_decls = clang_declaration_database.map.emplace(
+                            tc_module, Clang_module_declarations{}).first->second;
+
+                        if (!tc_clang_decls.struct_declarations.contains(struct_decl.name))
+                        {
+                            clang::RecordDecl* const record_decl = create_clang_struct_declaration(
+                                clang_ast_context, tc_module, struct_decl);
+                            tc_clang_decls.struct_declarations.emplace(struct_decl.name, record_decl);
+                            set_clang_struct_definition(clang_ast_context, *record_decl, struct_decl,
+                                declaration_database, clang_declaration_database);
+                        }
+                    }
+                }
+                else
+                {
+                    visit_type_references_recursively(alias_underlying_type, ensure_nested_custom_type_declarations);
+                }
+            }
+
+            // Re-acquire the alias module's declarations in case the map was rehashed above.
+            Clang_module_declarations& alias_clang_decls = clang_declaration_database.map.emplace(
+                module_name, Clang_module_declarations{}).first->second;
+            add_clang_alias_type_declaration(alias_clang_decls.alias_type_declarations, clang_ast_context, *alias_declaration, declaration_database, clang_declaration_database);
             return;
         }
 
@@ -2163,6 +2197,12 @@ namespace iris::compiler
             return;
         }
 
+        if (std::holds_alternative<iris::Type_constructor const*>(declaration->data))
+        {
+            // Type constructors are templates, not concrete types — no Clang representation needed.
+            return;
+        }
+
         throw std::runtime_error{ std::format("'{}.{}' is not a type declaration", module_name, declaration_name) };
     }
 
@@ -2196,6 +2236,58 @@ namespace iris::compiler
             throw std::runtime_error{ std::format("Could not create clang type '{}.{}'", module_name, declaration_name) };
 
         return clang::CodeGen::convertTypeForMemory(clang_context.code_generator->CGM(), *clang_type);
+    }
+
+    llvm::Type* convert_type_instance_on_demand(
+        Clang_context const& clang_context,
+        Declaration_database const& declaration_database,
+        iris::Type_instance const& type_instance
+    )
+    {
+        Clang_declaration_database transient_clang_declaration_database;
+
+        iris::Declaration_instance_storage storage = iris::instantiate_type_instance(declaration_database, type_instance);
+        if (!std::holds_alternative<iris::Struct_declaration>(storage.data))
+            throw std::runtime_error{"convert_type_instance_on_demand: expected Struct_declaration"};
+
+        iris::Struct_declaration const& struct_declaration = std::get<iris::Struct_declaration>(storage.data);
+        std::string_view const transient_module_name = type_instance.type_constructor.module_reference.name;
+
+        auto const ensure_member_type = [&](iris::Type_reference const& type_ref) -> bool
+        {
+            if (!std::holds_alternative<iris::Custom_type_reference>(type_ref.data))
+                return false;
+            iris::Custom_type_reference const& ctr = std::get<iris::Custom_type_reference>(type_ref.data);
+            ensure_clang_custom_type_declaration(
+                clang_context.ast_context,
+                declaration_database,
+                transient_clang_declaration_database,
+                ctr.module_reference.name,
+                ctr.name
+            );
+            return false;
+        };
+        for (iris::Type_reference const& member_type : struct_declaration.member_types)
+            iris::visit_type_references_recursively(member_type, ensure_member_type);
+
+        Clang_module_declarations& transient_clang_declarations = transient_clang_declaration_database.map
+            .emplace(transient_module_name, Clang_module_declarations{}).first->second;
+
+        clang::RecordDecl* record_declaration = nullptr;
+        if (!transient_clang_declarations.struct_declarations.contains(struct_declaration.name))
+        {
+            record_declaration = create_clang_struct_declaration(clang_context.ast_context, transient_module_name, struct_declaration);
+            transient_clang_declarations.struct_declarations.emplace(struct_declaration.name, record_declaration);
+            set_clang_struct_definition(clang_context.ast_context, *record_declaration, struct_declaration,
+                declaration_database, transient_clang_declaration_database);
+        }
+        else
+        {
+            record_declaration = transient_clang_declarations.struct_declarations.at(struct_declaration.name);
+        }
+
+        clang::QualType const qual_type = clang_context.ast_context.getRecordType(record_declaration);
+        return clang::CodeGen::convertTypeForMemory(clang_context.code_generator->CGM(), qual_type);
     }
 
     llvm::Type* convert_type(
@@ -2704,6 +2796,22 @@ namespace iris::compiler
             unsigned int const number_of_bits = get_number_of_bits(integer_type);*/
 
             return clang_ast_context.getIntTypeForBitwidth(integer_type.number_of_bits, integer_type.is_signed ? 1 : 0);
+        }
+        else if (std::holds_alternative<iris::Type_instance>(type_reference.data))
+        {
+            iris::Type_instance const& type_instance = std::get<iris::Type_instance>(type_reference.data);
+            std::pmr::string const mangled_name = mangle_type_instance_name(type_instance);
+            std::string_view const tc_module = type_instance.type_constructor.module_reference.name;
+
+            auto const module_location = clang_declaration_database.map.find(tc_module);
+            if (module_location == clang_declaration_database.map.end())
+                return std::nullopt;
+
+            auto const struct_location = module_location->second.struct_declarations.find(mangled_name);
+            if (struct_location == module_location->second.struct_declarations.end())
+                return std::nullopt;
+
+            return clang_ast_context.getRecordType(struct_location->second);
         }
         else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
         {

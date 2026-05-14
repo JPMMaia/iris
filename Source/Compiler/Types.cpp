@@ -1506,8 +1506,7 @@ namespace iris::compiler
         else if (std::holds_alternative<Type_instance>(type_reference.data))
         {
             Type_instance const& data = std::get<Type_instance>(type_reference.data);
-            std::pmr::string const mangled_name = mangle_type_instance_name(data);
-            throw std::runtime_error{ std::format("Cannot evaluate reflection for unresolved type instance '{}'.", mangled_name) };
+            return convert_type_instance_on_demand(clang_context, declaration_database, data);
         }
 
         throw std::runtime_error{ "type_reference_to_llvm_type_on_demand: Not implemented." };

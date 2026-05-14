@@ -171,6 +171,12 @@ namespace iris::compiler
         std::string_view const declaration_name
     );
 
+    export llvm::Type* convert_type_instance_on_demand(
+        Clang_context const& clang_context,
+        Declaration_database const& declaration_database,
+        iris::Type_instance const& type_instance
+    );
+
     export llvm::Type* convert_type(
         Clang_module_data const& clang_module_data,
         clang::RecordDecl* const record_declaration

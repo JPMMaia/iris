@@ -57,6 +57,53 @@ namespace iris::compiler
 
     static std::pmr::string run_all_passes_and_format(
         std::string_view const input_text,
+        std::span<std::string_view const> const input_dependencies_text
+    )
+    {
+        iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input_text, input_dependencies_text);
+        iris::Module& core_module = context.core_module();
+
+        All_passes_runtime_context runtime_context = create_all_passes_runtime_context(
+            core_module,
+            context.dependencies(),
+            context.declaration_database
+        );
+
+        std::pmr::vector<iris::Module const*> sorted_modules;
+        sorted_modules.reserve(context.dependencies().size() + 1);
+        for (iris::Module const& dependency_module : context.dependencies())
+            sorted_modules.push_back(&dependency_module);
+        sorted_modules.push_back(&core_module);
+
+        std::pmr::polymorphic_allocator<> output_allocator;
+        std::pmr::polymorphic_allocator<> temporaries_allocator;
+
+        All_passes_parameters const parameters =
+        {
+            .target_module_name = core_module.name,
+            .sorted_core_modules = sorted_modules,
+            .llvm_context = *runtime_context.llvm_data.context,
+            .llvm_data_layout = runtime_context.llvm_data.data_layout,
+            .declaration_database = context.declaration_database,
+            .clang_context = *runtime_context.clang_context,
+            .dependencies = core_module.dependencies,
+            .instanced_declarations = core_module.instanced_declarations,
+            .definitions = core_module.definitions,
+            .output_allocator = output_allocator,
+            .temporaries_allocator = temporaries_allocator,
+            .is_test_mode = false,
+        };
+
+        run_all_passes_on_module(
+            core_module,
+            parameters
+        );
+
+        return iris::compiler::tests::format_core_module_to_text(core_module);
+    }
+
+    static std::pmr::string run_all_passes_and_format(
+        std::string_view const input_text,
         std::span<std::string_view const> const input_dependencies_text,
         std::string_view const function_name
     )
@@ -448,6 +495,87 @@ function containers.dynamic_array__at__get__at__9219431704710098038(instance: *m
 
         std::pmr::vector<std::string_view> const dependencies = { dependency_text };
         std::pmr::string const actual = run_all_passes_and_format(input, dependencies, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Transform reflection of instantiated types", "[All_passes][Passes]")
+    {
+        std::string_view const input = R"(module module_a;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+export using Vector3f32 = Vector3::<Float32>;
+
+export function get_vector3f32_size_of() -> (result: Uint64)
+{
+    return @size_of::<Vector3f32>();
+}
+
+export function_constructor get_vector3_size_of(Value_type: Type)
+{
+    return function() -> (result: Uint64)
+    {
+        return @size_of::<Vector3::<Value_type>>();
+    };
+}
+
+export var get_vector3f64_size_of = get_vector3_size_of::<Float64>;
+)";
+
+        std::string_view const expected = R"(module module_a;
+
+export type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+@unique_name("module_a__at__Vector3__at__14510683034154617699")
+struct module_a__at__Vector3__at__14510683034154617699
+{
+    x: Float32 = 0 as Float32;
+    y: Float32 = 0 as Float32;
+    z: Float32 = 0 as Float32;
+}
+
+export using Vector3f32 = module_a__at__Vector3__at__14510683034154617699;
+
+export function get_vector3f32_size_of() -> (result: Uint64)
+{
+    return 12u64;
+}
+
+export function_constructor get_vector3_size_of(Value_type: Type)
+{
+    return function () -> (result: Uint64)
+    {
+        return @size_of::<Vector3::<Value_type>>();
+    };
+}
+
+@unique_name("module_a__at__get_vector3_size_of__at__17893739862948921308")
+function module_a__at__get_vector3_size_of__at__17893739862948921308() -> (result: Uint64)
+{
+    return 24u64;
+}
+
+export var get_vector3f64_size_of = module_a__at__get_vector3_size_of__at__17893739862948921308;
+)";
+
+        std::pmr::vector<std::string_view> const dependencies = { };
+        std::pmr::string const actual = run_all_passes_and_format(input, dependencies);
 
         CHECK(expected == actual);
     }
