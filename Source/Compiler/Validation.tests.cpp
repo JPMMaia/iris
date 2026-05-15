@@ -5789,6 +5789,166 @@ export function foo(length: Uint64) -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates create_soa_array_view_from_pointer() with valid usage", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function create_view(data: *Void, length: Int64) -> (result: Soa_array_view::<Particle>)
+{
+    return create_soa_array_view_from_pointer::<Particle>(data, length);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates create_soa_array_view_from_pointer() argument count", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function create_view(data: *Void, length: Int64, extra: Int64) -> (result: Soa_array_view::<Particle>)
+{
+    return create_soa_array_view_from_pointer::<Particle>(data, length, extra);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 12, 10, 79),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Function expects 2 arguments, but 3 were provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates create_soa_array_view_from_pointer() type parameter count", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function create_view(data: *Void, length: Int64) -> (result: Soa_array_view::<Particle>)
+{
+    return create_soa_array_view_from_pointer(data, length);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 12, 10, 60),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Function expects 1 type arguments, but 0 were provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates calculate_soa_array_size_bytes() with valid usage", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function get_size(capacity: Int64) -> (result: Int64)
+{
+    return calculate_soa_array_size_bytes::<Particle>(capacity);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates calculate_soa_array_size_bytes() argument count", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function get_size(capacity: Int64, extra: Int64) -> (result: Int64)
+{
+    return calculate_soa_array_size_bytes::<Particle>(capacity, extra);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 12, 10, 71),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Function expects 1 arguments, but 2 were provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates calculate_soa_array_size_bytes() type parameter count", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function get_size(capacity: Int64) -> (result: Int64)
+{
+    return calculate_soa_array_size_bytes(capacity);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 12, 10, 52),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Function expects 1 type arguments, but 0 were provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that types with the same unique name from different modules match", "[Validation][Unique_name]")
     {
         std::string_view const module_a = R"(module Module_a;

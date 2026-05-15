@@ -673,7 +673,9 @@ namespace iris
                name == "create_array_slice_from_pointer" ||
                name == "create_stack_array_uninitialized" ||
                name == "offset_pointer" ||
-               name == "reinterpret_as";
+               name == "reinterpret_as" ||
+               name == "create_soa_array_view_from_pointer" ||
+               name == "calculate_soa_array_size_bytes";
     }
 
     bool is_expression_address_of(

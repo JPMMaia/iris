@@ -3066,6 +3066,104 @@ namespace iris::compiler
                         .type = destination_type_value.type
                     };
                 }
+                else if (variable_expression.name == "create_soa_array_view_from_pointer")
+                {
+                    if (expression.arguments.size() != 2)
+                        throw std::runtime_error{"create_soa_array_view_from_pointer() expects two arguments!"};
+
+                    Value_and_type const element_type_value = create_statement_value(instance_call_expression.arguments[0], parameters);
+
+                    bool is_view_mutable = false;
+                    if (parameters.expression_type.has_value() && std::holds_alternative<Soa_array_view_type>(parameters.expression_type->data))
+                        is_view_mutable = std::get<Soa_array_view_type>(parameters.expression_type->data).is_mutable;
+
+                    iris::Type_reference const soa_array_view_type_reference
+                    {
+                        .data = Soa_array_view_type
+                        {
+                            .value_type = {element_type_value.type.value()},
+                            .is_mutable = is_view_mutable,
+                        }
+                    };
+
+                    llvm::Type* const soa_view_llvm_type = type_reference_to_llvm_type(
+                        parameters.llvm_context,
+                        parameters.llvm_data_layout,
+                        soa_array_view_type_reference,
+                        parameters.type_database
+                    );
+
+                    llvm::AllocaInst* const soa_view_alloca = create_alloca_instruction(
+                        parameters.llvm_builder,
+                        parameters.llvm_data_layout,
+                        *parameters.llvm_parent_function,
+                        soa_view_llvm_type,
+                        "soa_array_view"
+                    );
+
+                    Value_and_type const data_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
+                    Value_and_type const length_value = create_loaded_expression_value(expression.arguments[1].expression_index, statement, parameters);
+
+                    llvm::Value* const start_index_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 0);
+                    create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, parameters.llvm_builder.getInt64(0), start_index_field);
+
+                    llvm::Value* const end_index_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 1);
+                    create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, length_value.value, end_index_field);
+
+                    llvm::Value* const length_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 2);
+                    create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, length_value.value, length_field);
+
+                    llvm::Value* const data_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 3);
+                    create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, data_value.value, data_field);
+
+                    return Value_and_type
+                    {
+                        .name = "",
+                        .value = soa_view_alloca,
+                        .type = soa_array_view_type_reference
+                    };
+                }
+                else if (variable_expression.name == "calculate_soa_array_size_bytes")
+                {
+                    if (expression.arguments.size() != 1)
+                        throw std::runtime_error{"calculate_soa_array_size_bytes() expects one argument!"};
+
+                    Value_and_type const element_type_value = create_statement_value(instance_call_expression.arguments[0], parameters);
+
+                    iris::Type_reference const& element_type = element_type_value.type.value();
+                    iris::Custom_type_reference const* const custom_type_reference = std::get_if<iris::Custom_type_reference>(&element_type.data);
+                    if (custom_type_reference == nullptr)
+                        throw std::runtime_error{"calculate_soa_array_size_bytes() element type must be a struct type."};
+
+                    Soa_layout const layout = calculate_soa_layout(
+                        parameters.llvm_data_layout,
+                        parameters.type_database,
+                        custom_type_reference->module_reference.name,
+                        custom_type_reference->name,
+                        1
+                    );
+
+                    Value_and_type const capacity_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
+
+                    llvm::Value* total_size = parameters.llvm_builder.getInt64(0);
+                    for (Soa_member_layout const& member : layout.members)
+                    {
+                        total_size = create_runtime_aligned_soa_offset(total_size, member.element_alignment, parameters);
+                        llvm::Value* const block_size = parameters.llvm_builder.CreateMul(
+                            capacity_value.value,
+                            parameters.llvm_builder.getInt64(member.element_size),
+                            "soa_member_block_size"
+                        );
+                        total_size = parameters.llvm_builder.CreateAdd(total_size, block_size, "soa_member_block_offset");
+                    }
+
+                    return Value_and_type
+                    {
+                        .name = "",
+                        .value = total_size,
+                        .type = iris::create_integer_type_type_reference(64, true)
+                    };
+                }
             }
         }
         else if (std::holds_alternative<iris::Variable_expression>(left_hand_side.data))
@@ -6247,6 +6345,15 @@ namespace iris::compiler
         return false;
     }
 
+    static bool is_global_array_variable(llvm::Value* const value)
+    {
+        if (!llvm::GlobalVariable::classof(value))
+            return false;
+
+        llvm::GlobalVariable const* const global_variable = static_cast<llvm::GlobalVariable*>(value);
+        return global_variable->getValueType()->isArrayTy();
+    }
+
     Value_and_type load_if_needed(
         Value_and_type const& value,
         std::size_t const expression_index,
@@ -6263,7 +6370,7 @@ namespace iris::compiler
 
             if (llvm::AllocaInst::classof(value.value) || llvm::GetElementPtrInst::classof(value.value) || llvm::GlobalVariable::classof(value.value))
             {
-                if (iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression))
+                if (iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression) || is_global_array_variable(value.value))
                 {
                     return value;
                 }

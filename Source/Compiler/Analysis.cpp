@@ -1366,6 +1366,24 @@ namespace iris::compiler
                         .is_mutable = false,
                     };
                 }
+                else if (builtin_type_reference.value == "create_soa_array_view_from_pointer")
+                {
+                    // This will generate a validation error as there is no element type.
+                    return Type_info
+                    {
+                        .type = {},
+                        .is_mutable = false,
+                    };
+                }
+                else if (builtin_type_reference.value == "calculate_soa_array_size_bytes")
+                {
+                    // This will generate a validation error as there is no element type.
+                    return Type_info
+                    {
+                        .type = {},
+                        .is_mutable = false,
+                    };
+                }
                 else if (builtin_type_reference.value == "soa_array_view")
                 {
                     iris::Expression const& callable_expression = statement.expressions[data.expression.expression_index];
@@ -1670,6 +1688,59 @@ namespace iris::compiler
                         return Type_info
                         {
                             .type = create_function_type_type_reference(std::move(function_type), {"value"}, {"result"}),
+                            .is_mutable = false,
+                        };
+                    }
+                    else if (variable_expression.name == "create_soa_array_view_from_pointer")
+                    {
+                        std::pmr::vector<iris::Type_reference> element_type;
+                        if (data.arguments.size() > 0)
+                        {
+                            iris::Statement const argument = data.arguments[0];
+                            if (!argument.expressions.empty() && std::holds_alternative<iris::Type_expression>(argument.expressions[0].data))
+                            {
+                                iris::Type_expression const& type_expression = std::get<iris::Type_expression>(argument.expressions[0].data);
+                                element_type.push_back(type_expression.type);
+                            }
+                        }
+
+                        iris::Type_reference const output_type
+                        {
+                            .data = iris::Soa_array_view_type
+                            {
+                                .value_type = element_type,
+                                .is_mutable = false,
+                            }
+                        };
+
+                        iris::Function_type function_type
+                        {
+                            .input_parameter_types = {
+                                create_pointer_type_type_reference({}, false),
+                                create_integer_type_type_reference(64, true)
+                            },
+                            .output_parameter_types = {output_type},
+                            .is_variadic = false,
+                        };
+
+                        return Type_info
+                        {
+                            .type = create_function_type_type_reference(std::move(function_type), {"data", "length"}, {"result"}),
+                            .is_mutable = false,
+                        };
+                    }
+                    else if (variable_expression.name == "calculate_soa_array_size_bytes")
+                    {
+                        iris::Function_type function_type
+                        {
+                            .input_parameter_types = { create_integer_type_type_reference(64, true) },
+                            .output_parameter_types = { create_integer_type_type_reference(64, true) },
+                            .is_variadic = false,
+                        };
+
+                        return Type_info
+                        {
+                            .type = create_function_type_type_reference(std::move(function_type), {"capacity"}, {"result"}),
                             .is_mutable = false,
                         };
                     }

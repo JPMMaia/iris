@@ -2607,6 +2607,36 @@ namespace iris::compiler
                     )
                 };
             }
+            else if (builtin_type_reference.value == "create_soa_array_view_from_pointer")
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format(
+                            "Function expects {} type arguments, but {} were provided.",
+                            1,
+                            0
+                        )
+                    )
+                };
+            }
+            else if (builtin_type_reference.value == "calculate_soa_array_size_bytes")
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format(
+                            "Function expects {} type arguments, but {} were provided.",
+                            1,
+                            0
+                        )
+                    )
+                };
+            }
         }
         
         {
@@ -2652,6 +2682,78 @@ namespace iris::compiler
                                     "Function expects {} type arguments, but {} were provided.",
                                     1,
                                     instance_call_expression.arguments.size()
+                                )
+                            )
+                        };
+                    }
+                }
+                else if (builtin_instance_call->first == "create_soa_array_view_from_pointer")
+                {
+                    iris::Instance_call_expression const& instance_call_expression = builtin_instance_call->second;
+
+                    if (instance_call_expression.arguments.size() != 1)
+                    {
+                        return
+                        {
+                            create_error_diagnostic(
+                                parameters.core_module.source_file_path,
+                                source_range,
+                                std::format(
+                                    "Function expects {} type arguments, but {} were provided.",
+                                    1,
+                                    instance_call_expression.arguments.size()
+                                )
+                            )
+                        };
+                    }
+
+                    if (expression.arguments.size() != 2)
+                    {
+                        return
+                        {
+                            create_error_diagnostic(
+                                parameters.core_module.source_file_path,
+                                source_range,
+                                std::format(
+                                    "Function expects {} arguments, but {} were provided.",
+                                    2,
+                                    expression.arguments.size()
+                                )
+                            )
+                        };
+                    }
+                }
+                else if (builtin_instance_call->first == "calculate_soa_array_size_bytes")
+                {
+                    iris::Instance_call_expression const& instance_call_expression = builtin_instance_call->second;
+
+                    if (instance_call_expression.arguments.size() != 1)
+                    {
+                        return
+                        {
+                            create_error_diagnostic(
+                                parameters.core_module.source_file_path,
+                                source_range,
+                                std::format(
+                                    "Function expects {} type arguments, but {} were provided.",
+                                    1,
+                                    instance_call_expression.arguments.size()
+                                )
+                            )
+                        };
+                    }
+
+                    if (expression.arguments.size() != 1)
+                    {
+                        return
+                        {
+                            create_error_diagnostic(
+                                parameters.core_module.source_file_path,
+                                source_range,
+                                std::format(
+                                    "Function expects {} arguments, but {} were provided.",
+                                    1,
+                                    expression.arguments.size()
                                 )
                             )
                         };

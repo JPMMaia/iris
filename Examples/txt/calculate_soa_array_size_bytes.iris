@@ -1,0 +1,12 @@
+module calculate_soa_array_size_bytes;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function get_size(capacity: Int64) -> (result: Int64)
+{
+    return calculate_soa_array_size_bytes::<Particle>(capacity);
+}

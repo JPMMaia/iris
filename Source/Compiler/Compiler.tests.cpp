@@ -9228,6 +9228,75 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
+
+  TEST_CASE("Compile create_soa_array_view_from_pointer", "[LLVM_IR]")
+  {
+    char const* const input_file = "soa_array_view_from_pointer.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map{};
+
+    char const* const expected_llvm_ir = R"(
+%__hl_soa_array_view = type { i64, i64, i64, ptr }
+
+; Function Attrs: convergent
+define private void @soa_array_view_from_pointer_create_mutable_view(ptr dead_on_unwind noalias writable sret(%__hl_soa_array_view) align 8 %return.result, ptr noundef %"arguments[0].data", i64 noundef %"arguments[1].length") #0 {
+entry:
+  %data = alloca ptr, align 8
+  %length = alloca i64, align 8
+  %soa_array_view = alloca %__hl_soa_array_view, align 8
+  store ptr %"arguments[0].data", ptr %data, align 8
+  store i64 %"arguments[1].length", ptr %length, align 8
+  %0 = load ptr, ptr %data, align 8
+  %1 = load i64, ptr %length, align 8
+  %2 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
+  store i64 0, ptr %2, align 8
+  %3 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
+  store i64 %1, ptr %3, align 8
+  %4 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
+  store i64 %1, ptr %4, align 8
+  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
+  store ptr %0, ptr %5, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return.result, ptr align 8 %soa_array_view, i64 32, i1 false)
+  ret void
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile calculate_soa_array_size_bytes", "[LLVM_IR]")
+  {
+    char const* const input_file = "calculate_soa_array_size_bytes.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map{};
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private i64 @calculate_soa_array_size_bytes_get_size(i64 noundef %"arguments[0].capacity") #0 {
+entry:
+  %capacity = alloca i64, align 8
+  store i64 %"arguments[0].capacity", ptr %capacity, align 8
+  %0 = load i64, ptr %capacity, align 8
+  %soa_member_block_size = mul i64 %0, 4
+  %soa_member_block_offset = add i64 0, %soa_member_block_size
+  %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
+  %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
+  %soa_member_block_size1 = mul i64 %0, 4
+  %soa_member_block_offset2 = add i64 %soa_offset_aligned, %soa_member_block_size1
+  ret i64 %soa_member_block_offset2
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
 }
 
 
