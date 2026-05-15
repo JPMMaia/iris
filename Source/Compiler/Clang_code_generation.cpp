@@ -309,6 +309,9 @@ namespace iris::compiler
         Clang_declaration_database const& clang_declaration_database
     )
     {
+        if (record_declaration.isCompleteDefinition())
+            return;
+
         for (std::size_t member_index = 0; member_index < struct_declaration.member_types.size(); ++member_index)
         {
             std::string_view const member_name = struct_declaration.member_names[member_index];
@@ -395,6 +398,8 @@ namespace iris::compiler
     )
     {
         clang::RecordDecl* record_declaration = clang_union_declarations.at(union_declaration.name);
+        if (record_declaration->isCompleteDefinition())
+            return;
 
         for (std::size_t member_index = 0; member_index < union_declaration.member_types.size(); ++member_index)
         {
@@ -556,6 +561,8 @@ namespace iris::compiler
     )
     {
         auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
+        if (iterator->second.struct_declarations.contains(struct_declaration.name))
+            return;
 
         clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
         iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
@@ -571,6 +578,8 @@ namespace iris::compiler
     )
     {
         auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
+        if (iterator->second.union_declarations.contains(union_declaration.name))
+            return;
 
         add_clang_union_declaration(iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
         add_clang_union_definition(iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
@@ -585,6 +594,8 @@ namespace iris::compiler
     )
     {
         auto iterator = clang_declaration_database.map.emplace(module_name.data(), Clang_module_declarations{}).first;
+        if (iterator->second.function_declarations.contains(function_declaration.name))
+            return;
 
         clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
         iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
@@ -601,12 +612,18 @@ namespace iris::compiler
 
         for (iris::Function_declaration const& function_declaration : core_module.export_declarations.function_declarations)
         {
+            if (iterator->second.function_declarations.contains(function_declaration.name))
+                continue;
+
             clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
             iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
         }
 
         for (iris::Function_declaration const& function_declaration : core_module.internal_declarations.function_declarations)
         {
+            if (iterator->second.function_declarations.contains(function_declaration.name))
+                continue;
+
             clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
             iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
         }
@@ -622,19 +639,35 @@ namespace iris::compiler
         auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
 
         for (iris::Enum_declaration const& enum_declaration : core_module.export_declarations.enum_declarations)
+        {
+            if (iterator->second.enum_declarations.contains(enum_declaration.name))
+                continue;
+            
             add_clang_enum_declaration(iterator->second.enum_declarations, clang_ast_context, enum_declaration);
+        }
 
         for (iris::Enum_declaration const& enum_declaration : core_module.internal_declarations.enum_declarations)
+        {
+            if (iterator->second.enum_declarations.contains(enum_declaration.name))
+                continue;
+
             add_clang_enum_declaration(iterator->second.enum_declarations, clang_ast_context, enum_declaration);
+        }
 
         for (iris::Struct_declaration const& struct_declaration : core_module.export_declarations.struct_declarations)
         {
+            if (iterator->second.struct_declarations.contains(struct_declaration.name))
+                continue;
+
             clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
             iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
         }
 
         for (iris::Struct_declaration const& struct_declaration : core_module.internal_declarations.struct_declarations)
         {
+            if (iterator->second.struct_declarations.contains(struct_declaration.name))
+                continue;
+
             clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
             iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
         }
@@ -710,12 +743,18 @@ namespace iris::compiler
 
         for (iris::Function_declaration const& function_declaration : core_module.export_declarations.function_declarations)
         {
+            if (iterator->second.function_declarations.contains(function_declaration.name))
+                continue;
+
             clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
             iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
         }
 
         for (iris::Function_declaration const& function_declaration : core_module.internal_declarations.function_declarations)
         {
+            if (iterator->second.function_declarations.contains(function_declaration.name))
+                continue;
+
             clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
             iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
         }

@@ -427,6 +427,9 @@ namespace iris::compiler
             if (!is_requested_type(struct_declaration.name, requested_debug_types))
                 continue;
 
+            if (llvm_debug_type_map.contains(struct_declaration.name))
+                continue;
+
             std::string const mangled_name = mangle_struct_name(core_module, struct_declaration.name);
 
             llvm::DIFile* const declaration_llvm_debug_file = get_or_create_llvm_debug_file(llvm_debug_builder, llvm_debug_file, llvm_debug_files, struct_declaration.source_location);
@@ -461,6 +464,10 @@ namespace iris::compiler
         for (Struct_declaration const& struct_declaration : struct_declarations)
         {
             if (!is_requested_type(struct_declaration.name, requested_debug_types))
+                continue;
+
+            llvm::DIType* const llvm_forward_declaration_debug_type = llvm_debug_type_map.at(struct_declaration.name);
+            if (!llvm_forward_declaration_debug_type->isReplaceable())
                 continue;
 
             std::pmr::vector<llvm::DIType*> const llvm_member_debug_types = type_references_to_llvm_debug_types(
@@ -539,8 +546,6 @@ namespace iris::compiler
                 }
             }
 
-            llvm::DIType* const llvm_forward_declaration_debug_type = llvm_debug_type_map.at(struct_declaration.name);
-
             llvm::TypeSize const size_in_bits = llvm_data_layout.getTypeSizeInBits(llvm_struct_type);
 
             llvm::DIFile* const declaration_llvm_debug_file = get_or_create_llvm_debug_file(llvm_debug_builder, llvm_debug_file, llvm_debug_files, struct_declaration.source_location);
@@ -597,6 +602,9 @@ namespace iris::compiler
             if (!is_requested_type(union_declaration.name, requested_debug_types))
                 continue;
 
+            if (llvm_debug_type_map.contains(union_declaration.name))
+                continue;
+
             std::string const mangled_name = mangle_struct_name(core_module, union_declaration.name);
 
             llvm::DIFile* const declaration_llvm_debug_file = get_or_create_llvm_debug_file(llvm_debug_builder, llvm_debug_file, llvm_debug_files, union_declaration.source_location);
@@ -630,6 +638,10 @@ namespace iris::compiler
         for (Union_declaration const& union_declaration : union_declarations)
         {
             if (!is_requested_type(union_declaration.name, requested_debug_types))
+                continue;
+
+            llvm::DIType* const llvm_forward_declaration_debug_type = llvm_debug_type_map.at(union_declaration.name);
+            if (!llvm_forward_declaration_debug_type->isReplaceable())
                 continue;
 
             std::pmr::vector<llvm::DIType*> const llvm_member_debug_types = type_references_to_llvm_debug_types(
@@ -672,8 +684,6 @@ namespace iris::compiler
 
                 elements.push_back(llvm_member_debug_type);
             }
-
-            llvm::DIType* const llvm_forward_declaration_debug_type = llvm_debug_type_map.at(union_declaration.name);
 
             llvm::TypeSize const size_in_bits = llvm_data_layout.getTypeSizeInBits(llvm_union_type);
 
