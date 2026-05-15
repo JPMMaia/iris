@@ -6261,7 +6261,7 @@ namespace iris::compiler
 
             iris::Expression const& expression = statement.expressions[expression_index];
 
-            if (llvm::AllocaInst::classof(value.value) || llvm::GetElementPtrInst::classof(value.value))
+            if (llvm::AllocaInst::classof(value.value) || llvm::GetElementPtrInst::classof(value.value) || llvm::GlobalVariable::classof(value.value))
             {
                 if (iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression))
                 {

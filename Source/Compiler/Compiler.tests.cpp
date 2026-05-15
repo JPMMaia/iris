@@ -9218,7 +9218,8 @@ define private void @Function_constructor_global_consumer_2_run() #0 {
 entry:
   %a = alloca i32, align 4
   store i32 0, ptr %a, align 4
-  call void @Function_constructor_global_provider_2_to_json_int32(ptr noundef %a)
+  %0 = load ptr, ptr @Function_constructor_global_provider_2_to_json_int32, align 8
+  call void %0(ptr noundef %a)
   ret void
 }
 
