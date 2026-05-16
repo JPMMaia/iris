@@ -2,7 +2,7 @@ macro(compile_cxx_header_unit target input header_type header_path header_unit_n
     set(custom_target_name "header_unit_${header_unit_name}_custom_target")
 
     if (MSVC)
-        set(output_module_path "${CMAKE_CURRENT_BINARY_DIR}/${header_unit_name}.ifc")
+        set(output_module_path "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/${header_unit_name}.ifc")
         set(include_compiler_string)
 
         get_target_property(target_includes ${target} INCLUDE_DIRECTORIES)
@@ -12,10 +12,15 @@ macro(compile_cxx_header_unit target input header_type header_path header_unit_n
 
         set(header_compile_options "/std:c++latest" "/EHsc" "/nologo" "/D_SCL_SECURE_NO_WARNINGS")
 
-        if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-            list(APPEND header_compile_options "/MDd")
+        get_property(is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+        if (${is_multi_config})
+            list(APPEND header_compile_options "$<IF:$<CONFIG:Debug>,/MDd,/MD>")
         else ()
-            list(APPEND header_compile_options "/MD")
+            if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+                list(APPEND header_compile_options "/MDd")
+            else ()
+                list(APPEND header_compile_options "/MD")
+            endif ()
         endif ()
 
         list(APPEND header_compile_options ${additional_compile_options})

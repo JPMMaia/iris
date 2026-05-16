@@ -7,8 +7,8 @@
   },
   "configurePresets": [
     {
-      "name": "windows-debug",
-      "generator": "Ninja",
+      "name": "windows",
+      "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",

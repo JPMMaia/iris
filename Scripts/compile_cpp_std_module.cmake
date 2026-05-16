@@ -3,18 +3,31 @@ if (TARGET std_module)
 endif ()
 
 if (MSVC)
-    set(STD_MODULE_OUT ${CMAKE_BINARY_DIR}/std_modules)
+    get_property(is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+    
+    if (is_multi_config)
+        set(STD_MODULE_OUT ${CMAKE_BINARY_DIR}/std_modules/$<CONFIG>)
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/std_modules/Debug)
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/std_modules/Release)
+    else ()
+        set(STD_MODULE_OUT ${CMAKE_BINARY_DIR}/std_modules)
+        file(MAKE_DIRECTORY ${STD_MODULE_OUT})
+    endif ()
+
     set(STD_IFC ${STD_MODULE_OUT}/std.ifc)
     set(STD_COMPAT_IFC ${STD_MODULE_OUT}/std_compat.ifc)
 
-    file(MAKE_DIRECTORY ${STD_MODULE_OUT})
 
     set(STD_COMPILE_OPTIONS "/std:c++latest" "/EHsc" "/nologo" "/D_SCL_SECURE_NO_WARNINGS")
 
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        list(APPEND STD_COMPILE_OPTIONS "/MDd")
+    if (${is_multi_config})
+        list(APPEND STD_COMPILE_OPTIONS "$<IF:$<CONFIG:Debug>,/MDd,/MD>")
     else ()
-        list(APPEND STD_COMPILE_OPTIONS "/MD")
+        if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+            list(APPEND STD_COMPILE_OPTIONS "/MDd")
+        else ()
+            list(APPEND STD_COMPILE_OPTIONS "/MD")
+        endif ()
     endif ()
 
     add_custom_command(
