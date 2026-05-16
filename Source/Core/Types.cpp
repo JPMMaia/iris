@@ -577,6 +577,14 @@ namespace iris
         return false;
     }
 
+    bool is_primitive_type(Type_reference const& type)
+    {
+        return is_integer(type) || is_floating_point(type) ||
+               is_bool(type) || is_c_bool(type) || is_byte(type) ||
+               is_decimal(type) || is_pointer(type) || is_null_pointer_type(type) ||
+               is_function_pointer(type);
+    }
+
     std::optional<Type_reference> get_element_or_pointee_type(Type_reference const& type)
     {
         if (std::holds_alternative<Array_slice_type>(type.data))

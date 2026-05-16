@@ -1811,6 +1811,15 @@ namespace iris::compiler
                 };
             }
 
+            if (is_primitive_type(type_to_instantiate.value()) || is_constant_array_type_reference(type_to_instantiate.value()))
+            {
+                return Type_info
+                {
+                    .type = type_to_instantiate.value(),
+                    .is_mutable = false,
+                };
+            }
+
             std::optional<Declaration> const declaration = find_underlying_declaration(
                 declaration_database,
                 type_to_instantiate.value()
@@ -1818,7 +1827,7 @@ namespace iris::compiler
             if (!declaration.has_value())
                 return std::nullopt;
 
-            if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data) || std::holds_alternative<iris::Union_declaration const*>(declaration->data) || std::holds_alternative<iris::Type_constructor const*>(declaration->data))
+            if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data) || std::holds_alternative<iris::Union_declaration const*>(declaration->data) || std::holds_alternative<iris::Type_constructor const*>(declaration->data) || std::holds_alternative<iris::Enum_declaration const*>(declaration->data))
             {
                 return Type_info
                 {

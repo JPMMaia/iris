@@ -5209,6 +5209,39 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
   }
 
 
+  TEST_CASE("Compile Primitive Instantiate", "[LLVM_IR]")
+  {
+    char const* const input_file = "primitive_instantiate.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private void @Primitive_instantiate_run() #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca float, align 4
+  %c = alloca i8, align 1
+  %d = alloca ptr, align 8
+  %e = alloca i32, align 4
+  %f = alloca [4 x i32], align 4
+  store i32 0, ptr %a, align 4
+  store float 0.000000e+00, ptr %b, align 4
+  store i8 0, ptr %c, align 1
+  store ptr null, ptr %d, align 8
+  store i32 0, ptr %e, align 4
+  store [4 x i32] zeroinitializer, ptr %f, align 4
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Load Pointers", "[LLVM_IR]")
   {
     char const* const input_file = "load_pointers.iris";

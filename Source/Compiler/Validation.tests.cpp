@@ -931,7 +931,7 @@ struct My_struct
         test_validate_module(input, {}, expected_diagnostics);
     }
 
-    TEST_CASE("Validates that instantiate expressions can only be assigned to struct or union types", "[Validation][Struct]")
+    TEST_CASE("Validates that instantiate expressions work with non-union types including primitives", "[Validation][Struct]")
     {
         std::string_view const input = R"(module Test;
 
@@ -959,15 +959,55 @@ struct My_struct_1
 }
 )";
 
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that instantiate expressions work with primitive types in function scope", "[Validation][Struct]")
+    {
+        std::string_view const input = R"(module Test;
+
+enum My_enum
+{
+    A = 0,
+    B = 1,
+}
+
+function foo() -> ()
+{
+    var a: Int32 = {};
+    var b: Float32 = {};
+    var c: Bool = {};
+    var d: *Int32 = {};
+    var e: My_enum = {};
+    var f: Constant_array::<Int32, 4> = {};
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that primitive instantiate expressions cannot have named members", "[Validation][Struct]")
+    {
+        std::string_view const input = R"(module Test;
+
+function foo() -> ()
+{
+    var a: Int32 = { x: 1 };
+}
+)";
+
         std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
         {
             iris::compiler::Diagnostic
             {
-                .range = create_source_range(23, 16, 23, 18),
+                .range = create_source_range(5, 20, 5, 28),
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
-                .code = Diagnostic_code::Type_mismatch,
-                .message = "Expression type 'Void' does not match expected type 'Int32'.",
+                .message = "Primitive types cannot have named members in instantiate expressions.",
                 .related_information = {},
             }
         };

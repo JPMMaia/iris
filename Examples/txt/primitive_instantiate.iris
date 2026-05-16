@@ -1,0 +1,17 @@
+module Primitive_instantiate;
+
+enum My_enum
+{
+    A = 0,
+    B = 1,
+}
+
+function run() -> ()
+{
+    var a: Int32 = {};
+    var b: Float32 = {};
+    var c: Bool = {};
+    var d: *Int32 = {};
+    var e: My_enum = {};
+    var f: Constant_array::<Int32, 4> = {};
+}

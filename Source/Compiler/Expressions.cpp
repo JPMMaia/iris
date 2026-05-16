@@ -5117,6 +5117,50 @@ namespace iris::compiler
             return create_instantiate_struct_expression_value(statement, expression, parameters, "iris.builtin", struct_declaration, type_reference);
         }
 
+        if (is_primitive_type(type_reference) || is_constant_array_type_reference(type_reference) || is_enum_type(declaration_database, type_reference))
+        {
+            if (parameters.llvm_parent_function == nullptr)
+                throw std::runtime_error{ "Primitive instantiate expression is not supported as a global constant!" };
+
+            llvm::LLVMContext& llvm_context = parameters.llvm_context;
+            llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
+            llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+            Type_database const& type_database = parameters.type_database;
+
+            llvm::Type* const llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, type_reference, type_database);
+            llvm::AllocaInst* const alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, llvm_type);
+
+            if (expression.type != Instantiate_expression_type::Uninitialized)
+            {
+                llvm::Constant* zero_value = nullptr;
+                if (is_pointer(type_reference) || is_null_pointer_type(type_reference) || is_function_pointer(type_reference))
+                {
+                    zero_value = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(llvm_type));
+                }
+                else if (is_floating_point(type_reference))
+                {
+                    zero_value = llvm::ConstantFP::get(llvm_type, 0.0);
+                }
+                else if (std::holds_alternative<iris::Constant_array_type>(type_reference.data))
+                {
+                    zero_value = llvm::ConstantAggregateZero::get(llvm_type);
+                }
+                else
+                {
+                    // integers, bool, c_bool, byte, decimal, enums
+                    zero_value = llvm::ConstantInt::get(llvm_type, 0);
+                }
+                create_store_instruction(llvm_builder, llvm_data_layout, zero_value, alloca);
+            }
+
+            return Value_and_type
+            {
+                .name = "",
+                .value = alloca,
+                .type = type_reference
+            };
+        }
+
         std::optional<Declaration_to_instantiate> const found_instance = get_declaration_type_to_instantiate(
             declaration_database,
             type_reference

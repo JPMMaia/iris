@@ -64,6 +64,7 @@ namespace iris
     export std::optional<Type_reference> remove_pointer(Type_reference const& type);
     export bool is_pointer(Type_reference const& type);
     export bool is_non_void_pointer(Type_reference const& type);
+    export bool is_primitive_type(Type_reference const& type);
 
     export std::optional<Type_reference> get_element_or_pointee_type(Type_reference const& type);
 

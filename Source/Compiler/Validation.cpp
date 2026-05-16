@@ -3380,6 +3380,22 @@ namespace iris::compiler
             };
         }
 
+        if (is_primitive_type(type_to_instantiate.value()) || is_constant_array_type_reference(type_to_instantiate.value()))
+        {
+            if (!expression.members.empty())
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        "Primitive types cannot have named members in instantiate expressions."
+                    )
+                };
+            }
+            return {};
+        }
+
         std::pmr::vector<iris::Declaration_instance_storage> temporary_storage{parameters.temporaries_allocator};
         std::optional<Declaration> const declaration_optional = find_declaration_to_instantiate(
             parameters.declaration_database,
@@ -4116,11 +4132,15 @@ namespace iris::compiler
             std::holds_alternative<iris::Instantiate_expression>(right_hand_side.data) &&
             !std::holds_alternative<iris::Array_slice_type>(type.data) &&
             !std::holds_alternative<iris::Soa_array_type>(type.data) &&
-            !std::holds_alternative<iris::Soa_array_view_type>(type.data)
+            !std::holds_alternative<iris::Soa_array_view_type>(type.data) &&
+            !std::holds_alternative<iris::Constant_array_type>(type.data) &&
+            !is_integer(type) && !is_floating_point(type) &&
+            !is_bool(type) && !is_c_bool(type) && !is_byte(type) && !is_decimal(type) &&
+            !is_pointer(type) && !is_null_pointer_type(type) && !is_function_pointer(type)
         )
         {
             std::optional<Declaration> const declaration_optional = find_underlying_declaration(parameters.declaration_database, type);
-            if (!declaration_optional.has_value() || (!std::holds_alternative<iris::Struct_declaration const*>(declaration_optional->data) && !std::holds_alternative<iris::Union_declaration const*>(declaration_optional->data) && !std::holds_alternative<iris::Type_constructor const*>(declaration_optional->data)))
+            if (!declaration_optional.has_value() || (!std::holds_alternative<iris::Struct_declaration const*>(declaration_optional->data) && !std::holds_alternative<iris::Union_declaration const*>(declaration_optional->data) && !std::holds_alternative<iris::Type_constructor const*>(declaration_optional->data) && !std::holds_alternative<iris::Enum_declaration const*>(declaration_optional->data)))
             {
                 return
                 {
