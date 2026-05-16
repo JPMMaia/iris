@@ -1134,11 +1134,19 @@ namespace iris::compiler
         );
     }
 
+    static std::string format_source_location(std::optional<Source_range> const& source_range)
+    {
+        if (!source_range.has_value())
+            return "";
+        return std::format(" (line {}, column {})", source_range->start.line, source_range->start.column);
+    }
+
     llvm::Type* fundamental_type_to_llvm_type(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         Fundamental_type const type,
-        Builtin_types const& builtin_types
+        Builtin_types const& builtin_types,
+        std::optional<Source_range> const source_range = {}
     )
     {
         switch (type)
@@ -1172,14 +1180,15 @@ namespace iris::compiler
         case Fundamental_type::C_ulonglong:
             return llvm_data_layout.getSmallestLegalIntType(llvm_context, 64);
         default:
-            throw std::runtime_error{ "fundamental_type_to_llvm_type: Not implemented." };
+            throw std::runtime_error{ std::format("fundamental_type_to_llvm_type: Not implemented.{}", format_source_location(source_range)) };
         }
     }
 
     llvm::DIType* fundamental_type_to_llvm_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
         Fundamental_type const type,
-        Debug_builtin_types const& debug_builtin_types
+        Debug_builtin_types const& debug_builtin_types,
+        std::optional<Source_range> const source_range = {}
     )
     {
         std::pmr::string const type_name = format_debug_primitive_type_name(type, {});
@@ -1225,7 +1234,7 @@ namespace iris::compiler
         case Fundamental_type::C_longdouble:
             return llvm_debug_builder.createBasicType(type_name.data(), 128, llvm::dwarf::DW_ATE_float);
         default:
-            throw std::runtime_error{ "fundamental_type_to_llvm_debug_type: Not implemented." };
+            throw std::runtime_error{ std::format("fundamental_type_to_llvm_debug_type: Not implemented.{}", format_source_location(source_range)) };
         }
     }
 
@@ -1367,7 +1376,7 @@ namespace iris::compiler
             LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at("iris.builtin");
             auto const location = llvm_type_map.find("Generic_array_slice");
             if (location == llvm_type_map.end())
-                throw std::runtime_error{ "Could not find Generic_array_slice LLVM type!" };
+                throw std::runtime_error{ std::format("Could not find Generic_array_slice LLVM type!{}", format_source_location(type_reference.source_range)) };
 
             llvm::Type* const llvm_type = location->second;
             return llvm_type;
@@ -1375,7 +1384,7 @@ namespace iris::compiler
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             // Builtin_type_reference const& data = std::get<Builtin_type_reference>(type_reference.data);
-            throw std::runtime_error{ "type_reference_to_llvm_type builtin type not implemented." };
+            throw std::runtime_error{ std::format("type_reference_to_llvm_type builtin type not implemented.{}", format_source_location(type_reference.source_range)) };
         }
         else if (std::holds_alternative<Constant_array_type>(type_reference.data))
         {
@@ -1408,7 +1417,7 @@ namespace iris::compiler
         else if (std::holds_alternative<Fundamental_type>(type_reference.data))
         {
             Fundamental_type const data = std::get<Fundamental_type>(type_reference.data);
-            return fundamental_type_to_llvm_type(llvm_context, llvm_data_layout, data, type_database.builtin);
+            return fundamental_type_to_llvm_type(llvm_context, llvm_data_layout, data, type_database.builtin, type_reference.source_range);
         }
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
@@ -1430,8 +1439,12 @@ namespace iris::compiler
             Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
             return pointer_type_to_llvm_type(llvm_context, llvm_data_layout, data, type_database);
         }
+        else if (std::holds_alternative<Null_pointer_type>(type_reference.data))
+        {
+            return llvm::PointerType::get(llvm_context, 0);
+        }
 
-        throw std::runtime_error{ "type_reference_to_llvm_type: Not implemented." };
+        throw std::runtime_error{ std::format("type_reference_to_llvm_type: Not implemented.{}", format_source_location(type_reference.source_range)) };
     }
 
     static llvm::Type* pointer_type_to_llvm_type_on_demand(
@@ -1465,7 +1478,7 @@ namespace iris::compiler
         }
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
-            throw std::runtime_error{ "Builtin_type_reference on-demand conversion is not implemented." };
+            throw std::runtime_error{ std::format("Builtin_type_reference on-demand conversion is not implemented.{}", format_source_location(type_reference.source_range)) };
         }
         else if (std::holds_alternative<Constant_array_type>(type_reference.data))
         {
@@ -1491,7 +1504,7 @@ namespace iris::compiler
         {
             Fundamental_type const data = std::get<Fundamental_type>(type_reference.data);
             Builtin_types const builtin_types = create_builtin_types(llvm_context);
-            return fundamental_type_to_llvm_type(llvm_context, llvm_data_layout, data, builtin_types);
+            return fundamental_type_to_llvm_type(llvm_context, llvm_data_layout, data, builtin_types, type_reference.source_range);
         }
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
@@ -1513,13 +1526,17 @@ namespace iris::compiler
             Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
             return pointer_type_to_llvm_type_on_demand(llvm_context, llvm_data_layout, data, declaration_database, clang_context);
         }
+        else if (std::holds_alternative<Null_pointer_type>(type_reference.data))
+        {
+            return llvm::PointerType::get(llvm_context, 0);
+        }
         else if (std::holds_alternative<Type_instance>(type_reference.data))
         {
             Type_instance const& data = std::get<Type_instance>(type_reference.data);
             return convert_type_instance_on_demand(clang_context, declaration_database, data);
         }
 
-        throw std::runtime_error{ "type_reference_to_llvm_type_on_demand: Not implemented." };
+        throw std::runtime_error{ std::format("type_reference_to_llvm_type_on_demand: Not implemented.{}", format_source_location(type_reference.source_range)) };
     }
 
     llvm::Type* type_reference_to_llvm_type(
@@ -1587,7 +1604,7 @@ namespace iris::compiler
         if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             // Builtin_type_reference const& data = std::get<Builtin_type_reference>(type_reference.data);
-            throw std::runtime_error{ "type_reference_to_llvm_debug_type builtin type not implemented." };
+            throw std::runtime_error{ std::format("type_reference_to_llvm_debug_type builtin type not implemented.{}", format_source_location(type_reference.source_range)) };
         }
         else if (std::holds_alternative<Constant_array_type>(type_reference.data))
         {
@@ -1620,7 +1637,7 @@ namespace iris::compiler
         else if (std::holds_alternative<Fundamental_type>(type_reference.data))
         {
             Fundamental_type const data = std::get<Fundamental_type>(type_reference.data);
-            return fundamental_type_to_llvm_debug_type(llvm_debug_builder, data, debug_type_database.builtin);
+            return fundamental_type_to_llvm_debug_type(llvm_debug_builder, data, debug_type_database.builtin, type_reference.source_range);
         }
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
@@ -1647,7 +1664,7 @@ namespace iris::compiler
             return llvm_debug_builder.createPointerType(create_void_type(llvm_debug_builder), llvm_data_layout.getPointerSizeInBits());
         }
 
-        throw std::runtime_error{ "type_reference_to_llvm_debug_type: Not implemented." };
+        throw std::runtime_error{ std::format("type_reference_to_llvm_debug_type: Not implemented.{}", format_source_location(type_reference.source_range)) };
     }
 
     llvm::DIType* type_reference_to_llvm_debug_type(
