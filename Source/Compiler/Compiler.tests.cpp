@@ -5411,35 +5411,69 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     {
     };
 
-    char const* const expected_llvm_ir = R"(
+    std::string const expected_llvm_ir = std::format(R"(
 ; Function Attrs: convergent
-define i32 @Null_pointers_pointers(ptr noundef %"arguments[0].parameter") #0 {
+define i32 @Null_pointers_pointers(ptr noundef %"arguments[0].parameter") #0 !dbg !3 {{
 entry:
   %parameter = alloca ptr, align 8
+  %x = alloca ptr, align 8, !dbg !10
   store ptr %"arguments[0].parameter", ptr %parameter, align 8
-  %0 = load ptr, ptr %parameter, align 8
-  %1 = icmp eq ptr %0, null
-  br i1 %1, label %if_s0_then, label %if_s1_after
+  call void @llvm.dbg.declare(metadata ptr %parameter, metadata !9, metadata !DIExpression()), !dbg !11
+  %0 = load ptr, ptr %parameter, align 8, !dbg !12
+  %1 = icmp eq ptr %0, null, !dbg !12
+  br i1 %1, label %if_s0_then, label %if_s1_after, !dbg !12
 
 if_s0_then:                                       ; preds = %entry
-  ret i32 -1
+  ret i32 -1, !dbg !13
 
 if_s1_after:                                      ; preds = %entry
-  %2 = load ptr, ptr %parameter, align 8
-  %3 = icmp ne ptr %2, null
-  br i1 %3, label %if_s0_then1, label %if_s1_after2
+  %2 = load ptr, ptr %parameter, align 8, !dbg !15
+  %3 = icmp ne ptr %2, null, !dbg !15
+  br i1 %3, label %if_s0_then1, label %if_s1_after2, !dbg !15
 
 if_s0_then1:                                      ; preds = %if_s1_after
-  ret i32 1
+  ret i32 1, !dbg !16
 
 if_s1_after2:                                     ; preds = %if_s1_after
-  ret i32 0
-}
+  call void @llvm.dbg.declare(metadata ptr %x, metadata !18, metadata !DIExpression()), !dbg !10
+  store ptr null, ptr %x, align 8, !dbg !10
+  ret i32 0, !dbg !21
+}}
 
-attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
-)";
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
 
-    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
+
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
+
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "null_pointers.iris", directory: "{}")
+!3 = distinct !DISubprogram(name: "pointers", linkageName: "Null_pointers_pointers", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !8)
+!4 = !DISubroutineType(types: !5)
+!5 = !{{!6, !7}}
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
+!7 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !6, size: 64)
+!8 = !{{!9}}
+!9 = !DILocalVariable(name: "parameter", arg: 1, scope: !3, file: !2, line: 3, type: !7)
+!10 = !DILocation(line: 15, column: 5, scope: !3)
+!11 = !DILocation(line: 3, column: 26, scope: !3)
+!12 = !DILocation(line: 5, column: 8, scope: !3)
+!13 = !DILocation(line: 7, column: 9, scope: !14)
+!14 = distinct !DILexicalBlock(scope: !3, file: !2, line: 6, column: 5)
+!15 = !DILocation(line: 10, column: 8, scope: !3)
+!16 = !DILocation(line: 12, column: 9, scope: !17)
+!17 = distinct !DILexicalBlock(scope: !3, file: !2, line: 11, column: 5)
+!18 = !DILocalVariable(name: "x", scope: !3, file: !2, line: 15, type: !19)
+!19 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !20, size: 64)
+!20 = !DIBasicType(name: "void", encoding: DW_ATE_unsigned)
+!21 = !DILocation(line: 17, column: 5, scope: !3)
+)", g_test_source_files_path.generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
   }
 
   TEST_CASE("Compile Numbers", "[LLVM_IR]")

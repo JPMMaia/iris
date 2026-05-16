@@ -12,5 +12,7 @@ export function pointers(parameter: *Int32) -> (result: Int32)
         return 1;
     }
 
+    var x = null;
+
     return 0;
 }

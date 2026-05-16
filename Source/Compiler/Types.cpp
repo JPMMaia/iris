@@ -1642,6 +1642,10 @@ namespace iris::compiler
             Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
             return pointer_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
         }
+        else if (std::holds_alternative<Null_pointer_type>(type_reference.data))
+        {
+            return llvm_debug_builder.createPointerType(create_void_type(llvm_debug_builder), llvm_data_layout.getPointerSizeInBits());
+        }
 
         throw std::runtime_error{ "type_reference_to_llvm_debug_type: Not implemented." };
     }
