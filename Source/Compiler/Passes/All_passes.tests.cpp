@@ -579,4 +579,56 @@ export var get_vector3f64_size_of = module_a__at__get_vector3_size_of__at__17893
 
         CHECK(expected == actual);
     }
+
+    TEST_CASE("Transform reflection of given type at function constructor", "[All_passes][Passes]")
+    {
+        std::string_view const input = R"(module module_a;
+
+export function_constructor get_size_of(Value_type: Type)
+{
+    return function() -> (result: Uint64)
+    {
+        if @size_of::<Value_type>() == 4u64
+        {
+            return 4u64;
+        }
+        return @size_of::<Value_type>();
+    };
+}
+
+export var get_int32_size_of = get_size_of::<Int32>;
+)";
+
+        std::string_view const expected = R"(module module_a;
+
+export function_constructor get_size_of(Value_type: Type)
+{
+    return function () -> (result: Uint64)
+    {
+        if @size_of::<Value_type>() == 4u64
+        {
+            return 4u64;
+        }
+        return @size_of::<Value_type>();
+    };
+}
+
+@unique_name("module_a__at__get_size_of__at__8600981796902147528")
+function module_a__at__get_size_of__at__8600981796902147528() -> (result: Uint64)
+{
+    if 4u64 == 4u64
+    {
+        return 4u64;
+    }
+    return 4u64;
+}
+
+export var get_int32_size_of = module_a__at__get_size_of__at__8600981796902147528;
+)";
+
+        std::pmr::vector<std::string_view> const dependencies = { };
+        std::pmr::string const actual = run_all_passes_and_format(input, dependencies);
+
+        CHECK(expected == actual);
+    }
 }

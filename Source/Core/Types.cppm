@@ -93,7 +93,7 @@ namespace iris
 
     export template <typename Function_t>
         bool visit_expressions(
-            std::optional<iris::Statement> const statement,
+            std::optional<iris::Statement> const& statement,
             Function_t predicate
         );
 
@@ -912,13 +912,13 @@ namespace iris
 
     export template <typename Function_t>
         bool visit_expressions(
-            std::optional<iris::Statement> const statement,
+            std::optional<iris::Statement> const& statement,
             Function_t predicate
         )
     {
-        if (statement)
+        if (statement.has_value())
         {
-            return visit_expressions(*statement, predicate);
+            return visit_expressions(statement.value(), predicate);
         }
 
         return false;
