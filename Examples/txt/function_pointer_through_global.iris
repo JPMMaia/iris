@@ -1,0 +1,41 @@
+module function_pointer_through_global;
+
+export type_constructor Holder(Key_type: Type)
+{
+    return struct
+    {
+        hash_fn: function<(key: *Key_type) -> (hash: Uint64)> = null;
+    };
+}
+
+export function_constructor identity_hash(Key_type: Type)
+{
+    return function(key: *Key_type) -> (hash: Uint64)
+    {
+        // Keep body trivial so crashes point to call target/lowering, not logic.
+        return 0u64;
+    };
+}
+
+export function_constructor make_holder(Key_type: Type)
+{
+    return function(hash_fn: function<(key: *Key_type) -> (hash: Uint64)>) -> (holder: Holder::<Key_type>)
+    {
+        return explicit
+        {
+            hash_fn: hash_fn
+        };
+    };
+}
+
+export var identity_hash_u64 = identity_hash::<Uint64>;
+export var make_holder_u64 = make_holder::<Uint64>;
+
+function test_function_pointer_global_passthrough_abi() -> ()
+{
+    mutable holder = make_holder_u64(identity_hash_u64);
+
+    var x = 1u64;
+    var f = holder.hash_fn;
+    var result = f(&x);
+}

@@ -4811,6 +4811,73 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Function Pointers through Globals", "[LLVM_IR]")
+  {
+    char const* const input_file = "function_pointer_through_global.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.function_pointer_through_global__at__Holder__at__16854961200032185695 = type { ptr }
+
+@function_pointer_through_global_identity_hash_u64 = constant ptr @function_pointer_through_global__at__identity_hash__at__6786277289116093716
+@function_pointer_through_global_make_holder_u64 = constant ptr @function_pointer_through_global__at__make_holder__at__12710636169570723101
+
+; Function Attrs: convergent
+define private i64 @function_pointer_through_global__at__identity_hash__at__6786277289116093716(ptr noundef %"arguments[0].key") #0 {
+entry:
+  %key = alloca ptr, align 8
+  store ptr %"arguments[0].key", ptr %key, align 8
+  ret i64 0
+}
+
+; Function Attrs: convergent
+define private ptr @function_pointer_through_global__at__make_holder__at__12710636169570723101(ptr noundef %"arguments[0].hash_fn") #0 {
+entry:
+  %hash_fn = alloca ptr, align 8
+  %0 = alloca %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, align 8
+  store ptr %"arguments[0].hash_fn", ptr %hash_fn, align 8
+  %1 = load ptr, ptr %hash_fn, align 8
+  %2 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, i32 0, i32 0
+  store ptr %1, ptr %2, align 8
+  %3 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  ret ptr %4
+}
+
+; Function Attrs: convergent
+define private void @function_pointer_through_global_test_function_pointer_global_passthrough_abi() #0 {
+entry:
+  %0 = alloca %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, align 8
+  %holder = alloca %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, align 8
+  %x = alloca i64, align 8
+  %f = alloca ptr, align 8
+  %result = alloca i64, align 8
+  %1 = load ptr, ptr @function_pointer_through_global_make_holder_u64, align 8
+  %2 = load ptr, ptr @function_pointer_through_global_identity_hash_u64, align 8
+  %3 = call ptr %1(ptr noundef %2)
+  %4 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, i32 0, i32 0
+  store ptr %3, ptr %4, align 8
+  %5 = load %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, align 8
+  store %struct.function_pointer_through_global__at__Holder__at__16854961200032185695 %5, ptr %holder, align 8
+  store i64 1, ptr %x, align 8
+  %6 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %holder, i32 0, i32 0
+  %7 = load ptr, ptr %6, align 8
+  store ptr %7, ptr %f, align 8
+  %8 = load ptr, ptr %f, align 8
+  %9 = call i64 %8(ptr noundef %x)
+  store i64 %9, ptr %result, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile hello world!", "[LLVM_IR]")
   {
     char const* const input_file = "hello_world.iris";

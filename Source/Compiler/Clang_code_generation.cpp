@@ -1897,6 +1897,15 @@ namespace iris::compiler
         Convertion_type const convertion_type
     )
     {   
+        auto const is_pointer_valued_global_variable = [](llvm::Value* const value) -> bool
+        {
+            if (!llvm::GlobalVariable::classof(value))
+                return false;
+
+            llvm::GlobalVariable const* const global_variable = static_cast<llvm::GlobalVariable const*>(value);
+            return global_variable->getValueType()->isPointerTy();
+        };
+
         if (source_llvm_type == destination_llvm_type)
         {
             if (source_llvm_value->getType() != source_llvm_type && source_llvm_value->getType()->isPointerTy())
@@ -1914,7 +1923,7 @@ namespace iris::compiler
                 }
                 else
                 {
-                    if (llvm::AllocaInst::classof(source_llvm_value) || llvm::GetElementPtrInst::classof(source_llvm_value))
+                    if (llvm::AllocaInst::classof(source_llvm_value) || llvm::GetElementPtrInst::classof(source_llvm_value) || is_pointer_valued_global_variable(source_llvm_value))
                     {
                         if (!is_taking_address_of_source_llvm_value)
                         {
