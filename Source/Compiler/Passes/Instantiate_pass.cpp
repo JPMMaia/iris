@@ -45,15 +45,21 @@ namespace iris::compiler
             add_struct_declaration(declaration_database, type_instance.type_constructor.module_reference.name, false, instanced_declarations.struct_declarations.back());
 
             Struct_declaration& added_struct = instanced_declarations.struct_declarations.back();
-            for (iris::Type_reference& member_type : added_struct.member_types)
+
+            auto const replace_nested_type_instances = [&](iris::Type_reference const& type_reference) -> bool
             {
-                if (std::holds_alternative<Type_instance>(member_type.data))
+                if (std::holds_alternative<Type_instance>(type_reference.data))
                 {
-                    Type_instance const nested_instance = std::get<Type_instance>(member_type.data);
+                    Type_instance const& nested_instance = std::get<Type_instance>(type_reference.data);
                     add_instantiated_type_to_module(declaration_database, nested_instance, instanced_declarations);
-                    member_type = iris::create_custom_type_reference(nested_instance.type_constructor.module_reference.name, mangle_type_instance_name(nested_instance));
+                    iris::Type_reference& mutable_type_reference = const_cast<iris::Type_reference&>(type_reference);
+                    mutable_type_reference = iris::create_custom_type_reference(nested_instance.type_constructor.module_reference.name, mangle_type_instance_name(nested_instance));
                 }
-            }
+                return false;
+            };
+
+            for (iris::Type_reference& member_type : added_struct.member_types)
+                iris::visit_type_references_recursively(member_type, replace_nested_type_instances);
         }
     }
 

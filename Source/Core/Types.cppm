@@ -469,6 +469,16 @@ namespace iris
 
                 return visit_type_references(statement.expressions[data.type.expression_index], statement, predicate);
             }
+            else if (std::holds_alternative<Instance_call_expression>(expression.data))
+            {
+                Instance_call_expression const& data = std::get<Instance_call_expression>(expression.data);
+                for (iris::Statement const& argument : data.arguments)
+                {
+                    if (visit_type_references(argument, predicate))
+                        return true;
+                }
+                return false;
+            }
 
             return false;
         };

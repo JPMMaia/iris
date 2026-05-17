@@ -1039,4 +1039,130 @@ using Transformf32 = Test__at__Transform__at__8125935347908839557;
 
         CHECK(expected == actual);
     }
+
+    TEST_CASE("Types are replaced recursively", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const input = R"(module Test;
+
+export type_constructor Hash_map_node(Key_type: Type, Value_type: Type)
+{
+    return struct
+    {
+        key: Key_type = {};
+        value: Value_type = {};
+    };
+}
+
+export type_constructor Hash_map(Key_type: Type, Value_type: Type)
+{
+    return struct
+    {
+        slots: Soa_array_view::<mutable Hash_map_node::<Key_type, Value_type>> = {};
+        count: Uint64 = 0u64;
+        capacity: Uint64 = 0u64;
+    };
+}
+
+export function_constructor create_hash_map(Key_type: Type, Value_type: Type)
+{
+    return function (capacity: Uint64, allocator: *alloc.Allocator) -> (map: Hash_map::<Key_type, Value_type>)
+    {
+        var slots_size_bytes = calculate_soa_array_size_bytes::<Hash_map_node::<Key_type, Value_type>>(capacity);
+        var memory = allocator->allocate(slots_size_bytes, 8u64);
+        var slots_raw_memory = reinterpret_as::<*mutable Void>(memory);
+        var slots = create_soa_array_view_from_pointer::<Hash_map_node::<Key_type, Value_type>>(slots_raw_memory, slots_size_bytes);
+
+        return explicit {
+            slots: slots,
+            count: 0u64,
+            capacity: capacity
+        };
+    };
+}
+
+function run() -> ()
+{
+    var hash_map = create_hash_map::<Uint64, Uint64>(1u64, null);
+}
+)";
+
+        std::array<std::string_view, 0> const dependencies = {};
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies);
+
+        std::string_view const expected = R"(module Test;
+
+export type_constructor Hash_map_node(Key_type: Type, Value_type: Type)
+{
+    return struct
+    {
+        key: Key_type = {};
+        value: Value_type = {};
+    };
+}
+
+@unique_name("Test__at__Hash_map_node__at__6287389176771742536")
+struct Test__at__Hash_map_node__at__6287389176771742536
+{
+    key: Uint64 = {};
+    value: Uint64 = {};
+}
+
+export type_constructor Hash_map(Key_type: Type, Value_type: Type)
+{
+    return struct
+    {
+        slots: Soa_array_view::<mutable Hash_map_node::<Key_type, Value_type>> = {};
+        count: Uint64 = 0u64;
+        capacity: Uint64 = 0u64;
+    };
+}
+
+@unique_name("Test__at__Hash_map__at__90519977598602787")
+struct Test__at__Hash_map__at__90519977598602787
+{
+    slots: Soa_array_view::<mutable Test__at__Hash_map_node__at__6287389176771742536> = {};
+    count: Uint64 = 0u64;
+    capacity: Uint64 = 0u64;
+}
+
+export function_constructor create_hash_map(Key_type: Type, Value_type: Type)
+{
+    return function (capacity: Uint64, allocator: *Allocator) -> (map: Hash_map::<Key_type, Value_type>)
+    {
+        var slots_size_bytes = calculate_soa_array_size_bytes::<Hash_map_node::<Key_type, Value_type>>(capacity);
+        var memory = allocator->allocate(slots_size_bytes, 8u64);
+        var slots_raw_memory = reinterpret_as::<*mutable Void>(memory);
+        var slots = create_soa_array_view_from_pointer::<Hash_map_node::<Key_type, Value_type>>(slots_raw_memory, slots_size_bytes);
+
+        return explicit {
+            slots: slots,
+            count: 0u64,
+            capacity: capacity
+        };
+    };
+}
+
+@unique_name("Test__at__create_hash_map__at__18357070326143641679")
+function Test__at__create_hash_map__at__18357070326143641679(capacity: Uint64, allocator: *Allocator) -> (map: Test__at__Hash_map__at__90519977598602787)
+{
+    var slots_size_bytes = calculate_soa_array_size_bytes::<Test__at__Hash_map_node__at__6287389176771742536>(capacity);
+    var memory = allocator->allocate(slots_size_bytes, 8u64);
+    var slots_raw_memory = reinterpret_as::<*mutable Void>(memory);
+    var slots = create_soa_array_view_from_pointer::<Test__at__Hash_map_node__at__6287389176771742536>(slots_raw_memory, slots_size_bytes);
+
+    return explicit {
+        slots: slots,
+        count: 0u64,
+        capacity: capacity
+    };
+}
+
+function run() -> ()
+{
+    var hash_map = Test__at__create_hash_map__at__18357070326143641679(1u64, null);
+}
+)";
+
+        CHECK(expected == actual);
+    }
 }
