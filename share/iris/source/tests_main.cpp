@@ -9,6 +9,10 @@
 #include <string_view>
 #include <vector>
 
+static constexpr char const* ANSI_GREEN = "\033[32m";
+static constexpr char const* ANSI_RED   = "\033[31m";
+static constexpr char const* ANSI_RESET = "\033[0m";
+
 using Test_function_pointer = void(*)();
 
 extern "C" uint64_t iris_get_test_count();
@@ -130,6 +134,17 @@ static std::pmr::vector<Test_function_pointer> get_tests_function_pointers(std::
 
     for (std::uint64_t const test_index : tests_indices)
         output.push_back(tests[test_index]);
+
+    return output;
+}
+
+static std::pmr::vector<char const*> get_filtered_test_names(std::span<std::uint64_t const> const tests_indices, std::span<char const* const> const all_test_names)
+{
+    std::pmr::vector<char const*> output;
+    output.reserve(tests_indices.size());
+
+    for (std::uint64_t const test_index : tests_indices)
+        output.push_back(all_test_names[test_index]);
 
     return output;
 }
@@ -270,22 +285,31 @@ struct Test_results
     std::uint64_t success_count = 0;
 };
 
-static Test_results run_tests(std::span<Test_function_pointer const> const tests_function_pointers)
+static Test_results run_tests(std::span<Test_function_pointer const> const tests_function_pointers, std::span<char const* const> const test_names)
 {
     Test_results results = {};
 
-    for (Test_function_pointer const test_function_pointer : tests_function_pointers)
+    for (std::uint64_t i = 0; i < tests_function_pointers.size(); ++i)
     {
         iris_test_context current_test_context = {};
 
+        std::printf("[ RUN      ] \"%s\"\n", test_names[i]);
+        std::fflush(stdout);
+
         g_iris_current_test_context = &current_test_context;
-        test_function_pointer();
+        tests_function_pointers[i]();
         g_iris_current_test_context = nullptr;
 
         if (current_test_context.success)
+        {
+            std::printf("[       %sOK%s ] \"%s\"\n", ANSI_GREEN, ANSI_RESET, test_names[i]);
             results.success_count += 1;
+        }
         else
+        {
+            std::printf("[     %sFAIL%s ] \"%s\"\n", ANSI_RED, ANSI_RESET, test_names[i]);
             results.failed_count += 1;
+        }
     }
 
     return results;
@@ -293,7 +317,8 @@ static Test_results run_tests(std::span<Test_function_pointer const> const tests
 
 void print_test_results(Test_results const& test_results)
 {
-    std::printf("%llu tests passed\n%llu tests failed\n", test_results.success_count, test_results.failed_count);
+    if (test_results.failed_count > 0)
+        std::printf("%s%llu tests failed%s\n", ANSI_RED, test_results.failed_count, ANSI_RESET);
 }
 
 int main(int const argc, char const* const argv[])
@@ -319,8 +344,9 @@ int main(int const argc, char const* const argv[])
     std::span<char const* const> const all_test_names = get_all_test_names();
     std::pmr::vector<std::uint64_t> const filtered_test_indices = filter_tests(argc, argv, all_test_names);
     std::pmr::vector<Test_function_pointer> const tests_function_pointers = get_tests_function_pointers(filtered_test_indices);
+    std::pmr::vector<char const*> const filtered_test_names = get_filtered_test_names(filtered_test_indices, all_test_names);
 
-    Test_results const results = run_tests(tests_function_pointers);
+    Test_results const results = run_tests(tests_function_pointers, filtered_test_names);
     print_test_results(results);
 
     return results.failed_count == 0 ? 0 : -1;
