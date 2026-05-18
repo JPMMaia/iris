@@ -13,4 +13,9 @@ function run(instance: *My_struct) -> ()
 
     var p0 = &instance[0];
     var v0 = instance[0];
+
+    var n = null;
+    if p0 == n
+    {
+    }
 }

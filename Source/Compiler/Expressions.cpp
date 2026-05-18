@@ -6421,7 +6421,7 @@ namespace iris::compiler
     {
         if (value.value != nullptr && value.type.has_value() && value.value->getType()->isPointerTy())
         {
-            if (std::holds_alternative<Null_pointer_type>(value.type->data))
+            if (std::holds_alternative<Null_pointer_type>(value.type->data) && !llvm::AllocaInst::classof(value.value) && !llvm::GetElementPtrInst::classof(value.value) && !llvm::GlobalVariable::classof(value.value))
                 return value;
 
             iris::Expression const& expression = statement.expressions[expression_index];

@@ -5326,6 +5326,7 @@ entry:
   %instance = alloca ptr, align 8
   %p0 = alloca ptr, align 8
   %v0 = alloca %struct.Load_pointers_My_struct, align 8
+  %n = alloca ptr, align 8
   store ptr %"arguments[0].instance", ptr %instance, align 8
   %0 = load ptr, ptr %instance, align 8
   %1 = getelementptr inbounds %struct.Load_pointers_My_struct, ptr %0, i32 0, i32 0
@@ -5344,6 +5345,16 @@ if_s1_after:                                      ; preds = %if_s0_then, %entry
   %array_element_pointer1 = getelementptr %struct.Load_pointers_My_struct, ptr %5, i32 0
   %6 = load %struct.Load_pointers_My_struct, ptr %array_element_pointer1, align 8
   store %struct.Load_pointers_My_struct %6, ptr %v0, align 8
+  store ptr null, ptr %n, align 8
+  %7 = load ptr, ptr %p0, align 8
+  %8 = load ptr, ptr %n, align 8
+  %9 = icmp eq ptr %7, %8
+  br i1 %9, label %if_s0_then2, label %if_s1_after3
+
+if_s0_then2:                                      ; preds = %if_s1_after
+  br label %if_s1_after3
+
+if_s1_after3:                                     ; preds = %if_s0_then2, %if_s1_after
   ret void
 }
 
