@@ -745,7 +745,8 @@ namespace iris::c
         std::string_view const declaration_name,
         std::optional<std::pmr::string> const unique_name,
         std::span<std::pmr::string const> const member_names,
-        std::span<iris::Type_reference const> const member_types
+        std::span<iris::Type_reference const> const member_types,
+        std::span<std::optional<std::uint32_t> const> const member_bit_fields
     )
     {
         write_iris_meta_comment(stream, core_module_name, declaration_name, declaration_type);
@@ -759,6 +760,8 @@ namespace iris::c
 
             stream << "    ";
             write_c_type_name(stream, declaration_database, member_type, member_names[member_index]);
+            if (!member_bit_fields.empty() && member_bit_fields[member_index].has_value())
+                stream << " : " << member_bit_fields[member_index].value();
             stream << ";\n";
         }
         
@@ -790,7 +793,8 @@ namespace iris::c
                     alias_type_declaration.name,
                     std::nullopt,
                     instantiated.member_names,
-                    instantiated.member_types
+                    instantiated.member_types,
+                    instantiated.member_bit_fields
                 );
             }
         }
@@ -805,7 +809,8 @@ namespace iris::c
                 struct_declaration.name,
                 struct_declaration.unique_name,
                 struct_declaration.member_names,
-                struct_declaration.member_types
+                struct_declaration.member_types,
+                struct_declaration.member_bit_fields
             );
         }
         else if (std::holds_alternative<iris::Union_declaration const*>(declaration.data))
@@ -819,7 +824,8 @@ namespace iris::c
                 union_declaration.name,
                 union_declaration.unique_name,
                 union_declaration.member_names,
-                union_declaration.member_types
+                union_declaration.member_types,
+                {}
             );
         }
     }

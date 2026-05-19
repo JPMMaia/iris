@@ -212,6 +212,36 @@ namespace my::namespace
         test_cpp_exporter(input, "input.h", cpp_expected);
     }
 
+    TEST_CASE("Export structs with bitfields")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+export struct Entity
+{
+    index: Uint32 = 0u32;
+    archetype: Uint32 : 8 = 0u32;
+    generation: Uint32 : 24 = 0u32;
+}
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Entity kind=struct */
+struct my_namespace_Entity
+{
+    uint32_t index;
+    uint32_t archetype : 8;
+    uint32_t generation : 24;
+};
+
+struct Array_slice_my_namespace_Entity
+{
+    struct my_namespace_Entity* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
     TEST_CASE("Export functions")
     {
         std::string_view const input = R"RAW(module my.namespace;
