@@ -148,7 +148,11 @@ namespace iris::c
         std::filesystem::path const vulkan_headers_path = g_vulkan_headers_location;
         std::filesystem::path const vulkan_header_path = vulkan_headers_path / "vulkan" / "vulkan.h";
 
+        std::pmr::vector<std::filesystem::path> const default_header_search_directories = iris::common::get_default_header_search_directories();
+        
         std::pmr::vector<std::filesystem::path> include_directories;
+        include_directories.reserve(1 + default_header_search_directories.size());
+        include_directories.insert(include_directories.end(), default_header_search_directories.begin(), default_header_search_directories.end());
         include_directories.push_back(vulkan_headers_path);
 
         iris::c::Options const options = {
