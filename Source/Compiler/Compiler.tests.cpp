@@ -69,7 +69,10 @@ namespace iris
     if (!std::filesystem::exists(output_file_path.parent_path()))
       std::filesystem::create_directories(output_file_path.parent_path());
 
-    iris::c::Options const options = {};
+    std::pmr::vector<std::filesystem::path> header_search_directories = iris::common::get_default_header_search_directories();
+    iris::c::Options const options = {
+      .include_directories = header_search_directories,
+    };
     std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(
       header_name,
       input_file_path,
@@ -92,8 +95,12 @@ namespace iris
     std::filesystem::path const header_file_path = output_directory / header_filename;
     iris::common::write_to_file(header_file_path, header_content);
 
+    std::pmr::vector<std::filesystem::path> header_search_directories = iris::common::get_default_header_search_directories();
+    iris::c::Options const options = {
+      .include_directories = header_search_directories,
+    };
     std::filesystem::path const header_module_file_path = output_directory / header_module_filename;
-    std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(header_module_name, header_file_path, header_module_file_path, {});
+    std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(header_module_name, header_file_path, header_module_file_path, options);
     REQUIRE(header_module.has_value());
 
     return header_module_file_path;
@@ -6317,7 +6324,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
 %struct.iris_json_Write_stream = type {{ ptr }}
 
-@iris_test_source_file_path = internal constant [68 x i8] c"C:/Users/JPMMa/Desktop/source/iris/Examples/txt/test_framework.iris\00"
+@iris_test_source_file_path = internal constant [68 x i8] c"{}/test_framework.iris\00"
 @global_1 = internal constant [4 x i8] c"hhi\00"
 @global_2 = internal constant [3 x i8] c"hi\00"
 @global_3 = internal constant [2 x i8] c"i\00"
@@ -6683,7 +6690,7 @@ declare ptr @__acrt_iob_func(i32 noundef) #0
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
 attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
-)", test_source_file_path.size() + 1, test_source_file_path);
+)", g_test_source_files_path.generic_string(), test_source_file_path.size() + 1, test_source_file_path);
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.is_test_mode = true});
   }
@@ -8029,7 +8036,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     std::filesystem::create_directories(root_directory_path);
 
     std::string const header_content = R"(
-#include "stdint.h"
+#include <stdint.h>
 
 struct My_struct
 {
@@ -8042,10 +8049,15 @@ struct My_struct
 };
 )";
 
-std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_struct.h", "my_struct.iris", "my_module", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_struct.h", "my_struct.iris", "my_module", root_directory_path);
+
+    std::pmr::vector<std::filesystem::path> header_search_directories = iris::common::get_default_header_search_directories();
+    iris::c::Options const options = {
+      .include_directories = header_search_directories,
+    };
 
     std::filesystem::path const header_file_path = root_directory_path / "my_struct.h";
-    std::optional<iris::Struct_layout> const expected_struct_layout = iris::c::calculate_struct_layout(header_file_path, "My_struct", {});
+    std::optional<iris::Struct_layout> const expected_struct_layout = iris::c::calculate_struct_layout(header_file_path, "My_struct", options);
     REQUIRE(expected_struct_layout.has_value());
 
     std::optional<iris::Module> core_module = iris::compiler::read_core_module(header_module_file_path);
