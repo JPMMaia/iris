@@ -32,6 +32,10 @@
 *.app
 *.vsix
 
+# Coding agents
+.pi/logs/
+nul
+
 build/
 build_linux/
 out/

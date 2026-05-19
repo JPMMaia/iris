@@ -1,0 +1,8 @@
+{
+  "name": "cmake-tools",
+  "version": "1.0.0",
+  "description": "CMake Tools extension for pi — configure and build CMake projects with VS Dev Environment support",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}
