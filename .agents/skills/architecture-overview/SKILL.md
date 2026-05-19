@@ -1,6 +1,7 @@
 ---
-name: 'Architecture Overview'
-description: 'Overview of the Iris language repository structure and components'
+name: 'architecture-overview'
+description: 'Architecture overview of the Iris language compiler: directory structure, key components, build system, common tasks, best practices'
+license: MIT
 ---
 
 # Iris Language Repository - GitHub Copilot Instructions
