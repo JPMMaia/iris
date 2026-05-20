@@ -99,6 +99,12 @@ namespace iris::compiler
 
         arguments.push_back(std::pmr::string{clang_path.generic_string()});
 
+        std::pmr::vector<std::filesystem::path> const default_header_search_directories = iris::common::get_default_header_search_directories();
+        for (std::filesystem::path const& include_directory : default_header_search_directories)
+        {
+            add_include_directory_argument(arguments, include_directory.generic_string(), use_clang_cl);
+        }
+
         std::filesystem::path const builtin_include_directory = iris::common::get_builtin_include_directory();
         add_include_directory_argument(arguments, builtin_include_directory.generic_string(), use_clang_cl);
 

@@ -16,6 +16,7 @@ module;
 module iris.compiler.linker;
 
 import iris.common;
+import iris.common.filesystem;
 import iris.common.filesystem_common;
 
 LLD_HAS_DRIVER(coff);
@@ -52,6 +53,10 @@ namespace iris::compiler
             arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "iris_soa_array.natvis").generic_string()));
             arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "iris_soa_array_view.natvis").generic_string()));
         }
+
+        std::pmr::vector<std::filesystem::path> const default_library_directories = iris::common::get_default_library_directories();
+        for (std::filesystem::path const& library_directory : default_library_directories)
+            arguments_storage.push_back(std::format("/libpath:{}", library_directory.generic_string()));
 
         // Provides mainCRTStartup
         arguments_storage.push_back(options.debug ? "/defaultlib:msvcrtd.lib" : "/defaultlib:msvcrt.lib");

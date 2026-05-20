@@ -177,7 +177,7 @@ namespace iris::c
 
         std::filesystem::path const stdio_header_path = find_c_header_path("stdio.h", header_search_directories);
 
-        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.stdio", stdio_header_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.stdio", stdio_header_path, {.include_directories = header_search_directories});
         REQUIRE(header_module_optional.has_value());
         iris::Module const& header_module = header_module_optional.value();
 
@@ -217,7 +217,7 @@ namespace iris::c
 
         std::filesystem::path const stdio_header_path = find_c_header_path("stdio.h", header_search_directories);
 
-        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.stdio", stdio_header_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.stdio", stdio_header_path, {.include_directories = header_search_directories});
         REQUIRE(header_module_optional.has_value());
         iris::Module const& header_module = header_module_optional.value();
 
@@ -242,7 +242,7 @@ namespace iris::c
 
         std::filesystem::path const time_header_path = find_c_header_path("time.h", header_search_directories);
 
-        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.time", time_header_path, {});
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.time", time_header_path, {.include_directories = header_search_directories});
         REQUIRE(header_module_optional.has_value());
         iris::Module const& header_module = header_module_optional.value();
 

@@ -48,7 +48,7 @@ namespace iris::common
         if (!best_match)
             iris::common::print_message_and_exit(std::format("Could not find an Windows 10 Kit version in {}! Is Windows 10 Kit installed?", library_path.generic_string()));
 
-        return *best_match / "ucrt";
+        return *best_match;
     }
 
     static std::optional<std::pmr::string> execute_process_capture_stdout(
@@ -158,14 +158,14 @@ namespace iris::common
 
     std::pmr::vector<std::filesystem::path> get_default_header_search_directories()
     {
-        std::filesystem::path const windows_kit_library_path = find_default_windows_kit_subdirectory_path("Include");
+        std::filesystem::path const windows_kit_include_path = find_default_windows_kit_subdirectory_path("Include");
 
         std::pmr::vector<std::filesystem::path> include_directories
         {
-            windows_kit_library_path
+            windows_kit_include_path / "ucrt"
         };
 
-        if (auto const vc_tools_path = find_vc_tools_install_path(); vc_tools_path)
+        if (std::optional<std::filesystem::path> const vc_tools_path = find_vc_tools_install_path(); vc_tools_path)
             include_directories.push_back(*vc_tools_path / "include");
 
         return include_directories;
@@ -173,16 +173,16 @@ namespace iris::common
 
     std::pmr::vector<std::filesystem::path> get_default_library_directories()
     {
+        std::filesystem::path const windows_kit_library_path = find_default_windows_kit_subdirectory_path("Lib");
+        
         std::pmr::vector<std::filesystem::path> library_directories
         {
-            find_default_windows_kit_subdirectory_path("Lib") / "x64"
+            windows_kit_library_path / "ucrt" / "x64",
+            windows_kit_library_path / "um" / "x64",
         };
 
-        // Add VC Tools lib path
-        if (auto const vc_tools_path = find_vc_tools_install_path(); vc_tools_path)
-        {
+        if (std::optional<std::filesystem::path> const vc_tools_path = find_vc_tools_install_path(); vc_tools_path)
             library_directories.push_back(*vc_tools_path / "lib" / "x64");
-        }
 
         return library_directories;
     }
