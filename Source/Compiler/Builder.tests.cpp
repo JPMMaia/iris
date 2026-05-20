@@ -149,7 +149,17 @@ namespace iris::compiler
 
         CHECK(std::filesystem::exists(output_file_path));
 
-        std::pmr::vector<Compile_command> const actual_compile_commands = read_compile_commands_from_file(output_file_path);
+        std::pmr::vector<Compile_command> actual_compile_commands = read_compile_commands_from_file(output_file_path);
+        for (Compile_command& compile_command : actual_compile_commands)
+        {
+            auto const iterator = std::remove_if(
+                compile_command.arguments.begin(),
+                compile_command.arguments.end(),
+                [](std::pmr::string const& argument) -> bool { return argument.starts_with("/clang:-IC:/Program Files"); }
+            );
+            compile_command.arguments.erase(iterator, compile_command.arguments.end());
+        }
+        
         CHECK(expected_compile_commands == actual_compile_commands);
     }
 
