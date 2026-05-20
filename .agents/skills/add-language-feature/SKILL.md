@@ -66,3 +66,7 @@ Use the #askQuestions tool to validate the changes with the user.
 9. Language Server support
 
 Use the [language-server](../language-server/SKILL.md) skill if the feature requires changes to the language server.
+
+10. Update documentation
+
+Check if we need to update the [documentation](../../../Documentation).
