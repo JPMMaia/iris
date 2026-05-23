@@ -1174,6 +1174,13 @@ namespace iris
                 add_text(buffer, ", ");
             }
 
+            if (index < expression.arguments_mutability.size())
+            {
+                bool const is_mutable = expression.arguments_mutability[index];
+                if (is_mutable)
+                    add_text(buffer, "mutable ");
+            }
+
             iris::Statement const& statement = expression.arguments[index];
             add_format_statement(buffer, statement, outside_indentation + 4, options, false);
         }

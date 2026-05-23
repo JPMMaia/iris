@@ -1704,12 +1704,14 @@ namespace iris::compiler
                             }
                         }
 
+                        bool const is_mutable = !data.arguments_mutability.empty() ? data.arguments_mutability.front() : false;
+
                         iris::Type_reference const output_type
                         {
                             .data = iris::Soa_array_view_type
                             {
                                 .value_type = element_type,
-                                .is_mutable = false,
+                                .is_mutable = is_mutable,
                             }
                         };
 
@@ -1717,7 +1719,7 @@ namespace iris::compiler
                         {
                             .input_parameter_types = {
                                 create_pointer_type_type_reference({}, false),
-                                create_integer_type_type_reference(64, true)
+                                create_integer_type_type_reference(64, false)
                             },
                             .output_parameter_types = {output_type},
                             .is_variadic = false,
@@ -1733,8 +1735,8 @@ namespace iris::compiler
                     {
                         iris::Function_type function_type
                         {
-                            .input_parameter_types = { create_integer_type_type_reference(64, true) },
-                            .output_parameter_types = { create_integer_type_type_reference(64, true) },
+                            .input_parameter_types = { create_integer_type_type_reference(64, false) },
+                            .output_parameter_types = { create_integer_type_type_reference(64, false) },
                             .is_variadic = false,
                         };
 

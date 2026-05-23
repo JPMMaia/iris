@@ -2838,6 +2838,25 @@ namespace iris::parser
         
         std::pmr::vector<Parse_node> const argument_nodes = get_child_nodes(tree, node, "Expression_instance_call_parameter", temporaries_allocator);
         output.arguments = node_to_block(module_info, tree, argument_nodes, output_allocator, temporaries_allocator);
+
+        {
+            std::pmr::vector<bool> arguments_mutability{output_allocator};
+            arguments_mutability.reserve(argument_nodes.size());
+            for (Parse_node const& argument_node : argument_nodes)
+            {
+                std::optional<Parse_node> const type_node = get_child_node(tree, argument_node, "Expression_type");
+                if (type_node.has_value())
+                {
+                    bool const is_mutable = get_child_node(tree, type_node.value(), "mutable").has_value();
+                    arguments_mutability.push_back(is_mutable);
+                }
+                else
+                {
+                    arguments_mutability.push_back(false);
+                }
+            }
+            output.arguments_mutability = std::move(arguments_mutability);
+        }
         
         return output;
     }
@@ -3145,7 +3164,7 @@ namespace iris::parser
     {
         iris::Type_expression output = {};
         
-        std::optional<Parse_node> const type_node = get_child_node(tree, node, 0);
+        std::optional<Parse_node> const type_node = get_child_node(tree, node, "Type");
         if (type_node.has_value())
         {
             std::optional<iris::Type_reference> type = node_to_type_reference(module_info, tree, type_node.value(), output_allocator, temporaries_allocator);

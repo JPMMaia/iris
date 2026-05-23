@@ -9,9 +9,11 @@ struct Particle {
     y: Float32 = 0.0f32;
 }
 
-function run() -> () {
+function run(memory: *mutable Void, length: Uint64) -> () {
   var particles: Soa_array_view::<Particle> = {};
   var mutable_particles: Soa_array_view::<mutable Particle> = {};
+
+  var mutable_particles_2 = create_soa_array_view_from_pointer::<mutable Particle>(memory, length);
 }
 
 ---
@@ -54,7 +56,23 @@ function run() -> () {
       (Function_declaration
         (Function_name
           (Identifier))
-        (Function_input_parameters)
+        (Function_input_parameters
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Pointer_type
+                  (Type
+                    (Type_name
+                      (Identifier)))))))
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Type_name
+                  (Identifier))))))
         (Function_output_parameters))
       (Function_definition
         (Block
@@ -85,4 +103,33 @@ function run() -> () {
                         (Identifier))))))
               (Generic_expression_or_instantiate
                 (Expression_instantiate
-                  (Expression_instantiate_members))))))))))
+                  (Expression_instantiate_members)))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_call
+                  (Generic_expression
+                    (Expression_instance_call
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier))))
+                      (Expression_instance_call_parameter
+                        (Expression_type
+                          (Type
+                            (Type_name
+                              (Identifier)))))))
+                  (Expression_call_arguments
+                    (Generic_expression_or_instantiate
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier)))))
+                    (Generic_expression_or_instantiate
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier)))))))))))))))

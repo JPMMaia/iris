@@ -249,7 +249,7 @@ module.exports = grammar({
       $.Expression_constant,
       $.Expression_variable
     ),
-    Expression_type: $ => $.Type,
+    Expression_type: $ => seq(optional("mutable"), $.Type),
     Expression_ternary_condition: $ => prec.right(0, seq($.Generic_expression, "?", $.Generic_expression, ":", $.Generic_expression)),
     Expression_unary: $ => prec.right(12, seq($.Expression_unary_symbol, $.Generic_expression)),
     Expression_unary_symbol: $ => choice("!", "~", "-", "&", "*"),

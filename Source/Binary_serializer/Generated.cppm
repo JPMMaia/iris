@@ -818,6 +818,7 @@ namespace iris::binary_serializer
     {
         serialize(serializer, value.left_hand_side);
         serialize(serializer, value.arguments);
+        serialize(serializer, value.arguments_mutability);
     }
 
     template <>
@@ -825,6 +826,7 @@ namespace iris::binary_serializer
     {
         deserialize(deserializer, value.left_hand_side);
         deserialize(deserializer, value.arguments);
+        deserialize(deserializer, value.arguments_mutability);
     }
 
     template <>

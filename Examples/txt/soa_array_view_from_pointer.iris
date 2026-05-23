@@ -6,7 +6,7 @@ struct Particle
     y: Float32 = 0.0f32;
 }
 
-function create_mutable_view(data: *Void, length: Int64) -> (result: Soa_array_view::<mutable Particle>)
+function create_mutable_view(data: *mutable Void, length: Uint64) -> (result: Soa_array_view::<mutable Particle>)
 {
-    return create_soa_array_view_from_pointer::<Particle>(data, length);
+    return create_soa_array_view_from_pointer::<mutable Particle>(data, length);
 }

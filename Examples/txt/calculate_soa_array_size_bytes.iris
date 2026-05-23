@@ -6,7 +6,7 @@ struct Particle
     y: Float32 = 0.0f32;
 }
 
-function get_size(capacity: Int64) -> (result: Int64)
+function get_size(capacity: Uint64) -> (result: Uint64)
 {
     return calculate_soa_array_size_bytes::<Particle>(capacity);
 }

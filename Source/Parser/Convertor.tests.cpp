@@ -496,6 +496,12 @@ namespace iris::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts soa_array_view_from_pointer.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "soa_array_view_from_pointer.iris";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts switch_expressions.iris", "[Convertor]")
     {
         std::string_view const input_file = "switch_expressions.iris";

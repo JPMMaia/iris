@@ -5857,9 +5857,14 @@ struct Particle
     x: Float32 = 0.0f32;
 }
 
-function create_view(data: *Void, length: Int64) -> (result: Soa_array_view::<Particle>)
+function create_view(data: *Void, length: Uint64) -> (result: Soa_array_view::<Particle>)
 {
     return create_soa_array_view_from_pointer::<Particle>(data, length);
+}
+
+function create_mutable_view(data: *mutable Void, length: Uint64) -> (result: Soa_array_view::<mutable Particle>)
+{
+    return create_soa_array_view_from_pointer::<mutable Particle>(data, length);
 }
 )";
 
@@ -5877,7 +5882,7 @@ struct Particle
     x: Float32 = 0.0f32;
 }
 
-function create_view(data: *Void, length: Int64, extra: Int64) -> (result: Soa_array_view::<Particle>)
+function create_view(data: *Void, length: Uint64, extra: Uint64) -> (result: Soa_array_view::<Particle>)
 {
     return create_soa_array_view_from_pointer::<Particle>(data, length, extra);
 }
@@ -5907,7 +5912,7 @@ struct Particle
     x: Float32 = 0.0f32;
 }
 
-function create_view(data: *Void, length: Int64) -> (result: Soa_array_view::<Particle>)
+function create_view(data: *Void, length: Uint64) -> (result: Soa_array_view::<Particle>)
 {
     return create_soa_array_view_from_pointer(data, length);
 }
@@ -5937,7 +5942,7 @@ struct Particle
     x: Float32 = 0.0f32;
 }
 
-function get_size(capacity: Int64) -> (result: Int64)
+function get_size(capacity: Uint64) -> (result: Uint64)
 {
     return calculate_soa_array_size_bytes::<Particle>(capacity);
 }
@@ -5957,7 +5962,7 @@ struct Particle
     x: Float32 = 0.0f32;
 }
 
-function get_size(capacity: Int64, extra: Int64) -> (result: Int64)
+function get_size(capacity: Uint64, extra: Uint64) -> (result: Uint64)
 {
     return calculate_soa_array_size_bytes::<Particle>(capacity, extra);
 }
@@ -5987,7 +5992,7 @@ struct Particle
     x: Float32 = 0.0f32;
 }
 
-function get_size(capacity: Int64) -> (result: Int64)
+function get_size(capacity: Uint64) -> (result: Uint64)
 {
     return calculate_soa_array_size_bytes(capacity);
 }

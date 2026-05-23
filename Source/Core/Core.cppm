@@ -606,6 +606,7 @@ namespace iris
     {
         Expression_index left_hand_side;
         std::pmr::vector<Statement> arguments;
+        std::pmr::vector<bool> arguments_mutability;
 
         friend bool operator==(Instance_call_expression const&, Instance_call_expression const&) = default;
     };

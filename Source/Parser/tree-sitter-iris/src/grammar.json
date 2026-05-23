@@ -3208,8 +3208,25 @@
       ]
     },
     "Expression_type": {
-      "type": "SYMBOL",
-      "name": "Type"
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "mutable"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Type"
+        }
+      ]
     },
     "Expression_ternary_condition": {
       "type": "PREC_RIGHT",

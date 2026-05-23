@@ -1156,6 +1156,7 @@ namespace iris::json
         JSON data;
         data["left_hand_side"] = to_json(value.left_hand_side);
         data["arguments"] = to_json(value.arguments);
+        data["arguments_mutability"] = to_json(value.arguments_mutability);
         return data;
     }
 
@@ -1164,6 +1165,7 @@ namespace iris::json
     {
         from_json(data.at("left_hand_side"), value.left_hand_side);
         if (data.contains("arguments")) from_json(data.at("arguments"), value.arguments);
+        if (data.contains("arguments_mutability")) from_json(data.at("arguments_mutability"), value.arguments_mutability);
     }
 
     EXPORT template <>
