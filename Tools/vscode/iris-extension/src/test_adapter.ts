@@ -434,7 +434,21 @@ async function on_debug_tests(test_controller: vscode.TestController, run: vscod
     };
 
     try {
-        await vscode.debug.startDebugging(undefined, debug_config);
+        const session_started = await vscode.debug.startDebugging(undefined, debug_config);
+        if (!session_started) {
+            run.failed(item, new vscode.TestMessage("Failed to start debug session."));
+            return;
+        }
+
+        await new Promise<void>((resolve) => {
+            const disposable = vscode.debug.onDidTerminateDebugSession((session) => {
+                if (session.name === debug_config.name) {
+                    disposable.dispose();
+                    resolve();
+                }
+            });
+        });
+
         run.passed(item);
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
