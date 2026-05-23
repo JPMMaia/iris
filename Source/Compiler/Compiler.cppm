@@ -23,7 +23,7 @@ namespace iris::compiler
 
     export struct LLVM_data
     {
-        std::string target_triple;
+        llvm::Triple target_triple;
         llvm::Target const* target;
         llvm::TargetMachine* target_machine;
         llvm::DataLayout data_layout;

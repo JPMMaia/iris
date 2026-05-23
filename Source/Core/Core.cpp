@@ -109,7 +109,7 @@ namespace iris
     {
         return Source_range_location
         {
-            .file_path = file_path,
+            .file_path = file_path.has_value() && !file_path->empty() ? file_path : std::optional<std::filesystem::path>{std::nullopt},
             .range = create_source_range(start_line, start_column, end_line, end_column),
         };
     }

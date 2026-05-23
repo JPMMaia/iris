@@ -88,7 +88,7 @@ namespace iris::c
         unsigned line = 0;
         unsigned column = 0;
         unsigned offset = 0;
-        clang_getSpellingLocation(
+        clang_getExpansionLocation(
             cursor_location,
             &file,
             &line,
@@ -96,7 +96,14 @@ namespace iris::c
             &offset
         );
 
-        std::optional<String> const file_name = file != nullptr ? clang_getFileName(file) : std::optional<String>{};
+        std::optional<String> file_name;
+        if (file != nullptr)
+        {
+            file_name = clang_File_tryGetRealPathName(file);
+            if (!file_name.has_value())
+                file_name = clang_getFileName(file);
+        }
+
         std::optional<std::filesystem::path> file_path = file_name.has_value() ? file_name->string_view() : std::optional<std::filesystem::path>{};
 
         return Header_source_location
@@ -363,6 +370,11 @@ namespace iris::c
 
     std::string_view remove_type(std::string_view const string)
     {
+        if (string.starts_with("const "))
+        {
+            return remove_type(string.substr(6));
+        }
+
         if (string.starts_with("enum "))
         {
             return string.substr(5);
@@ -495,6 +507,7 @@ namespace iris::c
             };
         }
         case CXType_Typedef:
+        case CXType_Unexposed:
         {
             String const type_spelling = { clang_getTypedefName(type) };
             std::string_view const typedef_name = type_spelling.string_view();
@@ -527,12 +540,7 @@ namespace iris::c
                 }
 
                 CXType const canonical_type = clang_getCanonicalType(type);
-                if (canonical_type.kind == CXType_Enum || canonical_type.kind == CXType_Record)
-                    return create_type_reference(declarations, cursor, canonical_type);
-
-                std::string const message = std::format("Could not find typedef with name '{}'\n", typedef_name);
-                std::cerr << message;
-                throw std::runtime_error{ message };
+                return create_type_reference(declarations, cursor, canonical_type);
             }
 
             iris::Alias_type_declaration const& declaration = *location;
@@ -2697,6 +2705,11 @@ namespace iris::c
             {
                 if (!macro_declaration.name.starts_with("_") && !macro_declaration.is_function_like && !ignore_macro(macro_declaration.name))
                 {
+                    if (!macro_declaration.replacement_text.has_value())
+                        continue;
+                    if (macro_declaration.replacement_text->starts_with("__pragma"))
+                        continue;
+
                     std::fputs("auto const ", file);
                     std::fputs(special_prefix, file);
                     std::fputs(macro_declaration.name.c_str(), file);

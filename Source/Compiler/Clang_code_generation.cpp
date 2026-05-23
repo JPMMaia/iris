@@ -29,6 +29,7 @@ namespace iris::compiler
     struct Clang_data
     {
         std::unique_ptr<clang::CompilerInstance> compiler_instance;
+        std::unique_ptr<clang::TargetOptions> target_options;
     };
 
     struct Clang_module_declarations
@@ -100,7 +101,7 @@ namespace iris::compiler
         record_declaration->addDecl(field);
         record_declaration->completeDefinition();
 
-        return clang_ast_context.getRecordType(record_declaration);
+        return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
     }
 
     static clang::QualType create_clang_soa_array_view_type(
@@ -147,7 +148,7 @@ namespace iris::compiler
 
         record_declaration->completeDefinition();
 
-        return clang_ast_context.getRecordType(record_declaration);
+        return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
     }
 
     void add_clang_alias_type_declaration(
@@ -348,8 +349,8 @@ namespace iris::compiler
             {
                 std::uint32_t const bits = member_bit_field.value();
 
-                llvm::APInt const width{32, bits};
-                clang::QualType const bit_width_type = clang_ast_context.getIntTypeForBitwidth(32, 0);
+                llvm::APInt const width{64, bits};
+                clang::QualType const bit_width_type = clang_ast_context.getIntTypeForBitwidth(64, 0);
 
                 clang::IntegerLiteral* const bit_width_expression = clang::IntegerLiteral::Create(
                     clang_ast_context,
@@ -358,7 +359,14 @@ namespace iris::compiler
                     {}
                 );
 
-                field->setBitWidth(bit_width_expression);    
+                clang::ConstantExpr* const constant_expression = clang::ConstantExpr::Create(
+                    clang_ast_context,
+                    bit_width_expression,
+                    clang::APValue{llvm::APSInt{bit_width_expression->getValue(), true}}
+                );
+
+                field->setBitWidth(constant_expression);
+                assert(field->hasConstantIntegerBitWidth());
             }
 
             record_declaration.addDecl(field);
@@ -2030,7 +2038,7 @@ namespace iris::compiler
             if (location != clang_declarations.alias_type_declarations.end())
             {
                 clang::TypedefDecl* const typedef_declaration = location->second;
-                clang::QualType const qual_type = clang_module_data.ast_context.getTypedefType(typedef_declaration);
+                clang::QualType const qual_type = clang_module_data.ast_context.getCanonicalTypeDeclType(typedef_declaration);
                 llvm::Type* const clang_type = clang::CodeGen::convertTypeForMemory(clang_module_data.code_generator->CGM(), qual_type);
                 return clang_type;
             }
@@ -2041,7 +2049,7 @@ namespace iris::compiler
             if (location != clang_declarations.enum_declarations.end())
             {
                 clang::EnumDecl* const enum_declaration = location->second;
-                clang::QualType const qual_type = clang_module_data.ast_context.getEnumType(enum_declaration);
+                clang::QualType const qual_type = clang_module_data.ast_context.getCanonicalTypeDeclType(enum_declaration);
                 llvm::Type* const clang_type = clang::CodeGen::convertTypeForMemory(clang_module_data.code_generator->CGM(), qual_type);
                 return clang_type;
             }
@@ -2334,7 +2342,7 @@ namespace iris::compiler
             record_declaration = transient_clang_declarations.struct_declarations.at(struct_declaration.name);
         }
 
-        clang::QualType const qual_type = clang_context.ast_context.getRecordType(record_declaration);
+        clang::QualType const qual_type = clang_context.ast_context.getCanonicalTypeDeclType(record_declaration);
         return clang::CodeGen::convertTypeForMemory(clang_context.code_generator->CGM(), qual_type);
     }
 
@@ -2343,7 +2351,7 @@ namespace iris::compiler
         clang::RecordDecl* const record_declaration
     )
     {
-        clang::QualType const qual_type = clang_module_data.ast_context.getRecordType(record_declaration);
+        clang::QualType const qual_type = clang_module_data.ast_context.getCanonicalTypeDeclType(record_declaration);
         llvm::Type* const clang_type = clang::CodeGen::convertTypeForMemory(clang_module_data.code_generator->CGM(), qual_type);
         return clang_type;
     }
@@ -2703,7 +2711,7 @@ namespace iris::compiler
                 throw std::runtime_error{"Cannot find Builtin.Generic_array_slice!"};
 
             clang::RecordDecl* const record_declaration = array_slice_type_location->second;
-            return clang_ast_context.getRecordType(record_declaration);
+            return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
         }
         else if (std::holds_alternative<iris::Builtin_type_reference>(type_reference.data))
         {
@@ -2771,7 +2779,7 @@ namespace iris::compiler
                     Clang_module_declarations const& clang_declarations = clang_declaration_database.map.find(c_builtin_module_name)->second;
                     clang::RecordDecl* const record_declaration = clang_declarations.struct_declarations.at("String");
 
-                    return clang_ast_context.getRecordType(record_declaration);
+                    return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
                 }
                 case iris::Fundamental_type::Any_type: {
                     return clang_ast_context.VoidPtrTy;
@@ -2859,7 +2867,7 @@ namespace iris::compiler
             if (struct_location == module_location->second.struct_declarations.end())
                 return std::nullopt;
 
-            return clang_ast_context.getRecordType(struct_location->second);
+            return clang_ast_context.getCanonicalTypeDeclType(struct_location->second);
         }
         else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
         {
@@ -2877,14 +2885,14 @@ namespace iris::compiler
                     Clang_module_declarations const& clang_declarations = clang_declaration_database.map.at(custom_type_reference.module_reference.name);
                     clang::TypedefDecl* const typedef_declaration = clang_declarations.alias_type_declarations.at(custom_type_reference.name);
 
-                    return clang_ast_context.getTypedefType(typedef_declaration);
+                    return clang_ast_context.getCanonicalTypeDeclType(typedef_declaration);
                 }
                 else if (std::holds_alternative<iris::Enum_declaration const*>(declaration->data))
                 {
                     Clang_module_declarations const& clang_declarations = clang_declaration_database.map.at(custom_type_reference.module_reference.name);
                     clang::EnumDecl* const enum_declaration = clang_declarations.enum_declarations.at(custom_type_reference.name);
 
-                    return clang_ast_context.getEnumType(enum_declaration);
+                    return clang_ast_context.getCanonicalTypeDeclType(enum_declaration);
                 }
                 else if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data))
                 {
@@ -2894,14 +2902,14 @@ namespace iris::compiler
                         return std::nullopt;
                     
                     clang::RecordDecl* const record_declaration = location->second;
-                    return clang_ast_context.getRecordType(record_declaration);
+                    return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
                 }
                 else if (std::holds_alternative<iris::Union_declaration const*>(declaration->data))
                 {
                     Clang_module_declarations const& clang_declarations = clang_declaration_database.map.at(custom_type_reference.module_reference.name);
                     clang::RecordDecl* const record_declaration = clang_declarations.union_declarations.at(custom_type_reference.name);
 
-                    return clang_ast_context.getRecordType(record_declaration);
+                    return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
                 }
             }
         }
@@ -2957,16 +2965,14 @@ namespace iris::compiler
 
         compiler_instance->createDiagnostics();
 
-        compiler_instance->createFileManager();
-        compiler_instance->createSourceManager(compiler_instance->getFileManager());
-
-        std::shared_ptr<clang::TargetOptions> target_options = std::make_shared<clang::TargetOptions>();
+        std::unique_ptr<clang::TargetOptions> target_options = std::make_unique<clang::TargetOptions>();
         target_options->Triple = llvm_triple.str();
-        clang::TargetInfo* target_info = clang::TargetInfo::CreateTargetInfo(compiler_instance->getDiagnostics(), target_options);
+        clang::TargetInfo* target_info = clang::TargetInfo::CreateTargetInfo(compiler_instance->getDiagnostics(), *target_options.get());
         compiler_instance->setTarget(target_info);
 
+        compiler_instance->createVirtualFileSystem();
         compiler_instance->createFileManager();
-        compiler_instance->createSourceManager(compiler_instance->getFileManager());
+        compiler_instance->createSourceManager();
 
         clang::LangOptions language_options;
         std::vector<std::string> language_option_includes;
@@ -2982,6 +2988,7 @@ namespace iris::compiler
             new Clang_data
             {
                 .compiler_instance = std::move(compiler_instance),
+                .target_options = std::move(target_options),
             },
             destroy_clang_data
         );

@@ -45,6 +45,7 @@
 #include <llvm/Support/PointerLikeTypeTraits.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/TrailingObjects.h>
 #include <llvm/Support/VirtualFileSystem.h>
 
 #include <llvm/Target/TargetMachine.h>

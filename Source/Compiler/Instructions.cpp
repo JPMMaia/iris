@@ -49,17 +49,17 @@ namespace iris::compiler
 
         if (stack_save_pointer == nullptr)
         {
-            llvm::Function* stack_save_function = llvm::Intrinsic::getDeclaration(&llvm_module, llvm::Intrinsic::stacksave, {llvm_builder.getPtrTy()});
+            llvm::Function* stack_save_function = llvm::Intrinsic::getOrInsertDeclaration(&llvm_module, llvm::Intrinsic::stacksave, {llvm_builder.getPtrTy()});
             stack_save_pointer = llvm_builder.CreateCall(stack_save_function, {}, "stack_save_pointer");
         }
 
         llvm::AllocaInst* const instruction = llvm_builder.CreateAlloca(llvm_type, dynamic_array_size, name.data());
         
-        llvm::Align const stack_alignment = llvm_data_layout.getStackAlignment();
+        llvm::MaybeAlign const stack_alignment = llvm_data_layout.getStackAlignment();
         llvm::Align const type_alignment = llvm_data_layout.getABITypeAlign(llvm_type);
 
-        if (stack_alignment > type_alignment)
-            instruction->setAlignment(stack_alignment);
+        if (stack_alignment && *stack_alignment > type_alignment)
+            instruction->setAlignment(*stack_alignment);
         else
             instruction->setAlignment(type_alignment);
 
@@ -74,7 +74,7 @@ namespace iris::compiler
     {
         if (stack_save_pointer != nullptr)
         {
-            llvm::Function* stack_restore_function = llvm::Intrinsic::getDeclaration(&llvm_module, llvm::Intrinsic::stackrestore, {llvm_builder.getPtrTy()});
+            llvm::Function* stack_restore_function = llvm::Intrinsic::getOrInsertDeclaration(&llvm_module, llvm::Intrinsic::stackrestore, {llvm_builder.getPtrTy()});
             llvm_builder.CreateCall(stack_restore_function, {stack_save_pointer});
         }
     }
@@ -156,8 +156,8 @@ namespace iris::compiler
 
         llvm::Type* const int64_type = llvm::Type::getInt64Ty(llvm_context);
         llvm::Type* const int1_type = llvm::Type::getInt1Ty(llvm_context);
-        llvm::Type* const pointer_type = llvm::PointerType::get(llvm::Type::getInt8Ty(llvm_context), 0);
-        llvm::Function* const memcpy_function = llvm::Intrinsic::getDeclaration(&llvm_module, llvm::Intrinsic::memcpy, {pointer_type, pointer_type, int64_type});
+        llvm::Type* const pointer_type = llvm::PointerType::get(llvm_context, 0);
+        llvm::Function* const memcpy_function = llvm::Intrinsic::getOrInsertDeclaration(&llvm_module, llvm::Intrinsic::memcpy, {pointer_type, pointer_type, int64_type});
 
         llvm::Value* const size = llvm::ConstantInt::get(int64_type, size_in_bits);
         llvm::Value* const is_volatile = llvm::ConstantInt::get(int1_type, 0);

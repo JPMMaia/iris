@@ -1102,7 +1102,7 @@ namespace iris::compiler
                         std::filesystem::path const output_file_path = build_directory_path / std::format("{}.{}.{}", artifact.name, source_file_path.stem().generic_string(), "ll");
                         bool const success = compile_cpp(
                             *llvm_data.clang_data,
-                            llvm_data.target_triple,
+                            llvm_data.target_triple.str(),
                             source_file_path,
                             output_llvm_ir_file,
                             std::nullopt,
@@ -1122,7 +1122,7 @@ namespace iris::compiler
 
                     bool const success = compile_cpp(
                         *llvm_data.clang_data,
-                        llvm_data.target_triple,
+                        llvm_data.target_triple.str(),
                         source_file_path,
                         output_assembly_file,
                         output_dependency_file,
@@ -1158,7 +1158,7 @@ namespace iris::compiler
 
                 bool const success = compile_cpp(
                     *llvm_data.clang_data,
-                    llvm_data.target_triple,
+                    llvm_data.target_triple.str(),
                     tests_main_file_path,
                     output_assembly_file,
                     output_dependency_file,

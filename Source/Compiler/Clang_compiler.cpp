@@ -39,16 +39,31 @@ namespace iris::compiler
         }
     }
 
-    static void add_include_directory_argument(std::pmr::vector<std::pmr::string>& arguments, std::string_view const& value, bool const use_clang_cl)
+    static void add_include_directory_argument(std::pmr::vector<std::pmr::string>& arguments, std::string_view const& value, bool const use_clang_cl, bool const is_system_directory)
     {
-        if (use_clang_cl)
+        if (is_system_directory)
         {
-            arguments.push_back("/clang:-I" + std::pmr::string{value});
+            if (use_clang_cl)
+            {
+                arguments.push_back("/clang:-isystem" + std::pmr::string{value});
+            }
+            else
+            {
+                arguments.push_back("-isystem");
+                arguments.push_back(std::pmr::string{value});
+            }
         }
         else
         {
-            arguments.push_back("-I");
-            arguments.push_back(std::pmr::string{value});
+            if (use_clang_cl)
+            {
+                arguments.push_back("/clang:-I" + std::pmr::string{value});
+            }
+            else
+            {
+                arguments.push_back("-I");
+                arguments.push_back(std::pmr::string{value});
+            }
         }
     }
 
@@ -102,19 +117,19 @@ namespace iris::compiler
         std::pmr::vector<std::filesystem::path> const default_header_search_directories = iris::common::get_default_header_search_directories();
         for (std::filesystem::path const& include_directory : default_header_search_directories)
         {
-            add_include_directory_argument(arguments, include_directory.generic_string(), use_clang_cl);
+            add_include_directory_argument(arguments, include_directory.generic_string(), use_clang_cl, true);
         }
 
         std::filesystem::path const builtin_include_directory = iris::common::get_builtin_include_directory();
-        add_include_directory_argument(arguments, builtin_include_directory.generic_string(), use_clang_cl);
+        add_include_directory_argument(arguments, builtin_include_directory.generic_string(), use_clang_cl, false);
 
         std::filesystem::path const build_directory = build_artifacts_directory.parent_path();
         std::filesystem::path const generated_headers_directory = std::filesystem::weakly_canonical(build_directory / "include");
-        add_include_directory_argument(arguments, generated_headers_directory.generic_string(), use_clang_cl);
+        add_include_directory_argument(arguments, generated_headers_directory.generic_string(), use_clang_cl, false);
 
         for (std::pmr::string const& include_directory : include_directories)
         {
-            add_include_directory_argument(arguments, include_directory, use_clang_cl);
+            add_include_directory_argument(arguments, include_directory, use_clang_cl, false);
         }
 
         for (std::pmr::string const& additional_flag : additional_flags)
@@ -131,6 +146,8 @@ namespace iris::compiler
                 arguments.push_back("/MDd");
             else
                 arguments.push_back("/MD");
+            
+            arguments.push_back("/EHsc");
         }
 
         if (output_dependency_file_path.has_value())
@@ -177,8 +194,8 @@ namespace iris::compiler
         clang::CompilerInstance& clang_compiler_instance = get_compiler_instance(clang_data);
 
         llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> diagnostic_ids{new clang::DiagnosticIDs{}};
-        llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> diagnostic_options{new clang::DiagnosticOptions{}};
-        clang::TextDiagnosticPrinter diagnostic_printer{llvm::outs(), diagnostic_options.get()};
+        clang::DiagnosticOptions diagnostic_options{};
+        clang::TextDiagnosticPrinter diagnostic_printer{llvm::outs(), diagnostic_options};
         clang::DiagnosticsEngine diagnostics_engine{diagnostic_ids, diagnostic_options, &diagnostic_printer, false};
 
         std::filesystem::path const clang_path = find_clang(use_clang_cl);

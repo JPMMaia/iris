@@ -155,7 +155,7 @@ namespace iris::compiler
             auto const iterator = std::remove_if(
                 compile_command.arguments.begin(),
                 compile_command.arguments.end(),
-                [](std::pmr::string const& argument) -> bool { return argument.starts_with("/clang:-IC:/Program Files"); }
+                [](std::pmr::string const& argument) -> bool { return argument.starts_with("/clang:-isystemC:/Program Files"); }
             );
             compile_command.arguments.erase(iterator, compile_command.arguments.end());
         }
@@ -249,6 +249,7 @@ namespace iris::compiler
                         std::pmr::string{"/clang:-std=c++23"},
                         std::pmr::string{"/clang:-o"} + std::pmr::string{(build_directory_path / "artifacts" / "my_app.cpp_implementation.bc").generic_string()},
                         std::pmr::string{"/MD"},
+                        std::pmr::string{"/EHsc"},
                         std::pmr::string{"/clang:-MMD"},
                         std::pmr::string{"/clang:-MF"} + std::pmr::string{(build_directory_path / "artifacts" / "my_app.cpp_implementation.d").generic_string()},
                         std::pmr::string{"/clang:-emit-llvm"},

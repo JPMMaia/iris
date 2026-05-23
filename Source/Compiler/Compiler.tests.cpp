@@ -346,7 +346,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 define void @Array_slices_take(ptr %"arguments[0].integers_0", i64 %"arguments[0].integers_1") #0 !dbg !3 {{
 entry:
   %integers = alloca %struct.iris_builtin_Generic_array_slice, align 8
-  call void @llvm.dbg.declare(metadata ptr %integers, metadata !14, metadata !DIExpression()), !dbg !19
+    #dbg_declare(ptr %integers, !14, !DIExpression(), !19)
   %data = alloca ptr, align 8, !dbg !20
   %length = alloca i64, align 8, !dbg !21
   %v0 = alloca i32, align 4, !dbg !21
@@ -360,38 +360,38 @@ entry:
   store i64 %"arguments[0].integers_1", ptr %1, align 8
   %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !20
   %3 = load ptr, ptr %2, align 8, !dbg !20
-  call void @llvm.dbg.declare(metadata ptr %data, metadata !25, metadata !DIExpression()), !dbg !26
+    #dbg_declare(ptr %data, !25, !DIExpression(), !26)
   store ptr %3, ptr %data, align 8, !dbg !26
   %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 1, !dbg !26
   %5 = load i64, ptr %4, align 8, !dbg !26
-  call void @llvm.dbg.declare(metadata ptr %length, metadata !27, metadata !DIExpression()), !dbg !21
+    #dbg_declare(ptr %length, !27, !DIExpression(), !21)
   store i64 %5, ptr %length, align 8, !dbg !21
-  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !21
+  %6 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !21
   %7 = load ptr, ptr %6, align 8, !dbg !21
   %array_slice_element_pointer = getelementptr i32, ptr %7, i32 0, !dbg !21
   %8 = load i32, ptr %array_slice_element_pointer, align 4, !dbg !21
-  call void @llvm.dbg.declare(metadata ptr %v0, metadata !28, metadata !DIExpression()), !dbg !22
+    #dbg_declare(ptr %v0, !28, !DIExpression(), !22)
   store i32 %8, ptr %v0, align 4, !dbg !22
-  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !22
+  %9 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !22
   %10 = load ptr, ptr %9, align 8, !dbg !22
   %array_slice_element_pointer1 = getelementptr i32, ptr %10, i32 1, !dbg !22
   %11 = load i32, ptr %array_slice_element_pointer1, align 4, !dbg !22
-  call void @llvm.dbg.declare(metadata ptr %v1, metadata !29, metadata !DIExpression()), !dbg !23
+    #dbg_declare(ptr %v1, !29, !DIExpression(), !23)
   store i32 %11, ptr %v1, align 4, !dbg !23
-  %12 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !23
+  %12 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !23
   %13 = load ptr, ptr %12, align 8, !dbg !23
   %array_slice_element_pointer2 = getelementptr i32, ptr %13, i32 2, !dbg !23
   %14 = load i32, ptr %array_slice_element_pointer2, align 4, !dbg !23
-  call void @llvm.dbg.declare(metadata ptr %v2, metadata !30, metadata !DIExpression()), !dbg !31
+    #dbg_declare(ptr %v2, !30, !DIExpression(), !31)
   store i32 %14, ptr %v2, align 4, !dbg !31
-  call void @llvm.dbg.declare(metadata ptr %index, metadata !32, metadata !DIExpression()), !dbg !24
+    #dbg_declare(ptr %index, !32, !DIExpression(), !24)
   store i32 3, ptr %index, align 4, !dbg !24
   %15 = load i32, ptr %index, align 4, !dbg !24
-  %16 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !24
+  %16 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !24
   %17 = load ptr, ptr %16, align 8, !dbg !24
   %array_slice_element_pointer3 = getelementptr i32, ptr %17, i32 %15, !dbg !24
   %18 = load i32, ptr %array_slice_element_pointer3, align 4, !dbg !24
-  call void @llvm.dbg.declare(metadata ptr %v3, metadata !33, metadata !DIExpression()), !dbg !34
+    #dbg_declare(ptr %v3, !33, !DIExpression(), !34)
   store i32 %18, ptr %v3, align 4, !dbg !34
   ret void, !dbg !34
 }}
@@ -424,7 +424,7 @@ entry:
   %array_element_pointer3 = getelementptr [4 x i32], ptr %array, i32 0, i32 3, !dbg !39
   store i32 3, ptr %array_element_pointer3, align 4, !dbg !39
   %5 = load [4 x i32], ptr %array, align 4, !dbg !39
-  call void @llvm.dbg.declare(metadata ptr %a, metadata !50, metadata !DIExpression()), !dbg !40
+    #dbg_declare(ptr %a, !50, !DIExpression(), !40)
   store [4 x i32] %5, ptr %a, align 4, !dbg !40
   %data_pointer = getelementptr [4 x i32], ptr %a, i32 0, i32 0, !dbg !40
   %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !40
@@ -457,9 +457,9 @@ entry:
   %22 = getelementptr inbounds {{ ptr, i64 }}, ptr %2, i32 0, i32 1, !dbg !52
   %23 = load i64, ptr %22, align 8, !dbg !52
   call void @Array_slices_take(ptr %21, i64 %23), !dbg !52
-  call void @llvm.dbg.declare(metadata ptr %b, metadata !53, metadata !DIExpression()), !dbg !43
+    #dbg_declare(ptr %b, !53, !DIExpression(), !43)
   store i32 0, ptr %b, align 4, !dbg !43
-  call void @llvm.dbg.declare(metadata ptr %c, metadata !54, metadata !DIExpression()), !dbg !44
+    #dbg_declare(ptr %c, !54, !DIExpression(), !44)
   store ptr %b, ptr %c, align 8, !dbg !44
   %24 = load ptr, ptr %c, align 8, !dbg !44
   %25 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 0, !dbg !44
@@ -467,16 +467,16 @@ entry:
   %26 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 1, !dbg !44
   store i64 1, ptr %26, align 8, !dbg !44
   %27 = load %struct.iris_builtin_Generic_array_slice, ptr %3, align 8, !dbg !44
-  call void @llvm.dbg.declare(metadata ptr %d, metadata !55, metadata !DIExpression()), !dbg !45
+    #dbg_declare(ptr %d, !55, !DIExpression(), !45)
   store %struct.iris_builtin_Generic_array_slice %27, ptr %d, align 8, !dbg !45
   %28 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 0, !dbg !60
   %29 = load ptr, ptr %28, align 8, !dbg !60
   %30 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 1, !dbg !60
   %31 = load i64, ptr %30, align 8, !dbg !60
   call void @Array_slices_take(ptr %29, i64 %31), !dbg !60
-  call void @llvm.dbg.declare(metadata ptr %f, metadata !61, metadata !DIExpression()), !dbg !46
+    #dbg_declare(ptr %f, !61, !DIExpression(), !46)
   store i32 0, ptr %f, align 4, !dbg !46
-  call void @llvm.dbg.declare(metadata ptr %g, metadata !62, metadata !DIExpression()), !dbg !47
+    #dbg_declare(ptr %g, !62, !DIExpression(), !47)
   store ptr %f, ptr %g, align 8, !dbg !47
   %32 = load ptr, ptr %g, align 8, !dbg !47
   %33 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !47
@@ -484,25 +484,21 @@ entry:
   %34 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !47
   store i64 1, ptr %34, align 8, !dbg !47
   %35 = load %struct.iris_builtin_Generic_array_slice, ptr %4, align 8, !dbg !47
-  call void @llvm.dbg.declare(metadata ptr %h, metadata !63, metadata !DIExpression()), !dbg !48
+    #dbg_declare(ptr %h, !63, !DIExpression(), !48)
   store %struct.iris_builtin_Generic_array_slice %35, ptr %h, align 8, !dbg !48
   %36 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
   %37 = load ptr, ptr %36, align 8, !dbg !48
-  call void @llvm.dbg.declare(metadata ptr %i, metadata !64, metadata !DIExpression()), !dbg !49
+    #dbg_declare(ptr %i, !64, !DIExpression(), !49)
   store ptr %37, ptr %i, align 8, !dbg !49
   %38 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !49
   %39 = load ptr, ptr %38, align 8, !dbg !49
   %array_element_pointer7 = getelementptr i32, ptr %39, i32 0, !dbg !49
-  call void @llvm.dbg.declare(metadata ptr %j, metadata !65, metadata !DIExpression()), !dbg !66
+    #dbg_declare(ptr %j, !65, !DIExpression(), !66)
   store ptr %array_element_pointer7, ptr %j, align 8, !dbg !66
   ret void, !dbg !66
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -605,22 +601,18 @@ entry:
   %3 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8, !dbg !7
   %4 = getelementptr inbounds %struct.Array_slices_instantiate_My_struct, ptr %v0, i32 0, i32 0, !dbg !7
   store %struct.iris_builtin_Generic_array_slice %3, ptr %4, align 8, !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %v0, metadata !10, metadata !DIExpression()), !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !21, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %v0, !10, !DIExpression(), !7)
+    #dbg_declare(ptr %value, !21, !DIExpression(), !8)
   store i32 0, ptr %value, align 4, !dbg !8
   %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 0, !dbg !9
   store ptr %value, ptr %5, align 8, !dbg !9
   %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 1, !dbg !9
   store i64 1, ptr %6, align 8, !dbg !9
-  call void @llvm.dbg.declare(metadata ptr %s0, metadata !22, metadata !DIExpression()), !dbg !9
+    #dbg_declare(ptr %s0, !22, !DIExpression(), !9)
   ret void, !dbg !9
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -1842,14 +1834,14 @@ entry:
   store i64 %"arguments[0].integers_1", ptr %1, align 8
   store i32 %"arguments[1].index", ptr %index, align 4
   %2 = load i32, ptr %index, align 4
-  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 1
+  %3 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 1
   %4 = load i64, ptr %3, align 8
   %bounds_check_index = zext i32 %2 to i64
   %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
   br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
 
 bounds_check_pass:                                ; preds = %entry
-  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0
+  %5 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0
   %6 = load ptr, ptr %5, align 8
   %array_slice_element_pointer = getelementptr i32, ptr %6, i32 %2
   %7 = load i32, ptr %array_slice_element_pointer, align 4
@@ -1929,7 +1921,7 @@ entry:
   %soa_element = alloca %struct.Bounds_check_1_Particle, align 4
   store i32 %"arguments[0].index", ptr %index, align 4
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
-  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %0 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   store ptr %soa_array_data, ptr %0, align 8
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
@@ -1961,7 +1953,7 @@ entry:
   br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
 
 bounds_check_pass:                                ; preds = %entry
-  %2 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %2 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %3 = load ptr, ptr %2, align 8
   %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 0
   %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 %1
@@ -1991,7 +1983,7 @@ entry:
   %soa_array_storage = alloca [32 x i8], align 4
   store i32 %"arguments[0].index", ptr %index, align 4
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
-  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %0 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   store ptr %soa_array_data, ptr %0, align 8
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
@@ -2018,7 +2010,7 @@ entry:
   %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
   store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
   %1 = load i32, ptr %index, align 4
-  %2 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %2 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %3 = load ptr, ptr %2, align 8
   %bounds_check_index = zext i32 %1 to i64
   %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
@@ -2044,7 +2036,7 @@ entry:
   %soa_array_storage = alloca [32 x i8], align 4
   store i32 %"arguments[0].index", ptr %index, align 4
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
-  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %0 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   store ptr %soa_array_data, ptr %0, align 8
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
@@ -2071,7 +2063,7 @@ entry:
   %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
   store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
   %1 = load i32, ptr %index, align 4
-  %2 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %2 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %3 = load ptr, ptr %2, align 8
   %bounds_check_index = zext i32 %1 to i64
   %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
@@ -2122,16 +2114,16 @@ entry:
   %soa_element = alloca %struct.Bounds_check_2_Particle, align 4
   store i32 %"arguments[1].index", ptr %index, align 4
   %0 = load i32, ptr %index, align 4
-  %1 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %1 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
   %2 = load ptr, ptr %1, align 8
-  %3 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %3 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
   %4 = load i64, ptr %3, align 8
   %bounds_check_index = zext i32 %0 to i64
   %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
   br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
 
 bounds_check_pass:                                ; preds = %entry
-  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
   %6 = load i64, ptr %5, align 8
   %soa_index_i64 = zext i32 %0 to i64
   %soa_adjusted_index = add i64 %6, %soa_index_i64
@@ -2165,16 +2157,16 @@ entry:
   %index = alloca i32, align 4
   store i32 %"arguments[1].index", ptr %index, align 4
   %0 = load i32, ptr %index, align 4
-  %1 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %1 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
   %2 = load ptr, ptr %1, align 8
-  %3 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %3 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
   %4 = load i64, ptr %3, align 8
   %bounds_check_index = zext i32 %0 to i64
   %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
   br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
 
 bounds_check_pass:                                ; preds = %entry
-  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
   %6 = load i64, ptr %5, align 8
   %soa_index_i64 = zext i32 %0 to i64
   %soa_adjusted_index = add i64 %6, %soa_index_i64
@@ -2195,16 +2187,16 @@ entry:
   %index = alloca i32, align 4
   store i32 %"arguments[1].index", ptr %index, align 4
   %0 = load i32, ptr %index, align 4
-  %1 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %1 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
   %2 = load ptr, ptr %1, align 8
-  %3 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %3 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
   %4 = load i64, ptr %3, align 8
   %bounds_check_index = zext i32 %0 to i64
   %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
   br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
 
 bounds_check_pass:                                ; preds = %entry
-  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
   %6 = load i64, ptr %5, align 8
   %soa_index_i64 = zext i32 %0 to i64
   %soa_adjusted_index = add i64 %6, %soa_index_i64
@@ -2296,7 +2288,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
@@ -2332,7 +2324,7 @@ entry:
   %length = alloca i64, align 8
   %data = alloca ptr, align 8
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
-  %1 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %1 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   store ptr %soa_array_data, ptr %1, align 8
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
@@ -2358,7 +2350,7 @@ entry:
   %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
   %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
   store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
-  %2 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %2 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %3 = load ptr, ptr %2, align 8
   %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 0
   %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 1
@@ -2372,7 +2364,7 @@ entry:
   store float %6, ptr %7, align 4
   %8 = load %struct.soa_array_type_Particle, ptr %soa_element, align 4
   store %struct.soa_array_type_Particle %8, ptr %p1, align 4
-  %9 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %9 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %10 = load ptr, ptr %9, align 8
   %soa_member_base_pointer20 = getelementptr i8, ptr %10, i64 0
   %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i32 1
@@ -2389,7 +2381,7 @@ entry:
   %16 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 1
   store float 4.000000e+00, ptr %16, align 4
   %17 = load %struct.soa_array_type_Particle, ptr %0, align 4
-  %18 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %18 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %19 = load ptr, ptr %18, align 8
   store %struct.soa_array_type_Particle %17, ptr %soa_assignment_struct, align 4
   %20 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
@@ -2402,30 +2394,30 @@ entry:
   %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i32 1
   %23 = load float, ptr %22, align 4
   store float %23, ptr %soa_member_element_pointer27, align 4
-  %24 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %24 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %25 = load ptr, ptr %24, align 8
   %soa_member_base_pointer28 = getelementptr i8, ptr %25, i64 0
   %soa_member_element_pointer29 = getelementptr float, ptr %soa_member_base_pointer28, i32 2
   %26 = load float, ptr %soa_member_element_pointer29, align 4
   store float %26, ptr %x2, align 4
-  %27 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %27 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %28 = load ptr, ptr %27, align 8
   %soa_member_base_pointer30 = getelementptr i8, ptr %28, i64 0
   %soa_member_element_pointer31 = getelementptr float, ptr %soa_member_base_pointer30, i32 2
   store float 1.000000e+00, ptr %soa_member_element_pointer31, align 4
-  %29 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %29 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %30 = load ptr, ptr %29, align 8
   %soa_member_base_pointer32 = getelementptr i8, ptr %30, i64 16
   %soa_member_element_pointer33 = getelementptr float, ptr %soa_member_base_pointer32, i32 3
   %31 = load float, ptr %soa_member_element_pointer33, align 4
   store float %31, ptr %y3, align 4
-  %32 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %32 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %33 = load ptr, ptr %32, align 8
   %soa_member_base_pointer34 = getelementptr i8, ptr %33, i64 16
   %soa_member_element_pointer35 = getelementptr float, ptr %soa_member_base_pointer34, i32 3
   store float 2.000000e+00, ptr %soa_member_element_pointer35, align 4
   store i64 4, ptr %length, align 8
-  %34 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %34 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %35 = load ptr, ptr %34, align 8
   store ptr %35, ptr %data, align 8
   ret void
@@ -2454,7 +2446,7 @@ entry:
   %particles = alloca %__hl_soa_array, align 8, !dbg !7
   %soa_array_storage = alloca [32 x i8], align 4, !dbg !7
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0, !dbg !7
-  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0, !dbg !7
+  %0 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0, !dbg !7
   store ptr %soa_array_data, ptr %0, align 8, !dbg !7
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0, !dbg !7
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0, !dbg !7
@@ -2480,15 +2472,11 @@ entry:
   %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16, !dbg !7
   %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3, !dbg !7
   store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4, !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %particles, metadata !8, metadata !DIExpression()), !dbg !7
+    #dbg_declare(ptr %particles, !8, !DIExpression(), !7)
   ret void, !dbg !7
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -2548,7 +2536,7 @@ entry:
   %soa_array_view58 = alloca %__hl_soa_array_view, align 8
   %full_view = alloca %__hl_soa_array_view, align 8
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
-  %1 = getelementptr inbounds %__hl_soa_array, ptr %soa_array, i32 0, i32 0
+  %1 = getelementptr inbounds nuw %__hl_soa_array, ptr %soa_array, i32 0, i32 0
   store ptr %soa_array_data, ptr %1, align 8
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
@@ -2576,35 +2564,35 @@ entry:
   store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
   %2 = load %__hl_soa_array, ptr %soa_array, align 8
   store %__hl_soa_array %2, ptr %particles, align 8
-  %3 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %4 = load ptr, ptr %3, align 8
-  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
   store i32 1, ptr %5, align 4
-  %6 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
+  %6 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
   store i32 3, ptr %6, align 4
-  %7 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
+  %7 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
   store i64 4, ptr %7, align 8
-  %8 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
+  %8 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
   store ptr %4, ptr %8, align 8
   %9 = load %__hl_soa_array_view, ptr %soa_array_view, align 8
   store %__hl_soa_array_view %9, ptr %view, align 8
-  %10 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %10 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %11 = load i64, ptr %10, align 8
   store i64 %11, ptr %start_index, align 8
-  %12 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 1
+  %12 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 1
   %13 = load i64, ptr %12, align 8
   store i64 %13, ptr %end_index, align 8
-  %14 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %14 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %15 = load i64, ptr %14, align 8
   store i64 %15, ptr %length, align 8
-  %16 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %16 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %17 = load ptr, ptr %16, align 8
   store ptr %17, ptr %data, align 8
-  %18 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %18 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %19 = load ptr, ptr %18, align 8
-  %20 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %20 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %21 = load i64, ptr %20, align 8
-  %22 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %22 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %23 = load i64, ptr %22, align 8
   %soa_adjusted_index = add i64 %23, 0
   %soa_member_base_pointer15 = getelementptr i8, ptr %19, i64 0
@@ -2626,11 +2614,11 @@ entry:
   %29 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 1
   store float 4.000000e+00, ptr %29, align 4
   %30 = load %struct.soa_array_view_type_Particle, ptr %0, align 4
-  %31 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %31 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %32 = load ptr, ptr %31, align 8
-  %33 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %33 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %34 = load i64, ptr %33, align 8
-  %35 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %35 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %36 = load i64, ptr %35, align 8
   %soa_adjusted_index19 = add i64 %36, 0
   store %struct.soa_array_view_type_Particle %30, ptr %soa_assignment_struct, align 4
@@ -2648,21 +2636,21 @@ entry:
   %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i64 %soa_adjusted_index19
   %40 = load float, ptr %39, align 4
   store float %40, ptr %soa_member_element_pointer27, align 4
-  %41 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %41 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %42 = load ptr, ptr %41, align 8
-  %43 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %43 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %44 = load i64, ptr %43, align 8
-  %45 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %45 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %46 = load i64, ptr %45, align 8
   %soa_adjusted_index28 = add i64 %46, 0
   %soa_member_base_pointer29 = getelementptr i8, ptr %42, i64 0
   %soa_member_element_pointer30 = getelementptr float, ptr %soa_member_base_pointer29, i64 %soa_adjusted_index28
   store float 1.000000e+00, ptr %soa_member_element_pointer30, align 4
-  %47 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %47 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %48 = load ptr, ptr %47, align 8
-  %49 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %49 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %50 = load i64, ptr %49, align 8
-  %51 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %51 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %52 = load i64, ptr %51, align 8
   %soa_adjusted_index31 = add i64 %52, 1
   %soa_member_block_size32 = mul i64 %50, 4
@@ -2672,11 +2660,11 @@ entry:
   %soa_member_base_pointer36 = getelementptr i8, ptr %48, i64 %soa_offset_aligned35
   %soa_member_element_pointer37 = getelementptr float, ptr %soa_member_base_pointer36, i64 %soa_adjusted_index31
   store float 2.000000e+00, ptr %soa_member_element_pointer37, align 4
-  %53 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %53 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %54 = load ptr, ptr %53, align 8
-  %55 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %55 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %56 = load i64, ptr %55, align 8
-  %57 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %57 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %58 = load i64, ptr %57, align 8
   %soa_adjusted_index38 = add i64 %58, 0
   %soa_member_base_pointer40 = getelementptr i8, ptr %54, i64 0
@@ -2695,22 +2683,22 @@ entry:
   store float %61, ptr %62, align 4
   %63 = load %struct.soa_array_view_type_Particle, ptr %soa_element39, align 4
   store %struct.soa_array_view_type_Particle %63, ptr %p_0, align 4
-  %64 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %64 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %65 = load ptr, ptr %64, align 8
-  %66 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %66 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %67 = load i64, ptr %66, align 8
-  %68 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %68 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %69 = load i64, ptr %68, align 8
   %soa_adjusted_index48 = add i64 %69, 0
   %soa_member_base_pointer49 = getelementptr i8, ptr %65, i64 0
   %soa_member_element_pointer50 = getelementptr float, ptr %soa_member_base_pointer49, i64 %soa_adjusted_index48
   %70 = load float, ptr %soa_member_element_pointer50, align 4
   store float %70, ptr %x0, align 4
-  %71 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %71 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %72 = load ptr, ptr %71, align 8
-  %73 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %73 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %74 = load i64, ptr %73, align 8
-  %75 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %75 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %76 = load i64, ptr %75, align 8
   %soa_adjusted_index51 = add i64 %76, 1
   %soa_member_block_size52 = mul i64 %74, 4
@@ -2721,15 +2709,15 @@ entry:
   %soa_member_element_pointer57 = getelementptr float, ptr %soa_member_base_pointer56, i64 %soa_adjusted_index51
   %77 = load float, ptr %soa_member_element_pointer57, align 4
   store float %77, ptr %y1, align 4
-  %78 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %78 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %79 = load ptr, ptr %78, align 8
-  %80 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
+  %80 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
   store i64 0, ptr %80, align 8
-  %81 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
+  %81 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
   store i64 4, ptr %81, align 8
-  %82 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
+  %82 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
   store i64 4, ptr %82, align 8
-  %83 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
+  %83 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
   store ptr %79, ptr %83, align 8
   %84 = load %__hl_soa_array_view, ptr %soa_array_view58, align 8
   store %__hl_soa_array_view %84, ptr %full_view, align 8
@@ -2758,19 +2746,15 @@ define private void @soa_array_view_type_debug_information_run() #0 !dbg !3 {{
 entry:
   %view = alloca %__hl_soa_array_view, align 8, !dbg !7
   call void @llvm.memset.p0.i64(ptr align 8 %view, i8 0, i64 32, i1 false), !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %view, metadata !8, metadata !DIExpression()), !dbg !7
+    #dbg_declare(ptr %view, !8, !DIExpression(), !7)
   ret void, !dbg !7
 }}
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
-
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #2
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
 attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
-attributes #2 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -2840,12 +2824,12 @@ entry:
   store i32 1, ptr %1, align 4, !dbg !8
   %2 = getelementptr inbounds %struct.Vector2i, ptr %a, i32 0, i32 1, !dbg !8
   store i32 -1, ptr %2, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %a, metadata !12, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %a, !12, !DIExpression(), !8)
   %3 = getelementptr inbounds %struct.Vector2i, ptr %b, i32 0, i32 0, !dbg !9
   store i32 2, ptr %3, align 4, !dbg !9
   %4 = getelementptr inbounds %struct.Vector2i, ptr %b, i32 0, i32 1, !dbg !9
   store i32 -2, ptr %4, align 4, !dbg !9
-  call void @llvm.dbg.declare(metadata ptr %b, metadata !18, metadata !DIExpression()), !dbg !9
+    #dbg_declare(ptr %b, !18, !DIExpression(), !9)
   %5 = getelementptr inbounds %struct.Vector2i, ptr %a, i32 0, i32 0, !dbg !10
   %6 = load i64, ptr %5, align 4, !dbg !10
   %7 = getelementptr inbounds %struct.Vector2i, ptr %b, i32 0, i32 0, !dbg !10
@@ -2854,7 +2838,7 @@ entry:
   %10 = getelementptr inbounds %struct.Vector2i, ptr %0, i32 0, i32 0, !dbg !10
   store i64 %9, ptr %10, align 4, !dbg !10
   %11 = load %struct.Vector2i, ptr %0, align 4, !dbg !10
-  call void @llvm.dbg.declare(metadata ptr %c, metadata !19, metadata !DIExpression()), !dbg !11
+    #dbg_declare(ptr %c, !19, !DIExpression(), !11)
   store %struct.Vector2i %11, ptr %c, align 4, !dbg !11
   %12 = getelementptr inbounds %struct.Vector2i, ptr %c, i32 0, i32 0, !dbg !11
   %13 = load i32, ptr %12, align 4, !dbg !11
@@ -2864,11 +2848,7 @@ entry:
   ret i32 %16, !dbg !20
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -2937,11 +2917,11 @@ entry:
   %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !21
   %b = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !21
   store ptr %"arguments[0].integers", ptr %integers, align 8
-  call void @llvm.dbg.declare(metadata ptr %integers, metadata !17, metadata !DIExpression()), !dbg !22
+    #dbg_declare(ptr %integers, !17, !DIExpression(), !22)
   store ptr %"arguments[1].vectors", ptr %vectors, align 8
-  call void @llvm.dbg.declare(metadata ptr %vectors, metadata !18, metadata !DIExpression()), !dbg !23
+    #dbg_declare(ptr %vectors, !18, !DIExpression(), !23)
   store i64 %"arguments[2].length", ptr %length, align 8
-  call void @llvm.dbg.declare(metadata ptr %length, metadata !19, metadata !DIExpression()), !dbg !24
+    #dbg_declare(ptr %length, !19, !DIExpression(), !24)
   %2 = load ptr, ptr %integers, align 8, !dbg !20
   %3 = load i64, ptr %length, align 8, !dbg !20
   %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !20
@@ -2949,7 +2929,7 @@ entry:
   %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !20
   store i64 %3, ptr %5, align 8, !dbg !20
   %6 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8, !dbg !20
-  call void @llvm.dbg.declare(metadata ptr %a, metadata !25, metadata !DIExpression()), !dbg !21
+    #dbg_declare(ptr %a, !25, !DIExpression(), !21)
   store %struct.iris_builtin_Generic_array_slice %6, ptr %a, align 8, !dbg !21
   %7 = load ptr, ptr %vectors, align 8, !dbg !21
   %8 = load i64, ptr %length, align 8, !dbg !21
@@ -2958,16 +2938,12 @@ entry:
   %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !21
   store i64 %8, ptr %10, align 8, !dbg !21
   %11 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8, !dbg !21
-  call void @llvm.dbg.declare(metadata ptr %b, metadata !30, metadata !DIExpression()), !dbg !34
+    #dbg_declare(ptr %b, !30, !DIExpression(), !34)
   store %struct.iris_builtin_Generic_array_slice %11, ptr %b, align 8, !dbg !34
   ret void, !dbg !34
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3039,17 +3015,13 @@ entry:
   %7 = and i32 %6, 16777215, !dbg !13
   %8 = or i32 %7, 33554432, !dbg !13
   store i32 %8, ptr %5, align 4, !dbg !13
-  call void @llvm.dbg.declare(metadata ptr %instance, metadata !14, metadata !DIExpression()), !dbg !13
+    #dbg_declare(ptr %instance, !14, !DIExpression(), !13)
   %9 = getelementptr inbounds %struct.Debug_information_My_struct, ptr %instance, i32 0, i32 0, !dbg !15
   %10 = load i64, ptr %9, align 4, !dbg !15
   ret i64 %10, !dbg !15
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3088,10 +3060,10 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 define i32 @Debug_information_run() #0 !dbg !3 {{
 entry:
   %value = alloca i32, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !9, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %value, !9, !DIExpression(), !8)
   %index = alloca i32, align 4, !dbg !10
   store i32 0, ptr %value, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %index, metadata !12, metadata !DIExpression()), !dbg !10
+    #dbg_declare(ptr %index, !12, !DIExpression(), !10)
   store i32 0, ptr %index, align 4, !dbg !10
   br label %for_loop_condition, !dbg !10
 
@@ -3118,11 +3090,7 @@ for_loop_after:                                   ; preds = %for_loop_condition
   ret i32 %7, !dbg !14
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3161,7 +3129,7 @@ define i32 @Debug_information_run() #0 !dbg !3 {{
 entry:
   %value = alloca i32, align 4, !dbg !8
   %0 = call i32 @Debug_information_add(i32 noundef 1, i32 noundef 2), !dbg !9
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !10, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %value, !10, !DIExpression(), !8)
   store i32 %0, ptr %value, align 4, !dbg !8
   %1 = load i32, ptr %value, align 4, !dbg !11
   ret i32 %1, !dbg !11
@@ -3173,20 +3141,16 @@ entry:
   %lhs = alloca i32, align 4
   %rhs = alloca i32, align 4
   store i32 %"arguments[0].lhs", ptr %lhs, align 4
-  call void @llvm.dbg.declare(metadata ptr %lhs, metadata !16, metadata !DIExpression()), !dbg !18
+    #dbg_declare(ptr %lhs, !16, !DIExpression(), !18)
   store i32 %"arguments[1].rhs", ptr %rhs, align 4
-  call void @llvm.dbg.declare(metadata ptr %rhs, metadata !17, metadata !DIExpression()), !dbg !19
+    #dbg_declare(ptr %rhs, !17, !DIExpression(), !19)
   %0 = load i32, ptr %lhs, align 4, !dbg !20
   %1 = load i32, ptr %rhs, align 4, !dbg !20
   %2 = add i32 %0, %1, !dbg !20
   ret i32 %2, !dbg !21
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3233,7 +3197,7 @@ define i32 @Debug_information_function_constructor_consumer_run() #0 !dbg !3 {{
 entry:
   %value = alloca i32, align 4, !dbg !8
   %0 = call i32 @Debug_information_function_constructor_provider__at__add__at__489334907677298949(i32 noundef 1, i32 noundef 2), !dbg !9
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !10, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %value, !10, !DIExpression(), !8)
   store i32 %0, ptr %value, align 4, !dbg !8
   %1 = load i32, ptr %value, align 4, !dbg !11
   ret i32 %1, !dbg !11
@@ -3245,20 +3209,16 @@ entry:
   %lhs = alloca i32, align 4
   %rhs = alloca i32, align 4
   store i32 %"arguments[0].lhs", ptr %lhs, align 4
-  call void @llvm.dbg.declare(metadata ptr %lhs, metadata !17, metadata !DIExpression()), !dbg !19
+    #dbg_declare(ptr %lhs, !17, !DIExpression(), !19)
   store i32 %"arguments[1].rhs", ptr %rhs, align 4
-  call void @llvm.dbg.declare(metadata ptr %rhs, metadata !18, metadata !DIExpression()), !dbg !20
+    #dbg_declare(ptr %rhs, !18, !DIExpression(), !20)
   %0 = load i32, ptr %lhs, align 4, !dbg !21
   %1 = load i32, ptr %rhs, align 4, !dbg !21
   %2 = add i32 %0, %1, !dbg !21
   ret i32 %2, !dbg !22
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3305,7 +3265,7 @@ define private i32 @Debug_information_run(i32 noundef %"arguments[0].value") #0 
 entry:
   %value = alloca i32, align 4
   store i32 %"arguments[0].value", ptr %value, align 4
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !8, metadata !DIExpression()), !dbg !9
+    #dbg_declare(ptr %value, !8, !DIExpression(), !9)
   %0 = load i32, ptr %value, align 4, !dbg !10
   %1 = icmp eq i32 %0, 0, !dbg !10
   br i1 %1, label %if_s0_then, label %if_s1_else, !dbg !10
@@ -3325,11 +3285,7 @@ if_s3_else:                                       ; preds = %if_s1_else
   ret i32 3, !dbg !16
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3376,17 +3332,13 @@ entry:
   store i32 1, ptr %0, align 4, !dbg !12
   %1 = getelementptr inbounds %struct.Debug_information_Vector2i, ptr %instance, i32 0, i32 1, !dbg !12
   store i32 2, ptr %1, align 4, !dbg !12
-  call void @llvm.dbg.declare(metadata ptr %instance, metadata !13, metadata !DIExpression()), !dbg !12
+    #dbg_declare(ptr %instance, !13, !DIExpression(), !12)
   %2 = getelementptr inbounds %struct.Debug_information_Vector2i, ptr %instance, i32 0, i32 0, !dbg !14
   %3 = load i64, ptr %2, align 4, !dbg !14
   ret i64 %3, !dbg !14
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3425,7 +3377,7 @@ define private i32 @Debug_information_run(i32 noundef %"arguments[0].value") #0 
 entry:
   %value = alloca i32, align 4
   store i32 %"arguments[0].value", ptr %value, align 4
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !8, metadata !DIExpression()), !dbg !9
+    #dbg_declare(ptr %value, !8, !DIExpression(), !9)
   %0 = load i32, ptr %value, align 4, !dbg !10
   switch i32 %0, label %switch_case_default [
     i32 0, label %switch_case_i0_
@@ -3446,11 +3398,7 @@ switch_case_default:                              ; preds = %entry
   br label %switch_after, !dbg !14
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3494,15 +3442,11 @@ entry:
   store ptr null, ptr %0, align 8, !dbg !7
   %1 = getelementptr inbounds %struct.Debug_information_temporary_replacement_My_struct, ptr %instance, i32 0, i32 1, !dbg !7
   store ptr null, ptr %1, align 8, !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %instance, metadata !8, metadata !DIExpression()), !dbg !7
+    #dbg_declare(ptr %instance, !8, !DIExpression(), !7)
   ret void, !dbg !7
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3543,17 +3487,13 @@ define private i32 @Debug_information_instantiate() #0 !dbg !3 {{
 entry:
   %instance = alloca %union.Debug_information_My_int, align 4, !dbg !13
   store i32 0, ptr %instance, align 4, !dbg !13
-  call void @llvm.dbg.declare(metadata ptr %instance, metadata !14, metadata !DIExpression()), !dbg !13
+    #dbg_declare(ptr %instance, !14, !DIExpression(), !13)
   %0 = getelementptr inbounds %union.Debug_information_My_int, ptr %instance, i32 0, i32 0, !dbg !15
   %1 = load i32, ptr %0, align 4, !dbg !15
   ret i32 %1, !dbg !15
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3592,18 +3532,14 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 define i32 @Debug_information_run() #0 !dbg !3 {{
 entry:
   %i = alloca i32, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %i, metadata !9, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %i, !9, !DIExpression(), !8)
   store i32 0, ptr %i, align 4, !dbg !8
   store i32 2, ptr %i, align 4, !dbg !10
   %0 = load i32, ptr %i, align 4, !dbg !11
   ret i32 %0, !dbg !11
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3638,10 +3574,10 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 define i32 @Debug_information_run() #0 !dbg !3 {{
 entry:
   %value = alloca i32, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !9, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %value, !9, !DIExpression(), !8)
   %index = alloca i32, align 4, !dbg !10
   store i32 0, ptr %value, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %index, metadata !11, metadata !DIExpression()), !dbg !10
+    #dbg_declare(ptr %index, !11, !DIExpression(), !10)
   store i32 0, ptr %index, align 4, !dbg !10
   br label %while_loop_condition, !dbg !10
 
@@ -3682,11 +3618,7 @@ if_s1_after:                                      ; preds = %while_loop_then1
   br label %while_loop_then1, !dbg !23
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3989,25 +3921,21 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 define void @Debug_information_decimal_expressions_decimal_constants() #0 !dbg !3 {{
 entry:
   %a = alloca i32, align 4, !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %a, metadata !8, metadata !DIExpression()), !dbg !14
+    #dbg_declare(ptr %a, !8, !DIExpression(), !14)
   %b = alloca i32, align 4, !dbg !14
   %c = alloca i64, align 8, !dbg !15
   %d = alloca i32, align 4, !dbg !16
   store i32 15, ptr %a, align 4, !dbg !14
-  call void @llvm.dbg.declare(metadata ptr %b, metadata !17, metadata !DIExpression()), !dbg !15
+    #dbg_declare(ptr %b, !17, !DIExpression(), !15)
   store i32 15700, ptr %b, align 4, !dbg !15
-  call void @llvm.dbg.declare(metadata ptr %c, metadata !22, metadata !DIExpression()), !dbg !16
+    #dbg_declare(ptr %c, !22, !DIExpression(), !16)
   store i64 1234567000, ptr %c, align 8, !dbg !16
-  call void @llvm.dbg.declare(metadata ptr %d, metadata !27, metadata !DIExpression()), !dbg !28
+    #dbg_declare(ptr %d, !27, !DIExpression(), !28)
   store i32 10000, ptr %d, align 4, !dbg !28
   ret void, !dbg !28
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -4320,7 +4248,7 @@ define private void @Defer_expressions_with_debug_information_do_defer(i32 nound
 entry:
   %value = alloca i32, align 4
   store i32 %"arguments[0].value", ptr %value, align 4
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !8, metadata !DIExpression()), !dbg !9
+    #dbg_declare(ptr %value, !8, !DIExpression(), !9)
   ret void, !dbg !10
 }}
 
@@ -4332,21 +4260,17 @@ entry:
   %value_2 = alloca i32, align 4, !dbg !18
   %0 = zext i1 %"arguments[0].condition" to i8
   store i8 %0, ptr %condition, align 1
-  call void @llvm.dbg.declare(metadata ptr %condition, metadata !16, metadata !DIExpression()), !dbg !19
+    #dbg_declare(ptr %condition, !16, !DIExpression(), !19)
   store i32 %"arguments[1].value", ptr %value, align 4
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !17, metadata !DIExpression()), !dbg !20
-  call void @llvm.dbg.declare(metadata ptr %value_2, metadata !21, metadata !DIExpression()), !dbg !18
+    #dbg_declare(ptr %value, !17, !DIExpression(), !20)
+    #dbg_declare(ptr %value_2, !21, !DIExpression(), !18)
   store i32 0, ptr %value_2, align 4, !dbg !18
   call void @Defer_expressions_with_debug_information_do_defer(i32 noundef 1), !dbg !22
   call void @Defer_expressions_with_debug_information_do_defer(i32 noundef 0), !dbg !23
   ret void, !dbg !24
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -4615,7 +4539,7 @@ declare i32 @puts(ptr)
 declare void @abort()
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -5273,7 +5197,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
@@ -5503,7 +5427,7 @@ entry:
   %parameter = alloca ptr, align 8
   %x = alloca ptr, align 8, !dbg !10
   store ptr %"arguments[0].parameter", ptr %parameter, align 8
-  call void @llvm.dbg.declare(metadata ptr %parameter, metadata !9, metadata !DIExpression()), !dbg !11
+    #dbg_declare(ptr %parameter, !9, !DIExpression(), !11)
   %0 = load ptr, ptr %parameter, align 8, !dbg !12
   %1 = icmp eq ptr %0, null, !dbg !12
   br i1 %1, label %if_s0_then, label %if_s1_after, !dbg !12
@@ -5520,16 +5444,12 @@ if_s0_then1:                                      ; preds = %if_s1_after
   ret i32 1, !dbg !16
 
 if_s1_after2:                                     ; preds = %if_s1_after
-  call void @llvm.dbg.declare(metadata ptr %x, metadata !18, metadata !DIExpression()), !dbg !10
+    #dbg_declare(ptr %x, !18, !DIExpression(), !10)
   store ptr null, ptr %x, align 8, !dbg !10
   ret i32 0, !dbg !21
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -6016,7 +5936,7 @@ for_loop_then:                                    ; preds = %for_loop_condition
   store i64 %9, ptr %11, align 8
   %12 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8
   store %struct.iris_builtin_Generic_array_slice %12, ptr %array_1, align 8
-  %13 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %array_1, i32 0, i32 0
+  %13 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %array_1, i32 0, i32 0
   %14 = load ptr, ptr %13, align 8
   %array_slice_element_pointer = getelementptr i32, ptr %14, i32 0
   %15 = load i64, ptr %index, align 8
@@ -6532,7 +6452,7 @@ entry:
   %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 1
   store i64 %"arguments[0].buffer_1", ptr %1, align 8
   store ptr %"arguments[1].specifier", ptr %specifier, align 8
-  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %2 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
   %3 = load ptr, ptr %2, align 8
   %array_slice_element_pointer = getelementptr i8, ptr %3, i32 0
   store i8 37, ptr %array_slice_element_pointer, align 1
@@ -6551,7 +6471,7 @@ for_loop_condition:                               ; preds = %for_loop_update_ind
 for_loop_then:                                    ; preds = %for_loop_condition
   %9 = load i64, ptr %index, align 8
   %10 = add i64 1, %9
-  %11 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %11 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
   %12 = load ptr, ptr %11, align 8
   %array_slice_element_pointer1 = getelementptr i8, ptr %12, i64 %10
   %13 = load i64, ptr %index, align 8
@@ -6570,7 +6490,7 @@ for_loop_update_index:                            ; preds = %for_loop_then
 for_loop_after:                                   ; preds = %for_loop_condition
   %18 = load i64, ptr %length, align 8
   %19 = add i64 1, %18
-  %20 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %20 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
   %21 = load ptr, ptr %20, align 8
   %array_slice_element_pointer2 = getelementptr i8, ptr %21, i64 %19
   store i8 0, ptr %array_slice_element_pointer2, align 1
@@ -6683,7 +6603,7 @@ entry:
 declare void @iris_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 ; Function Attrs: convergent
 declare ptr @__acrt_iob_func(i32 noundef) #0
@@ -7287,7 +7207,7 @@ entry:
   %7 = load float, ptr @my_global, align 4
   store float %7, ptr %d, align 4
   store float 1.000000e+00, ptr %e, align 4
-  %8 = load i32, ptr getelementptr inbounds ([3 x i32], ptr @Global_variables_my_global_array, i32 0, i32 1), align 4
+  %8 = load i32, ptr getelementptr ([3 x i32], ptr @Global_variables_my_global_array, i32 0, i32 1), align 4
   store i32 %8, ptr %f, align 4
   ret void
 }
@@ -7754,7 +7674,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
@@ -8183,7 +8103,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -8306,7 +8226,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -8443,10 +8363,10 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #2
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #2
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
@@ -8486,10 +8406,10 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #2
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #2
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
@@ -8534,7 +8454,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -8578,7 +8498,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -8920,7 +8840,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -9011,7 +8931,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -9087,7 +9007,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -9323,7 +9243,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -9405,20 +9325,20 @@ entry:
   store i64 %"arguments[1].length", ptr %length, align 8
   %0 = load ptr, ptr %data, align 8
   %1 = load i64, ptr %length, align 8
-  %2 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
+  %2 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
   store i64 0, ptr %2, align 8
-  %3 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
+  %3 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
   store i64 %1, ptr %3, align 8
-  %4 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
+  %4 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
   store i64 %1, ptr %4, align 8
-  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
   store ptr %0, ptr %5, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return.result, ptr align 8 %soa_array_view, i64 32, i1 false)
   ret void
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }

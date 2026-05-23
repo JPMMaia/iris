@@ -1647,7 +1647,7 @@ DEFINE_HANDLE(My_macro_type)
             REQUIRE(declaration.type.size() == 1);
             CHECK(declaration.type[0] == iris::create_pointer_type_type_reference({iris::create_custom_type_reference("c.My_data", "My_macro_type_t")}, true));
 
-            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 10, 15, 10, 16));
+            CHECK(declaration.source_location == iris::create_source_range_location(header_file_path, 10, 1, 10, 2));
         }
 
         {

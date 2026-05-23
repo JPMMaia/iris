@@ -648,12 +648,12 @@ namespace iris::compiler
         llvm::InitializeAllAsmParsers();
         llvm::InitializeAllAsmPrinters();
 
-        std::string const target_triple = llvm::sys::getDefaultTargetTriple();
+        llvm::Triple const target_triple{llvm::sys::getDefaultTargetTriple()};
 
         llvm::Target const& target = [&]() -> llvm::Target const&
         {
             std::string error;
-            llvm::Target const* target = llvm::TargetRegistry::lookupTarget(target_triple, error);
+            llvm::Target const* target = llvm::TargetRegistry::lookupTarget(target_triple.str(), error);
 
             // Print an error and exit if we couldn't find the requested target.
             // This generally occurs if we've forgotten to initialise the
@@ -1161,7 +1161,7 @@ namespace iris::compiler
 
     static std::unique_ptr<llvm::Module> create_module(
         llvm::LLVMContext& llvm_context,
-        std::string_view const target_triple,
+        llvm::Triple const& target_triple,
         llvm::DataLayout const& llvm_data_layout,
         Clang_module_data const& clang_module_data,
         Module const& core_module,
@@ -1275,7 +1275,7 @@ namespace iris::compiler
         llvm::InitializeAllAsmParsers();
         llvm::InitializeAllAsmPrinters();
 
-        std::string target_triple = options.target_triple.has_value() ? std::string{ *options.target_triple } : llvm::sys::getDefaultTargetTriple();
+        llvm::Triple target_triple = options.target_triple.has_value() ? llvm::Triple{llvm::StringRef{*options.target_triple}} : llvm::Triple{llvm::sys::getDefaultTargetTriple()};
 
         llvm::Target const& target = [&]() -> llvm::Target const&
         {
