@@ -67,6 +67,12 @@ static std::optional<std::string_view> search_argument(int const argc, char cons
     return std::nullopt;
 }
 
+static bool should_print_help(int const argc, char const* const argv[])
+{
+    std::optional<std::string_view> const argument = search_argument(argc, argv, "--help");
+    return argument.has_value();
+}
+
 static bool should_list_tests(int const argc, char const* const argv[])
 {
     std::optional<std::string_view> const argument = search_argument(argc, argv, "--list-tests");
@@ -315,6 +321,20 @@ static Test_results run_tests(std::span<Test_function_pointer const> const tests
     return results;
 }
 
+static void print_help(char const* const program_name)
+{
+    std::printf(
+        "Usage: %s [OPTIONS]\n"
+        "\n"
+        "Options:\n"
+        "  --help                              Show this help message and exit\n"
+        "  --list-tests                        List all available test names and exit\n"
+        "  --output-format=json[:<file>]       Write test list as JSON (default file: test_detail.json); use with --list-tests\n"
+        "  --test-name=<name>                  Run only the test with this name (repeatable)\n",
+        program_name
+    );
+}
+
 void print_test_results(Test_results const& test_results)
 {
     if (test_results.failed_count > 0)
@@ -325,6 +345,12 @@ int main(int const argc, char const* const argv[])
 {
     if (argc >= 2)
     {
+        if (should_print_help(argc, argv))
+        {
+            print_help(argv[0]);
+            return 0;
+        }
+
         if (should_list_tests(argc, argv))
         {
             if (should_output_json(argc, argv))
