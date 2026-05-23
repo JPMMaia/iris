@@ -2666,6 +2666,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "Expression_dereference_and_access"
+        },
+        {
+          "type": "SYMBOL",
           "name": "Expression_unary"
         },
         {

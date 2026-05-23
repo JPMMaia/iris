@@ -696,6 +696,10 @@
           "named": true
         },
         {
+          "type": "Expression_dereference_and_access",
+          "named": true
+        },
+        {
           "type": "Expression_unary",
           "named": true
         },

@@ -208,6 +208,7 @@ module.exports = grammar({
       $.Expression_binary,
       $.Expression_call,
       $.Expression_constant,
+      $.Expression_dereference_and_access,
       $.Expression_unary,
       $.Expression_variable
     ),
