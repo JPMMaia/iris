@@ -2179,8 +2179,27 @@ function run(value: My_enum) -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that functions can be compared", "[Validation][Binary_expression]")
+    {
+        std::string_view const input = R"(module Test;
 
-        TEST_CASE("Validates that break can only be placed inside for loops, while loops and switch cases", "[Validation][Break_expression]")
+using System_function = function<() ->()>;
+
+function run(lhs: System_function, rhs: System_function) -> (result: Bool)
+{ 
+    return lhs == rhs;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+
+    TEST_CASE("Validates that break can only be placed inside for loops, while loops and switch cases", "[Validation][Break_expression]")
     {
         std::string_view const input = R"(module Test;
 

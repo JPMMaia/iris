@@ -2057,7 +2057,7 @@ namespace iris::compiler
                     };
                 }
             }
-            else if (!is_integer(type) && !is_floating_point(type) && !is_byte(type) && !is_bool(type) && !is_c_bool(type) && !is_enum_type(parameters.declaration_database, type))
+            else if (!is_integer(type) && !is_floating_point(type) && !is_byte(type) && !is_bool(type) && !is_c_bool(type) && !is_enum_type(parameters.declaration_database, type) && !is_function_pointer(type))
             {
                 return
                 {
@@ -2065,7 +2065,7 @@ namespace iris::compiler
                         parameters.core_module.source_file_path,
                         source_range,
                         std::format(
-                            "Binary operation '{}' can only be applied to numbers, bytes, booleans or enums.",
+                            "Binary operation '{}' can only be applied to numbers, bytes, booleans, enums or functions.",
                             iris::binary_operation_symbol_to_string(operation)
                         )
                     )
