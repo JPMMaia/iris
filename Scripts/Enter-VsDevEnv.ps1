@@ -14,3 +14,19 @@ function Enter-VsDevEnv {
         Remove-Item -Path "env:VCPKG_ROOT" -ErrorAction SilentlyContinue
     }
 }
+
+# Call the function
+Enter-VsDevEnv
+
+# Output environment variables for capture (only when --output-env flag is passed)
+if ($args -contains "--output-env") {
+    $envVarsToCapture = @("VCINSTALLDIR", "VCToolsVersion", "VisualStudioVersion",
+                           "PATH", "INCLUDE", "LIB", "LIBPATH", "VCPKG_ROOT", "UCRTVersion", "WindowsSDKLibVersion", "WindowsSDKVersion", "WindowsSdkDir", "WindowsSDKLibDir", "WindowsSDKIncludeDir")
+
+    foreach ($var in $envVarsToCapture) {
+        $val = Get-Item -Path "env:$var" -ErrorAction SilentlyContinue
+        if ($val) {
+            Write-Output "$var=$($val.Value)"
+        }
+    }
+}
