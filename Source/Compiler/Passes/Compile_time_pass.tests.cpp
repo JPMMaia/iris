@@ -1295,4 +1295,43 @@ export function run_chained_or() -> (result: Int32)
 
         CHECK(expected == actual);
     }
+
+    TEST_CASE("Evaluates compile_time for recursive expressions", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_recursive;
+
+using System = function<(world: *mutable World) -> ()>;
+
+struct World
+{
+    system: System = null;
+}
+
+function run() -> ()
+{
+    var a = @size_of::<World>();
+    var b = @size_of::<System>();
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_recursive;
+
+using System = function<(world: *mutable World) -> ()>;
+
+struct World
+{
+    system: System = null;
+}
+
+function run() -> ()
+{
+    var a = 8u64;
+    var b = 8u64;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
 }

@@ -2207,9 +2207,6 @@ namespace iris::compiler
         {
             Struct_declaration const* const struct_declaration = std::get<iris::Struct_declaration const*>(declaration->data);
 
-            for (Type_reference const& member_type : struct_declaration->member_types)
-                visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
-
             clang::RecordDecl* record_declaration = nullptr;
             auto const struct_location = clang_declarations.struct_declarations.find(declaration_name);
             if (struct_location == clang_declarations.struct_declarations.end())
@@ -2222,6 +2219,9 @@ namespace iris::compiler
                 record_declaration = struct_location->second;
             }
 
+            for (Type_reference const& member_type : struct_declaration->member_types)
+                visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
+
             if (!record_declaration->isCompleteDefinition())
                 set_clang_struct_definition(clang_ast_context, *record_declaration, *struct_declaration, declaration_database, clang_declaration_database);
 
@@ -2231,9 +2231,6 @@ namespace iris::compiler
         if (std::holds_alternative<iris::Union_declaration const*>(declaration->data))
         {
             Union_declaration const* const union_declaration = std::get<iris::Union_declaration const*>(declaration->data);
-
-            for (Type_reference const& member_type : union_declaration->member_types)
-                visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
 
             clang::RecordDecl* record_declaration = nullptr;
             auto const union_location = clang_declarations.union_declarations.find(declaration_name);
@@ -2246,6 +2243,9 @@ namespace iris::compiler
             {
                 record_declaration = union_location->second;
             }
+
+            for (Type_reference const& member_type : union_declaration->member_types)
+                visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
 
             if (!record_declaration->isCompleteDefinition())
                 add_clang_union_definition(clang_declarations.union_declarations, clang_ast_context, *union_declaration, declaration_database, clang_declaration_database);
