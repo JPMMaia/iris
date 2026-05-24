@@ -520,6 +520,7 @@
 			}
 		},
 		"terminal.integrated.defaultProfile.windows": "Powershell + VsDevEnv",
+		"terminal.integrated.shellIntegration.enabled": true,
 		"C_Cpp.default.cppStandard": "c++23",
 		"C_Cpp.default.cStandard": "c23",
 		"C_Cpp.default.compileCommands": [
