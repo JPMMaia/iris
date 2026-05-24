@@ -19,7 +19,8 @@ target_sources(Iris_builder_executable PRIVATE
 install(
    TARGETS Iris_builder_executable
    RUNTIME_DEPENDENCIES
-      PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-"
+      DIRECTORIES "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/llvm"
+      PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-" "zlib"
       POST_EXCLUDE_REGEXES "system32"
       DESTINATION bin
 )
