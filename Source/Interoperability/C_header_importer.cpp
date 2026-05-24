@@ -254,6 +254,34 @@ namespace iris::c
         }
     }
 
+    iris::Integer_type create_integer_type_from_clang_type(CXType const type)
+    {
+        bool const is_signed = [kind = type.kind]() -> bool
+        {
+            switch (kind)
+            {
+            case CXType_Char_S:
+            case CXType_SChar:
+            case CXType_Short:
+            case CXType_Int:
+            case CXType_Long:
+            case CXType_LongLong:
+                return true;
+            default:
+                return false;
+            }
+        }();
+
+        long long const size_in_bytes = clang_Type_getSizeOf(type);
+        std::uint32_t const number_of_bits = static_cast<std::uint32_t>(size_in_bytes * 8);
+
+        return iris::Integer_type
+        {
+            .number_of_bits = number_of_bits,
+            .is_signed = is_signed
+        };
+    }
+
     std::string_view find_enum_name(std::string_view const spelling)
     {
         std::size_t begin_word = 0;
@@ -715,7 +743,12 @@ namespace iris::c
                 String const enum_constant_spelling = clang_getCursorSpelling(current_cursor);
                 std::string_view const enum_constant_name = enum_constant_spelling.string_view();
 
-                std::uint64_t const enum_constant_value = static_cast<std::uint64_t>(clang_getEnumConstantDeclUnsignedValue(current_cursor));
+                CXType const underlying_type = clang_getEnumDeclIntegerType(parent);
+                iris::Integer_type const integer_type = create_integer_type_from_clang_type(underlying_type);
+
+                std::pmr::string const enum_constant_value_str = integer_type.is_signed
+                    ? std::pmr::string{std::to_string(clang_getEnumConstantDeclValue(current_cursor))}
+                    : std::pmr::string{std::to_string(clang_getEnumConstantDeclUnsignedValue(current_cursor))};
 
                 iris::Statement statement_value
                 {
@@ -725,13 +758,9 @@ namespace iris::c
                             .data = iris::Constant_expression
                             {
                                 .type = {
-                                    .data = iris::Integer_type
-                                    {
-                                        .number_of_bits = 32,
-                                        .is_signed = true
-                                    }
+                                    .data = integer_type
                                 },
-                                .data = std::pmr::string{std::to_string(enum_constant_value)}
+                                .data = enum_constant_value_str
                             }
                         }
                     }

@@ -286,6 +286,25 @@ namespace iris::c
         check_enum_constant_value(actual, 4, "4");
     }
 
+    TEST_CASE("Import vulkan.h C header creates 'VkResult' enum")
+    {
+        iris::Module const& header_module = import_vulkan_header_module();
+
+        iris::Enum_declaration const& actual = iris::c::find_enum_declaration(header_module, "VkResult");
+
+        CHECK(actual.name == "VkResult");
+        REQUIRE(actual.unique_name.has_value());
+        CHECK(actual.unique_name.value() == "VkResult");
+
+        REQUIRE(actual.values.size() >= 19);
+
+        CHECK(actual.values[0].name == "Success");
+        check_enum_constant_value(actual, 0, "0");
+
+        CHECK(actual.values[6].name == "Error_out_of_host_memory");
+        check_enum_constant_value(actual, 6, "-1");
+    }
+
     TEST_CASE("Import vulkan.h C header creates 'VkCommandPoolCreateInfo' struct")
     {
         iris::Module const& header_module = import_vulkan_header_module();
