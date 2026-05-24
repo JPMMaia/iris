@@ -1304,7 +1304,7 @@ using System = function<(world: *mutable World) -> ()>;
 
 struct World
 {
-    system: System = null;
+    system: Array_slice::<System> = {};
 }
 
 function run() -> ()
@@ -1320,12 +1320,12 @@ using System = function<(world: *mutable World) -> ()>;
 
 struct World
 {
-    system: System = null;
+    system: Array_slice::<System> = {};
 }
 
 function run() -> ()
 {
-    var a = 8u64;
+    var a = 16u64;
     var b = 8u64;
 }
 )";

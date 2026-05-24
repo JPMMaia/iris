@@ -2129,6 +2129,18 @@ namespace iris::compiler
 
         auto const ensure_nested_custom_type_declarations = [&](Type_reference const& type_reference) -> bool
         {
+            if (std::holds_alternative<Array_slice_type>(type_reference.data))
+            {
+                ensure_clang_custom_type_declaration(
+                    clang_ast_context,
+                    declaration_database,
+                    clang_declaration_database,
+                    "iris.builtin",
+                    "Generic_array_slice"
+                );
+                return false;
+            }
+
             if (!std::holds_alternative<Custom_type_reference>(type_reference.data))
                 return false;
 
