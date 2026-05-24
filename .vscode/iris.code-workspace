@@ -510,15 +510,16 @@
 		],
 		"editor.formatOnSave": false,
 		"terminal.integrated.profiles.windows": {
-			"x64 Native Tools": {
-				"path": "C:/Windows/System32/cmd.exe",
+			"Powershell + VsDevEnv": {
+				"source": "PowerShell",
 				"args": [
-					"/k",
-					"C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/VsDevCmd.bat",
-					"-arch=x64"
+					"-NoExit",
+					"-File",
+					"${workspaceFolder}/Scripts/Enter-VsDevEnv.ps1"
 				]
 			}
 		},
+		"terminal.integrated.defaultProfile.windows": "Powershell + VsDevEnv",
 		"C_Cpp.default.cppStandard": "c++23",
 		"C_Cpp.default.cStandard": "c23",
 		"C_Cpp.default.compileCommands": [
