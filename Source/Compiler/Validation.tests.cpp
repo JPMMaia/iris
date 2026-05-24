@@ -2368,6 +2368,30 @@ function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that functions pointers can be called through alias types", "[Validation][Call_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+using System = function<() -> ()>;
+
+function foo() -> ()
+{
+}
+
+export function run() -> ()
+{
+    var system: System = foo;
+    system();   
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that function call has the correct number of arguments", "[Validation][Call_expression]")
     {
         std::string_view const input = R"(module Test;

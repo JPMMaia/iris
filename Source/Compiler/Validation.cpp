@@ -2512,7 +2512,8 @@ namespace iris::compiler
         std::optional<iris::Source_range> const& source_range
     )
     {
-        std::optional<iris::Type_reference> const& callable_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.expression);
+        std::optional<iris::Type_reference> const& expression_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.expression);
+        std::optional<iris::Type_reference> const callable_type_optional = expression_type_optional.has_value() ? get_underlying_type(parameters.declaration_database, expression_type_optional.value()) : std::optional<iris::Type_reference>{};
 
         if (callable_type_optional.has_value() && is_builtin_type_reference(callable_type_optional.value()))
         {
