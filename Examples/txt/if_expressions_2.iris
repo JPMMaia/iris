@@ -1,0 +1,18 @@
+module If_expressions_2;
+
+struct Container
+{
+    data: Array_slice::<Uint64> = {};
+}
+
+function get_value(id: Uint64, container: *Container) -> (count: Uint64)
+{
+    if id == 1u64
+    {
+        return container->data[0u64];
+    }
+    else
+    {
+        return container->data[1u64];
+    }
+}

@@ -536,14 +536,26 @@ namespace iris::compiler
             }
         }
 
-        // Delete the last block if it has no predecessors.
-        // This can happen, for example, if the last statement of a function is a if expression that returns non-void.
-        if (llvm_function.size() > 1)
+        // Delete any non-entry block with no predecessors.
+        // This can happen when all branches of an if expression return (including cases where
+        // bounds-check blocks are appended after the after-block, making it no longer the last block).
         {
-            llvm::BasicBlock& last_block = llvm_function.back();
-            if (llvm::pred_empty(&last_block))
+            bool removed = true;
+            while (removed)
             {
-                last_block.eraseFromParent();
+                removed = false;
+                for (auto it = std::next(llvm_function.begin()); it != llvm_function.end(); )
+                {
+                    if (llvm::pred_empty(&*it))
+                    {
+                        it = it->eraseFromParent();
+                        removed = true;
+                    }
+                    else
+                    {
+                        ++it;
+                    }
+                }
             }
         }
 

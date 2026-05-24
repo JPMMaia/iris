@@ -4969,6 +4969,83 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile If Expressions 2", "[LLVM_IR]")
+  {
+    char const* const input_file = "if_expressions_2.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.If_expressions_2_Container = type { %struct.iris_builtin_Generic_array_slice }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
+
+@function_contract_error_string = private unnamed_addr constant [66 x i8] c"Out-of-bounds array slice access in 'If_expressions_2.get_value'!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [66 x i8] c"Out-of-bounds array slice access in 'If_expressions_2.get_value'!\00"
+
+; Function Attrs: convergent
+define private i64 @If_expressions_2_get_value(i64 noundef %"arguments[0].id", ptr noundef %"arguments[1].container") #0 {
+entry:
+  %id = alloca i64, align 8
+  %container = alloca ptr, align 8
+  store i64 %"arguments[0].id", ptr %id, align 8
+  store ptr %"arguments[1].container", ptr %container, align 8
+  %0 = load i64, ptr %id, align 8
+  %1 = icmp eq i64 %0, 1
+  br i1 %1, label %if_s0_then, label %if_s1_else
+
+if_s0_then:                                       ; preds = %entry
+  %2 = load ptr, ptr %container, align 8
+  %3 = getelementptr inbounds %struct.If_expressions_2_Container, ptr %2, i32 0, i32 0
+  %4 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 1
+  %5 = load i64, ptr %4, align 8
+  %bounds_check_in_bounds = icmp ult i64 0, %5
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+if_s1_else:                                       ; preds = %entry
+  %6 = load ptr, ptr %container, align 8
+  %7 = getelementptr inbounds %struct.If_expressions_2_Container, ptr %6, i32 0, i32 0
+  %8 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %7, i32 0, i32 1
+  %9 = load i64, ptr %8, align 8
+  %bounds_check_in_bounds1 = icmp ult i64 1, %9
+  br i1 %bounds_check_in_bounds1, label %bounds_check_pass2, label %bounds_check_fail3
+
+bounds_check_pass:                                ; preds = %if_s0_then
+  %10 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  %array_slice_element_pointer = getelementptr i64, ptr %11, i64 0
+  %12 = load i64, ptr %array_slice_element_pointer, align 8
+  ret i64 %12
+
+bounds_check_fail:                                ; preds = %if_s0_then
+  %13 = call i32 @puts(ptr @function_contract_error_string)
+  call void @abort()
+  unreachable
+
+bounds_check_pass2:                               ; preds = %if_s1_else
+  %14 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %7, i32 0, i32 0
+  %15 = load ptr, ptr %14, align 8
+  %array_slice_element_pointer4 = getelementptr i64, ptr %15, i64 1
+  %16 = load i64, ptr %array_slice_element_pointer4, align 8
+  ret i64 %16
+
+bounds_check_fail3:                               ; preds = %if_s1_else
+  %17 = call i32 @puts(ptr @function_contract_error_string.1)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @puts(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_bounds_checks = true });
+  }
+
   TEST_CASE("Compile If Return Expressions", "[LLVM_IR]")
   {
     char const* const input_file = "if_return_expressions.iris";
@@ -6028,9 +6105,6 @@ switch_case_i4_:                                  ; preds = %switch_after
 switch_case_default:                              ; preds = %switch_case_i4_, %switch_after
   ret i32 3
 
-switch_after3:                                    ; No predecessors!
-  ret i32 5
-
 switch_case_default4:                             ; preds = %switch_after1
   br label %switch_case_i1_5
 
@@ -6406,11 +6480,8 @@ if_s3_else:                                       ; preds = %if_s1_else
 if_s4_then:                                       ; preds = %if_s3_else
   ret ptr @global_9
 
-if_s5_after:                                      ; preds = %if_s3_else, %switch_after1, %switch_after
+if_s5_after:                                      ; preds = %if_s3_else
   ret ptr @global_10
-
-switch_after:                                     ; No predecessors!
-  br label %if_s5_after
 
 switch_case_i0_:                                  ; preds = %if_s0_then
   ret ptr @global_1
@@ -6423,9 +6494,6 @@ switch_case_i2_:                                  ; preds = %if_s0_then
 
 switch_case_default:                              ; preds = %if_s0_then
   ret ptr @global_4
-
-switch_after1:                                    ; No predecessors!
-  br label %if_s5_after
 
 switch_case_i0_2:                                 ; preds = %if_s2_then
   ret ptr @global_5
