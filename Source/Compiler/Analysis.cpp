@@ -1873,6 +1873,30 @@ namespace iris::compiler
                     .is_mutable = false,
                 };   
             }
+            else if (data.name == "member_count" || data.name == "member_offset" || data.name == "member_type")
+            {
+                return Type_info
+                {
+                    .type = iris::create_integer_type_type_reference(64, false),
+                    .is_mutable = false,
+                };
+            }
+            else if (data.name == "member_name" || data.name == "type_name")
+            {
+                return Type_info
+                {
+                    .type = create_c_string_type_reference(false),
+                    .is_mutable = false,
+                };
+            }
+            else if (data.name == "get_type_kind")
+            {
+                return Type_info
+                {
+                    .type = create_custom_type_reference("iris.builtin", "Type_kind"),
+                    .is_mutable = false,
+                };
+            }
 
             return std::nullopt;
         }

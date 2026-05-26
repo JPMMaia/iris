@@ -6075,4 +6075,646 @@ function run(a: module_a.My_unique_type, b: module_b.My_unique_type) -> ()
 
         test_validate_module(input, dependencies, expected_diagnostics);
     }
+
+    TEST_CASE("Validates that @alignment_of parameter is a valid type", "[Validation][Alignment_of]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct My_struct
+{
+    a: Int32 = 0;
+}
+
+function run() -> ()
+{
+    var int32_align = @alignment_of::<Int32>();
+    var my_struct_align = @alignment_of::<My_struct>();
+    var invalid = @alignment_of::<Foo>();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(12, 35, 12, 38),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Type 'Foo' does not exist.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @alignment_of has only one type argument", "[Validation][Alignment_of]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run() -> ()
+{
+    var v0 = @alignment_of::<Int32>();
+    var v1 = @alignment_of();
+    var v2 = @alignment_of::<Int32>(v1);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 14, 6, 29),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@alignment_of requires only 1 type argument.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(7, 14, 7, 40),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@alignment_of does not have any parameters.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_count has only one type argument", "[Validation][Member_count]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct My_struct
+{
+    a: Int32 = 0;
+}
+
+function run() -> ()
+{
+    var v0 = @member_count::<My_struct>();
+    var v1 = @member_count();
+    var v2 = @member_count::<My_struct, Int32>();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(11, 14, 11, 29),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_count requires only 1 type argument.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(12, 14, 12, 49),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_count requires only 1 type argument.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_count does not have any parameters", "[Validation][Member_count]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct My_struct
+{
+    a: Int32 = 0;
+}
+
+function run() -> ()
+{
+    var v0 = @member_count::<My_struct>();
+    var v1 = @member_count::<My_struct>(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(11, 14, 11, 46),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_count does not have any parameters.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_count type argument must be a struct or union", "[Validation][Member_count]")
+    {
+        std::string_view const input = R"(module Test;
+
+enum My_enum
+{
+    A,
+}
+
+function run() -> ()
+{
+    var v0 = @member_count::<Int32>();
+    var v1 = @member_count::<My_enum>();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 14, 10, 38),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_count type argument must be a struct or union type.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(11, 14, 11, 40),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_count type argument must be a struct or union type.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_type has only one type argument", "[Validation][Member_type]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct My_struct
+{
+    a: Int32 = 0;
+}
+
+function run() -> ()
+{
+    var v1 = @member_type(0u64);
+    var v2 = @member_type::<My_struct, Int32>(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 14, 10, 32),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_type requires only 1 type argument.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(11, 14, 11, 52),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_type requires only 1 type argument.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_type requires 1 index parameter", "[Validation][Member_type]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct My_struct
+{
+    a: Int32 = 0;
+    b: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    var v0 = @member_type::<My_struct>(0u64);
+    var v1 = @member_type::<My_struct>();
+    var v2 = @member_type::<My_struct>(0u64, 1u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(12, 14, 12, 41),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_type requires 1 index parameter.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(13, 14, 13, 51),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_type requires 1 index parameter.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_type type argument must be a struct or union", "[Validation][Member_type]")
+    {
+        std::string_view const input = R"(module Test;
+
+enum My_enum
+{
+    A,
+}
+
+function run() -> ()
+{
+    var v0 = @member_type::<Int32>(0u64);
+    var v1 = @member_type::<My_enum>(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 14, 10, 41),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_type type argument must be a struct or union type.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(11, 14, 11, 43),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_type type argument must be a struct or union type.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_name has only one type argument", "[Validation][Member_name]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct My_struct
+{
+    a: Int32 = 0;
+}
+
+function run() -> ()
+{
+    var v1 = @member_name(0u64);
+    var v2 = @member_name::<My_struct, Int32>(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 14, 10, 32),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_name requires only 1 type argument.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(11, 14, 11, 52),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_name requires only 1 type argument.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_name requires 1 index parameter", "[Validation][Member_name]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct My_struct
+{
+    a: Int32 = 0;
+    b: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    var v0 = @member_name::<My_struct>(0u64);
+    var v1 = @member_name::<My_struct>();
+    var v2 = @member_name::<My_struct>(0u64, 1u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(12, 14, 12, 41),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_name requires 1 index parameter.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(13, 14, 13, 51),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_name requires 1 index parameter.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_name type argument must be a struct or union", "[Validation][Member_name]")
+    {
+        std::string_view const input = R"(module Test;
+
+enum My_enum
+{
+    A,
+}
+
+function run() -> ()
+{
+    var v0 = @member_name::<Int32>(0u64);
+    var v1 = @member_name::<My_enum>(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 14, 10, 41),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_name type argument must be a struct or union type.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(11, 14, 11, 43),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_name type argument must be a struct or union type.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_offset has only one type argument", "[Validation][Member_offset]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct My_struct
+{
+    a: Int32 = 0;
+}
+
+function run() -> ()
+{
+    var v1 = @member_offset(0u64);
+    var v2 = @member_offset::<My_struct, Int32>(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 14, 10, 34),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_offset requires only 1 type argument.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(11, 14, 11, 54),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_offset requires only 1 type argument.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_offset requires 1 index parameter", "[Validation][Member_offset]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct My_struct
+{
+    a: Int32 = 0;
+    b: Float32 = 0.0f32;
+}
+
+function run() -> ()
+{
+    var v0 = @member_offset::<My_struct>(0u64);
+    var v1 = @member_offset::<My_struct>();
+    var v2 = @member_offset::<My_struct>(0u64, 1u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(12, 14, 12, 43),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_offset requires 1 index parameter.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(13, 14, 13, 53),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_offset requires 1 index parameter.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @member_offset type argument must be a struct or union", "[Validation][Member_offset]")
+    {
+        std::string_view const input = R"(module Test;
+
+enum My_enum
+{
+    A,
+}
+
+function run() -> ()
+{
+    var v0 = @member_offset::<Int32>(0u64);
+    var v1 = @member_offset::<My_enum>(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 14, 10, 43),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_offset type argument must be a struct or union type.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(11, 14, 11, 45),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@member_offset type argument must be a struct or union type.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @type_name has only one type argument", "[Validation][Type_name]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run() -> ()
+{
+    var v0 = @type_name::<Int32>();
+    var v1 = @type_name();
+    var v2 = @type_name::<Int32, Float32>();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 14, 6, 26),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@type_name requires only 1 type argument.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(7, 14, 7, 44),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@type_name requires only 1 type argument.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @type_name does not have any parameters", "[Validation][Type_name]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run() -> ()
+{
+    var v0 = @type_name::<Int32>();
+    var v1 = @type_name::<Int32>(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 14, 6, 39),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@type_name does not have any parameters.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @get_type_kind has only one type argument", "[Validation][Get_type_kind]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run() -> ()
+{
+    var v0 = @get_type_kind::<Int32>();
+    var v1 = @get_type_kind();
+    var v2 = @get_type_kind::<Int32, Float32>();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 14, 6, 30),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@get_type_kind requires only 1 type argument.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(7, 14, 7, 48),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@get_type_kind requires only 1 type argument.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @get_type_kind does not have any parameters", "[Validation][Get_type_kind]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run() -> ()
+{
+    var v0 = @get_type_kind::<Int32>();
+    var v1 = @get_type_kind::<Int32>(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 14, 6, 43),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@get_type_kind does not have any parameters.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
 }

@@ -3578,6 +3578,129 @@ namespace iris::compiler
                 };
             }
         }
+        else if (expression.name == "member_count")
+        {
+            if (expression.type_arguments.size() != 1)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format("@{} requires only 1 type argument.", expression.name)
+                    )
+                };
+            }
+
+            if (expression.arguments.size() != 0)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format("@{} does not have any parameters.", expression.name)
+                    )
+                };
+            }
+
+            if (!std::holds_alternative<iris::Parameter_type>(expression.type_arguments[0].data))
+            {
+                std::optional<Declaration> const declaration = find_declaration(
+                    parameters.declaration_database,
+                    expression.type_arguments[0]
+                );
+                if (!declaration.has_value() ||
+                    (!std::holds_alternative<Struct_declaration const*>(declaration.value().data) &&
+                     !std::holds_alternative<Union_declaration const*>(declaration.value().data)))
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format("@{} type argument must be a struct or union type.", expression.name)
+                        )
+                    };
+                }
+            }
+        }
+        else if (
+            expression.name == "member_type" ||
+            expression.name == "member_name" ||
+            expression.name == "member_offset")
+        {
+            if (expression.type_arguments.size() != 1)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format("@{} requires only 1 type argument.", expression.name)
+                    )
+                };
+            }
+
+            if (expression.arguments.size() != 1)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format("@{} requires 1 index parameter.", expression.name)
+                    )
+                };
+            }
+
+            if (!std::holds_alternative<iris::Parameter_type>(expression.type_arguments[0].data))
+            {
+                std::optional<Declaration> const declaration = find_declaration(
+                    parameters.declaration_database,
+                    expression.type_arguments[0]
+                );
+                if (!declaration.has_value() ||
+                    (!std::holds_alternative<Struct_declaration const*>(declaration.value().data) &&
+                     !std::holds_alternative<Union_declaration const*>(declaration.value().data)))
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format("@{} type argument must be a struct or union type.", expression.name)
+                        )
+                    };
+                }
+            }
+        }
+        else if (expression.name == "type_name" || expression.name == "get_type_kind")
+        {
+            if (expression.type_arguments.size() != 1)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format("@{} requires only 1 type argument.", expression.name)
+                    )
+                };
+            }
+
+            if (expression.arguments.size() != 0)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format("@{} does not have any parameters.", expression.name)
+                    )
+                };
+            }
+        }
 
         return {};
     }
