@@ -3368,10 +3368,11 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator = parameters.temporaries_allocator;
 
         Value_and_type const left_hand_side = create_loaded_expression_value(expression.expression.expression_index, statement, parameters);
-        if (!left_hand_side.type.has_value() || !std::holds_alternative<Function_pointer_type>(left_hand_side.type.value().data))
+        std::optional<Type_reference> const resolved_lhs_type = left_hand_side.type.has_value() ? get_underlying_type(parameters.declaration_database, left_hand_side.type.value()) : std::nullopt;
+        if (!resolved_lhs_type.has_value() || !std::holds_alternative<Function_pointer_type>(resolved_lhs_type.value().data))
             throw std::runtime_error{ format_error(std::format("Left hand side of call expression is not a function!"), parameters.source_position) };
 
-        Function_pointer_type const& function_pointer_type = std::get<Function_pointer_type>(left_hand_side.type.value().data);
+        Function_pointer_type const& function_pointer_type = std::get<Function_pointer_type>(resolved_lhs_type.value().data);
 
         llvm::FunctionType* const llvm_function_type = convert_to_llvm_function_type(
             parameters.clang_module_data,

@@ -4742,6 +4742,37 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Function Pointers through Alias", "[LLVM_IR]")
+  {
+    char const* const input_file = "function_pointer_through_alias.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define void @Function_pointer_through_alias_run() #0 {
+entry:
+  %system = alloca ptr, align 8
+  store ptr @Function_pointer_through_alias_foo, ptr %system, align 8
+  %0 = load ptr, ptr %system, align 8
+  call void %0()
+  ret void
+}
+
+; Function Attrs: convergent
+define private void @Function_pointer_through_alias_foo() #0 {
+entry:
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Function Pointers through Globals", "[LLVM_IR]")
   {
     char const* const input_file = "function_pointer_through_global.iris";
