@@ -803,6 +803,39 @@ function run(view: Soa_array_view::<Particle>, mutable_view: Soa_array_view::<mu
     }
 
 
+    TEST_CASE("Validates that Soa_array_view with generic element type can be assigned as member when instantiating type constructor", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Test_archetype_a
+{
+    x: Float32 = 0.0f32;
+}
+
+type_constructor Archetypes(T: Type)
+{
+    return struct
+    {
+        a: Soa_array_view::<mutable T>;
+    };
+}
+
+using Test_archetypes = Archetypes::<Test_archetype_a>;
+
+function run(view: Soa_array_view::<mutable Test_archetype_a>) -> (result: Test_archetypes)
+{
+    return {
+        a: view,
+    };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+
     TEST_CASE("Validates that struct member names are different from each other", "[Validation][Struct]")
     {
         std::string_view const input = R"(module Test;

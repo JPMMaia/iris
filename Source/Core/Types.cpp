@@ -803,6 +803,15 @@ namespace iris
                         return false;
                 }
             }
+            else if (std::holds_alternative<Soa_array_view_type>(type_reference.data))
+            {
+                Soa_array_view_type& soa_array_view_type = std::get<Soa_array_view_type>(type_reference.data);
+                for (Type_reference& value_type : soa_array_view_type.value_type)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(value_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+            }
             else if (std::holds_alternative<Type_instance>(type_reference.data))
             {
                 Type_instance& type_instance = std::get<Type_instance>(type_reference.data);
