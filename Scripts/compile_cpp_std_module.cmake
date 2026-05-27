@@ -17,6 +17,8 @@ if (MSVC)
     set(STD_IFC ${STD_MODULE_OUT}/std.ifc)
     set(STD_COMPAT_IFC ${STD_MODULE_OUT}/std_compat.ifc)
 
+    set(STD_OBJ ${STD_MODULE_OUT}/std.obj)
+    set(STD_COMPAT_OBJ ${STD_MODULE_OUT}/std_compat.obj)
 
     set(STD_COMPILE_OPTIONS "/std:c++latest" "/EHsc" "/nologo" "/D_SCL_SECURE_NO_WARNINGS")
 
@@ -31,24 +33,26 @@ if (MSVC)
     endif ()
 
     add_custom_command(
-        OUTPUT ${STD_IFC}
+        OUTPUT ${STD_IFC} ${STD_OBJ}
         COMMAND ${CMAKE_CXX_COMPILER}
             ${STD_COMPILE_OPTIONS}
             /c
             "$ENV{VCToolsInstallDir}/modules/std.ixx"
             /ifcOutput ${STD_IFC}
+            /Fo${STD_OBJ}
         DEPENDS "$ENV{VCToolsInstallDir}/modules/std.ixx"
         COMMENT "Building std module interface"
     )
 
     add_custom_command(
-        OUTPUT ${STD_COMPAT_IFC}
+        OUTPUT ${STD_COMPAT_IFC} ${STD_COMPAT_OBJ}
         COMMAND ${CMAKE_CXX_COMPILER}
             ${STD_COMPILE_OPTIONS}
             "/reference \"std=${STD_IFC}\""
             /c
             "$ENV{VCToolsInstallDir}/modules/std.compat.ixx"
             /ifcOutput ${STD_COMPAT_IFC}
+            /Fo${STD_COMPAT_OBJ}
         DEPENDS
             "$ENV{VCToolsInstallDir}/modules/std.compat.ixx"
             "${STD_IFC}"
@@ -65,6 +69,9 @@ if (MSVC)
     target_compile_options(std_module INTERFACE "SHELL:/reference std.compat=${STD_COMPAT_IFC}")
 
     add_dependencies(std_module std_module_custom_target)
+
+    target_link_libraries(std_module INTERFACE "${STD_OBJ}" "${STD_COMPAT_OBJ}")
+
 elseif (UNIX AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     
     set(STD_MODULE_OUT ${CMAKE_BINARY_DIR}/std_modules_clang)
