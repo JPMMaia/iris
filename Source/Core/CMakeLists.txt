@@ -1,4 +1,4 @@
-add_library(Iris_core)
+add_library(Iris_core SHARED)
 add_library(Iris::Core ALIAS Iris_core)
 
 target_link_libraries(Iris_core PUBLIC std_module)
@@ -42,3 +42,6 @@ else()
 endif()
 
 add_dependencies(Iris_core Generate_h_core_expressions_visitor)
+
+target_generate_module_exports(Iris_core)
+install(TARGETS Iris_core)

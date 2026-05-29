@@ -11,7 +11,7 @@
 				"name": "Generate JSON serializer",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/Debug/Iris_Tools_Generate_JSON.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/Iris_Tools_Generate_JSON.exe",
 				"args": [
 					"serialize_json_code",
 					"${workspaceFolder}/Source/Core/Core.cppm",
@@ -23,7 +23,7 @@
 				"name": "Generate JSON operators",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/code_generator/Debug/Iris_Tools_Generate_JSON.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/Iris_Tools_Generate_JSON.exe",
 				"args": [
 					"operators",
 					"${workspaceFolder}/Source/Core/Core.cppm",
@@ -35,9 +35,9 @@
 				"name": "Replace Compiler Tests",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Tools/tests_result_replacer/Debug/Iris_Tools_Replace_tests_results.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/Iris_Tools_Replace_tests_results.exe",
 				"args": [
-					"${workspaceFolder}/build/Source/Compiler/Debug/Iris_compiler_tests.exe",
+					"${workspaceFolder}/build/bin/Debug/Iris_compiler_tests.exe",
 					"${workspaceFolder}/Source/Compiler/Compiler.tests.cpp",
 				],
 				"cwd": "${workspaceFolder}"
@@ -46,7 +46,7 @@
 				"name": "C Header Importer tests",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Interoperability/Debug/Iris_c_header_importer_tests.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/Iris_c_header_importer_tests.exe",
 				"args": [],
 				"cwd": "${workspaceFolder}",
 			},
@@ -54,7 +54,7 @@
 				"name": "iris build rts-game",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/iris.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
 				"args": [
 					"build",
 					"game"
@@ -65,7 +65,7 @@
 				"name": "iris build-tests rts-game",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/iris.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
 				"args": [
 					"build-tests",
 					"game"
@@ -87,7 +87,7 @@
 				"name": "iris import-c-header",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/iris.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
 				"args": [
 					"import-c-header",
 					"c.complex",
@@ -100,7 +100,7 @@
 				"name": "iris print-struct-layout",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/iris.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
 				"args": [
 					"print-struct-layout",
 					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/no_artifact/code_lens_0.generated.irisb",
@@ -112,7 +112,7 @@
 				"name": "iris generate-compile-commands rts-game",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Builder/Debug/iris.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
 				"args": [
 					"generate-compile-commands",
 					"--artifact-file=${workspaceFolder}/../rts-game/source/game/iris_artifact.json",
@@ -129,7 +129,7 @@
 				"name": "Run Language Server",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Language_server/Debug/iris_language_server.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/iris_language_server.exe",
 				"args": [],
 				"cwd": "${workspaceFolder}/build"
 			},
@@ -137,7 +137,7 @@
 				"name": "Attach to Language Server",
 				"type": "cppvsdbg",
 				"request": "attach",
-				"program": "${workspaceFolder}/build/Source/Language_server/iris_language_server"
+				"program": "${workspaceFolder}/build/bin/Debug/iris_language_server.exe"
 			},
 			{
 				"name": "Run Language Client",
@@ -156,7 +156,7 @@
 				],
 				"env": {
 					"mode": "debug",
-					"iris_language_server": "${workspaceFolder}/build/Source/Language_server/Debug/iris_language_server.exe"
+					"iris_language_server": "${workspaceFolder}/build/bin/Debug/iris_language_server.exe"
 				}
 			},
 			{
@@ -170,14 +170,14 @@
 				"preLaunchTask": "Build Language Client and Server",
 				"env": {
 					"mode": "debug",
-					"iris_language_server": "${workspaceFolder}/build/Source/Language_server/Debug/iris_language_server.exe"
+					"iris_language_server": "${workspaceFolder}/build/bin/Debug/iris_language_server.exe"
 				}
 			},
 			{
 				"name": "Compiler Tests",
 				"type": "cppvsdbg",
 				"request": "launch",
-				"program": "${workspaceFolder}/build/Source/Compiler/Debug/Iris_compiler_tests.exe",
+				"program": "${workspaceFolder}/build/bin/Debug/Iris_compiler_tests.exe",
 				"args": [
 					"[JIT]"
 				],
@@ -205,7 +205,7 @@
 				],
 				"preLaunchTask": "Build Language Client",
 				"env": {
-					"iris_language_server": "${workspaceFolder}/build/Source/Language_server/Debug/iris_language_server.exe"
+					"iris_language_server": "${workspaceFolder}/build/bin/Debug/iris_language_server.exe"
 				}
 			},
 		],

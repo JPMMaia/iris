@@ -1,4 +1,4 @@
-add_library(Iris_C_header_importer)
+add_library(Iris_C_header_importer SHARED)
 add_library(Iris::C_header_importer ALIAS Iris_C_header_importer)
 
 target_compile_features(Iris_C_header_importer PUBLIC cxx_std_23)
@@ -40,6 +40,9 @@ target_sources(Iris_C_header_importer
       "C_macro_parser.cpp"
       "C_header_importer.cpp"
 )
+
+target_generate_module_exports(Iris_C_header_importer)
+install(TARGETS Iris_C_header_importer)
 
 if(BUILD_TESTING)
    find_package(Vulkan REQUIRED)
@@ -122,7 +125,7 @@ macro(Import_c_header)
 
 endmacro()
 
-add_library(Iris_C_header_exporter)
+add_library(Iris_C_header_exporter SHARED)
 add_library(Iris::C_header_exporter ALIAS Iris_C_header_exporter)
 
 target_compile_features(Iris_C_header_exporter PUBLIC cxx_std_23)
@@ -136,6 +139,9 @@ target_sources(Iris_C_header_exporter
    PRIVATE
       "C_header_exporter.cpp"
 )
+
+target_generate_module_exports(Iris_C_header_exporter)
+install(TARGETS Iris_C_header_exporter)
 
 if(BUILD_TESTING)
    add_executable(Iris_C_header_exporter_tests)

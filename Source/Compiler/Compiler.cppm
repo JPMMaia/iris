@@ -14,6 +14,13 @@ namespace iris::compiler
 {
     export struct Optimization_managers
     {
+        Optimization_managers() = default;
+        Optimization_managers(Optimization_managers&&) = default;
+        Optimization_managers& operator=(Optimization_managers&&) = default;
+        Optimization_managers(Optimization_managers const&) = delete;
+        Optimization_managers& operator=(Optimization_managers const&) = delete;
+        ~Optimization_managers();
+
         std::unique_ptr<llvm::LoopAnalysisManager> loop_analysis_manager;
         std::unique_ptr<llvm::FunctionAnalysisManager> function_analysis_manager;
         std::unique_ptr<llvm::CGSCCAnalysisManager> cgscc_analysis_manager;
@@ -23,6 +30,21 @@ namespace iris::compiler
 
     export struct LLVM_data
     {
+        LLVM_data(
+            llvm::Triple target_triple,
+            llvm::Target const* target,
+            llvm::TargetMachine* target_machine,
+            llvm::DataLayout data_layout,
+            std::unique_ptr<llvm::LLVMContext> context,
+            Optimization_managers optimization_managers,
+            std::unique_ptr<Clang_data, void(*)(Clang_data*)> clang_data
+        );
+        LLVM_data(LLVM_data&&) = default;
+        LLVM_data& operator=(LLVM_data&&) = default;
+        LLVM_data(LLVM_data const&) = delete;
+        LLVM_data& operator=(LLVM_data const&) = delete;
+        ~LLVM_data();
+
         llvm::Triple target_triple;
         llvm::Target const* target;
         llvm::TargetMachine* target_machine;

@@ -19,6 +19,7 @@ if(WIN32)
       PRIVATE
       clangBasic
       clangCodeGen
+      clangDriver
       libclang
    )
 else()
@@ -41,8 +42,8 @@ if (WIN32)
    add_custom_command(
       TARGET clang_target
       POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG_CL} ${CMAKE_BINARY_DIR}/Source/Compiler/$<CONFIG>/clang-cl.exe
-      COMMAND ${CMAKE_COMMAND} -DPROGRAM="${PROGRAM_CLANG_CL}" -DDESTINATION="${CMAKE_BINARY_DIR}/Source/Compiler" -P "${CMAKE_SOURCE_DIR}/Scripts/copy_runtime_dependencies.cmake"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG_CL} ${CMAKE_BINARY_DIR}/bin/$<CONFIG>/clang-cl.exe
+      COMMAND ${CMAKE_COMMAND} -DPROGRAM="${PROGRAM_CLANG_CL}" -DDESTINATION="${CMAKE_BINARY_DIR}/bin/$<CONFIG>" -P "${CMAKE_SOURCE_DIR}/Scripts/copy_runtime_dependencies.cmake"
    )
 else()
    find_program(PROGRAM_CLANG "clang++" REQUIRED)

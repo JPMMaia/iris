@@ -10,42 +10,6 @@ import iris.common;
 
 namespace iris
 {
-    bool operator==(Statement const& lhs, Statement const& rhs)
-    {
-        if (lhs.expressions.size() != rhs.expressions.size())
-            return false;
-
-        for (std::size_t index = 0; index < lhs.expressions.size(); ++index)
-        {
-            if (!(lhs.expressions[index] == rhs.expressions[index]))
-                return false;
-        }
-
-        return true;
-    }
-    
-    bool operator==(Expression const& lhs, Expression const& rhs)
-    {
-        return lhs.data == rhs.data;
-    }
-
-    bool operator==(Type_reference const& lhs, Type_reference const& rhs)
-    {
-        return lhs.data == rhs.data;
-    }
-
-    bool operator==(Import_module_with_alias const& lhs, Import_module_with_alias const& rhs)
-    {
-        return lhs.module_name == rhs.module_name &&
-               lhs.alias == rhs.alias;
-    }
-
-    bool operator==(Function_condition const& lhs, Function_condition const& rhs)
-    {
-        return lhs.description == rhs.description &&
-               lhs.condition == rhs.condition;
-    }
-
     // Comparison operator for sorting Source_range_location objects
     bool operator<(Source_range_location const& lhs, Source_range_location const& rhs) noexcept
     {

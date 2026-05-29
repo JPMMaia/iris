@@ -1,6 +1,6 @@
 add_subdirectory("tree-sitter-iris")
 
-add_library(Iris_parser)
+add_library(Iris_parser SHARED)
 add_library(Iris::Parser ALIAS Iris_parser)
 
 set_target_properties(Iris_parser PROPERTIES OUTPUT_NAME "iris_parser_lib")
@@ -33,6 +33,8 @@ target_sources(Iris_parser
       "Type_name_parser.cpp"
 )
 
+target_generate_module_exports(Iris_parser)
+install(TARGETS Iris_parser)
 
 add_executable(Iris_parser_executable)
 add_executable(Iris::Parser_executable ALIAS Iris_parser_executable)

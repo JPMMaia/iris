@@ -1,11 +1,11 @@
-add_library(Iris_language_server)
+add_library(Iris_language_server SHARED)
 add_library(Iris::Language_server ALIAS Iris_language_server)
 
 set_target_properties(Iris_language_server PROPERTIES OUTPUT_NAME "iris_language_server_lib")
 
 target_compile_features(Iris_language_server PUBLIC cxx_std_23)
 
-target_link_libraries(Iris_language_server PUBLIC Iris::Common Iris::Compiler)
+target_link_libraries(Iris_language_server PUBLIC Iris::Common Iris::Core Iris::Compiler Iris::Parser)
 
 target_link_libraries(Iris_language_server PRIVATE lsp)
 
@@ -42,6 +42,9 @@ target_sources(Iris_language_server
       "Server.cpp"
       "Signature_help.cpp"
 )
+
+target_generate_module_exports(Iris_language_server)
+install(TARGETS Iris_language_server)
 
 
 add_executable(Iris_language_server_app)

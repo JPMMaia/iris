@@ -6,7 +6,7 @@ set_target_properties(Iris_builder_executable PROPERTIES OUTPUT_NAME "iris")
 target_compile_features(Iris_builder_executable PRIVATE cxx_std_23)
 target_link_libraries(Iris_builder_executable PUBLIC std_module)
 
-target_link_libraries(Iris_builder_executable PRIVATE Iris::Compiler)
+target_link_libraries(Iris_builder_executable PRIVATE Iris::Common Iris::Compiler Iris::C_header_importer Iris::Parser)
 
 
 find_package(argparse CONFIG REQUIRED)

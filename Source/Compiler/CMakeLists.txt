@@ -1,4 +1,4 @@
-add_library(Iris_compiler)
+add_library(Iris_compiler SHARED)
 add_library(Iris::Compiler ALIAS Iris_compiler)
 
 target_compile_features(Iris_compiler PRIVATE cxx_std_23)
@@ -84,6 +84,9 @@ else()
       "Project/Target_linux.cpp"
    )
 endif()
+
+target_generate_module_exports(Iris_compiler)
+install(TARGETS Iris_compiler)
 
 if(BUILD_TESTING)
    find_package(Catch2 CONFIG REQUIRED)

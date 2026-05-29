@@ -4,6 +4,13 @@ cmake_policy(SET CMP0207 NEW)
 
 project(Iris LANGUAGES C CXX)
 
+if(MSVC)
+    add_link_options($<$<CONFIG:Debug>:/DEBUG:FASTLINK>)
+endif()
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -14,6 +21,7 @@ include(InstallRequiredSystemLibraries)
 
 include("Scripts/compile_cxx_header_unit.cmake")
 include("Scripts/compile_cpp_std_module.cmake")
+include("Scripts/module_exports.cmake")
 
 include(CTest)
 

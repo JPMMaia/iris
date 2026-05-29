@@ -250,7 +250,6 @@ namespace iris
     };
 
 
-
     export struct Indexed_comment
     {
         std::uint64_t index;
@@ -267,7 +266,6 @@ namespace iris
 
         friend bool operator==(Statement const& lhs, Statement const& rhs);
     };
-
 
     export enum class Global_variable_type
     {
@@ -1035,4 +1033,40 @@ namespace iris
     export std::optional<Source_position> get_statement_source_position(
         iris::Statement const& statement
     );
+
+    export inline bool operator==(Type_reference const& lhs, Type_reference const& rhs)
+    {
+        return lhs.data == rhs.data;
+    }
+
+    export inline bool operator==(Function_condition const& lhs, Function_condition const& rhs)
+    {
+        return lhs.description == rhs.description &&
+               lhs.condition == rhs.condition;
+    }
+
+    export inline bool operator==(Statement const& lhs, Statement const& rhs)
+    {
+        if (lhs.expressions.size() != rhs.expressions.size())
+            return false;
+
+        for (std::size_t index = 0; index < lhs.expressions.size(); ++index)
+        {
+            if (!(lhs.expressions[index] == rhs.expressions[index]))
+                return false;
+        }
+
+        return true;
+    }
+
+    export inline bool operator==(Expression const& lhs, Expression const& rhs)
+    {
+        return lhs.data == rhs.data;
+    }
+
+    export inline bool operator==(Import_module_with_alias const& lhs, Import_module_with_alias const& rhs)
+    {
+        return lhs.module_name == rhs.module_name &&
+                lhs.alias == rhs.alias;
+    }
 }

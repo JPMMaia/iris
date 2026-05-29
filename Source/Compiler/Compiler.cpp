@@ -39,6 +39,28 @@ namespace iris::compiler
 {
     static constexpr bool g_debug = false;
 
+    Optimization_managers::~Optimization_managers() = default;
+
+    LLVM_data::LLVM_data(
+        llvm::Triple target_triple,
+        llvm::Target const* target,
+        llvm::TargetMachine* target_machine,
+        llvm::DataLayout data_layout,
+        std::unique_ptr<llvm::LLVMContext> context,
+        Optimization_managers optimization_managers,
+        std::unique_ptr<Clang_data, void(*)(Clang_data*)> clang_data
+    ) :
+        target_triple(std::move(target_triple)),
+        target(target),
+        target_machine(target_machine),
+        data_layout(std::move(data_layout)),
+        context(std::move(context)),
+        optimization_managers(std::move(optimization_managers)),
+        clang_data(std::move(clang_data))
+    {
+    }
+    LLVM_data::~LLVM_data() = default;
+
     template<typename T>
     std::pmr::vector<T const*> get_deque_element_pointers(
         std::pmr::deque<T> const& elements,
@@ -1350,23 +1372,22 @@ namespace iris::compiler
             options.is_optimized ? 2 : 0
         );
 
-        return LLVM_data
-        {
-            .target_triple = std::move(target_triple),
-            .target = &target,
-            .target_machine = target_machine,
-            .data_layout = std::move(llvm_data_layout),
-            .context = std::move(llvm_context),
-            .optimization_managers =
-            {
-                .loop_analysis_manager = std::move(loop_analysis_manager),
-                .function_analysis_manager = std::move(function_analysis_manager),
-                .cgscc_analysis_manager = std::move(cgscc_analysis_manager),
-                .module_analysis_manager = std::move(module_analysis_manager),
-                .module_pass_manager = std::move(module_pass_manager),
-            },
-            .clang_data = std::move(clang_data),
-        };
+        Optimization_managers opt_managers;
+        opt_managers.loop_analysis_manager = std::move(loop_analysis_manager);
+        opt_managers.function_analysis_manager = std::move(function_analysis_manager);
+        opt_managers.cgscc_analysis_manager = std::move(cgscc_analysis_manager);
+        opt_managers.module_analysis_manager = std::move(module_analysis_manager);
+        opt_managers.module_pass_manager = std::move(module_pass_manager);
+
+        return LLVM_data(
+            std::move(target_triple),
+            &target,
+            target_machine,
+            std::move(llvm_data_layout),
+            std::move(llvm_context),
+            std::move(opt_managers),
+            std::move(clang_data)
+        );
     }
 
     std::pmr::vector<iris::Module const*> sort_core_modules(

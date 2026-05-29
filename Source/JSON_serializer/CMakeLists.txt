@@ -1,4 +1,4 @@
-add_library(Iris_JSON_serializer)
+add_library(Iris_JSON_serializer SHARED)
 add_library(Iris::JSON_serializer ALIAS Iris_JSON_serializer)
 
 target_compile_features(Iris_JSON_serializer PUBLIC cxx_std_23)
@@ -16,6 +16,9 @@ target_sources(Iris_JSON_serializer
             "JSON_serializer.cppm"
             "Operators.cppm"
 )
+
+target_generate_module_exports(Iris_JSON_serializer)
+install(TARGETS Iris_JSON_serializer)
 
 
 if(BUILD_TESTING)
