@@ -811,7 +811,11 @@ namespace iris::compiler
             std::size_t const source_node_index = module_name_to_node_index.at(core_module.name);
             for (iris::Import_module_with_alias const& import_module : core_module.dependencies.alias_imports)
             {
-                std::size_t const destination_node_index = module_name_to_node_index.at(import_module.module_name);
+                auto const location = module_name_to_node_index.find(import_module.module_name);
+                if (location == module_name_to_node_index.end())
+                    throw std::runtime_error{ std::format("Could not find '{}' import module.", import_module.module_name) };
+
+                std::size_t const destination_node_index = location->second;
                 edges.insert(std::make_pair(source_node_index, destination_node_index));
             }
         }
