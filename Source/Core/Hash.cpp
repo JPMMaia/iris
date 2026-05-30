@@ -145,6 +145,11 @@ namespace iris
 
             update_hash(state, &data.size, sizeof(data.size));
         }
+        else if (std::holds_alternative<iris::Decimal_type>(type_reference.data))
+        {
+            iris::Decimal_type const& data = std::get<iris::Decimal_type>(type_reference.data);
+            update_hash(state, &data.scale, sizeof(data.scale));
+        }
         else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
         {
             iris::Custom_type_reference const& data = std::get<iris::Custom_type_reference>(type_reference.data);
