@@ -2203,7 +2203,7 @@ namespace iris::compiler
 
             auto const location = std::find_if(function_constructor.parameters.begin(), function_constructor.parameters.end(), is_parameter);
             if (location == function_constructor.parameters.end())
-                throw std::runtime_error{ std::format("Could not find parameter type '{}'", value.name) };
+                return;
             
             std::size_t const parameter_index = std::distance(function_constructor.parameters.begin(), location);
             deduced_parameters[parameter_index] = argument_type;
@@ -2317,7 +2317,7 @@ namespace iris::compiler
                 declaration_database
             );
             if (!argument_type.has_value())
-                throw std::runtime_error("Argument type is not valid.");
+                return std::nullopt;
 
             std::size_t const output_argument_index = implicit_first_argument_type.has_value() ? argument_index + 1 : argument_index;
             argument_types[output_argument_index] = argument_type.value();
@@ -2387,7 +2387,7 @@ namespace iris::compiler
             }
         }
 
-        throw std::runtime_error("Could not deduce instance call arguments.");
+        return std::nullopt;
     }
 
     std::pmr::vector<Function_expression const*> get_all_possible_function_expressions(
