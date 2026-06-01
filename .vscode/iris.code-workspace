@@ -232,19 +232,6 @@
 	},
 	"tasks": {
 		"version": "2.0.0",
-		"windows": {
-			"options": {
-				"shell": {
-					"executable": "cmd.exe",
-					"args": [
-						"/c",
-						"\"C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/VsDevCmd.bat\"",
-						"-arch=x64",
-						"&"
-					]
-				}
-			}
-		},
 		"tasks": [
 			{
 				"label": "Package VSCode Extension",
@@ -509,18 +496,6 @@
 			}
 		],
 		"editor.formatOnSave": false,
-		"terminal.integrated.profiles.windows": {
-			"Powershell + VsDevEnv": {
-				"source": "PowerShell",
-				"args": [
-					"-NoExit",
-					"-File",
-					"${workspaceFolder}/Scripts/Enter-VsDevEnv.ps1"
-				]
-			}
-		},
-		"terminal.integrated.defaultProfile.windows": "Powershell + VsDevEnv",
-		"terminal.integrated.shellIntegration.enabled": true,
 		"C_Cpp.default.cppStandard": "c++23",
 		"C_Cpp.default.cStandard": "c23",
 		"C_Cpp.default.compileCommands": [
