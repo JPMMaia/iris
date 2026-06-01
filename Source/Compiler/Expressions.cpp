@@ -1741,6 +1741,23 @@ namespace iris::compiler
         std::optional<Type_reference> const underling_type = get_underlying_type(declaration_database, left_hand_side.type.value());
         Type_reference const& type = underling_type.has_value() ? underling_type.value() : left_hand_side.type.value();
 
+        auto const create_bool_value = [&llvm_builder](llvm::Value* condition_value) -> Value_and_type
+        {
+            llvm::Value* result_value = condition_value;
+            if (condition_value->getType()->isIntegerTy() && !condition_value->getType()->isIntegerTy(1))
+            {
+                llvm::Value* const zero_value = llvm::ConstantInt::get(condition_value->getType(), 0);
+                result_value = llvm_builder.CreateICmpNE(condition_value, zero_value);
+            }
+
+            return Value_and_type
+            {
+                .name = "",
+                .value = result_value,
+                .type = create_bool_type_reference()
+            };
+        };
+
         switch (operation)
         {
         case Binary_operation::Add: {
@@ -2161,18 +2178,24 @@ namespace iris::compiler
             break;
         }
         case Binary_operation::Logical_and: {
+            Value_and_type const left_bool_value = create_bool_value(left_hand_side.value);
+            Value_and_type const right_bool_value = create_bool_value(right_hand_side.value);
+
             return Value_and_type
             {
                 .name = "",
-                .value = llvm_builder.CreateAnd(left_hand_side.value, right_hand_side.value),
+                .value = llvm_builder.CreateAnd(left_bool_value.value, right_bool_value.value),
                 .type = create_bool_type_reference()
             };
         }
         case Binary_operation::Logical_or: {
+            Value_and_type const left_bool_value = create_bool_value(left_hand_side.value);
+            Value_and_type const right_bool_value = create_bool_value(right_hand_side.value);
+
             return Value_and_type
             {
                 .name = "",
-                .value = llvm_builder.CreateOr(left_hand_side.value, right_hand_side.value),
+                .value = llvm_builder.CreateOr(left_bool_value.value, right_bool_value.value),
                 .type = create_bool_type_reference()
             };
         }

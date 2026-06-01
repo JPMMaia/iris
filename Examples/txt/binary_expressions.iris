@@ -44,6 +44,9 @@ export function boolean_operations(
     var not_equal = first_boolean != second_boolean;
     var logical_and = first_boolean && second_boolean;
     var logical_or = first_boolean || second_boolean;
+    var mix = first_boolean && first_boolean == second_boolean;
+    var mix_0 = first_boolean || first_boolean != second_boolean;
+    var mix_1 = (first_boolean == second_boolean) && first_boolean;
 }
 
 export function float32_operations(

@@ -1092,8 +1092,11 @@ entry:
   %second_boolean = alloca i8, align 1
   %equal = alloca i1, align 1
   %not_equal = alloca i1, align 1
-  %logical_and = alloca i8, align 1
-  %logical_or = alloca i8, align 1
+  %logical_and = alloca i1, align 1
+  %logical_or = alloca i1, align 1
+  %mix = alloca i1, align 1
+  %mix_0 = alloca i1, align 1
+  %mix_1 = alloca i1, align 1
   %0 = zext i1 %"arguments[0].first_boolean" to i8
   store i8 %0, ptr %first_boolean, align 1
   %1 = zext i1 %"arguments[1].second_boolean" to i8
@@ -1108,12 +1111,37 @@ entry:
   store i1 %7, ptr %not_equal, align 1
   %8 = load i8, ptr %first_boolean, align 1
   %9 = load i8, ptr %second_boolean, align 1
-  %10 = and i8 %8, %9
-  store i8 %10, ptr %logical_and, align 1
-  %11 = load i8, ptr %first_boolean, align 1
-  %12 = load i8, ptr %second_boolean, align 1
-  %13 = or i8 %11, %12
-  store i8 %13, ptr %logical_or, align 1
+  %10 = icmp ne i8 %8, 0
+  %11 = icmp ne i8 %9, 0
+  %12 = and i1 %10, %11
+  store i1 %12, ptr %logical_and, align 1
+  %13 = load i8, ptr %first_boolean, align 1
+  %14 = load i8, ptr %second_boolean, align 1
+  %15 = icmp ne i8 %13, 0
+  %16 = icmp ne i8 %14, 0
+  %17 = or i1 %15, %16
+  store i1 %17, ptr %logical_or, align 1
+  %18 = load i8, ptr %first_boolean, align 1
+  %19 = load i8, ptr %first_boolean, align 1
+  %20 = load i8, ptr %second_boolean, align 1
+  %21 = icmp eq i8 %19, %20
+  %22 = icmp ne i8 %18, 0
+  %23 = and i1 %22, %21
+  store i1 %23, ptr %mix, align 1
+  %24 = load i8, ptr %first_boolean, align 1
+  %25 = load i8, ptr %first_boolean, align 1
+  %26 = load i8, ptr %second_boolean, align 1
+  %27 = icmp ne i8 %25, %26
+  %28 = icmp ne i8 %24, 0
+  %29 = or i1 %28, %27
+  store i1 %29, ptr %mix_0, align 1
+  %30 = load i8, ptr %first_boolean, align 1
+  %31 = load i8, ptr %second_boolean, align 1
+  %32 = icmp eq i8 %30, %31
+  %33 = load i8, ptr %first_boolean, align 1
+  %34 = icmp ne i8 %33, 0
+  %35 = and i1 %32, %34
+  store i1 %35, ptr %mix_1, align 1
   ret void
 }
 
