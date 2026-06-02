@@ -8,6 +8,7 @@
 #include <lsp/types.h>
 
 import iris.common;
+import iris.common.filesystem_common;
 import iris.compiler;
 import iris.language_server.server;
 
@@ -28,6 +29,7 @@ namespace iris::language_server
     {
         std::filesystem::path const workspace_directory = create_clean_temporary_directory("iris_language_server_presets_workspace");
         std::filesystem::path const dependency_directory = workspace_directory / "dependency";
+        std::filesystem::path const standard_repository_path = iris::common::get_standard_repository_file_path();
         std::filesystem::path const build_directory = workspace_directory / "preset_build";
         std::filesystem::create_directories(dependency_directory);
 
@@ -117,6 +119,7 @@ export function main() -> (result: Int32)
                 R"({{
     "build_directory": "preset_build",
     "repository_paths": [
+        "{}",
         "iris_repository.json"
     ],
     "function_contracts": "disabled",
@@ -125,6 +128,7 @@ export function main() -> (result: Int32)
         "PROJECT_ROOT": "{}"
     }}
 }})",
+                standard_repository_path.generic_string(),
                 workspace_directory.generic_string()
             )
         );
@@ -161,7 +165,7 @@ export function main() -> (result: Int32)
         std::string const actual_project_root = workspace_data.builder.environment_variables.at("PROJECT_ROOT").c_str();
         std::string const expected_project_root = workspace_directory.generic_string();
         CHECK(actual_project_root == expected_project_root);
-        CHECK(workspace_data.builder.repositories.size() == 1);
+        CHECK(workspace_data.builder.repositories.size() >= 2);
         CHECK(
             std::ranges::find(
                 workspace_data.core_module_source_file_paths,
