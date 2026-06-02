@@ -72,6 +72,10 @@ if(BUILD_TESTING)
    target_sources(Iris_language_server_tests PRIVATE
       "Server.tests.cpp"
       "Signature_help.tests.cpp"
+      "Inlay_hints.tests.cpp"
+      "Go_to_location.tests.cpp"
+      "Completion.tests.cpp"
+      "Hover.tests.cpp"
    )
 
    include(Catch)

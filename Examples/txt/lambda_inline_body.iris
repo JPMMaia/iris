@@ -1,0 +1,9 @@
+module Lambda_inline_body;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var cmp = lambda(a, b) => a - b;
+    var mapper = lambda(x) => x * 2;
+}

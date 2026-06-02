@@ -168,4 +168,14 @@ if(BUILD_TESTING)
    )
    catch_discover_tests(Iris_compiler_tests)
 
+   # Core Hash tests
+   add_executable(Iris_hash_tests)
+   target_link_libraries(Iris_hash_tests PRIVATE ${iris_test_link_libraries})
+   target_compile_definitions(Iris_hash_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_hash_tests PRIVATE
+      "main.tests.cpp"
+      "Hash.tests.cpp"
+   )
+   catch_discover_tests(Iris_hash_tests)
+
 endif()

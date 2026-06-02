@@ -224,6 +224,14 @@ namespace iris
         friend bool operator==(Parameter_type const&, Parameter_type const&) = default;
     };
 
+    export struct Lambda_type
+    {
+        std::pmr::vector<Type_reference> input_parameter_types;
+        std::pmr::vector<Type_reference> output_parameter_types;
+
+        friend bool operator==(Lambda_type const&, Lambda_type const&) = default;
+    };
+
     export struct Type_reference
     {
         using Data_type = std::variant<
@@ -235,6 +243,7 @@ namespace iris
             Fundamental_type,
             Function_pointer_type,
             Integer_type,
+            Lambda_type,
             Null_pointer_type,
             Parameter_type,
             Pointer_type,
@@ -392,6 +401,32 @@ namespace iris
         std::optional<std::pmr::vector<Source_position>> output_parameter_source_positions;
 
         friend bool operator==(Function_declaration const&, Function_declaration const&) = default;
+    };
+
+    export struct Lambda_declaration
+    {
+        std::pmr::string name;
+        std::optional<std::pmr::string> unique_name;
+        std::pmr::vector<Type_reference> input_parameter_types;
+        std::pmr::vector<Type_reference> output_parameter_types;
+        std::pmr::vector<std::pmr::string> input_parameter_names;
+        std::pmr::vector<std::pmr::string> output_parameter_names;
+        std::optional<std::pmr::string> comment;
+        std::optional<Source_range_location> source_location;
+
+        friend bool operator==(Lambda_declaration const&, Lambda_declaration const&) = default;
+    };
+
+    export struct Lambda_expression
+    {
+        std::pmr::vector<std::pmr::string> parameter_names;
+        std::pmr::vector<std::optional<Type_reference>> parameter_types;  // explicit types; nullopt = inferred
+        std::optional<Type_reference> return_type;  // explicit return type; nullopt = inferred
+        Statement body;  // either an inline expression or a block
+        std::optional<std::pmr::vector<std::pmr::string>> captured_variables;  // variables captured from outer scope
+        std::optional<Source_range> source_range;
+
+        friend bool operator==(Lambda_expression const&, Lambda_expression const&) = default;
     };
 
     export struct Function_definition
@@ -818,6 +853,7 @@ namespace iris
             If_expression,
             Instantiate_expression,
             Invalid_expression,
+            Lambda_expression,
             Null_pointer_expression,
             Parenthesis_expression,
             Reflection_expression,
@@ -916,6 +952,7 @@ namespace iris
         std::pmr::vector<Function_declaration> function_declarations;
         std::pmr::vector<Function_constructor> function_constructors;
         std::pmr::vector<Type_constructor> type_constructors;
+        std::pmr::vector<Lambda_declaration> lambda_declarations;
 
         friend bool operator==(Module_declarations const&, Module_declarations const&) = default;
     };

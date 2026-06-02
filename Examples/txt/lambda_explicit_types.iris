@@ -1,0 +1,10 @@
+module Lambda_explicit_types;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var mapper = lambda(x) -> Int32 => x * 2;
+    var identity = lambda(value: Int32) -> Int32  => value;
+    var cmp: Comparator = lambda(a: Int32, b: Int32) -> (result: Int32)  => a - b;
+}

@@ -1943,4 +1943,204 @@ struct maia_runtime_scene_Camera maia_runtime_scene_create_camera(void);
         REQUIRE(create_camera.type.output_parameter_types.size() == 1);
         CHECK(create_camera.type.output_parameter_types[0] == iris::create_custom_type_reference("maia.runtime.scene", "Camera"));
     }
+
+    iris::Lambda_declaration const& find_lambda_declaration(iris::Module const& header_module, std::string_view const name)
+    {
+        std::span<iris::Lambda_declaration const> const declarations = header_module.internal_declarations.lambda_declarations;
+        auto const location = std::find_if(declarations.begin(), declarations.end(), [name](iris::Lambda_declaration const& value) -> bool { return value.name == name; });
+        REQUIRE(location != declarations.end());
+        return *location;
+    }
+
+    TEST_CASE("Import C header with IRIS_META lambda comment creates Lambda_declaration", "[C_header_importer][Lambda]")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "lambda_import_with_metadata";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+/** IRIS_META v=1 module=c.comparator name=Comparator kind=lambda data=(a: Int32, b: Int32) -> (result: Int32) */
+struct my_namespace_Comparator
+{
+    int32_t (*function_pointer)(int32_t a, int32_t b, void* user_data);
+    void* user_data;
+};
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "comparator.h";
+        iris::common::write_to_file(header_file_path, header_content);
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.comparator", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        iris::Module const& header_module = header_module_optional.value();
+
+        CHECK(header_module.source_file_path == header_file_path);
+
+        // Verify the Lambda_declaration was created in internal declarations
+        iris::Lambda_declaration const& lambda = find_lambda_declaration(header_module, "Comparator");
+
+        CHECK(lambda.name == "Comparator");
+        REQUIRE(lambda.unique_name.has_value());
+        CHECK(lambda.unique_name.value() == "Comparator");
+
+        // Verify input parameter types
+        REQUIRE(lambda.input_parameter_types.size() == 2);
+        CHECK(lambda.input_parameter_types[0] == iris::create_integer_type_type_reference(32, true));
+        CHECK(lambda.input_parameter_types[1] == iris::create_integer_type_type_reference(32, true));
+
+        // Verify output parameter types
+        REQUIRE(lambda.output_parameter_types.size() == 1);
+        CHECK(lambda.output_parameter_types[0] == iris::create_integer_type_type_reference(32, true));
+
+        // Verify input parameter names
+        REQUIRE(lambda.input_parameter_names.size() == 2);
+        CHECK(lambda.input_parameter_names[0] == "a");
+        CHECK(lambda.input_parameter_names[1] == "b");
+
+        // Verify output parameter names
+        REQUIRE(lambda.output_parameter_names.size() == 1);
+        CHECK(lambda.output_parameter_names[0] == "result");
+    }
+
+    TEST_CASE("Import C header with IRIS_META lambda comment — lambda with no parameters", "[C_header_importer][Lambda]")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "lambda_import_no_params";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+/** IRIS_META v=1 module=c.callback name=Callback kind=lambda data=() -> () */
+struct my_namespace_Callback
+{
+    void (*function_pointer)(void* user_data);
+    void* user_data;
+};
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "callback.h";
+        iris::common::write_to_file(header_file_path, header_content);
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.callback", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        iris::Module const& header_module = header_module_optional.value();
+
+        CHECK(header_module.source_file_path == header_file_path);
+
+        iris::Lambda_declaration const& lambda = find_lambda_declaration(header_module, "Callback");
+
+        CHECK(lambda.name == "Callback");
+
+        // Verify no input parameters
+        CHECK(lambda.input_parameter_types.empty());
+        CHECK(lambda.input_parameter_names.empty());
+
+        // Verify no output parameters
+        CHECK(lambda.output_parameter_types.empty());
+        CHECK(lambda.output_parameter_names.empty());
+    }
+
+    TEST_CASE("Import C header with IRIS_META lambda comment — multiple lambdas", "[C_header_importer][Lambda]")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "lambda_import_multiple";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+/** IRIS_META v=1 module=c.comparator name=Comparator kind=lambda data=(a: Int32, b: Int32) -> (result: Int32) */
+struct my_namespace_Comparator
+{
+    int32_t (*function_pointer)(int32_t a, int32_t b, void* user_data);
+    void* user_data;
+};
+
+/** IRIS_META v=1 module=c.predicate name=Predicate kind=lambda data=(value: Float32) -> (result: Bool) */
+struct my_namespace_Predicate
+{
+    bool (*function_pointer)(float value, void* user_data);
+    void* user_data;
+};
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "lambdas.h";
+        iris::common::write_to_file(header_file_path, header_content);
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.lambdas", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        iris::Module const& header_module = header_module_optional.value();
+
+        CHECK(header_module.source_file_path == header_file_path);
+
+        // Verify both lambdas were created
+        REQUIRE(header_module.internal_declarations.lambda_declarations.size() == 2);
+
+        iris::Lambda_declaration const& comparator = find_lambda_declaration(header_module, "Comparator");
+        CHECK(comparator.name == "Comparator");
+        CHECK(comparator.input_parameter_types.size() == 2);
+        CHECK(comparator.output_parameter_types.size() == 1);
+
+        iris::Lambda_declaration const& predicate = find_lambda_declaration(header_module, "Predicate");
+        CHECK(predicate.name == "Predicate");
+        CHECK(predicate.input_parameter_types.size() == 1);
+        CHECK(predicate.output_parameter_types.size() == 1);
+    }
+
+    TEST_CASE("Import C header without IRIS_META lambda comment treats struct as regular struct", "[C_header_importer][Lambda]")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "lambda_import_no_metadata";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+struct Comparator
+{
+    int32_t (*function_pointer)(int32_t a, int32_t b, void* user_data);
+    void* user_data;
+};
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "comparator.h";
+        iris::common::write_to_file(header_file_path, header_content);
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.comparator", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        iris::Module const& header_module = header_module_optional.value();
+
+        CHECK(header_module.source_file_path == header_file_path);
+
+        // Verify no Lambda_declaration was created
+        CHECK(header_module.internal_declarations.lambda_declarations.empty());
+
+        // Verify the struct was imported as a regular struct
+        iris::Struct_declaration const& struct_decl = find_struct_declaration(header_module, "Comparator");
+        CHECK(struct_decl.name == "Comparator");
+        CHECK(struct_decl.member_names.size() == 2);
+        CHECK(struct_decl.member_names[0] == "function_pointer");
+        CHECK(struct_decl.member_names[1] == "user_data");
+    }
+
+    TEST_CASE("Import C header with lambda-like struct but no IRIS_META lambda comment does not create Lambda_declaration", "[C_header_importer][Lambda]")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "lambda_import_no_metadata_2";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+struct my_namespace_Comparator
+{
+    int32_t (*function_pointer)(int32_t a, int32_t b, void* user_data);
+    void* user_data;
+};
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "comparator.h";
+        iris::common::write_to_file(header_file_path, header_content);
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.comparator", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        iris::Module const& header_module = header_module_optional.value();
+
+        CHECK(header_module.source_file_path == header_file_path);
+
+        // Verify no Lambda_declaration was created despite the struct matching the lambda pattern
+        CHECK(header_module.internal_declarations.lambda_declarations.empty());
+
+        // Verify struct is imported as regular struct
+        REQUIRE(header_module.export_declarations.struct_declarations.size() == 1);
+        CHECK(header_module.export_declarations.struct_declarations[0].name == "my_namespace_Comparator");
+    }
 }

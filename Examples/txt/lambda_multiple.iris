@@ -1,0 +1,12 @@
+module Lambda_multiple;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var cmp1: Comparator = lambda(a, b) => a - b;
+    var cmp2: Comparator = lambda(a, b) => a + b;
+    var mapper1: Mapper = lambda(x) => x * 2;
+    var mapper2: Mapper = lambda(x) => x + 1;
+}

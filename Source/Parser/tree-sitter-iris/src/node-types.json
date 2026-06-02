@@ -159,6 +159,10 @@
           "named": true
         },
         {
+          "type": "Lambda",
+          "named": true
+        },
+        {
           "type": "Struct",
           "named": true
         },
@@ -980,6 +984,33 @@
     }
   },
   {
+    "type": "Expression_lambda",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_block",
+          "named": true
+        },
+        {
+          "type": "Generic_expression",
+          "named": true
+        },
+        {
+          "type": "Lambda_literal_parameter",
+          "named": true
+        },
+        {
+          "type": "Type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "Expression_parenthesis",
     "named": true,
     "fields": {},
@@ -1708,6 +1739,10 @@
           "named": true
         },
         {
+          "type": "Expression_lambda",
+          "named": true
+        },
+        {
           "type": "Expression_null_pointer",
           "named": true
         },
@@ -1867,6 +1902,112 @@
       "types": [
         {
           "type": "Identifier_with_dots",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Lambda",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "Lambda_input_parameters",
+          "named": true
+        },
+        {
+          "type": "Lambda_name",
+          "named": true
+        },
+        {
+          "type": "Lambda_output_parameters",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Lambda_input_parameters",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "Lambda_parameter",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Lambda_literal_parameter",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "Identifier",
+          "named": true
+        },
+        {
+          "type": "Type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Lambda_name",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Lambda_output_parameters",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "Lambda_parameter",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Lambda_parameter",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "Identifier",
+          "named": true
+        },
+        {
+          "type": "Type",
           "named": true
         }
       ]
@@ -2634,6 +2775,10 @@
     "named": false
   },
   {
+    "type": "=>",
+    "named": false
+  },
+  {
     "type": ">",
     "named": false
   },
@@ -2795,6 +2940,10 @@
   },
   {
     "type": "in",
+    "named": false
+  },
+  {
+    "type": "lambda",
     "named": false
   },
   {

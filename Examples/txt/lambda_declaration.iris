@@ -1,0 +1,5 @@
+module Lambda_declaration;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+lambda Mapper(value: Int32) -> (result: Int32);
+lambda Predicate() -> (result: Bool);

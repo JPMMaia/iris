@@ -1,0 +1,17 @@
+module Lambda_mixed;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function apply(cmp: Comparator, x: Int32, y: Int32) -> (result: Int32)
+{
+    return cmp(x, y);
+}
+
+export function main() -> ()
+{
+    var base: Int32 = 100;
+    var cmp: Comparator = lambda(a, b) => a - b + base;
+    var mapped: Mapper = lambda(v) => v * 2;
+    var result = apply(cmp, 10, 3);
+}

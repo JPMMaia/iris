@@ -1,0 +1,13 @@
+module Lambda_return_lambda;
+
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function create_mapper() -> (mapper: Mapper)
+{
+    return (x) => x * 2;
+}
+
+export function main() -> ()
+{
+    var mapper = create_mapper();
+}

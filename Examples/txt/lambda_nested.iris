@@ -1,0 +1,12 @@
+module Lambda_nested;
+
+lambda Inner(x: Int32) -> (result: Int32);
+lambda Outer(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var outer: Outer = lambda(a, b) => {
+        var inner: Inner = lambda(x) => x + a;
+        return inner(b);
+    };
+}

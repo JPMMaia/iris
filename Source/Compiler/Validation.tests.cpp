@@ -6865,4 +6865,913 @@ function run() -> ()
 
         test_validate_module(input, {}, expected_diagnostics);
     }
+
+    TEST_CASE("Validates valid lambda declaration", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var cmp: Comparator = lambda(a, b) => a - b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates valid lambda literal", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var cmp: Comparator = lambda(a, b) => a - b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda literal with captures", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var offset: Int32 = 10;
+    var cmp: Comparator = lambda(a, b) => a - b + offset;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda literal with explicit return type matching body", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function main() -> ()
+{
+    var mapper = lambda(x: Int32) -> Int32 => x * 2;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda call through function parameter", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function apply(cmp: Comparator, x: Int32, y: Int32) -> (result: Int32)
+{
+    return cmp(x, y);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda literal with captured non-existent variable", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var cmp: Comparator = lambda(a, b) => a - b + nonexistent;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(8, 45, 8, 56),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot find variable 'nonexistent'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda literal type mismatch with named lambda type", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var cmp: Comparator = lambda(a: Float32, b: Float32) => a - b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(8, 30, 8, 39),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Type mismatch: expected 'Int32', but got 'Float32'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda literal with no expected type and no explicit types", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function main() -> ()
+{
+    var cmp = lambda(a, b) => a - b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(4, 15, 4, 28),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot infer lambda type — no expected type available.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with explicit return type mismatching body", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function main() -> ()
+{
+    var mapper = lambda(x: Int32) -> Bool => x * 2;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(4, 30, 4, 34),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Type mismatch: expected 'Bool', but got 'Int32'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates duplicate lambda declaration names", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+lambda Comparator(x: Float32) -> (result: Float32);
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(4, 7, 4, 17),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Duplicate declaration name 'Comparator'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with valid parameter types", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda MultiParam(a: Int32, b: Float32, c: Bool) -> (result: Float64);
+
+export function main() -> ()
+{
+    var f: MultiParam = lambda(a, b, c) => b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with no parameters", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Counter() -> (result: Int32);
+
+export function main() -> ()
+{
+    var c: Counter = () => 42;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with single parameter", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var m: Mapper = lambda(x) => x * 2;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with no captures", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var add: Adder = lambda(a, b) => a + b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with block body", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var add: Adder = lambda(a, b) => {
+        var result = a + b;
+        return result;
+    };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with block body and captures", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var offset: Int32 = 5;
+    var add: Adder = lambda(a, b) => {
+        var result = a + b + offset;
+        return result;
+    };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with void return type", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Printer(value: Int32) -> ();
+
+export function main() -> ()
+{
+    var print: Printer = lambda(v) => {};
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda assigned to function parameter", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Bool);
+
+export function sort(values: []Int32, cmp: Comparator) -> ()
+{
+}
+
+export function main() -> ()
+{
+    var values: []Int32 = [];
+    sort(values, (a, b) => a < b);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda as function return type", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function create_mapper() -> (result: Mapper)
+{
+    return (x) => x * 2;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda in return statement", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function get_mapper() -> (result: Mapper)
+{
+    return (x) => x * 2;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda call through variable", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var add: Adder = lambda(a, b) => a + b;
+    var result = add(1, 2);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates multiple lambdas in same function", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+lambda Multiplier(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var add: Adder = lambda(a, b) => a + b;
+    var mul: Multiplier = lambda(a, b) => a * b;
+    var result = add(1, mul(2, 3));
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates nested lambda literals", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Mapper(value: Int32) -> (result: Int32);
+lambda Comparator(a: Int32, b: Int32) -> (result: Bool);
+
+export function main() -> ()
+{
+    var outer: Mapper = lambda(x) => {
+        var inner: Comparator = lambda(a, b) => a < b;
+        return x;
+    };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with explicit parameter types matching expected type", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Bool);
+
+export function main() -> ()
+{
+    var cmp: Comparator = lambda(a: Int32, b: Int32) => a < b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with explicit return type matching body expression", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function main() -> ()
+{
+    var mapper = lambda(x: Int32) -> Int32 => x * 2;
+    var result = mapper(5);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with captured variable used in expression", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var multiplier: Int32 = 3;
+    var add: Adder = lambda(a, b) => (a + b) * multiplier;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with multiple captured variables", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Transform(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var offset: Int32 = 10;
+    var scale: Int32 = 2;
+    var t: Transform = lambda(a, b) => (a + offset) * scale - b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with captured non-constant variable", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Counter(start: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    mutable counter: Int32 = 0;
+    var c: Counter = lambda(s) => s + counter;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with mismatched explicit parameter type", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var add: Adder = lambda(a: Float32, b: Int32) => a + b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(8, 26, 8, 35),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Type mismatch: expected 'Int32', but got 'Float32'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with mismatched return type in body", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function main() -> ()
+{
+    var mapper = lambda(x: Int32) -> Int32 => x + 1.0f32;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 48, 5, 58),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Type mismatch: expected 'Int32', but got 'Float32'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with mismatched parameter count", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var add: Adder = lambda(a) => a + 1;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(8, 21, 8, 28),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Lambda parameter count mismatch: expected 2 parameters, but 1 were provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with extra parameters compared to expected type", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var add: Adder = lambda(a, b) => a + b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(8, 21, 8, 32),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Lambda parameter count mismatch: expected 1 parameters, but 2 were provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with correct return type inferred from block body", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function main() -> ()
+{
+    var mapper = lambda(x: Int32) =>{
+        return x * 2;
+    };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with no parameters and no return value", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Action() -> ();
+
+export function main() -> ()
+{
+    var action: Action = () => {};
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with Bool return type", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Predicate(value: Int32) -> (result: Bool);
+
+export function main() -> ()
+{
+    var pred: Predicate = lambda(v) => v > 0;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with Float64 return type", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Doubler(value: Float64) -> (result: Float64);
+
+export function main() -> ()
+{
+    var d: Doubler = lambda(v) => v * 2.0;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with pointer parameter type", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda PointerSetter(value: *Int32) -> ();
+
+export function main() -> ()
+{
+    var setter: PointerSetter = lambda(v) => {};
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda call with correct argument count", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var add: Adder = lambda(a, b) => a + b;
+    var result = add(1, 2);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda call with wrong argument count", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var add: Adder = lambda(a, b) => a + b;
+    var result = add(1);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 20, 10, 26),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Function expects 2 arguments, but 1 were provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with multiple lambda declarations", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+lambda Multiplier(a: Int32, b: Int32) -> (result: Int32);
+lambda Divider(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var add: Adder = lambda(a, b) => a + b;
+    var mul: Multiplier = lambda(a, b) => a * b;
+    var div: Divider = lambda(a, b) => a / b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with different lambda names", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Bool);
+lambda Mapper(value: Int32) -> (result: Int32);
+lambda Transformer(value: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var cmp: Comparator = lambda(a, b) => a < b;
+    var map: Mapper = lambda(v) => v * 2;
+    var trans: Transformer = lambda(v) => v + 1;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with captured variable in nested scope", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var offset: Int32 = 10;
+    var m: Mapper = lambda(v) => {
+        var temp = v + offset;
+        return temp;
+    };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with captured variable from enclosing function", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Action(x: Int32) -> ();
+
+export function create_action() -> (result: Action)
+{
+    var base: Int32 = 100;
+    return (x) => {};
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with Bool parameter types", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda And(a: Bool, b: Bool) -> (result: Bool);
+
+export function main() -> ()
+{
+    var and_op: And = lambda(a, b) => a && b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with Int64 parameter types", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Sum(a: Int64, b: Int64) -> (result: Int64);
+
+export function main() -> ()
+{
+    var s: Sum = lambda(a, b) => a + b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates lambda with mixed parameter types", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Mixed(a: Int32, b: Float64, c: Bool) -> (result: Float64);
+
+export function main() -> ()
+{
+    var m: Mixed = lambda(a, b, c) => b + (c as Float64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
 }

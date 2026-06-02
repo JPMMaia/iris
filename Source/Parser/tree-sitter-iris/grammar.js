@@ -28,6 +28,7 @@ module.exports = grammar({
       $.Alias,
       $.Enum,
       $.Global_variable,
+      $.Lambda,
       $.Struct,
       $.Union,
       $.Function,
@@ -85,6 +86,11 @@ module.exports = grammar({
     Union_member: $ => seq(optional($.Comment), $.Union_member_name, ":", $.Union_member_type, ";"),
     Union_member_name: $ => $.Identifier,
     Union_member_type: $ => $.Type,
+    Lambda: $ => seq("lambda", $.Lambda_name, $.Lambda_input_parameters, "->", $.Lambda_output_parameters, ";"),
+    Lambda_name: $ => $.Identifier,
+    Lambda_input_parameters: $ => seq("(", optional(seq($.Lambda_parameter, repeat(seq(",", $.Lambda_parameter)))), ")"),
+    Lambda_output_parameters: $ => seq("(", optional(seq($.Lambda_parameter, repeat(seq(",", $.Lambda_parameter)))), ")"),
+    Lambda_parameter: $ => seq($.Identifier, optional(seq(":", $.Type))),
     Function: $ => seq($.Function_declaration, choice($.Function_definition, ";")),
     Function_declaration: $ => seq("function", $.Function_name, $.Function_input_parameters, "->", $.Function_output_parameters, repeat($.Function_precondition), repeat($.Function_postcondition)),
     Function_name: $ => $.Identifier,
@@ -137,6 +143,7 @@ module.exports = grammar({
       $.Expression_dereference_and_access,
       $.Expression_function,
       $.Expression_instance_call,
+      $.Expression_lambda,
       $.Expression_null_pointer,
       $.Expression_parenthesis,
       $.Expression_reflection_call,
@@ -213,6 +220,14 @@ module.exports = grammar({
       $.Expression_variable
     ),
     Expression_for_loop_statements: $ => seq("{", repeat($.Statement), "}"),
+    Expression_lambda: $ => prec(100, seq(
+        "lambda",
+        "(", optional(seq($.Lambda_literal_parameter, repeat(seq(",", $.Lambda_literal_parameter)))), ")",
+        optional(seq("->", $.Type)),
+        "=>",
+        choice($.Expression_block, $.Generic_expression)
+    )),
+    Lambda_literal_parameter: $ => seq($.Identifier, optional(seq(":", $.Type))),
     Expression_function: $ => seq("function", $.Function_input_parameters, "->", $.Function_output_parameters, repeat($.Function_precondition), repeat($.Function_postcondition), $.Block),
     Expression_instance_call: $ => prec.left(13, seq($.Generic_expression, seq("::<", optional(seq($.Expression_instance_call_parameter, repeat(seq(",", $.Expression_instance_call_parameter)))), ">"))),
     Expression_instance_call_parameter: $ => choice(

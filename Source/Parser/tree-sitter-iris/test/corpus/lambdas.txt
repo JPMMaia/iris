@@ -1,0 +1,455 @@
+=========================
+Lambda type declaration
+=========================
+
+module Lambda_type_declaration;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+lambda Mapper(value: Int32) -> (result: Int32);
+
+lambda Filter(predicate: Int32) -> (result: Bool);
+
+---
+
+(Module
+  (Module_head
+    (Module_declaration
+      (Module_name
+        (Identifier_with_dots
+          (Identifier)))))
+  (Declaration
+    (Lambda
+      (Lambda_name
+        (Identifier))
+      (Lambda_input_parameters
+        (Lambda_parameter
+          (Identifier)
+          (Type
+            (Type_name
+              (Identifier))))
+        (Lambda_parameter
+          (Identifier)
+          (Type
+            (Type_name
+              (Identifier)))))
+      (Lambda_output_parameters
+        (Lambda_parameter
+          (Identifier)
+          (Type
+            (Type_name
+              (Identifier)))))))
+  (Declaration
+    (Lambda
+      (Lambda_name
+        (Identifier))
+      (Lambda_input_parameters
+        (Lambda_parameter
+          (Identifier)
+          (Type
+            (Type_name
+              (Identifier)))))
+      (Lambda_output_parameters
+        (Lambda_parameter
+          (Identifier)
+          (Type
+            (Type_name
+              (Identifier)))))))
+  (Declaration
+    (Lambda
+      (Lambda_name
+        (Identifier))
+      (Lambda_input_parameters
+        (Lambda_parameter
+          (Identifier)
+          (Type
+            (Type_name
+              (Identifier)))))
+      (Lambda_output_parameters
+        (Lambda_parameter
+          (Identifier)
+          (Type
+            (Type_name
+              (Identifier))))))))
+
+=========================
+Lambda literal with inline body
+=========================
+
+module Lambda_literal_inline;
+
+export function run() -> ()
+{
+    var cmp = lambda(a, b) => a - b;
+    var mapper = lambda(x) => x * 2;
+}
+
+---
+
+(Module
+  (Module_head
+    (Module_declaration
+      (Module_name
+        (Identifier_with_dots
+          (Identifier)))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters)
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_binary
+                  (Generic_expression
+                    (Expression_lambda
+                      (Lambda_literal_parameter
+                        (Identifier))
+                      (Lambda_literal_parameter
+                        (Identifier))
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier))))))
+                  (Generic_expression
+                    (Expression_variable
+                      (Variable_name
+                        (Identifier))))))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_binary
+                  (Generic_expression
+                    (Expression_lambda
+                      (Lambda_literal_parameter
+                        (Identifier))
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier))))))
+                  (Generic_expression
+                    (Expression_constant
+                      (Number))))))))))))
+
+=========================
+Lambda literal with block body
+=========================
+
+module Lambda_literal_block;
+
+export function run() -> ()
+{
+    var cmp = lambda(a, b) => { return a - b; };
+    var complex = lambda(x, y) -> Int32 => {
+        var result = x + y;
+        return result;
+    };
+}
+
+---
+
+(Module
+  (Module_head
+    (Module_declaration
+      (Module_name
+        (Identifier_with_dots
+          (Identifier)))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters)
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_lambda
+                  (Lambda_literal_parameter
+                    (Identifier))
+                  (Lambda_literal_parameter
+                    (Identifier))
+                  (Expression_block
+                    (Statement
+                      (Expression_return
+                        (Generic_expression_or_instantiate
+                          (Generic_expression
+                            (Expression_binary
+                              (Generic_expression
+                                (Expression_variable
+                                  (Variable_name
+                                    (Identifier))))
+                              (Generic_expression
+                                (Expression_variable
+                                  (Variable_name
+                                    (Identifier))))))))))))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_lambda
+                  (Lambda_literal_parameter
+                    (Identifier))
+                  (Lambda_literal_parameter
+                    (Identifier))
+                  (Type
+                    (Type_name
+                      (Identifier)))
+                  (Expression_block
+                    (Statement
+                      (Expression_variable_declaration
+                        (Expression_variable_mutability)
+                        (Variable_name
+                          (Identifier))
+                        (Generic_expression
+                          (Expression_binary
+                            (Generic_expression
+                              (Expression_variable
+                                (Variable_name
+                                  (Identifier))))
+                            (Generic_expression
+                              (Expression_variable
+                                (Variable_name
+                                  (Identifier))))))))
+                    (Statement
+                      (Expression_return
+                        (Generic_expression_or_instantiate
+                          (Generic_expression
+                            (Expression_variable
+                              (Variable_name
+                                (Identifier)))))))))))))))))
+
+=========================
+Lambda literal with explicit return type
+=========================
+
+module Lambda_literal_explicit_return;
+
+export function run() -> ()
+{
+    var mapper = lambda(x) -> Int32 => x * 2;
+    var identity = lambda(value: Int32) -> Int32 => value;
+}
+
+---
+
+(Module
+  (Module_head
+    (Module_declaration
+      (Module_name
+        (Identifier_with_dots
+          (Identifier)))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters)
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_binary
+                  (Generic_expression
+                    (Expression_lambda
+                      (Lambda_literal_parameter
+                        (Identifier))
+                      (Type
+                        (Type_name
+                          (Identifier)))
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier))))))
+                  (Generic_expression
+                    (Expression_constant
+                      (Number)))))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_lambda
+                  (Lambda_literal_parameter
+                    (Identifier)
+                    (Type
+                      (Type_name
+                        (Identifier))))
+                  (Type
+                    (Type_name
+                      (Identifier)))
+                  (Generic_expression
+                    (Expression_variable
+                      (Variable_name
+                        (Identifier)))))))))))))
+
+=========================
+Lambda with captures
+=========================
+
+module Lambda_with_captures;
+
+export function run() -> ()
+{
+    var offset: Int32 = 10;
+    var cmp = lambda(a, b) => a - b + offset;
+}
+
+---
+
+(Module
+  (Module_head
+    (Module_declaration
+      (Module_name
+        (Identifier_with_dots
+          (Identifier)))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters)
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration_with_type
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Expression_variable_declaration_type
+                (Type
+                  (Type_name
+                    (Identifier))))
+              (Generic_expression_or_instantiate
+                (Generic_expression
+                  (Expression_constant
+                    (Number))))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_binary
+                  (Generic_expression
+                    (Expression_binary
+                      (Generic_expression
+                        (Expression_lambda
+                          (Lambda_literal_parameter
+                            (Identifier))
+                          (Lambda_literal_parameter
+                            (Identifier))
+                          (Generic_expression
+                            (Expression_variable
+                              (Variable_name
+                                (Identifier))))))
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier))))))
+                  (Generic_expression
+                    (Expression_variable
+                      (Variable_name
+                        (Identifier)))))))))))))
+
+=========================
+Lambda assigned to named lambda type
+=========================
+
+module Lambda_assigned_to_named_type;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function run() -> ()
+{
+    var cmp: Comparator = lambda(a, b) => a - b;
+}
+
+---
+
+(Module
+  (Module_head
+    (Module_declaration
+      (Module_name
+        (Identifier_with_dots
+          (Identifier)))))
+  (Declaration
+    (Lambda
+      (Lambda_name
+        (Identifier))
+      (Lambda_input_parameters
+        (Lambda_parameter
+          (Identifier)
+          (Type
+            (Type_name
+              (Identifier))))
+        (Lambda_parameter
+          (Identifier)
+          (Type
+            (Type_name
+              (Identifier)))))
+      (Lambda_output_parameters
+        (Lambda_parameter
+          (Identifier)
+          (Type
+            (Type_name
+              (Identifier)))))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters)
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration_with_type
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Expression_variable_declaration_type
+                (Type
+                  (Type_name
+                    (Identifier))))
+              (Generic_expression_or_instantiate
+                (Generic_expression
+                  (Expression_binary
+                    (Generic_expression
+                      (Expression_lambda
+                        (Lambda_literal_parameter
+                          (Identifier))
+                        (Lambda_literal_parameter
+                          (Identifier))
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))))
+                    (Generic_expression
+                      (Expression_variable
+                        (Variable_name
+                          (Identifier))))))))))))))

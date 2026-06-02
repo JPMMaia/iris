@@ -9501,6 +9501,661 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
+
+
+  TEST_CASE("Compile Lambda No Captures", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_no_captures.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_no_captures_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_no_captures(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %sub = sub nsw i32 %0, %1
+  ret i32 %sub
+}
+
+; Function Attrs: convergent
+define private void @Lambda_no_captures_main() #0 {
+entry:
+  %cmp = alloca { ptr, ptr }, align 8
+  %0 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_no_captures, i32 0
+  %1 = insertvalue { ptr, ptr } %0, ptr null, i32 1
+  store { ptr, ptr } %1, ptr %cmp, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda With Captures", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_with_captures.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_with_captures_Comparator = type { ptr, ptr }
+%struct.__lambda_env0 = type { i32 }
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_with_captures(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %env = bitcast ptr %2 to ptr %struct.__lambda_env0
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %sub = sub nsw i32 %0, %1
+  %offset = getelementptr inbounds %struct.__lambda_env0, ptr %env, i32 0, i32 0
+  %offset_val = load i32, ptr %offset, align 4
+  %add = add nsw i32 %sub, %offset_val
+  ret i32 %add
+}
+
+; Function Attrs: convergent
+define private void @Lambda_with_captures_main() #0 {
+entry:
+  %offset = alloca i32, align 4
+  store i32 10, ptr %offset, align 4
+  %cmp = alloca { ptr, ptr }, align 8
+  %env = alloca %struct.__lambda_env0, align 4
+  %offset_ptr = getelementptr inbounds %struct.__lambda_env0, ptr %env, i32 0, i32 0
+  %0 = load i32, ptr %offset, align 4
+  store i32 %0, ptr %offset_ptr, align 4
+  %1 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_with_captures, i32 0
+  %2 = insertvalue { ptr, ptr } %1, ptr %env, i32 1
+  store { ptr, ptr } %2, ptr %cmp, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Call", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_call.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_call_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_call(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %sub = sub nsw i32 %0, %1
+  ret i32 %sub
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_call_apply(ptr noundef %cmp, i32 noundef %x, i32 noundef %y) #0 {
+entry:
+  %cmp_struct = load { ptr, ptr }, ptr %cmp, align 8
+  %fn_ptr = extractvalue { ptr, ptr } %cmp_struct, 0
+  %user_data = extractvalue { ptr, ptr } %cmp_struct, 1
+  %0 = load i32, ptr %x, align 4
+  %1 = load i32, ptr %y, align 4
+  %call = call i32 %fn_ptr(i32 %0, i32 %1, ptr %user_data)
+  ret i32 %call
+}
+
+; Function Attrs: convergent
+define private void @Lambda_call_main() #0 {
+entry:
+  %cmp = alloca { ptr, ptr }, align 8
+  %0 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_call, i32 0
+  %1 = insertvalue { ptr, ptr } %0, ptr null, i32 1
+  store { ptr, ptr } %1, ptr %cmp, align 8
+  %cmp2 = load { ptr, ptr }, ptr %cmp, align 8
+  %fn_ptr2 = extractvalue { ptr, ptr } %cmp2, 0
+  %user_data2 = extractvalue { ptr, ptr } %cmp2, 1
+  %call = call i32 %fn_ptr2(i32 10, i32 3, ptr %user_data2)
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Named Type", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_named_type.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_named_type_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_named_type(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %sub = sub nsw i32 %0, %1
+  ret i32 %sub
+}
+
+; Function Attrs: convergent
+define private void @Lambda_named_type_main() #0 {
+entry:
+  %cmp = alloca { ptr, ptr }, align 8
+  %0 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_named_type, i32 0
+  %1 = insertvalue { ptr, ptr } %0, ptr null, i32 1
+  store { ptr, ptr } %1, ptr %cmp, align 8
+  %x = alloca { ptr, ptr }, align 8
+  %2 = insertvalue { ptr, ptr } undef, ptr null, i32 0
+  %3 = insertvalue { ptr, ptr } %2, ptr null, i32 1
+  store { ptr, ptr } %3, ptr %x, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Multiple", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_multiple.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_multiple_Comparator = type { ptr, ptr }
+%struct.Lambda_multiple_Mapper = type { ptr, ptr }
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_multiple(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %sub = sub nsw i32 %0, %1
+  ret i32 %sub
+}
+
+; Function Attrs: convergent
+define internal i32 @__lambda1_Lambda_multiple(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %add = add nsw i32 %0, %1
+  ret i32 %add
+}
+
+; Function Attrs: convergent
+define internal i32 @__lambda2_Lambda_multiple(i32 noundef %x, ptr noundef %1) #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %x, ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %mul = mul nsw i32 %0, 2
+  ret i32 %mul
+}
+
+; Function Attrs: convergent
+define internal i32 @__lambda3_Lambda_multiple(i32 noundef %x, ptr noundef %1) #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %x, ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %add = add nsw i32 %0, 1
+  ret i32 %add
+}
+
+; Function Attrs: convergent
+define private void @Lambda_multiple_main() #0 {
+entry:
+  %cmp1 = alloca { ptr, ptr }, align 8
+  %0 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_multiple, i32 0
+  %1 = insertvalue { ptr, ptr } %0, ptr null, i32 1
+  store { ptr, ptr } %1, ptr %cmp1, align 8
+  %cmp2 = alloca { ptr, ptr }, align 8
+  %2 = insertvalue { ptr, ptr } undef, ptr @__lambda1_Lambda_multiple, i32 0
+  %3 = insertvalue { ptr, ptr } %2, ptr null, i32 1
+  store { ptr, ptr } %3, ptr %cmp2, align 8
+  %mapper1 = alloca { ptr, ptr }, align 8
+  %4 = insertvalue { ptr, ptr } undef, ptr @__lambda2_Lambda_multiple, i32 0
+  %5 = insertvalue { ptr, ptr } %4, ptr null, i32 1
+  store { ptr, ptr } %5, ptr %mapper1, align 8
+  %mapper2 = alloca { ptr, ptr }, align 8
+  %6 = insertvalue { ptr, ptr } undef, ptr @__lambda3_Lambda_multiple, i32 0
+  %7 = insertvalue { ptr, ptr } %6, ptr null, i32 1
+  store { ptr, ptr } %7, ptr %mapper2, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Nested", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_nested.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_nested_Inner = type { ptr, ptr }
+%struct.Lambda_nested_Outer = type { ptr, ptr }
+%struct.__lambda_env0 = type { i32, i32 }
+
+; Function Attrs: convergent
+define internal i32 @__lambda1_Lambda_nested(i32 noundef %x, ptr noundef %2) #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %x, ptr %x, align 4
+  %env = bitcast ptr %2 to ptr %struct.__lambda_env0
+  %0 = load i32, ptr %x, align 4
+  %a_val = getelementptr inbounds %struct.__lambda_env0, ptr %env, i32 0, i32 0
+  %a_loaded = load i32, ptr %a_val, align 4
+  %add = add nsw i32 %0, %a_loaded
+  ret i32 %add
+}
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_nested(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %env = alloca %struct.__lambda_env0, align 8
+  %a_ptr = getelementptr inbounds %struct.__lambda_env0, ptr %env, i32 0, i32 0
+  %0 = load i32, ptr %a, align 4
+  store i32 %0, ptr %a_ptr, align 4
+  %b_ptr = getelementptr inbounds %struct.__lambda_env0, ptr %env, i32 0, i32 1
+  %1 = load i32, ptr %b, align 4
+  store i32 %1, ptr %b_ptr, align 4
+  %inner_val = alloca { ptr, ptr }, align 8
+  %2 = insertvalue { ptr, ptr } undef, ptr @__lambda1_Lambda_nested, i32 0
+  %3 = insertvalue { ptr, ptr } %2, ptr %env, i32 1
+  store { ptr, ptr } %3, ptr %inner_val, align 8
+  %inner_struct = load { ptr, ptr }, ptr %inner_val, align 8
+  %inner_fn = extractvalue { ptr, ptr } %inner_struct, 0
+  %inner_ud = extractvalue { ptr, ptr } %inner_struct, 1
+  %4 = load i32, ptr %b, align 4
+  %call = call i32 %inner_fn(i32 %4, ptr %inner_ud)
+  ret i32 %call
+}
+
+; Function Attrs: convergent
+define private void @Lambda_nested_main() #0 {
+entry:
+  %outer = alloca { ptr, ptr }, align 8
+  %5 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_nested, i32 0
+  %6 = insertvalue { ptr, ptr } %5, ptr null, i32 1
+  store { ptr, ptr } %6, ptr %outer, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Return Lambda", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_return_lambda.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_return_lambda_Mapper = type { ptr, ptr }
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_return_lambda(i32 noundef %x, ptr noundef %1) #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %x, ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %mul = mul nsw i32 %0, 2
+  ret i32 %mul
+}
+
+; Function Attrs: convergent
+define private { ptr, ptr } @Lambda_return_lambda_create_mapper() #0 {
+entry:
+  %result = alloca { ptr, ptr }, align 8
+  %0 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_return_lambda, i32 0
+  %1 = insertvalue { ptr, ptr } %0, ptr null, i32 1
+  store { ptr, ptr } %1, ptr %result, align 8
+  %retval = load { ptr, ptr }, ptr %result, align 8
+  ret { ptr, ptr } %retval
+}
+
+; Function Attrs: convergent
+define private void @Lambda_return_lambda_main() #0 {
+entry:
+  %mapper = alloca { ptr, ptr }, align 8
+  %call = call { ptr, ptr } @Lambda_return_lambda_create_mapper()
+  store { ptr, ptr } %call, ptr %mapper, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Block Body", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_block_body.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_block_body_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_block_body(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %sub = sub nsw i32 %0, %1
+  ret i32 %sub
+}
+
+; Function Attrs: convergent
+define private void @Lambda_block_body_main() #0 {
+entry:
+  %cmp = alloca { ptr, ptr }, align 8
+  %0 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_block_body, i32 0
+  %1 = insertvalue { ptr, ptr } %0, ptr null, i32 1
+  store { ptr, ptr } %1, ptr %cmp, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Inline Body", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_inline_body.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_inline_body_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_inline_body(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %sub = sub nsw i32 %0, %1
+  ret i32 %sub
+}
+
+; Function Attrs: convergent
+define internal i32 @__lambda1_Lambda_inline_body(i32 noundef %x, ptr noundef %1) #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %x, ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %mul = mul nsw i32 %0, 2
+  ret i32 %mul
+}
+
+; Function Attrs: convergent
+define private void @Lambda_inline_body_main() #0 {
+entry:
+  %cmp = alloca { ptr, ptr }, align 8
+  %0 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_inline_body, i32 0
+  %1 = insertvalue { ptr, ptr } %0, ptr null, i32 1
+  store { ptr, ptr } %1, ptr %cmp, align 8
+  %mapper = alloca { ptr, ptr }, align 8
+  %2 = insertvalue { ptr, ptr } undef, ptr @__lambda1_Lambda_inline_body, i32 0
+  %3 = insertvalue { ptr, ptr } %2, ptr null, i32 1
+  store { ptr, ptr } %3, ptr %mapper, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Explicit Types", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_explicit_types.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_explicit_types_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_explicit_types(i32 noundef %x, ptr noundef %1) #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %x, ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %mul = mul nsw i32 %0, 2
+  ret i32 %mul
+}
+
+; Function Attrs: convergent
+define internal i32 @__lambda1_Lambda_explicit_types(i32 noundef %value, ptr noundef %1) #0 {
+entry:
+  %value = alloca i32, align 4
+  store i32 %value, ptr %value, align 4
+  %0 = load i32, ptr %value, align 4
+  ret i32 %0
+}
+
+; Function Attrs: convergent
+define internal i32 @__lambda2_Lambda_explicit_types(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %sub = sub nsw i32 %0, %1
+  ret i32 %sub
+}
+
+; Function Attrs: convergent
+define private void @Lambda_explicit_types_main() #0 {
+entry:
+  %mapper = alloca { ptr, ptr }, align 8
+  %0 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_explicit_types, i32 0
+  %1 = insertvalue { ptr, ptr } %0, ptr null, i32 1
+  store { ptr, ptr } %1, ptr %mapper, align 8
+  %identity = alloca { ptr, ptr }, align 8
+  %2 = insertvalue { ptr, ptr } undef, ptr @__lambda1_Lambda_explicit_types, i32 0
+  %3 = insertvalue { ptr, ptr } %2, ptr null, i32 1
+  store { ptr, ptr } %3, ptr %identity, align 8
+  %cmp = alloca { ptr, ptr }, align 8
+  %4 = insertvalue { ptr, ptr } undef, ptr @__lambda2_Lambda_explicit_types, i32 0
+  %5 = insertvalue { ptr, ptr } %4, ptr null, i32 1
+  store { ptr, ptr } %5, ptr %cmp, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Mixed", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_mixed.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_mixed_Comparator = type { ptr, ptr }
+%struct.Lambda_mixed_Mapper = type { ptr, ptr }
+%struct.__lambda_env0 = type { i32 }
+
+; Function Attrs: convergent
+define internal i32 @__lambda1_Lambda_mixed(i32 noundef %v, ptr noundef %1) #0 {
+entry:
+  %v = alloca i32, align 4
+  store i32 %v, ptr %v, align 4
+  %0 = load i32, ptr %v, align 4
+  %mul = mul nsw i32 %0, 2
+  ret i32 %mul
+}
+
+; Function Attrs: convergent
+define internal i32 @__lambda0_Lambda_mixed(i32 noundef %a, i32 noundef %b, ptr noundef %2) #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  store i32 %a, ptr %a, align 4
+  store i32 %b, ptr %b, align 4
+  %env = bitcast ptr %2 to ptr %struct.__lambda_env0
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %sub = sub nsw i32 %0, %1
+  %base_ptr = getelementptr inbounds %struct.__lambda_env0, ptr %env, i32 0, i32 0
+  %base_val = load i32, ptr %base_ptr, align 4
+  %add = add nsw i32 %sub, %base_val
+  ret i32 %add
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_mixed_apply(ptr noundef %cmp, i32 noundef %x, i32 noundef %y) #0 {
+entry:
+  %cmp_struct = load { ptr, ptr }, ptr %cmp, align 8
+  %fn_ptr = extractvalue { ptr, ptr } %cmp_struct, 0
+  %user_data = extractvalue { ptr, ptr } %cmp_struct, 1
+  %0 = load i32, ptr %x, align 4
+  %1 = load i32, ptr %y, align 4
+  %call = call i32 %fn_ptr(i32 %0, i32 %1, ptr %user_data)
+  ret i32 %call
+}
+
+; Function Attrs: convergent
+define private void @Lambda_mixed_main() #0 {
+entry:
+  %base = alloca i32, align 4
+  store i32 100, ptr %base, align 4
+  %cmp = alloca { ptr, ptr }, align 8
+  %env = alloca %struct.__lambda_env0, align 4
+  %base_ptr = getelementptr inbounds %struct.__lambda_env0, ptr %env, i32 0, i32 0
+  %0 = load i32, ptr %base, align 4
+  store i32 %0, ptr %base_ptr, align 4
+  %1 = insertvalue { ptr, ptr } undef, ptr @__lambda0_Lambda_mixed, i32 0
+  %2 = insertvalue { ptr, ptr } %1, ptr %env, i32 1
+  store { ptr, ptr } %2, ptr %cmp, align 8
+  %mapped = alloca { ptr, ptr }, align 8
+  %3 = insertvalue { ptr, ptr } undef, ptr @__lambda1_Lambda_mixed, i32 0
+  %4 = insertvalue { ptr, ptr } %3, ptr null, i32 1
+  store { ptr, ptr } %4, ptr %mapped, align 8
+  %cmp2 = load { ptr, ptr }, ptr %cmp, align 8
+  %fn_ptr2 = extractvalue { ptr, ptr } %cmp2, 0
+  %user_data2 = extractvalue { ptr, ptr } %cmp2, 1
+  %call = call i32 %fn_ptr2(i32 10, i32 3, ptr %user_data2)
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Declaration Only", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_declaration.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_declaration_Comparator = type { ptr, ptr }
+%struct.Lambda_declaration_Mapper = type { ptr, ptr }
+%struct.Lambda_declaration_Predicate = type { ptr, ptr }
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
 }
 
 
