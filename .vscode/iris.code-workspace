@@ -485,12 +485,12 @@
 		"C_Cpp.vcFormat.indent.lambdaBracesWhenParameter": false,
 		"testMate.cpp.test.advancedExecutables": [
 			{
-				"pattern": "{build,Build,BUILD,out,Out,OUT}/**/Debug/*{test,Test,TEST}*",
+				"pattern": "build/bin/Debug/*{test,Test,TEST}*",
 				"cwd": "${workspaceFolder}/build",
 				"name": "Debug ${filename}"
 			},
 			{
-				"pattern": "{build,Build,BUILD,out,Out,OUT}/**/Release/*{test,Test,TEST}*",
+				"pattern": "build/bin/Release/*{test,Test,TEST}*",
 				"cwd": "${workspaceFolder}/build",
 				"name": "Release ${filename}"
 			}
