@@ -176,4 +176,26 @@ if(BUILD_TESTING)
    )
    catch_discover_tests(Iris_compiler_tests)
 
+   # Analysis tests
+   add_executable(Iris_analysis_tests)
+   target_link_libraries(Iris_analysis_tests PRIVATE ${iris_test_link_libraries})
+   target_compile_definitions(Iris_analysis_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_analysis_tests PRIVATE
+      "main.tests.cpp"
+      "Analysis.tests.cpp"
+   )
+   catch_discover_tests(Iris_analysis_tests)
+
+   # Core Hash tests
+   add_executable(Iris_hash_tests)
+   target_link_libraries(Iris_hash_tests PRIVATE ${iris_test_link_libraries})
+   target_compile_definitions(Iris_hash_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_hash_tests PRIVATE
+      "main.tests.cpp"
+      "${CMAKE_CURRENT_LIST_DIR}/../Core/Hash.tests.cpp"
+   )
+   find_package(xxHash CONFIG REQUIRED)
+   target_link_libraries(Iris_hash_tests PRIVATE xxHash::xxhash)
+   catch_discover_tests(Iris_hash_tests)
+
 endif()

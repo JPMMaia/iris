@@ -510,6 +510,25 @@ namespace iris::json::operators
             return output_stream;
         }
 
+        export std::istream& operator>>(std::istream& input_stream, Lambda_type& value)
+        {
+            JSON data{};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }
+
+        export std::ostream& operator<<(std::ostream& output_stream, Lambda_type const& value)
+        {
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }
+
         export std::istream& operator>>(std::istream& input_stream, Type_reference& value)
         {
             JSON data{};
@@ -730,6 +749,44 @@ namespace iris::json::operators
         }
 
         export std::ostream& operator<<(std::ostream& output_stream, Function_declaration const& value)
+        {
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }
+
+        export std::istream& operator>>(std::istream& input_stream, Lambda_declaration& value)
+        {
+            JSON data{};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }
+
+        export std::ostream& operator<<(std::ostream& output_stream, Lambda_declaration const& value)
+        {
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }
+
+        export std::istream& operator>>(std::istream& input_stream, Lambda_expression& value)
+        {
+            JSON data{};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }
+
+        export std::ostream& operator<<(std::ostream& output_stream, Lambda_expression const& value)
         {
             JSON const data = to_json(value);
 

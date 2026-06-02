@@ -132,6 +132,119 @@ namespace iris::language_server
                 return &module.internal_declarations.struct_declarations.front();
             return nullptr;
         }
+
+        static lsp::TextDocument_SignatureHelpResult run_signature_help_test(
+            std::string_view const source,
+            std::span<std::string_view const> const dependencies = {}
+        )
+        {
+            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+
+            Parse_session session;
+            for (std::string_view const dependency : dependencies)
+                session.add_module(dependency);
+            std::optional<std::size_t> const index = session.add_module(source_with_cursor.source);
+            REQUIRE(index.has_value());
+
+            iris::Declaration_database const declaration_database = create_declaration_database(session.modules);
+
+            return compute_signature_help(
+                declaration_database,
+                session.trees[index.value()],
+                session.modules[index.value()],
+                source_with_cursor.position,
+                [](lsp::LogMessageParams&&){}
+            );
+        }
+
+        static Signature_help_kind run_signature_help_kind_test(
+            std::string_view const source,
+            std::span<std::string_view const> const dependencies = {}
+        )
+        {
+            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+
+            Parse_session session;
+            for (std::string_view const dependency : dependencies)
+                session.add_module(dependency);
+            std::optional<std::size_t> const index = session.add_module(source_with_cursor.source);
+            REQUIRE(index.has_value());
+
+            iris::Declaration_database const declaration_database = create_declaration_database(session.modules);
+
+            return decide_signature_help_kind(
+                declaration_database,
+                session.trees[index.value()],
+                session.modules[index.value()],
+                source_with_cursor.position
+            );
+        }
+
+        static std::optional<Signature_help_name> run_find_function_call_test(
+            std::string_view const source,
+            std::span<std::string_view const> const dependencies = {}
+        )
+        {
+            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+
+            Parse_session session;
+            for (std::string_view const dependency : dependencies)
+                session.add_module(dependency);
+            std::optional<std::size_t> const index = session.add_module(source_with_cursor.source);
+            REQUIRE(index.has_value());
+
+            iris::Declaration_database const declaration_database = create_declaration_database(session.modules);
+
+            return find_function_call_module_and_function_name(
+                declaration_database,
+                session.trees[index.value()],
+                session.modules[index.value()],
+                source_with_cursor.position
+            );
+        }
+
+        static std::optional<std::uint32_t> run_find_active_parameter_test(
+            std::string_view const source,
+            std::span<std::string_view const> const dependencies = {}
+        )
+        {
+            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+
+            Parse_session session;
+            for (std::string_view const dependency : dependencies)
+                session.add_module(dependency);
+            std::optional<std::size_t> const index = session.add_module(source_with_cursor.source);
+            REQUIRE(index.has_value());
+
+            return find_function_call_active_parameter(
+                session.trees[index.value()],
+                source_with_cursor.position
+            );
+        }
+
+        static bool has_signature_with_label(
+            lsp::TextDocument_SignatureHelpResult const& result,
+            std::string_view const expected_label
+        )
+        {
+            if (result.isNull() || !result->signatures.has_value())
+                return false;
+            return std::any_of(
+                result->signatures->begin(),
+                result->signatures->end(),
+                [&expected_label](lsp::SignatureInformation const& sig)
+                {
+                    return sig.label == expected_label;
+                }
+            );
+        }
+
+        static bool has_active_parameter(lsp::TextDocument_SignatureHelpResult const& result, std::uint32_t const param)
+        {
+            if (result.isNull())
+                return false;
+            return result->activeParameter.has_value() && result->activeParameter.value() == param;
+        }
     }
 
     TEST_CASE("Extracts cursor marker position and removes marker", "[Language_server][Signature_help]")
@@ -1146,7 +1259,7 @@ function bar() -> ()
         );
 
         REQUIRE(result.has_value());
-        CHECK(result.value() == 0); 
+        CHECK(result.value() == 0);
     }
 
     TEST_CASE("Finds instantiate active member while writing second member", "[Language_server][Signature_help]")
@@ -1730,5 +1843,275 @@ struct Foo
             lsp::Tuple<lsp::uint, lsp::uint>{32, 49}
         );
         CHECK(!second_parameter.documentation.has_value());
+    }
+
+    // ============================================================================
+    // Lambda Signature Help Tests
+    // ============================================================================
+
+    TEST_CASE("Decides signature help kind as none for lambda literal parameter list", "[Language_server][Signature_help][Lambda]")
+    {
+        // Verifies that signature help inside a lambda literal's parameter list
+        // returns None (lambda literals don't have their own signature help).
+        std::string_view const source =
+            R"(module A;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var cmp: Comparator = lambda(a, $CURSOR_POSITIONb) => a - b;
+}
+)";
+
+        Signature_help_kind const kind = run_signature_help_kind_test(source);
+        CHECK(kind == Signature_help_kind::None);
+    }
+
+    TEST_CASE("Decides signature help kind as function for lambda call", "[Language_server][Signature_help][Lambda]")
+    {
+        // Verifies that calling a lambda-typed variable shows function signature help.
+        std::string_view const source =
+            R"(module A;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function apply(cmp: Comparator, x: Int32, y: Int32) -> (result: Int32)
+{
+    return cmp(x, $CURSOR_POSITIONy);
+}
+)";
+
+        Signature_help_kind const kind = run_signature_help_kind_test(source);
+        CHECK(kind == Signature_help_kind::Function);
+    }
+
+    TEST_CASE("Finds function call module and function name for lambda call", "[Language_server][Signature_help][Lambda]")
+    {
+        // Verifies that calling a lambda-typed variable identifies the correct
+        // lambda declaration (Comparator) as the function to show signature help for.
+        std::string_view const source =
+            R"(module A;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function apply(cmp: Comparator, x: Int32, y: Int32) -> (result: Int32)
+{
+    return cmp(x, $CURSOR_POSITIONy);
+}
+)";
+
+        std::optional<Signature_help_name> const result = run_find_function_call_test(source);
+
+        REQUIRE(result.has_value());
+        CHECK(result->module_name == "A");
+        CHECK(result->declaration_name == "Comparator");
+    }
+
+    TEST_CASE("Finds active function parameter for lambda call first argument", "[Language_server][Signature_help][Lambda]")
+    {
+        // Verifies that the first argument position is correctly identified.
+        std::string_view const source =
+            R"(module A;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function apply(cmp: Comparator, x: Int32, y: Int32) -> (result: Int32)
+{
+    return cmp($CURSOR_POSITIONx, y);
+}
+)";
+
+        std::optional<std::uint32_t> const result = run_find_active_parameter_test(source);
+        REQUIRE(result.has_value());
+        CHECK(result.value() == 0);
+    }
+
+    TEST_CASE("Finds active function parameter for lambda call second argument", "[Language_server][Signature_help][Lambda]")
+    {
+        // Verifies that the second argument position is correctly identified.
+        std::string_view const source =
+            R"(module A;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function apply(cmp: Comparator, x: Int32, y: Int32) -> (result: Int32)
+{
+    return cmp(x, $CURSOR_POSITIONy);
+}
+)";
+
+        std::optional<std::uint32_t> const result = run_find_active_parameter_test(source);
+        REQUIRE(result.has_value());
+        CHECK(result.value() == 1);
+    }
+
+    TEST_CASE("Computes signature help for lambda call with explicit return type", "[Language_server][Signature_help][Lambda]")
+    {
+        // Verifies that signature help for a lambda call with explicit return type
+        // shows the correct lambda signature and active parameter.
+        std::string_view const source =
+            R"(module A;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function apply(cmp: Comparator, x: Int32, y: Int32) -> (result: Int32)
+{
+    return cmp(x, $CURSOR_POSITIONy);
+}
+)";
+
+        lsp::TextDocument_SignatureHelpResult const result = run_signature_help_test(source);
+
+        REQUIRE(!result.isNull());
+        REQUIRE(result->signatures.size() == 1);
+
+        // Verify the signature label matches the Comparator lambda
+        CHECK(result->signatures[0].label == "lambda Comparator(a: Int32, b: Int32) -> (result: Int32)");
+
+        // Verify active parameter is 1 (second argument 'y')
+        REQUIRE(result->activeParameter.has_value());
+        CHECK(result->activeParameter.value() == 1);
+
+        // Verify parameters have documentation
+        REQUIRE(result->signatures[0].parameters.has_value());
+        REQUIRE(result->signatures[0].parameters->size() == 2);
+    }
+
+    TEST_CASE("Computes signature help for lambda call with inferred return type", "[Language_server][Signature_help][Lambda]")
+    {
+        // Verifies that signature help for a lambda call shows the correct
+        // lambda signature (Mapper) with proper parameter info.
+        std::string_view const source =
+            R"(module A;
+
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function apply_mapper(mapper: Mapper, x: Int32) -> Int32
+{
+    return mapper($CURSOR_POSITIONx);
+}
+)";
+
+        lsp::TextDocument_SignatureHelpResult const result = run_signature_help_test(source);
+
+        REQUIRE(!result.isNull());
+        REQUIRE(result->signatures.size() == 1);
+
+        // Verify the signature label matches the Mapper lambda
+        CHECK(result->signatures[0].label == "lambda Mapper(value: Int32) -> (result: Int32)");
+
+        // Verify active parameter is 0 (first argument 'x')
+        REQUIRE(result->activeParameter.has_value());
+        CHECK(result->activeParameter.value() == 0);
+
+        // Verify parameter has documentation
+        REQUIRE(result->signatures[0].parameters.has_value());
+        REQUIRE(result->signatures[0].parameters->size() == 1);
+    }
+
+    TEST_CASE("Computes signature help for nested lambda call", "[Language_server][Signature_help][Lambda]")
+    {
+        // Verifies that signature help for a nested lambda call correctly identifies
+        // the inner lambda (Inner) rather than the outer lambda (Outer).
+        std::string_view const source =
+            R"(module A;
+
+lambda Inner(x: Int32) -> (result: Int32);
+lambda Outer(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var outer: Outer = lambda(a, b) => {
+        var inner: Inner = lambda(x) => x + a;
+        return inner($CURSOR_POSITIONb);
+    };
+}
+)";
+
+        lsp::TextDocument_SignatureHelpResult const result = run_signature_help_test(source);
+
+        REQUIRE(!result.isNull());
+        REQUIRE(result->signatures.size() == 1);
+
+        // Verify the signature label matches the Inner lambda (not Outer)
+        CHECK(result->signatures[0].label == "lambda Inner(x: Int32) -> (result: Int32)");
+
+        // Verify active parameter is 0 (first argument 'b')
+        REQUIRE(result->activeParameter.has_value());
+        CHECK(result->activeParameter.value() == 0);
+
+        // Verify parameter has documentation
+        REQUIRE(result->signatures[0].parameters.has_value());
+        REQUIRE(result->signatures[0].parameters->size() == 1);
+    }
+
+    TEST_CASE("Computes signature help for lambda call with captures", "[Language_server][Signature_help][Lambda]")
+    {
+        // Verifies that signature help for a lambda call works correctly even when
+        // the lambda captures variables from the enclosing scope.
+        std::string_view const source =
+            R"(module A;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var offset: Int32 = 10;
+    var cmp: Comparator = lambda(a, b) => a - b + offset;
+    var result = cmp($CURSOR_POSITION10, 3);
+}
+)";
+
+        lsp::TextDocument_SignatureHelpResult const result = run_signature_help_test(source);
+
+        REQUIRE(!result.isNull());
+        REQUIRE(result->signatures.size() == 1);
+
+        // Verify the signature label matches the Comparator lambda
+        CHECK(result->signatures[0].label == "lambda Comparator(a: Int32, b: Int32) -> (result: Int32)");
+
+        // Verify active parameter is 0 (first argument '10')
+        REQUIRE(result->activeParameter.has_value());
+        CHECK(result->activeParameter.value() == 0);
+
+        // Verify parameters have documentation
+        REQUIRE(result->signatures[0].parameters.has_value());
+        REQUIRE(result->signatures[0].parameters->size() == 2);
+    }
+
+    TEST_CASE("Computes signature help for lambda call with multiple lambdas", "[Language_server][Signature_help][Lambda]")
+    {
+        // Verifies that signature help correctly identifies the right lambda
+        // when multiple lambda types are in scope.
+        std::string_view const source =
+            R"(module A;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function main() -> ()
+{
+    var cmp: Comparator = lambda(a, b) => a - b;
+    var mapped: Mapper = lambda(v) => v * 2;
+    var result = cmp($CURSOR_POSITION10, 3);
+}
+)";
+
+        lsp::TextDocument_SignatureHelpResult const result = run_signature_help_test(source);
+
+        REQUIRE(!result.isNull());
+        REQUIRE(result->signatures.size() == 1);
+
+        // Verify the signature label matches the Comparator lambda (not Mapper)
+        CHECK(result->signatures[0].label == "lambda Comparator(a: Int32, b: Int32) -> (result: Int32)");
+
+        // Verify active parameter is 0 (first argument '10')
+        REQUIRE(result->activeParameter.has_value());
+        CHECK(result->activeParameter.value() == 0);
+
+        // Verify parameters have documentation
+        REQUIRE(result->signatures[0].parameters.has_value());
+        REQUIRE(result->signatures[0].parameters->size() == 2);
     }
 }
