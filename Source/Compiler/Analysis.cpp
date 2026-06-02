@@ -1671,10 +1671,19 @@ namespace iris::compiler
                         if (data.arguments.size() > 0)
                         {
                             iris::Statement const argument = data.arguments[0];
-                            if (!argument.expressions.empty() && std::holds_alternative<iris::Type_expression>(argument.expressions[0].data))
+                            if (!argument.expressions.empty())
                             {
-                                iris::Type_expression const& type_expression = std::get<iris::Type_expression>(argument.expressions[0].data);
-                                element_type.push_back(type_expression.type);
+                                if (std::holds_alternative<iris::Type_expression>(argument.expressions[0].data))
+                                {
+                                    iris::Type_expression const& type_expression = std::get<iris::Type_expression>(argument.expressions[0].data);
+                                    element_type.push_back(type_expression.type);
+                                }
+                                else if (std::holds_alternative<iris::Reflection_expression>(argument.expressions[0].data))
+                                {
+                                    std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, argument, argument.expressions[0], std::nullopt, declaration_database);
+                                    if (type.has_value())
+                                        element_type.push_back(type.value());
+                                }
                             }
                         }
 
@@ -1896,6 +1905,13 @@ namespace iris::compiler
                     .type = create_custom_type_reference("iris.builtin", "Type_kind"),
                     .is_mutable = false,
                 };
+            }
+            else if (data.name == "type_of")
+            {
+                if (data.arguments.empty())
+                    return std::nullopt;
+                
+                return get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
             }
 
             return std::nullopt;

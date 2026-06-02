@@ -905,6 +905,10 @@
           "named": true
         },
         {
+          "type": "Expression_reflection_call",
+          "named": true
+        },
+        {
           "type": "Expression_type",
           "named": true
         }

@@ -545,6 +545,60 @@ export function run_member_type_usage() -> ()
         CHECK(location != builtin_import->usages.end());
     }
 
+    TEST_CASE("Evaluates compile_time reflection type_of", "[Compile_time_pass][Passes][Type_of]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+export function run_type_of() -> ()
+{
+    var value: @type_of(0u64) = 0u64;
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+export function run_type_of() -> ()
+{
+    var value: Uint64 = 0u64;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_type_of");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection type_of in constructor type argument", "[Compile_time_pass][Passes][Type_of]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+function external_function(value: *Int32) -> ()
+{
+}
+
+export function run_type_of_reinterpret(pointer: *Int32) -> ()
+{
+    var value = reinterpret_as::<@type_of(external_function)>(pointer);
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+function external_function(value: *Int32) -> ()
+{
+}
+
+export function run_type_of_reinterpret(pointer: *Int32) -> ()
+{
+    var value = reinterpret_as::<function<(value: *Int32) -> ()>>(pointer);
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_type_of_reinterpret");
+
+        CHECK(expected == actual);
+    }
+
     TEST_CASE("Rewrites check equality to print json difference before checking", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_check;

@@ -217,7 +217,8 @@ module.exports = grammar({
     Expression_instance_call: $ => prec.left(13, seq($.Generic_expression, seq("::<", optional(seq($.Expression_instance_call_parameter, repeat(seq(",", $.Expression_instance_call_parameter)))), ">"))),
     Expression_instance_call_parameter: $ => choice(
       $.Expression_constant,
-      $.Expression_type
+      $.Expression_type,
+      $.Expression_reflection_call
     ),
     Expression_instantiate: $ => seq(optional(choice("explicit", "uninitialized", "zero_initialized")), $.Expression_instantiate_members),
     Expression_instantiate_members: $ => seq("{", optional(seq($.Expression_instantiate_member, repeat(seq(",", $.Expression_instantiate_member)))), "}"),

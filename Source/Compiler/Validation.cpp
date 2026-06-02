@@ -3701,6 +3701,32 @@ namespace iris::compiler
                 };
             }
         }
+        else if (expression.name == "type_of")
+        {
+            if (!expression.type_arguments.empty())
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        "@type_of does not have any type arguments."
+                    )
+                };
+            }
+
+            if (expression.arguments.size() != 1)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        "@type_of requires 1 parameter."
+                    )
+                };
+            }
+        }
 
         return {};
     }
@@ -4203,6 +4229,23 @@ namespace iris::compiler
                     std::format("Cannot assign expression of type 'void' to variable '{}'.", expression.name)
                 )
             };
+        }
+
+        iris::Expression const& right_hand_side = parameters.statement.expressions[expression.right_hand_side.expression_index];
+        if (std::holds_alternative<iris::Reflection_expression>(right_hand_side.data))
+        {
+            iris::Reflection_expression const& reflection_expression = std::get<iris::Reflection_expression>(right_hand_side.data);
+            if (reflection_expression.name == "type_of")
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        right_hand_side.source_range,
+                        std::format("Cannot assign expression 'type_of' to variable '{}'.", expression.name)
+                    )
+                };
+            }
         }
 
         return {};

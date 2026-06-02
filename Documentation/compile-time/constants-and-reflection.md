@@ -26,6 +26,27 @@ Returns the required alignment of a type in bytes:
 var align = @alignment_of::<Float64>();   // 8u64
 ```
 
+## `@type_of` — Type of an Expression
+
+Returns the type of a single expression as a type expression.
+
+```iris
+function external_function(value: *Int32) -> ()
+{
+}
+
+function run(pointer: *Int32) -> ()
+{
+    var typed_pointer = reinterpret_as::<@type_of(external_function)>(pointer);
+}
+```
+
+Rules:
+
+- `@type_of` takes exactly one expression parameter.
+- `@type_of` does not take type arguments.
+- `@type_of` is intended for type positions (for example, typed declarations and constructor/type arguments).
+
 ## `@member_count` — Struct/Union Member Count
 
 Returns the number of fields in a struct or union:

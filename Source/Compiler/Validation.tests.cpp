@@ -6399,6 +6399,121 @@ function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that @type_of does not have type arguments", "[Validation][Type_of]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run() -> ()
+{
+    var v1 = @type_of::<Int32>(0u64);
+    var v2 = @type_of::<Int32, Float32>(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 14, 5, 37),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@type_of does not have any type arguments.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 14, 6, 46),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@type_of does not have any type arguments.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @type_of requires exactly one parameter", "[Validation][Type_of]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run() -> ()
+{
+    var v1 = @type_of();
+    var v2 = @type_of(0u64, 1u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 14, 5, 24),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@type_of requires 1 parameter.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 14, 6, 34),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "@type_of requires 1 parameter.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @type_of cannot be used as a runtime expression", "[Validation][Type_of]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run() -> ()
+{
+    var v0 = @type_of(0u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 14, 5, 28),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot assign expression 'type_of' to variable 'v0'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that @type_of can be used in reinterpret_as", "[Validation][Type_of]")
+    {
+        std::string_view const input = R"(module Test;
+
+function foo() -> ()
+{
+}
+
+function run(pointer: *Void) -> ()
+{
+    var x = reinterpret_as::<@type_of(foo)>(pointer);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+
     TEST_CASE("Validates that @member_name has only one type argument", "[Validation][Member_name]")
     {
         std::string_view const input = R"(module Test;

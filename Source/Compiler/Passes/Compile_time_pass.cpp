@@ -1291,6 +1291,33 @@ namespace iris::compiler
 
             return create_value_and_type(std::move(enum_statement));
         }
+        else if (expression.name == "type_of")
+        {
+            if (!expression.type_arguments.empty())
+                throw std::runtime_error{ "type_of() does not take type arguments!" };
+
+            if (expression.arguments.size() != 1)
+                throw std::runtime_error{ "type_of() requires exactly one argument!" };
+
+            iris::Expression_index const argument_expression_index = expression.arguments[0];
+            if (argument_expression_index.expression_index >= statement.expressions.size())
+                throw std::runtime_error{ "type_of() argument index is out of bounds!" };
+
+            Scope scope = {};
+            std::optional<iris::Type_reference> const type = get_expression_type(
+                module_name,
+                nullptr,
+                scope,
+                statement,
+                statement.expressions[argument_expression_index.expression_index],
+                std::nullopt,
+                parameters.declaration_database
+            );
+            if (!type.has_value())
+                throw std::runtime_error{ "type_of() could not resolve expression type!" };
+
+            return create_value_and_type(create_type_expression_statement(type.value()));
+        }
         else
         {
             throw std::runtime_error{ std::format("Reflection expression '{}' not implemented!", expression.name) };
@@ -1764,6 +1791,29 @@ namespace iris::compiler
             if (new_value.has_value())
             {
                 replace_expression(statement, expression, new_value->statement, parameters.temporaries_allocator);
+            }
+        }
+        else if (std::holds_alternative<iris::Instance_call_expression>(expression.data))
+        {
+            iris::Instance_call_expression const& instance_call_expression = std::get<iris::Instance_call_expression>(expression.data);
+
+            for (iris::Statement const& argument_statement : instance_call_expression.arguments)
+            {
+                iris::Statement& mutable_argument_statement = const_cast<iris::Statement&>(argument_statement);
+                auto const visit_and_replace = [&](iris::Expression const& nested_expression, iris::Statement const& nested_statement) -> bool
+                {
+                    iris::Statement& mutable_nested_statement = const_cast<iris::Statement&>(nested_statement);
+                    visit_and_replace_compile_time_expressions(
+                        module_name,
+                        mutable_nested_statement,
+                        nested_expression,
+                        parameters,
+                        compile_time_local_variables
+                    );
+                    return false;
+                };
+
+                visit_expressions(mutable_argument_statement, visit_and_replace);
             }
         }
         else if (std::holds_alternative<iris::Compile_time_expression>(expression.data))

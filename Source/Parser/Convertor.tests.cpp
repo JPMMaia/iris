@@ -508,6 +508,12 @@ namespace iris::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts type_of_in_constructor_type_argument.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "type_of_in_constructor_type_argument.iris";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts ternary_condition_expressions.iris", "[Convertor]")
     {
         std::string_view const input_file = "ternary_condition_expressions.iris";

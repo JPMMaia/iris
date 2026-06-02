@@ -1,0 +1,10 @@
+module type_of_in_constructor_type_argument;
+
+function external_function(value: *Int32) -> ()
+{
+}
+
+function run(pointer: *Int32) -> ()
+{
+    var value = reinterpret_as::<@type_of(external_function)>(pointer);
+}

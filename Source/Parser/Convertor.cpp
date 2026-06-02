@@ -2837,7 +2837,15 @@ namespace iris::parser
         }
         
         std::pmr::vector<Parse_node> const argument_nodes = get_child_nodes(tree, node, "Expression_instance_call_parameter", temporaries_allocator);
-        output.arguments = node_to_block(module_info, tree, argument_nodes, output_allocator, temporaries_allocator);
+        output.arguments = std::pmr::vector<iris::Statement>{output_allocator};
+        output.arguments.reserve(argument_nodes.size());
+
+        for (Parse_node const& argument_node : argument_nodes)
+        {
+            output.arguments.push_back(
+                node_to_statement(module_info, tree, argument_node, output_allocator, temporaries_allocator)
+            );
+        }
 
         {
             std::pmr::vector<bool> arguments_mutability{output_allocator};
