@@ -4,10 +4,6 @@ cmake_policy(SET CMP0207 NEW)
 
 project(Iris LANGUAGES C CXX)
 
-if(MSVC)
-    add_link_options($<$<CONFIG:Debug>:/DEBUG:FASTLINK>)
-endif()
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
