@@ -7,7 +7,7 @@ description: 'Describes how to configure and build all CMake targets on Windows.
 
 To configure CMake:
 
-`cmake --preset windows-debug`
+`cmake --preset windows`
 
 To build all CMake targets:
 
