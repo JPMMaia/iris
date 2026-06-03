@@ -394,9 +394,8 @@ namespace iris::compiler
             std::optional<std::filesystem::path> const artifact_file_path = iris::compiler::get_artifact_location(repositories, artifact_name);
             if (!artifact_file_path.has_value())
             {
-                iris::common::print_message_and_exit(
-                    std::format("Error: Could not find dependency '{}'.\n", artifact_name)
-                );
+                std::printf("Error: Could not find dependency '%s'.\n", artifact_name.data());
+                return;
             }
 
             Artifact const artifact = get_artifact(artifact_file_path.value(), environment_variables);

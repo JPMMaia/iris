@@ -29,7 +29,6 @@ namespace iris::language_server
     {
         std::filesystem::path const workspace_directory = create_clean_temporary_directory("iris_language_server_presets_workspace");
         std::filesystem::path const dependency_directory = workspace_directory / "dependency";
-        std::filesystem::path const standard_repository_path = iris::common::get_standard_repository_file_path();
         std::filesystem::path const build_directory = workspace_directory / "preset_build";
         std::filesystem::create_directories(dependency_directory);
 
@@ -119,7 +118,6 @@ export function main() -> (result: Int32)
                 R"({{
     "build_directory": "preset_build",
     "repository_paths": [
-        "{}",
         "iris_repository.json"
     ],
     "function_contracts": "disabled",
@@ -128,7 +126,6 @@ export function main() -> (result: Int32)
         "PROJECT_ROOT": "{}"
     }}
 }})",
-                standard_repository_path.generic_string(),
                 workspace_directory.generic_string()
             )
         );

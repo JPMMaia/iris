@@ -357,10 +357,14 @@ namespace iris::language_server
         std::optional<iris::compiler::Presets> const& presets
     )
     {
+        std::filesystem::path const standard_repository_path = iris::common::get_standard_repository_file_path();
         if (!presets.has_value())
-            return {};
+            return {standard_repository_path};
 
-        return presets->repository_paths;
+        return merge_paths_with_dedup(
+            std::span<std::filesystem::path const>{ &standard_repository_path, 1 },
+            presets->repository_paths
+        );
     }
 
     static iris::compiler::Compilation_options get_compilation_options(
