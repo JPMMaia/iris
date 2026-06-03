@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Iris Project",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "dependencies_storage_path", "dependencies_build_path"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique project name."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+(\\.\\d+){0,2}$",
+      "description": "Semantic version of the project (e.g. \"0.1.0\")."
+    },
+    "dependencies_storage_path": {
+      "type": "string",
+      "description": "Path where dependency sources are stored."
+    },
+    "dependencies_build_path": {
+      "type": "string",
+      "description": "Path where dependencies are built."
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "List of project dependencies.",
+      "items": {
+        "$ref": "#/definitions/dependency"
+      }
+    }
+  },
+  "definitions": {
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "source_url"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the dependency."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+(\\.\\d+){0,2}$",
+          "description": "Semantic version of the dependency (e.g. \"0.1.0\")."
+        },
+        "source_url": {
+          "type": "string",
+          "description": "URL to fetch the dependency source from."
+        },
+        "build_commands": {
+          "type": "array",
+          "description": "Commands to build the dependency.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "install_path": {
+          "type": "string",
+          "description": "Directory within the dependency build path where the dependency is installed. Defaults to \"install\".",
+          "default": "install"
+        }
+      }
+    }
+  }
+}

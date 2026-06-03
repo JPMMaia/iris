@@ -28,6 +28,9 @@ if(BUILD_TESTING)
    find_package(Catch2 CONFIG REQUIRED)
    target_link_libraries(Iris_JSON_serializer_tests PRIVATE Catch2::Catch2WithMain)
 
+   find_package(nlohmann_json CONFIG REQUIRED)
+   target_link_libraries(Iris_JSON_serializer_tests PRIVATE nlohmann_json::nlohmann_json)
+
    target_sources(Iris_JSON_serializer_tests PRIVATE "JSON_serializer.tests.cpp")
 
    include(Catch)

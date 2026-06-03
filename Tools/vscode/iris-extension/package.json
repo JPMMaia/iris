@@ -78,6 +78,10 @@
       {
         "fileMatch": "**/iris_presets.json",
         "url": "./schemas/iris_presets.schema.json"
+      },
+      {
+        "fileMatch": "**/iris_project.json",
+        "url": "./schemas/iris_project.schema.json"
       }
     ]
   },

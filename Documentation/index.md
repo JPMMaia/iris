@@ -39,7 +39,7 @@ export function main() -> (result: Int32)
 Iris is still in early development and as such there are many bugs, caveats, and features that are not supported yet:
 - Currently, it only supports **x64 windows ABI**. Linux x64 or arm64 ABIs are not supported yet.
 - Iris uses a custom build system (`iris_artifact.json`/`iris_repository.json`). Integration with other build systems (e.g. CMake) is not supported yet.
-- External library dependencies are currently difficult to setup as it requires writing your own `iris_artifact.json`/`iris_repository.json` files.
+- External library dependencies can be managed with `iris_project.json` (see [Dependencies](tooling/dependencies.md)).
 - The syntax and features are changing all the time.
 - Almost non-existing Iris standard library.
 - Some interactions with the C standard library don't work well yet (e.g. using the `stdout` macro).
@@ -53,5 +53,6 @@ Iris is still in early development and as such there are many bugs, caveats, and
 | Understand the language fundamentals | [Language → Modules](language/modules.md) |
 | Call a C library | [Interoperability → Importing C](interop/importing-c.md) |
 | Understand the build system | [Tooling → Build System](tooling/build-system.md) |
+| Manage external library dependencies | [Tooling → Dependencies](tooling/dependencies.md) |
 | Write generic/reusable code | [Generic Programming → Function Constructors](generics/function-constructors.md) |
 | Optimise memory layout | [Memory → Structure of Arrays](memory/structure-of-arrays.md) |

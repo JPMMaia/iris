@@ -10,6 +10,7 @@ import iris.common;
 import iris.compiler;
 import iris.compiler.artifact;
 import iris.compiler.builder;
+import iris.compiler.project;
 import iris.compiler.expressions;
 import iris.compiler.linker;
 import iris.compiler.presets;
@@ -521,6 +522,30 @@ int main(int const argc, char const* const* argv)
     add_target_triple_argument(generate_compile_commands_command);
     program.add_subparser(generate_compile_commands_command);
 
+    // iris download-dependencies [--project=<project_file>] [--target=<dep_name>]
+    argparse::ArgumentParser download_deps_command("download-dependencies");
+    download_deps_command.add_description("Download dependency source archives.");
+    download_deps_command.add_argument("--project")
+        .help("Path to iris_project.json")
+        .default_value("iris_project.json");
+    download_deps_command.add_argument("--target")
+        .help("Download only this dependency (repeatable)")
+        .default_value<std::vector<std::string>>({})
+        .append();
+    program.add_subparser(download_deps_command);
+
+    // iris build-dependencies [--project=<project_file>] [--target=<dep_name>]
+    argparse::ArgumentParser build_deps_command("build-dependencies");
+    build_deps_command.add_description("Build dependencies.");
+    build_deps_command.add_argument("--project")
+        .help("Path to iris_project.json")
+        .default_value("iris_project.json");
+    build_deps_command.add_argument("--target")
+        .help("Build only this dependency (repeatable)")
+        .default_value<std::vector<std::string>>({})
+        .append();
+    program.add_subparser(build_deps_command);
+
     try
     {
         program.parse_args(argc, argv);
@@ -784,6 +809,60 @@ int main(int const argc, char const* const* argv)
             compilation_options,
             output_file_path
         );
+    }
+    else if (program.is_subcommand_used("download-dependencies"))
+    {
+        print_arguments(argc, argv);
+
+        argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("download-dependencies");
+        std::filesystem::path const project_path = subprogram.get<std::string>("--project");
+
+        iris::compiler::Iris_project const project = iris::compiler::get_iris_project(project_path);
+
+        std::vector<std::string> const targets = subprogram.get<std::vector<std::string>>("--target");
+        if (!targets.empty())
+        {
+            std::vector<iris::compiler::Project_dependency> filtered_deps;
+            for (std::string_view const target_name : targets)
+            {
+                auto const it = std::find_if(project.dependencies.begin(), project.dependencies.end(),
+                    [&target_name](iris::compiler::Project_dependency const& dep) { return dep.name == target_name; });
+                if (it != project.dependencies.end())
+                    filtered_deps.push_back(*it);
+            }
+            iris::compiler::download_dependencies(project, std::span<iris::compiler::Project_dependency const>{filtered_deps});
+        }
+        else
+        {
+            iris::compiler::download_dependencies(project);
+        }
+    }
+    else if (program.is_subcommand_used("build-dependencies"))
+    {
+        print_arguments(argc, argv);
+
+        argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("build-dependencies");
+        std::filesystem::path const project_path = subprogram.get<std::string>("--project");
+
+        iris::compiler::Iris_project const project = iris::compiler::get_iris_project(project_path);
+
+        std::vector<std::string> const targets = subprogram.get<std::vector<std::string>>("--target");
+        if (!targets.empty())
+        {
+            std::vector<iris::compiler::Project_dependency> filtered_deps;
+            for (std::string_view const target_name : targets)
+            {
+                auto const it = std::find_if(project.dependencies.begin(), project.dependencies.end(),
+                    [&target_name](iris::compiler::Project_dependency const& dep) { return dep.name == target_name; });
+                if (it != project.dependencies.end())
+                    filtered_deps.push_back(*it);
+            }
+            iris::compiler::build_dependencies(project, std::span<iris::compiler::Project_dependency const>{filtered_deps});
+        }
+        else
+        {
+            iris::compiler::build_dependencies(project);
+        }
     }
 
     return 0;

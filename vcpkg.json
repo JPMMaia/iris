@@ -8,6 +8,9 @@
     "tree-sitter",
     "xxhash",
     "zlib",
+    "miniz",
+    "curl",
+    "reproc",
     {
       "name": "llvm",
       "features": [

@@ -27,4 +27,19 @@ namespace iris::common
     export std::filesystem::path get_standard_repository_file_path();
 
     export std::filesystem::path get_visualizers_file_path();
+
+    export std::optional<std::pmr::string> download_file(
+        std::string_view const url,
+        std::filesystem::path const& destination_path
+    );
+
+    export bool extract_zip(
+        std::filesystem::path const& archive_path,
+        std::filesystem::path const& destination_directory
+    );
+
+    export int execute_command(
+        std::filesystem::path const& working_directory,
+        std::string_view const command
+    );
 }

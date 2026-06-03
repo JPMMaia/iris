@@ -1,6 +1,7 @@
 module;
 
 #include <assert.h>
+#include <nlohmann/json.hpp>
 #include <stdio.h>
 
 module iris.compiler.builder;
@@ -23,6 +24,7 @@ import iris.compiler.clang_data;
 import iris.compiler.compile_commands_generator;
 import iris.compiler.linker;
 import iris.compiler.profiler;
+import iris.compiler.project;
 import iris.compiler.repository;
 import iris.compiler.target;
 import iris.compiler.test_framework;
@@ -2096,5 +2098,171 @@ namespace iris::compiler
         }
 
         return std::pmr::vector<std::filesystem::path>{std::move(found_files), output_allocator};
+    }
+
+    void download_dependency(
+        Iris_project const& project,
+        Project_dependency const& dependency
+    )
+    {
+        std::printf("Downloading dependency '%s'...\n", dependency.name.c_str());
+
+        std::filesystem::path const storage_path = std::filesystem::current_path() / project.dependencies_storage_path;
+        std::filesystem::create_directories(storage_path);
+
+        std::string const archive_name = std::format("{}-{}.zip", dependency.name, dependency.version);
+        std::filesystem::path const archive_path = storage_path / archive_name;
+
+        if (std::filesystem::exists(archive_path))
+        {
+            std::printf("Archive already exists: %s\n", archive_path.generic_string().c_str());
+            return;
+        }
+
+        auto const result = iris::common::download_file(dependency.source_url, archive_path);
+        if (!result.has_value())
+        {
+            iris::common::print_message_and_exit(std::format("Failed to download '{}': {}", dependency.name, result.value()));
+        }
+
+        std::printf("Downloaded '%s' -> %s\n", dependency.name.c_str(), archive_path.generic_string().c_str());
+    }
+
+    void download_dependencies(
+        Iris_project const& project,
+        std::optional<std::span<Project_dependency const>> const targets
+    )
+    {
+        std::vector<Project_dependency const*> dependencies_to_download;
+
+        if (targets.has_value())
+        {
+            for (Project_dependency const& dependency : *targets)
+                dependencies_to_download.push_back(&dependency);
+        }
+        else
+        {
+            for (Project_dependency const& dependency : project.dependencies)
+                dependencies_to_download.push_back(&dependency);
+        }
+
+        for (Project_dependency const* dependency : dependencies_to_download)
+        {
+            download_dependency(project, *dependency);
+        }
+    }
+
+    void build_dependency(
+        Iris_project const& project,
+        Project_dependency const& dependency
+    )
+    {
+        std::printf("Building dependency '%s'...\n", dependency.name.c_str());
+
+        std::filesystem::path const storage_path = std::filesystem::current_path() / project.dependencies_storage_path;
+        std::string const archive_name = std::format("{}-{}.zip", dependency.name, dependency.version);
+        std::filesystem::path const archive_path = storage_path / archive_name;
+
+        if (!std::filesystem::exists(archive_path))
+        {
+            iris::common::print_message_and_exit(
+                std::format(
+                    "Archive not found: {}. Did you run 'download-dependencies'?",
+                    archive_path.generic_string()
+                )
+            );
+        }
+
+        std::filesystem::path const build_path = std::filesystem::current_path() / project.dependencies_build_path;
+        std::filesystem::create_directories(build_path);
+
+        std::filesystem::path const extract_path = build_path / std::format("{}-{}", dependency.name, dependency.version);
+
+        if (!iris::common::extract_zip(archive_path, extract_path))
+        {
+            iris::common::print_message_and_exit(std::format("Failed to extract '{}'", archive_path.generic_string()));
+        }
+
+        for (std::string_view const build_command : dependency.build_commands)
+        {
+            std::printf("Running: %s\n", build_command.data());
+            int const exit_code = iris::common::execute_command(extract_path, build_command);
+            if (exit_code != 0)
+            {
+                std::filesystem::path const log_path = extract_path / "build-log.txt";
+                iris::common::print_message_and_exit(
+                    std::format(
+                        "Build command failed for '{}': '{}' (exit code: {}).\nSee log file for details: {}",
+                        dependency.name,
+                        build_command,
+                        exit_code,
+                        log_path.generic_string()
+                    )
+                );
+            }
+        }
+
+        // Update iris_presets.json
+        std::filesystem::path const presets_path = std::filesystem::current_path() / "iris_presets.json";
+        auto const existing_presets = try_get_presets(presets_path);
+
+        Environment_variables env_vars;
+        if (existing_presets.has_value())
+            env_vars = existing_presets->environment_variables;
+
+        std::pmr::string const var_name = std::pmr::string{std::format("{}_root_path", dependency.name)};
+        std::filesystem::path const install_path = extract_path / (dependency.install_path.value_or("install"));
+        env_vars[var_name] = install_path.generic_string();
+
+        // Write presets
+        nlohmann::json presets_json;
+        if (existing_presets.has_value())
+        {
+            presets_json = nlohmann::json::object();
+            if (existing_presets->build_directory_path.has_value())
+                presets_json["build_directory"] = existing_presets->build_directory_path.value().generic_string();
+            presets_json["repository_paths"] = existing_presets->repository_paths;
+            presets_json["header_search_paths"] = existing_presets->header_search_paths;
+            if (existing_presets->function_contract_options.has_value())
+            {
+                presets_json["function_contracts"] = (existing_presets->function_contract_options.value() == Contract_options::Disabled) ? "disabled" : "log_error_and_abort";
+            }
+            if (existing_presets->output_llvm_ir.has_value())
+                presets_json["output_llvm_ir"] = existing_presets->output_llvm_ir.value();
+            presets_json["environment_variables"] = env_vars;
+        }
+        else
+        {
+            presets_json = nlohmann::json::object({{"environment_variables", env_vars}});
+        }
+
+        std::string const json_string = presets_json.dump(4);
+        iris::common::write_to_file(presets_path, json_string);
+
+        std::printf("Updated %s with %s=%s\n", presets_path.generic_string().c_str(), var_name.c_str(), env_vars.at(var_name).c_str());
+    }
+
+    void build_dependencies(
+        Iris_project const& project,
+        std::optional<std::span<Project_dependency const>> const targets
+    )
+    {
+        std::vector<Project_dependency const*> dependencies_to_build;
+
+        if (targets.has_value())
+        {
+            for (Project_dependency const& dependency : *targets)
+                dependencies_to_build.push_back(&dependency);
+        }
+        else
+        {
+            for (Project_dependency const& dependency : project.dependencies)
+                dependencies_to_build.push_back(&dependency);
+        }
+
+        for (Project_dependency const* dependency : dependencies_to_build)
+        {
+            build_dependency(project, *dependency);
+        }
     }
 }
