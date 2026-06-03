@@ -6,6 +6,7 @@ import iris.core;
 import iris.core.declarations;
 import iris.compiler;
 import iris.compiler.artifact;
+import iris.compiler.project;
 import iris.compiler.profiler;
 import iris.compiler.presets;
 import iris.compiler.repository;
@@ -33,6 +34,8 @@ namespace iris::compiler
         bool output_llvm_ir = false;
         bool is_test_mode = false;
         Environment_variables environment_variables = {};
+        std::optional<std::filesystem::path> dependencies_project_path;
+        std::pmr::vector<Project_dependency> dependencies;
     };
 
     export Builder create_builder(
@@ -193,5 +196,25 @@ namespace iris::compiler
         std::filesystem::path const& path,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    export void download_dependency(
+        Iris_project const& project,
+        Project_dependency const& dependency
+    );
+
+    export void download_dependencies(
+        Iris_project const& project,
+        std::optional<std::span<Project_dependency const>> const targets = std::nullopt
+    );
+
+    export void build_dependency(
+        Iris_project const& project,
+        Project_dependency const& dependency
+    );
+
+    export void build_dependencies(
+        Iris_project const& project,
+        std::optional<std::span<Project_dependency const>> const targets = std::nullopt
     );
 }

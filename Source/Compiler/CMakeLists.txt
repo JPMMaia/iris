@@ -20,6 +20,9 @@ else()
    target_link_libraries(Iris_compiler PRIVATE PkgConfig::XXHASH)
 endif()
 
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(Iris_compiler PRIVATE nlohmann_json::nlohmann_json)
+
 target_sources(Iris_compiler
    PUBLIC FILE_SET modules TYPE CXX_MODULES
       FILES
@@ -49,6 +52,7 @@ target_sources(Iris_compiler
          "Project/Presets.cppm"
          "Project/Repository.cppm"
          "Project/Target.cppm"
+         "Project/Project.cppm"
    PRIVATE
       "Analysis.cpp"
       "Builder.cpp"
@@ -71,6 +75,7 @@ target_sources(Iris_compiler
       "Project/Artifact.cpp"
       "Project/Presets.cpp"
       "Project/Repository.cpp"
+      "Project/Project.cpp"
 )
 
 if(WIN32)
@@ -145,7 +150,10 @@ if(BUILD_TESTING)
       "Project/Artifacts.tests.cpp"
       "Project/Presets.tests.cpp"
       "Project/Repository.tests.cpp"
+      "Project/Project.tests.cpp"
    )
+   find_package(nlohmann_json CONFIG REQUIRED)
+   target_link_libraries(Iris_project_tests PRIVATE nlohmann_json::nlohmann_json)
    catch_discover_tests(Iris_project_tests)
 
    # Validation tests

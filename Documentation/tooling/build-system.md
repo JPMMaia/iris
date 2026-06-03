@@ -24,6 +24,8 @@ Supported commands that read presets are:
 - `iris build-tests`
 - `iris test`
 - `iris generate-compile-commands`
+- `iris download-dependencies`
+- `iris build-dependencies`
 
 ---
 
@@ -88,6 +90,63 @@ Supported substitution fields in `iris_artifact.json`:
 Not substituted:
 
 - `sources[].include`
+
+---
+
+## `iris_project.json` — External Dependencies
+
+`iris_project.json` is an optional file that declares external library dependencies. When present, it enables the `download-dependencies` and `build-dependencies` commands to automatically download and build third-party libraries.
+
+### Example
+
+```json
+{
+    "name": "my_game",
+    "version": "1.0.0",
+    "dependencies": [
+        {
+            "name": "SDL",
+            "version": "2.30.0",
+            "source_url": "https://github.com/libsdl-org/SDL/releases/download/release-2.30.0/SDL2-2.30.0.zip",
+            "build_commands": [
+                "cmake -S . -B build -G \"Ninja Multi-Config\"",
+                "cmake --build build --config release",
+                "cmake --install build --prefix install"
+            ],
+            "install_path": "install"
+        }
+    ],
+    "dependencies_storage_path": "external",
+    "dependencies_build_path": "build_deps"
+}
+```
+
+### Relationship to `iris_presets.json`
+
+When `build-dependencies` completes, it automatically updates `iris_presets.json` with environment variables for each built dependency:
+
+```json
+{
+    "environment_variables": {
+        "SDL_root_path": "build_deps/SDL-2.30.0/install"
+    }
+}
+```
+
+These variables can then be used in `iris_artifact.json` for linking and header search paths.
+
+### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `iris download-dependencies [--project=<file>] [--target=<name>]` | Download dependency source archives |
+| `iris build-dependencies [--project=<file>] [--target=<name>]` | Build dependencies and update presets |
+
+See [Dependencies](./dependencies.md) for the full reference.
+
+---
+
+## `iris_artifact.json` — Full Reference
 
 ---
 
