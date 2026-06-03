@@ -224,7 +224,16 @@ namespace iris::language_server
         // TODO use workspace/didChangeWatchedFiles to watch for changes in artifact and repository files
       
          while(running)
-            message_handler.processIncomingMessages();
+         {
+            try
+            {
+                message_handler.processIncomingMessages();
+            }
+            catch (const std::exception& e)
+            {
+                std::fprintf(stderr, "Error processing message: %s\n", e.what());
+            }
+         }
     }
 
     void request_workspace_configurations(
