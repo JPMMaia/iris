@@ -62,6 +62,16 @@
 				"cwd": "${workspaceFolder}/../rts-game",
 			},
 			{
+				"name": "iris build-dependencies rts-game",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
+				"args": [
+					"build-dependencies"
+				],
+				"cwd": "${workspaceFolder}/../rts-game",
+			},
+			{
 				"name": "iris build-tests rts-game",
 				"type": "cppvsdbg",
 				"request": "launch",
