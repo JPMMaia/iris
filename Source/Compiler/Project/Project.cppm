@@ -13,6 +13,7 @@ namespace iris::compiler
         std::pmr::string source_url;
         std::pmr::vector<std::pmr::string> build_commands;
         std::optional<std::pmr::string> install_path;
+        std::optional<std::pmr::string> git_ref;
     };
 
     export struct Iris_project

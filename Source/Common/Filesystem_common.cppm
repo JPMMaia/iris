@@ -42,4 +42,17 @@ namespace iris::common
         std::filesystem::path const& working_directory,
         std::string_view const command
     );
+
+    export bool is_git_url(std::string_view url);
+
+    export std::optional<std::filesystem::path> download_git_repo(
+        std::string_view const url,
+        std::string_view const git_ref,
+        bool recurse_submodules
+    );
+
+    export std::optional<std::pmr::string> create_zip_from_directory(
+        std::filesystem::path const& source_directory,
+        std::filesystem::path const& output_zip_path
+    );
 }

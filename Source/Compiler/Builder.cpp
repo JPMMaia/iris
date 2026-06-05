@@ -2119,13 +2119,62 @@ namespace iris::compiler
             return;
         }
 
-        auto const result = iris::common::download_file(dependency.source_url, archive_path);
-        if (!result.has_value())
+        // Branch: git repo vs. direct archive
+        if (iris::common::is_git_url(dependency.source_url))
         {
-            iris::common::print_message_and_exit(std::format("Failed to download '{}': {}", dependency.name, result.value()));
-        }
+            // git_ref is optional — empty string means "use default branch" (omit --branch)
+            std::pmr::string const git_ref = dependency.git_ref.has_value()
+                ? *dependency.git_ref
+                : "";
 
-        std::printf("Downloaded '%s' -> %s\n", dependency.name.c_str(), archive_path.generic_string().c_str());
+            std::optional<std::filesystem::path> const clone_result = iris::common::download_git_repo(
+                dependency.source_url,
+                git_ref,
+                true
+            );
+
+            if (!clone_result.has_value())
+            {
+                iris::common::print_message_and_exit(
+                    std::format("Failed to clone '{}': {}", dependency.name, dependency.source_url)
+                );
+            }
+
+            std::filesystem::path const& cloned_directory = clone_result.value();
+
+            // Remove .git folder
+            std::filesystem::path const git_dir = cloned_directory / ".git";
+            if (std::filesystem::exists(git_dir))
+            {
+                std::filesystem::remove_all(git_dir);
+            }
+
+            // Create zip
+            auto const zip_error = iris::common::create_zip_from_directory(cloned_directory, archive_path);
+
+            // Clean up temp directory
+            std::filesystem::remove_all(cloned_directory);
+
+            if (zip_error.has_value())
+            {
+                std::filesystem::remove_all(cloned_directory);
+                iris::common::print_message_and_exit(
+                    std::format("Failed to zip '{}': {}", dependency.name, zip_error.value())
+                );
+            }
+
+            std::printf("Downloaded '%s' (git) -> %s\n", dependency.name.c_str(), archive_path.generic_string().c_str());
+        }
+        else
+        {
+            auto const result = iris::common::download_file(dependency.source_url, archive_path);
+            if (!result.has_value())
+            {
+                iris::common::print_message_and_exit(std::format("Failed to download '{}': {}", dependency.name, result.value()));
+            }
+
+            std::printf("Downloaded '%s' -> %s\n", dependency.name.c_str(), archive_path.generic_string().c_str());
+        }
     }
 
     void download_dependencies(
