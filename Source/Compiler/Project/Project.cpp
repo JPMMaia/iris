@@ -66,6 +66,13 @@ namespace iris::compiler
             dependency.install_path = "install";
         }
 
+        if (json.contains("git_ref"))
+        {
+            if (!json.at("git_ref").is_string())
+                throw std::runtime_error("'git_ref' must be a string.");
+            dependency.git_ref = json.at("git_ref").get<std::pmr::string>();
+        }
+
         return dependency;
     }
 

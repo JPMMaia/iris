@@ -60,6 +60,10 @@
           "type": "string",
           "description": "Directory within the dependency build path where the dependency is installed. Defaults to \"install\".",
           "default": "install"
+        },
+        "git_ref": {
+          "type": "string",
+          "description": "Git reference (branch, tag, or commit SHA) to clone. If not specified, the default branch is used."
         }
       }
     }
