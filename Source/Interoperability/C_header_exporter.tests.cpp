@@ -812,4 +812,106 @@ extern void(*my_namespace_on_update)(float value);
 
         test_c_exporter(input, {}, {}, expected);
     }
+
+    TEST_CASE("Export Decimal types in struct members")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export struct Price_info
+{
+    amount: Decimal7 = 0d7;
+    tax: Decimal4 = 0d4;
+    small: Decimal2 = 0d2;
+}
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Price_info kind=struct */
+struct my_namespace_Price_info
+{
+    Decimal7 amount;
+    Decimal4 tax;
+    Decimal2 small;
+};
+
+struct Array_slice_my_namespace_Price_info
+{
+    struct my_namespace_Price_info* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Export Decimal types in function signatures")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export function calculate(price: Decimal7, quantity: Decimal2) -> (total: Decimal7);
+export function format_decimal(value: Decimal4) -> ();
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=calculate kind=function */
+Decimal7 my_namespace_calculate(Decimal7 price, Decimal2 quantity);
+/** IRIS_META v=1 module=my.namespace name=format_decimal kind=function */
+void my_namespace_format_decimal(Decimal4 value);
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Export Decimal types in Array_slice")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export struct Price_buffer
+{
+    prices: Array_slice::<Decimal7> = {};
+}
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Price_buffer kind=struct */
+struct my_namespace_Price_buffer
+{
+    struct Array_slice_Decimal7 prices;
+};
+
+struct Array_slice_my_namespace_Price_buffer
+{
+    struct my_namespace_Price_buffer* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Export Decimal types in C++ header")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export struct Price_info
+{
+    amount: Decimal7 = 0d7;
+    tax: Decimal4 = 0d4;
+}
+
+export function calculate(price: Decimal7, quantity: Decimal2) -> (total: Decimal7);
+)RAW";
+
+        std::string_view const cpp_expected = R"RAW(
+namespace my::namespace
+{
+    using Price_info = ::my_namespace_Price_info;
+    using Array_slice_Price_info = ::Array_slice_my_namespace_Price_info;
+
+    inline auto calculate(Decimal7 price, Decimal2 quantity) -> Decimal7 { return ::my_namespace_calculate(price, quantity); }
+}
+)RAW";
+
+        test_cpp_exporter(input, "input.h", cpp_expected);
+    }
 }

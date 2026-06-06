@@ -426,6 +426,15 @@ namespace iris::c
         stream << "_t";
     }
 
+    static void write_decimal_type_name(
+        String_stream& stream,
+        iris::Decimal_type const& value
+    )
+    {
+        stream << "Decimal";
+        stream << value.scale;
+    }
+
     static void write_array_slice_type_name(
         String_stream& stream,
         std::span<iris::Type_reference const> const array_slice_element_type,
@@ -558,6 +567,14 @@ namespace iris::c
             iris::Type_instance const& type_instance = std::get<iris::Type_instance>(array_slice_element_type[0].data);
             stream << "Array_slice_";
             write_c_type_instance_name(stream, declaration_database, type_instance);
+            return;
+        }
+
+        if (!array_slice_element_type.empty() && std::holds_alternative<iris::Decimal_type>(array_slice_element_type[0].data))
+        {
+            iris::Decimal_type const& decimal_type = std::get<iris::Decimal_type>(array_slice_element_type[0].data);
+            stream << "Array_slice_";
+            write_decimal_type_name(stream, decimal_type);
             return;
         }
 
@@ -707,6 +724,14 @@ namespace iris::c
             iris::Type_instance const& data = std::get<iris::Type_instance>(type_reference.data);
             stream << "struct ";
             write_c_type_instance_name(stream, declaration_database, data);
+
+            if (variable_name.has_value())
+                stream << ' ' << variable_name.value();
+        }
+        else if (std::holds_alternative<iris::Decimal_type>(type_reference.data))
+        {
+            iris::Decimal_type const& data = std::get<iris::Decimal_type>(type_reference.data);
+            write_decimal_type_name(stream, data);
 
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
@@ -973,6 +998,14 @@ namespace iris::c
             return;
         }
 
+        if (!array_slice_element_type.empty() && std::holds_alternative<iris::Decimal_type>(array_slice_element_type[0].data))
+        {
+            iris::Decimal_type const& decimal_type = std::get<iris::Decimal_type>(array_slice_element_type[0].data);
+            stream << "Array_slice_";
+            write_decimal_type_name(stream, decimal_type);
+            return;
+        }
+
         auto const write_declaration_name = [&](String_stream& stream, std::string_view const module_name, std::string_view const declaration_name) -> void 
         {
             iris::Type_reference const type_reference = iris::create_custom_type_reference(module_name, declaration_name);
@@ -1094,6 +1127,14 @@ namespace iris::c
         {
             iris::Type_instance const& data = std::get<iris::Type_instance>(type_reference.data);
             stream << create_c_type_instance_name(data);
+
+            if (variable_name.has_value())
+                stream << ' ' << variable_name.value();
+        }
+        else if (std::holds_alternative<iris::Decimal_type>(type_reference.data))
+        {
+            iris::Decimal_type const& data = std::get<iris::Decimal_type>(type_reference.data);
+            write_decimal_type_name(stream, data);
 
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
