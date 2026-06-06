@@ -46,8 +46,14 @@ namespace iris::c
 
         std::stringstream include_stream;
         include_stream << "#include <iris_builtin.h>\n\n";
+
+        std::filesystem::path const build_include_path = "build/include";
         for (std::pair<std::pmr::string const, std::filesystem::path> const& pair : dependencies_c_file_paths)
-            include_stream << "#include <" << pair.second.generic_string() << ">\n";
+        {
+            std::filesystem::path const relative_path = std::filesystem::relative(pair.second, build_include_path);
+            include_stream << "#include <" << relative_path.generic_string() << ">\n";
+        }
+
         if (!dependencies_c_file_paths.empty())
             include_stream << '\n';
         include_stream << "#include <stdint.h>\n";
@@ -158,8 +164,9 @@ namespace iris::c
             "#endif\n";
 
         std::pmr::string const include_guard_name = get_module_namespace(module_name) + "_HPP";
-        std::string const c_header_file_path_string = c_header_file_path.generic_string();
-        return std::pmr::string{std::vformat(template_string, std::make_format_args(include_guard_name, include_guard_name, c_header_file_path_string, content))};
+        std::filesystem::path const relative_path = std::filesystem::relative(c_header_file_path, "build/include");
+        std::string const relative_path_string = relative_path.generic_string();
+        return std::pmr::string{std::vformat(template_string, std::make_format_args(include_guard_name, include_guard_name, relative_path_string, content))};
     }
 
     static void test_cpp_exporter(
@@ -459,7 +466,7 @@ export struct My_struct
 
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const dependencies_c_file_paths
         {
-            { "my_library.module_a", std::filesystem::path{"my_library/module_a.h"} }
+            { "my_library.module_a", std::filesystem::path{"build/include/my_library/module_a.h"} }
         };
 
         std::string_view const expected = R"RAW(

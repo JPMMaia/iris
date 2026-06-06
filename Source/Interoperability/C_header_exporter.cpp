@@ -232,13 +232,16 @@ namespace iris::c
     {
         stream << "#include <iris_builtin.h>\n\n";
 
+        std::filesystem::path const build_include_path = "build/include";
+
         for (iris::Import_module_with_alias const& import_module : core_module.dependencies.alias_imports)
         {
             auto const location = dependencies_c_file_paths.find(import_module.module_name);
             if (location != dependencies_c_file_paths.end())
             {
+                std::filesystem::path const relative_path = std::filesystem::relative(location->second, build_include_path);
                 stream << "#include <";
-                stream << location->second.generic_string();
+                stream << relative_path.generic_string();
                 stream << ">\n";
             }
         }
@@ -1202,7 +1205,8 @@ namespace iris::c
         String_stream stream{std::ios_base::in | std::ios_base::out, temporaries_allocator};
 
         write_header_start(stream, core_module.name, "_HPP");
-        stream << "#include <" << c_header_file_path.generic_string() << ">\n\n";
+        std::filesystem::path const relative_path = std::filesystem::relative(c_header_file_path, "build/include");
+        stream << "#include <" << relative_path.generic_string() << ">\n\n";
 
         stream << "namespace ";
         write_cpp_module_namespace(stream, core_module.name);
