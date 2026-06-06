@@ -801,6 +801,9 @@ namespace iris::compiler
 
         for (std::filesystem::path const& search_path : search_paths)
         {
+            if (!std::filesystem::exists(search_path) || !std::filesystem::is_directory(search_path))
+                continue;
+
             for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator{ search_path })
             {
                 if (entry.path().filename() == filename)
