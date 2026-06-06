@@ -1,11 +1,10 @@
 {
-  "name": "h",
+  "name": "iris",
   "version-string": "0.1.0",
   "dependencies": [
     "argparse",
     "catch2",
     "nlohmann-json",
-    "rapidjson",
     "tree-sitter",
     "xxhash",
     "zlib",
@@ -23,5 +22,5 @@
       "default-features": false
     }
   ],
-  "builtin-baseline": "8f63c9ed5897d7367a92a442a79f91721e0fd38f"
+  "builtin-baseline": "d13fa75214c258099923cf25a5e6311e58c07f3b"
 }

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "iris",
+      "camelcase": "Iris",
+      "title": "Iris",
+      "scope": "source.iris",
+      "file-types": [
+        "iris"
+      ],
+      "injection-regex": "^iris$",
+      "class-name": "TreeSitterIris"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Iris grammar for tree-sitter",
+    "authors": [
+      {
+        "name": "João Maia",
+        "email": "jpmmaia@gmail.com"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/JPMMaia/iris"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": false,
+    "node": false,
+    "python": false,
+    "rust": false,
+    "swift": false,
+    "zig": false
+  }
+}

@@ -9,9 +9,9 @@ module;
 #include <sys/ptrace.h>
 #endif
 
-export module h.language_server.breakpoint;
+export module iris.language_server.breakpoint;
 
-namespace h::language_server
+namespace iris::language_server
 {
     export inline void trigger_breakpoint()
     {

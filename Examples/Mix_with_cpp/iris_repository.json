@@ -1,0 +1,13 @@
+{
+    "name": "Mix_with_cpp",
+    "artifacts": [
+        {
+            "name": "external_library",
+            "location": "external_library/iris_artifact.json"
+        },
+        {
+            "name": "my_app",
+            "location": "my_app/iris_artifact.json"
+        }
+    ]
+}

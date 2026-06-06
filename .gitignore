@@ -32,8 +32,12 @@
 *.app
 *.vsix
 
+# Coding agents
+.pi/logs/
+nul
+
 build/
 build_linux/
-Examples/hl
 out/
 CMakeUserPresets.json
+iris_presets.json

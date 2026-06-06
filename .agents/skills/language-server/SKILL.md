@@ -1,0 +1,77 @@
+---
+name: 'language-server'
+description: 'Describes the Iris Language Server and Language Client. Use this skill when you need to understand or make changes to the Language Server or Language Client.'
+---
+
+There are two components: the Language Server and the Language Client.
+
+## Language Server
+
+The Language Server code is located in `Source/Language_server`. It uses the Language Server Protocol. We use the `leon-bckl/lsp-framework` library for this. Source code for this library is located in `build/_deps/extern_lsp_framework-build/generated/lsp` and `build/_deps/extern_lsp_framework-src/lsp`.
+
+Components:
+- `Source/Language_server/Message_handler.cpp`: Handles LSP requests and notifications.
+- `Source/Language_server/Server.cpp`: Main logic. It reads the workspace for artifact and repository files that it can use to figure out dependencies between Core Modules. Parses Iris source files and caches them as Core Modules. Handles Text Document changes. Ties all components together.
+- `Source/Language_server/Code_action.cpp`: Handles Code Action requests.
+- `Source/Language_server/Completion.cpp`: Handles Completion requests.
+- `Source/Language_server/Diagnostics.cpp`: Uses the Core Module Validation to create Diagnostic reports.
+- `Source/Language_server/Go_to_location.cpp`: Handles Go to Location requests.
+- `Source/Language_server/Inlay_hints.cpp`: Handles Inlay Hints requests.
+
+### Build the Language Server
+
+The Language Server is built using CMake. The CMake target is `Iris_language_server_app`.
+
+## Language Client
+
+The Language Client code is located in `Tools/vscode/iris-extension`. This is a VSCode extension built using Node.js and Typescript.
+
+The main file is `Tools/vscode/iris-extension/src/extension.ts` which simply tries to connect to a Language Server (or spawn one).
+
+### Build the Language Client
+
+```
+cd Tools/vscode/iris-extension
+npm run compile
+```
+
+## Tests
+
+The Language Server is mainly tested through the Language Client tests. The test files are located in `Tools/vscode/iris-extension/src/test`. The test fixture is located in `Tools/vscode/iris-extension/test_fixture`.
+
+Run the tests using PowerShell from the workspace root:
+
+```powershell
+cmake --build build --target Iris_language_server_app
+python ./Scripts/build_utilities.py test_language_server
+```
+
+### Debugging the Language Server
+
+It might be useful to print the Parser tree and nodes.
+
+To print a iris::parser::Parse_tree:
+
+```
+std::string const debug_string = iris::parser::print_tree(parse_tree);
+write_debug_message(debug_string);
+```
+
+To print a iris::parser::Parse_node:
+
+```
+std::string const debug_string = iris::parser::print_node(parse_tree, node);
+write_debug_message(debug_string);
+```
+
+You can also print any messages using `write_debug_message()`. The output will be located in `build/logs/debug-language-server.log`.
+
+Make sure that `iris.language_server.debug` is imported.
+
+## Making changes to the Language Server
+
+1. Create a new file for testing in `Tools/vscode/iris-extension/test_fixture/projects/other` if needed
+2. Add a new test to one of the files in `Tools/vscode/iris-extension/src/test`.
+3. Run the tests to confirm that the new test is failing.
+4. Make the required changes to the Language Server.
+5. Run the tests again and confirm that the the new test is passing. If not, go to step 4.

@@ -8,7 +8,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace h::json
+namespace iris::json
 {
     using JSON = nlohmann::json;
 
@@ -57,7 +57,7 @@ namespace h::json
     );
 
     template <>
-    JSON to_json(
+    inline JSON to_json(
         std::filesystem::path const& value
     )
     {
@@ -65,7 +65,7 @@ namespace h::json
     }
 
     template <>
-    void from_json(
+    inline void from_json(
         JSON const& data,
         std::filesystem::path& output
     )
@@ -74,7 +74,7 @@ namespace h::json
     }
 
     template <>
-    JSON to_json(
+    inline JSON to_json(
         std::pmr::string const& value
     )
     {
@@ -82,7 +82,7 @@ namespace h::json
     }
 
     template <>
-    void from_json(
+    inline void from_json(
         JSON const& data,
         std::pmr::string& output
     )
@@ -91,7 +91,7 @@ namespace h::json
     }
 
     template <>
-    JSON to_json(
+    inline JSON to_json(
         std::uint32_t const& value
     )
     {
@@ -99,7 +99,7 @@ namespace h::json
     }
 
     template <>
-    void from_json(
+    inline void from_json(
         JSON const& data,
         std::uint32_t& output
     )
@@ -108,7 +108,7 @@ namespace h::json
     }
 
     template <>
-    JSON to_json(
+    inline JSON to_json(
         std::uint64_t const& value
     )
     {
@@ -116,7 +116,7 @@ namespace h::json
     }
 
     template <>
-    void from_json(
+    inline void from_json(
         JSON const& data,
         std::uint64_t& output
     )
@@ -125,7 +125,7 @@ namespace h::json
     }
 
     template <>
-    JSON to_json(
+    inline JSON to_json(
         bool const& value
     )
     {
@@ -133,7 +133,7 @@ namespace h::json
     }
 
     template <>
-    void from_json(
+    inline void from_json(
         JSON const& data,
         bool& output
     )
@@ -164,7 +164,7 @@ namespace h::json
         }
             
         T value{};
-        h::json::from_json(data, value);
+        iris::json::from_json(data, value);
         output = value;
     }
 
@@ -196,7 +196,7 @@ namespace h::json
         for (JSON const& element_data : array_json)
         {
             T element{};
-            h::json::from_json(element_data, element);
+            iris::json::from_json(element_data, element);
             output.push_back(std::move(element));
         }
     }
@@ -230,7 +230,7 @@ namespace h::json
         for (JSON const& element_data : array_json)
         {
             T element{};
-            h::json::from_json(element_data, element);
+            iris::json::from_json(element_data, element);
             output.push_back(std::move(element));
         }
     }
@@ -248,7 +248,7 @@ namespace h::json
                 return false;
 
             std::variant_alternative_t<Index, Variant> value{};
-            h::json::from_json(data, value);
+            iris::json::from_json(data, value);
             output = std::move(value);
             return true;
         }

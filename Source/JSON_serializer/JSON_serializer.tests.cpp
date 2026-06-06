@@ -5,16 +5,16 @@
 
 #include <nlohmann/json.hpp>
 
-import h.core;
-import h.core.types;
-import h.json_serializer;
-import h.json_serializer.operators;
+import iris.core;
+import iris.core.types;
+import iris.json_serializer;
+import iris.json_serializer.operators;
 
-using h::json::operators::operator<<;
+using iris::json::operators::operator<<;
 
 #include <catch2/catch_all.hpp>
 
-namespace h
+namespace iris
 {
     template <typename Variant, typename T>
     struct index_of;
@@ -52,7 +52,7 @@ namespace h
             .patch = 3,
         };
 
-        std::optional<Language_version> const output = h::json::read<Language_version>(json_data);
+        std::optional<Language_version> const output = iris::json::read<Language_version>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -71,7 +71,7 @@ namespace h
 
         std::pmr::string const expected = "{\"major\":1,\"minor\":2,\"patch\":3}";
 
-        std::pmr::string const actual = h::json::write(input);
+        std::pmr::string const actual = iris::json::write(input);
 
         CHECK(actual == expected);
     }
@@ -94,7 +94,7 @@ namespace h
             .data = Fundamental_type::Byte
         };
 
-        std::optional<Type_reference> const output = h::json::read<Type_reference>(json_data);
+        std::optional<Type_reference> const output = iris::json::read<Type_reference>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -114,7 +114,7 @@ namespace h
             index_of_v<Type_reference::Data_type, Fundamental_type>
         )};
 
-        std::pmr::string const actual = h::json::write(input);
+        std::pmr::string const actual = iris::json::write(input);
 
         CHECK(actual == expected);
     }
@@ -148,7 +148,7 @@ namespace h
             }
         };
 
-        std::optional<Type_reference> const output = h::json::read<Type_reference>(json_data);
+        std::optional<Type_reference> const output = iris::json::read<Type_reference>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -174,7 +174,7 @@ namespace h
             index_of_v<Type_reference::Data_type, Custom_type_reference>
         )};
 
-        std::pmr::string const actual = h::json::write(input);
+        std::pmr::string const actual = iris::json::write(input);
 
         CHECK(actual == expected);
     }
@@ -200,7 +200,7 @@ namespace h
             .additional_operation = Binary_operation::Add
         };
 
-        std::optional<Assignment_expression> const output = h::json::read<Assignment_expression>(json_data);
+        std::optional<Assignment_expression> const output = iris::json::read<Assignment_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -219,7 +219,7 @@ namespace h
 
         std::pmr::string const expected = "{\"additional_operation\":\"Add\",\"left_hand_side\":{\"expression_index\":1},\"right_hand_side\":{\"expression_index\":2}}";
 
-        std::pmr::string const actual = h::json::write(input);
+        std::pmr::string const actual = iris::json::write(input);
 
         CHECK(actual == expected);
     }
@@ -244,7 +244,7 @@ namespace h
             .additional_operation = std::nullopt
         };
 
-        std::optional<Assignment_expression> const output = h::json::read<Assignment_expression>(json_data);
+        std::optional<Assignment_expression> const output = iris::json::read<Assignment_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -263,7 +263,7 @@ namespace h
 
         std::pmr::string const expected = "{\"left_hand_side\":{\"expression_index\":1},\"right_hand_side\":{\"expression_index\":2}}";
 
-        std::pmr::string const actual = h::json::write(input);
+        std::pmr::string const actual = iris::json::write(input);
 
         CHECK(actual == expected);
     }
@@ -439,7 +439,7 @@ namespace h
             .series = std::move(expected_series)
         };
 
-        std::optional<If_expression> const output = h::json::read<If_expression>(json_data);
+        std::optional<If_expression> const output = iris::json::read<If_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -532,7 +532,7 @@ namespace h
             index_of_v<Expression::Data_type, Variable_expression>
         )};
 
-        std::pmr::string const actual = h::json::write(input);
+        std::pmr::string const actual = iris::json::write(input);
 
         CHECK(actual == expected);
     }
@@ -551,7 +551,7 @@ namespace h
             .name = "variable_name"
         };
 
-        std::optional<Variable_expression> const output = h::json::read<Variable_expression>(json_data);
+        std::optional<Variable_expression> const output = iris::json::read<Variable_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -561,11 +561,11 @@ namespace h
 
     TEST_CASE("Read Binary_operation")
     {
-        CHECK(h::json::read_enum<Binary_operation>("Add") == Binary_operation::Add);
-        CHECK(h::json::read_enum<Binary_operation>("Subtract") == Binary_operation::Subtract);
-        CHECK(h::json::read_enum<Binary_operation>("Multiply") == Binary_operation::Multiply);
-        CHECK(h::json::read_enum<Binary_operation>("Divide") == Binary_operation::Divide);
-        CHECK(h::json::read_enum<Binary_operation>("Less_than") == Binary_operation::Less_than);
+        CHECK(iris::json::read_enum<Binary_operation>("Add") == Binary_operation::Add);
+        CHECK(iris::json::read_enum<Binary_operation>("Subtract") == Binary_operation::Subtract);
+        CHECK(iris::json::read_enum<Binary_operation>("Multiply") == Binary_operation::Multiply);
+        CHECK(iris::json::read_enum<Binary_operation>("Divide") == Binary_operation::Divide);
+        CHECK(iris::json::read_enum<Binary_operation>("Less_than") == Binary_operation::Less_than);
     }
 
     TEST_CASE("Read Binary_expression")
@@ -595,7 +595,7 @@ namespace h
             .operation = Binary_operation::Subtract
         };
 
-        std::optional<Binary_expression> const output = h::json::read<Binary_expression>(json_data);
+        std::optional<Binary_expression> const output = iris::json::read<Binary_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -644,7 +644,7 @@ namespace h
             .arguments = std::move(arguments)
         };
 
-        std::optional<Call_expression> const output = h::json::read<Call_expression>(json_data);
+        std::optional<Call_expression> const output = iris::json::read<Call_expression>(json_data);
 
         REQUIRE(output.has_value());
 
@@ -652,7 +652,7 @@ namespace h
         CHECK(actual == expected);
     }
 
-    h::Function_declaration create_expected_function_declaration()
+    iris::Function_declaration create_expected_function_declaration()
     {
         std::pmr::vector<Type_reference> input_parameter_types
         {
@@ -675,14 +675,14 @@ namespace h
             {"sum"}
         };
 
-        h::Function_type function_type
+        iris::Function_type function_type
         {
             .input_parameter_types = std::move(input_parameter_types),
             .output_parameter_types = std::move(output_parameter_types),
             .is_variadic = false
         };
 
-        std::pmr::vector<h::Source_position> input_parameter_source_positions
+        std::pmr::vector<iris::Source_position> input_parameter_source_positions
         {
             {
                 .line = 3,
@@ -690,7 +690,7 @@ namespace h
             }
         };
 
-        std::pmr::vector<h::Source_position> output_parameter_source_positions
+        std::pmr::vector<iris::Source_position> output_parameter_source_positions
         {
             {
                 .line = 3,
@@ -698,7 +698,7 @@ namespace h
             }
         };
 
-        return h::Function_declaration
+        return iris::Function_declaration
         {
             .name = "Add",
             .type = std::move(function_type),
@@ -813,28 +813,28 @@ namespace h
             index_of_v<Type_reference::Data_type, Fundamental_type>
         );
 
-        h::Function_declaration const expected = create_expected_function_declaration();
+        iris::Function_declaration const expected = create_expected_function_declaration();
 
-        std::optional<h::Function_declaration> const output = h::json::read<h::Function_declaration>(json_data);
+        std::optional<iris::Function_declaration> const output = iris::json::read<iris::Function_declaration>(json_data);
 
         REQUIRE(output.has_value());
 
-        h::Function_declaration const& actual = output.value();
+        iris::Function_declaration const& actual = output.value();
         CHECK(actual == expected);
     }
 
     TEST_CASE("Write empty Function_declaration")
     {
-        h::Function_declaration const input = {};
+        iris::Function_declaration const input = {};
 
         std::pmr::string const expected = "{\"input_parameter_names\":{\"elements\":[],\"size\":0},\"is_test\":false,\"linkage\":\"External\",\"name\":\"\",\"output_parameter_names\":{\"elements\":[],\"size\":0},\"postconditions\":{\"elements\":[],\"size\":0},\"preconditions\":{\"elements\":[],\"size\":0},\"type\":{\"input_parameter_types\":{\"elements\":[],\"size\":0},\"is_variadic\":false,\"output_parameter_types\":{\"elements\":[],\"size\":0}}}";
 
-        std::pmr::string const actual = h::json::write(input);
+        std::pmr::string const actual = iris::json::write(input);
 
         CHECK(actual == expected);
     }
 
-    h::Function_definition create_expected_function_definition()
+    iris::Function_definition create_expected_function_definition()
     {
         std::pmr::vector<Expression> expressions
         {
@@ -879,7 +879,7 @@ namespace h
             }
         };
 
-        h::Function_definition function
+        iris::Function_definition function
         {
             .name = "Add",
             .statements = std::move(statements)
@@ -954,17 +954,17 @@ namespace h
             index_of_v<Expression::Data_type, Return_expression>
         );
 
-        h::Function_definition const expected = create_expected_function_definition();
+        iris::Function_definition const expected = create_expected_function_definition();
 
-        std::optional<h::Function_definition> const output = h::json::read<h::Function_definition>(json_data);
+        std::optional<iris::Function_definition> const output = iris::json::read<iris::Function_definition>(json_data);
 
         REQUIRE(output.has_value());
 
-        h::Function_definition const& actual = output.value();
+        iris::Function_definition const& actual = output.value();
         CHECK(actual == expected);
     }
 
-    h::Module create_expected_module()
+    iris::Module create_expected_module()
     {
         Language_version const language_version
         {
@@ -994,7 +994,7 @@ namespace h
             .function_definitions = { create_expected_function_definition() }
         };
 
-        return h::Module
+        return iris::Module
         {
             .language_version = language_version,
             .name = "module_name",
@@ -1201,21 +1201,21 @@ namespace h
             index_of_v<Expression::Data_type, Return_expression>
         );
 
-        h::Module const expected = create_expected_module();
+        iris::Module const expected = create_expected_module();
 
-        std::optional<h::Module> const output = h::json::read<h::Module>(json_data);
+        std::optional<iris::Module> const output = iris::json::read<iris::Module>(json_data);
 
         REQUIRE(output.has_value());
 
-        h::Module const actual = output.value();
+        iris::Module const actual = output.value();
         CHECK(actual == expected);
     }
 
-    h::Struct_declaration create_expected_struct_declaration()
+    iris::Struct_declaration create_expected_struct_declaration()
     {
-        h::Type_reference const uint32_type = create_integer_type_type_reference(32, false);
+        iris::Type_reference const uint32_type = create_integer_type_type_reference(32, false);
 
-        h::Struct_declaration declaration = {};
+        iris::Struct_declaration declaration = {};
         declaration.name = "My_struct";
         declaration.member_names = {
             "first",
@@ -1412,19 +1412,19 @@ namespace h
             index_of_v<Type_reference::Data_type, Integer_type>
         );
 
-        h::Struct_declaration const expected = create_expected_struct_declaration();
+        iris::Struct_declaration const expected = create_expected_struct_declaration();
 
-        std::optional<h::Struct_declaration> const output = h::json::read<h::Struct_declaration>(json_data);
+        std::optional<iris::Struct_declaration> const output = iris::json::read<iris::Struct_declaration>(json_data);
 
         REQUIRE(output.has_value());
 
-        h::Struct_declaration const& actual = output.value();
+        iris::Struct_declaration const& actual = output.value();
         CHECK(actual == expected);
     }
 
     TEST_CASE("Write Struct_declaration")
     {
-        h::Struct_declaration const input = create_expected_struct_declaration();
+        iris::Struct_declaration const input = create_expected_struct_declaration();
 
         std::pmr::string const expected = std::pmr::string{std::format(
             R"({{"is_literal":false,"is_packed":false,"member_bit_fields":{{"elements":[24,8,null],"size":3}},"member_comments":{{"elements":[],"size":0}},"member_default_values":{{"elements":[{{"expressions":{{"elements":[{{"data":{{"index":{},"value":{{"data":"0","type":{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}}}}}}}}],"size":1}}}},{{"expressions":{{"elements":[{{"data":{{"index":{},"value":{{"data":"0","type":{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}}}}}}}}],"size":1}}}},{{"expressions":{{"elements":[{{"data":{{"index":{},"value":{{"data":"0","type":{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}}}}}}}}],"size":1}}}}],"size":3}},"member_names":{{"elements":["first","second","third"],"size":3}},"member_types":{{"elements":[{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}},{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}},{{"data":{{"index":{},"value":{{"is_signed":false,"number_of_bits":32}}}}}}],"size":3}},"name":"My_struct"}})",
@@ -1439,7 +1439,7 @@ namespace h
             index_of_v<Type_reference::Data_type, Integer_type>
         )};
 
-        std::pmr::string const actual = h::json::write(input);
+        std::pmr::string const actual = iris::json::write(input);
 
         CHECK(actual == expected);
     }
@@ -1699,7 +1699,7 @@ namespace h
     {
         std::pmr::string const json_data = create_module_instanced_declarations_json();
 
-        h::Module_instanced_declarations const expected
+        iris::Module_instanced_declarations const expected
         {
             .struct_declarations = {
                 create_expected_struct_declaration()
@@ -1710,17 +1710,17 @@ namespace h
             }
         };
 
-        std::optional<h::Module_instanced_declarations> const output = h::json::read<h::Module_instanced_declarations>(json_data);
+        std::optional<iris::Module_instanced_declarations> const output = iris::json::read<iris::Module_instanced_declarations>(json_data);
 
         REQUIRE(output.has_value());
 
-        h::Module_instanced_declarations const& actual = output.value();
+        iris::Module_instanced_declarations const& actual = output.value();
         CHECK(actual == expected);
     }
 
     TEST_CASE("Write Module_instanced_declarations")
     {
-        h::Module_instanced_declarations const input
+        iris::Module_instanced_declarations const input
         {
             .struct_declarations = {
                 create_expected_struct_declaration()
@@ -1733,7 +1733,7 @@ namespace h
 
         std::pmr::string const expected = create_module_instanced_declarations_json();
 
-        std::pmr::string const actual = h::json::write(input);
+        std::pmr::string const actual = iris::json::write(input);
 
         CHECK(actual == expected);
     }

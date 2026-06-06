@@ -1,19 +1,11 @@
-module;
+module iris.core.execution_engine;
 
-#include <algorithm>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <stdexcept>
-#include <variant>
-#include <vector>
+import std;
 
-module h.core.execution_engine;
+import iris.core;
+import iris.core.types;
 
-import h.core;
-import h.core.types;
-
-namespace h::execution_engine
+namespace iris::execution_engine
 {
     Value_storage create_value_storage_struct(
         Struct_declaration const& declaration,
@@ -165,7 +157,7 @@ namespace h::execution_engine
             if (location != type_constructor_parameters.end() && !is_compile_time_builtin_type(location->type))
                 throw std::runtime_error{ "Type constructor parameter type is not the compile time builtin type!"};
 
-            if (!h::replace_parameter_types_by_instance_arguments(mutable_type_reference, type_constructor_parameters, type_instance_arguments))
+            if (!iris::replace_parameter_types_by_instance_arguments(mutable_type_reference, type_constructor_parameters, type_instance_arguments))
                 throw std::runtime_error{ "Could not replace parameter type by instance argument!" };
 
             return false;
@@ -174,7 +166,7 @@ namespace h::execution_engine
         visit_type_references_recursively(value, process_type);
     }
 
-    std::optional<h::Type_expression> find_type_expression_from_function_constructor_arguments(
+    std::optional<iris::Type_expression> find_type_expression_from_function_constructor_arguments(
         std::span<Function_constructor_parameter const> const function_constructor_parameters,
         std::span<Statement const> const type_instance_arguments,
         std::string_view const parameter_name
@@ -211,18 +203,23 @@ namespace h::execution_engine
         std::span<Statement const> const type_instance_arguments
     )
     {
-        auto const process_expression = [&](h::Expression const& expression, h::Statement const& statement) -> bool
+        auto const try_get_parameter_type_expression = [&](std::string_view const parameter_name) -> std::optional<Type_expression>
         {
-            h::Expression& mutable_expression = const_cast<h::Expression&>(expression);
+            return find_type_expression_from_function_constructor_arguments(
+                function_constructor_parameters,
+                type_instance_arguments,
+                parameter_name
+            );
+        };
+
+        auto const process_expression = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
+        {
+            iris::Expression& mutable_expression = const_cast<iris::Expression&>(expression);
             if (std::holds_alternative<Variable_expression>(expression.data))
             {
                 Variable_expression const& variable_expression = std::get<Variable_expression>(expression.data);
 
-                std::optional<Type_expression> const new_parameter_type = find_type_expression_from_function_constructor_arguments(
-                    function_constructor_parameters,
-                    type_instance_arguments,
-                    variable_expression.name
-                );
+                std::optional<Type_expression> const new_parameter_type = try_get_parameter_type_expression(variable_expression.name);
                 if (!new_parameter_type.has_value())
                     return false;
 
@@ -230,6 +227,38 @@ namespace h::execution_engine
 
                 // TODO use allocator to copy
                 mutable_expression.data = type_expression;
+            }
+            else if (std::holds_alternative<Instance_call_expression>(expression.data))
+            {
+                Instance_call_expression& instance_call_expression = std::get<Instance_call_expression>(mutable_expression.data);
+
+                for (Statement& argument_statement : instance_call_expression.arguments)
+                {
+                    for (Expression& argument_expression : argument_statement.expressions)
+                    {
+                        if (std::holds_alternative<Variable_expression>(argument_expression.data))
+                        {
+                            Variable_expression const& argument_variable_expression = std::get<Variable_expression>(argument_expression.data);
+                            std::optional<Type_expression> const new_parameter_type = try_get_parameter_type_expression(argument_variable_expression.name);
+                            if (!new_parameter_type.has_value())
+                                continue;
+
+                            argument_expression.data = new_parameter_type.value();
+                        }
+                        else if (std::holds_alternative<Type_expression>(argument_expression.data))
+                        {
+                            Type_expression& argument_type_expression = std::get<Type_expression>(argument_expression.data);
+                            if (!iris::replace_parameter_types_by_instance_arguments(
+                                argument_type_expression.type,
+                                function_constructor_parameters,
+                                type_instance_arguments
+                            ))
+                            {
+                                throw std::runtime_error{ "Could not find parameter type in type constructor!" };
+                            }
+                        }
+                    }
+                }
             }
 
             return false;
@@ -240,7 +269,7 @@ namespace h::execution_engine
         auto const process_type = [&](Type_reference const& type_reference) -> bool
         {
             Type_reference& mutable_type_reference = const_cast<Type_reference&>(type_reference);
-            if (!h::replace_parameter_types_by_instance_arguments(mutable_type_reference, function_constructor_parameters, type_instance_arguments))
+            if (!iris::replace_parameter_types_by_instance_arguments(mutable_type_reference, function_constructor_parameters, type_instance_arguments))
                 throw std::runtime_error{ "Could not find parameter type in type constructor!"};
 
             return false;

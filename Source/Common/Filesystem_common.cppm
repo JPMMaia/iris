@@ -1,15 +1,8 @@
-module;
+export module iris.common.filesystem_common;
 
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string_view>
-#include <vector>
+import std;
 
-export module h.common.filesystem_common;
-
-namespace h::common
+namespace iris::common
 {
     export std::optional<std::filesystem::path> search_file(
         std::string_view const filename,
@@ -24,6 +17,10 @@ namespace h::common
     );
 
     export std::filesystem::path get_builtin_include_directory();
+
+    export std::filesystem::path get_builtin_module_file_path();
+
+    export std::filesystem::path get_json_module_file_path();
 
     export std::filesystem::path get_tests_main_file_path();
 

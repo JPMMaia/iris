@@ -1,0 +1,22 @@
+module Bounds_check_2;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+export function access_soa_array_view_element(view: Soa_array_view::<Particle>, index: Int32) -> (value: Particle)
+{
+    return view[index];
+}
+
+export function access_soa_array_view_member_x(view: Soa_array_view::<Particle>, index: Int32) -> (value: Float32)
+{
+    return view->x[index];
+}
+
+export function access_soa_array_view_member_y(view: Soa_array_view::<Particle>, index: Int32) -> (value: Float32)
+{
+    return view->y[index];
+}

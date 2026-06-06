@@ -1,8 +1,8 @@
-export module h.module_examples;
+export module iris.module_examples;
 
-import h.core;
+import iris.core;
 
-namespace h::module_examples
+namespace iris::module_examples
 {
-    export h::Module create_hello_world();
+    export iris::Module create_hello_world();
 }

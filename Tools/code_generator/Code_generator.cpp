@@ -2,11 +2,11 @@ module;
 
 #include <nlohmann/json.hpp>
 
-module h.tools.code_generator;
+module iris.tools.code_generator;
 
 import std;
 
-namespace h::tools::code_generator
+namespace iris::tools::code_generator
 {
     std::string indent(int const indentation)
     {
@@ -299,7 +299,7 @@ namespace h::tools::code_generator
                 }
 
                 std::pmr::string const& type = types[index];
-                stream << "h::" << type;
+                stream << "iris::" << type;
             }
 
             stream << ">";
@@ -645,14 +645,14 @@ namespace h::tools::code_generator
 
                         if (is_struct_type(elem_type, struct_types))
                         {
-                            output_stream << indent(indentation) << "            output." << member.name << " = h::" << type_name << "{};\n";
-                            output_stream << indent(indentation) << "            from_json(data.at(\"value\"), std::get<h::" << type_name << ">(output." << member.name << "));\n";
+                            output_stream << indent(indentation) << "            output." << member.name << " = iris::" << type_name << "{};\n";
+                            output_stream << indent(indentation) << "            from_json(data.at(\"value\"), std::get<iris::" << type_name << ">(output." << member.name << "));\n";
                         }
                         else if (is_enum_type(elem_type, enum_types))
                         {
                             output_stream << indent(indentation) << "            {\n";
                             output_stream << indent(indentation) << "                std::string const val_str = data.at(\"value\").get<std::string>();\n";
-                            output_stream << indent(indentation) << "                h::" << type_name << " enum_val{};\n";
+                            output_stream << indent(indentation) << "                iris::" << type_name << " enum_val{};\n";
                             output_stream << indent(indentation) << "                read_enum(enum_val, std::string_view{val_str});\n";
                             output_stream << indent(indentation) << "                output." << member.name << " = std::move(enum_val);\n";
                             output_stream << indent(indentation) << "            }\n";
@@ -1363,7 +1363,7 @@ namespace h::tools::code_generator
             // Forward declare from_json for all structs
             for (Struct const& struct_info : file_types.structs)
             {
-                output_stream << "    export void from_json(nlohmann::json const& j, h::" << struct_info.name << "& output);\n";
+                output_stream << "    export void from_json(nlohmann::json const& j, iris::" << struct_info.name << "& output);\n";
             }
             output_stream << "\n";
 
@@ -1396,14 +1396,14 @@ namespace h::tools::code_generator
 
 #include <nlohmann/json.hpp>
 
-export module h.json_serializer.operators;
+export module iris.json_serializer.operators;
 
 import std;
 
-import h.binary_serializer.generics;
-import h.core;
+import iris.binary_serializer.generics;
+import iris.core;
 
-namespace h::binary_serializer
+namespace iris::binary_serializer
 {
 
 )";
@@ -2529,36 +2529,24 @@ function intermediate_to_core_statement(intermediate_value: Statement): Core.Sta
 
 #include <compare>
 
-export module h.binary_serializer.generated;
+export module iris.binary_serializer.generated;
 
-import h.binary_serializer.generics;
-import h.core;
+import iris.binary_serializer.generics;
+import iris.core;
 
-namespace h::binary_serializer
+namespace iris::binary_serializer
 {
-    export template <typename T>
-    void serialize(
-        Serializer& serializer,
-        T const& data
-    );
-
-    export template <typename T>
-    void deserialize(
-        Serializer& serializer,
-        T& data
-    );
-
 )";
 
         output_stream << initial_code;
 
-        std::string_view const function_template = R"(    export template <>
+        std::string_view const function_template = R"(    template <>
     void serialize(Serializer& serializer, {} const& value)
     {{
 {}
     }}
 
-    export template <>
+    template <>
     void deserialize(Deserializer& deserializer, {}& value)
     {{
 {}
@@ -2611,31 +2599,21 @@ namespace h::binary_serializer
 
         std::string_view const initial_code = R"(module;
 
+#define EXPORT export
 #include "Generics.h"
 
 #include <compare>
 
-export module h.json_serializer.generated;
+export module iris.json_serializer.generated;
 
-//import h.json_serializer.generics;
-import h.core;
+//import iris.json_serializer.generics;
+import iris.core;
 
-namespace h::json
+namespace iris::json
 {
-    export template <typename T>
-    JSON to_json(
-        T const& value
-    );
-
-    export template <typename T>
-    void from_json(
-        JSON const& data,
-        T& output
-    );
-
 )";
 
-        std::string_view const enum_template = R"(    export template <>
+        std::string_view const enum_template = R"(    EXPORT template <>
     JSON to_json({} const& value)
     {{
         switch (value)
@@ -2644,7 +2622,7 @@ namespace h::json
         }}
     }}
 
-    export template <>
+    EXPORT template <>
     void from_json(JSON const& data, {}& output)
     {{
         std::string const& value = data.get<std::string>();
@@ -2653,7 +2631,7 @@ namespace h::json
 
 )";
 
-        std::string_view const function_template = R"(    export template <>
+        std::string_view const function_template = R"(    EXPORT template <>
     JSON to_json({} const& value)
     {{
         JSON data;
@@ -2661,7 +2639,7 @@ namespace h::json
         return data;
     }}
 
-    export template <>
+    EXPORT template <>
     void from_json(JSON const& data, {}& value)
     {{
 {}
@@ -2762,13 +2740,13 @@ namespace h::json
 
 #include <nlohmann/json.hpp>
 
-export module h.json_serializer.operators;
+export module iris.json_serializer.operators;
 
-import h.json_serializer.generated;
-//import h.json_serializer.generics;
-import h.core;
+import iris.json_serializer.generated;
+//import iris.json_serializer.generics;
+import iris.core;
 
-namespace h::json::operators
+namespace iris::json::operators
 {
 )";
 
@@ -2840,17 +2818,17 @@ namespace h::json::operators
             input_stream
         );
 
-        std::string_view const initial_code = R"(export module h.core.expressions_visitor;
+        std::string_view const initial_code = R"(export module iris.core.expressions_visitor;
 
 import std;
-import h.core;
+import iris.core;
 
-namespace h
+namespace iris
 {
 )";
 
     std::string_view const function_template = R"(
-    export void visit_expressions_recursively(h::Statement const& statement, h::Expression const& expression, std::function<void(h::Statement const& statement, h::Expression const& expression)> const& predicate)
+    export void visit_expressions_recursively(iris::Statement const& statement, iris::Expression const& expression, std::function<void(iris::Statement const& statement, iris::Expression const& expression)> const& predicate)
     {{
         predicate(statement, expression);
 {}
@@ -2942,7 +2920,7 @@ namespace h
             output_stream << std::format("  <!-- {} elements -->\n", member_count);
 
             std::stringstream type_name;
-            type_name << "h::Soa_array&lt;" << member_count;
+            type_name << "iris::Soa_array&lt;" << member_count;
             for (int index = 0; index < (2 * member_count + 2); ++index)
             {
                 type_name << ",*";
@@ -3024,7 +3002,7 @@ namespace h
             output_stream << std::format("  <!-- {} elements -->\n", member_count);
 
             std::stringstream type_name;
-            type_name << "h::Soa_array_view&lt;" << member_count;
+            type_name << "iris::Soa_array_view&lt;" << member_count;
             for (int index = 0; index < (2 * member_count + 1); ++index)
             {
                 type_name << ",*";

@@ -1,23 +1,16 @@
-module;
+export module iris.binary_serializer;
 
-#include <cstddef>
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <vector>
+import std;
 
-export module h.binary_serializer;
+export import iris.binary_serializer.generated;
+export import iris.binary_serializer.generics;
+import iris.common;
+import iris.core;
 
-import h.binary_serializer.generated;
-import h.binary_serializer.generics;
-import h.common;
-import h.core;
-
-namespace h::binary_serializer
+namespace iris::binary_serializer
 {
     export std::optional<std::pmr::vector<std::byte>> serialize_module(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -31,7 +24,7 @@ namespace h::binary_serializer
         return std::pmr::vector<std::byte>{std::move(serializer.data), output_allocator};
     }
 
-    export std::optional<h::Module> deserialize_module(
+    export std::optional<iris::Module> deserialize_module(
         std::span<std::byte const> const data
     )
     {
@@ -41,7 +34,7 @@ namespace h::binary_serializer
             .offset = 0,
         };
 
-        h::Module core_module = {};
+        iris::Module core_module = {};
         deserialize(deserializer, core_module);
 
         return core_module;
@@ -49,7 +42,7 @@ namespace h::binary_serializer
 
     export bool write_module_to_file(
         std::filesystem::path const& file_path,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -61,19 +54,19 @@ namespace h::binary_serializer
         if (!data.has_value())
             return false;
 
-        h::common::write_binary_file(file_path, data.value());
+        iris::common::write_binary_file(file_path, data.value());
         return true;
     }
 
-    export std::optional<h::Module> read_module_from_file(
+    export std::optional<iris::Module> read_module_from_file(
         std::filesystem::path const& file_path
     )
     {
-        std::optional<std::pmr::vector<std::byte>> const data = h::common::read_binary_file(file_path);
+        std::optional<std::pmr::vector<std::byte>> const data = iris::common::read_binary_file(file_path);
         if (!data.has_value())
             return std::nullopt;
 
-        std::optional<h::Module> core_module = deserialize_module(
+        std::optional<iris::Module> core_module = deserialize_module(
             data.value()
         );
 

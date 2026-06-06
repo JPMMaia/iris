@@ -13,14 +13,15 @@ module;
 #include <string_view>
 #include <vector>
 
-module h.compiler.linker;
+module iris.compiler.linker;
 
-import h.common;
-import h.common.filesystem_common;
+import iris.common;
+import iris.common.filesystem;
+import iris.common.filesystem_common;
 
 LLD_HAS_DRIVER(coff);
 
-namespace h::compiler
+namespace iris::compiler
 {
     bool link(
         std::span<std::filesystem::path const> const object_file_paths,
@@ -47,11 +48,15 @@ namespace h::compiler
             arguments_storage.push_back("/debug:full");
 
             // Natvis
-            std::filesystem::path const visualizers_path = h::common::get_visualizers_file_path();
-            arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "hlang_decimal.natvis").generic_string()));
-            arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "hlang_soa_array.natvis").generic_string()));
-            arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "hlang_soa_array_view.natvis").generic_string()));
+            std::filesystem::path const visualizers_path = iris::common::get_visualizers_file_path();
+            arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "iris_decimal.natvis").generic_string()));
+            arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "iris_soa_array.natvis").generic_string()));
+            arguments_storage.push_back(std::format("/NATVIS:{}", (visualizers_path / "iris_soa_array_view.natvis").generic_string()));
         }
+
+        std::pmr::vector<std::filesystem::path> const default_library_directories = iris::common::get_default_library_directories();
+        for (std::filesystem::path const& library_directory : default_library_directories)
+            arguments_storage.push_back(std::format("/libpath:{}", library_directory.generic_string()));
 
         // Provides mainCRTStartup
         arguments_storage.push_back(options.debug ? "/defaultlib:msvcrtd.lib" : "/defaultlib:msvcrt.lib");
@@ -113,7 +118,7 @@ namespace h::compiler
         {
             llvm::Expected<llvm::NewArchiveMember> member = llvm::NewArchiveMember::getFile(object_file_paths[index].generic_string(), true);
             if (llvm::Error error = member.takeError())
-                h::common::print_message_and_exit(std::format("Error while creating creating member for static library: {}", llvm::toString(std::move(error))));
+                iris::common::print_message_and_exit(std::format("Error while creating creating member for static library: {}", llvm::toString(std::move(error))));
 
             members[index] = std::move(member.get());
         }

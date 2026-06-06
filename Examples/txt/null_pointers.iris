@@ -1,0 +1,18 @@
+module Null_pointers;
+
+export function pointers(parameter: *Int32) -> (result: Int32)
+{
+    if parameter == null
+    {
+        return -1;
+    }
+
+    if parameter != null
+    {
+        return 1;
+    }
+
+    var x = null;
+
+    return 0;
+}

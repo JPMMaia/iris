@@ -1,10 +1,8 @@
-module;
+export module iris.common;
 
 import std;
 
-export module h.common;
-
-namespace h::common
+namespace iris::common
 {
     export void print_message_and_exit(std::string const& message);
     export void print_message_and_exit(char const* const message);

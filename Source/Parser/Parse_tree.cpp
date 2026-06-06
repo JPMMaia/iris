@@ -1,19 +1,16 @@
 module;
 
-#include <cassert>
-#include <optional>
-#include <memory_resource>
-#include <string>
-#include <string_view>
-#include <vector>
+#include <assert.h>
 
 #include <tree_sitter/api.h>
 
-module h.parser.parse_tree;
+module iris.parser.parse_tree;
 
-import h.core;
+import std;
 
-namespace h::parser
+import iris.core;
+
+namespace iris::parser
 {
     std::string_view get_node_value(
         Parse_tree const& tree,
@@ -373,7 +370,7 @@ namespace h::parser
 
     Parse_node get_smallest_node_that_contains_position(
         Parse_node const& node,
-        h::Source_position const& position
+        iris::Source_position const& position
     )
     {
         TSPoint const start_point
@@ -400,6 +397,8 @@ namespace h::parser
         TSPoint const target_point
     )
     {
+        assert((start_point.row < target_point.row) || (start_point.row == target_point.row && start_point.column <= target_point.column));
+        
         TSPoint current_point = start_point;
         std::uint32_t current_byte = start_byte;
 
@@ -421,10 +420,19 @@ namespace h::parser
         {
             char8_t const character = text[current_byte];
 
+            // Columns are counted in UTF-8 code points; advance by full code point bytes.
             if (is_utf_8_code_point(character))
+            {
                 current_point.column += 1;
-            
-            current_byte += 1;
+                current_byte += 1;
+
+                while (current_byte < text.size() && !is_utf_8_code_point(text[current_byte]))
+                    current_byte += 1;
+            }
+            else
+            {
+                current_byte += 1;
+            }
         }
         assert(current_point.column == target_point.column);
         
@@ -434,7 +442,7 @@ namespace h::parser
     std::uint32_t calculate_byte(
         Parse_tree const& tree,
         Parse_node const& hint_node,
-        h::Source_position const& source_position
+        iris::Source_position const& source_position
     )
     {
         TSPoint const hint_start_point = ts_node_start_point(hint_node.ts_node);
@@ -450,7 +458,7 @@ namespace h::parser
     std::optional<Parse_node> find_node_before_source_position(
         Parse_tree const& tree,
         Parse_node const& hint_node,
-        h::Source_position const& source_position
+        iris::Source_position const& source_position
     )
     {
         Parse_node const root_node = get_root_node(tree);
@@ -485,5 +493,42 @@ namespace h::parser
     )
     {
         return (character & 0b11000000) != 0b10000000;
+    }
+
+    static void print_node(
+        Parse_tree const& tree,
+        TSNode const node,
+        std::uint32_t const depth,
+        std::string& output
+    )
+    {
+        output.append(depth * 2, ' ');
+        output += ts_node_grammar_type(node);
+        output += " \"";
+        output += get_node_value(tree, Parse_node{node});
+        output += "\"\n";
+
+        std::uint32_t const child_count = ts_node_child_count(node);
+        for (std::uint32_t i = 0; i < child_count; ++i)
+            print_node(tree, ts_node_child(node, i), depth + 1, output);
+    }
+
+    std::string print_tree(
+        Parse_tree const& tree,
+        Parse_node const& node
+    )
+    {
+        std::string output;
+        print_node(tree, node.ts_node, 0, output);
+        return output;
+    }
+
+    std::string print_tree(
+        Parse_tree const& tree
+    )
+    {
+        std::string output;
+        print_node(tree, ts_tree_root_node(tree.ts_tree), 0, output);
+        return output;
     }
 }

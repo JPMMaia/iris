@@ -5,14 +5,14 @@
 
 #include <catch2/catch_all.hpp>
 
-import h.common;
-import h.core;
-import h.core.formatter;
-import h.parser.convertor;
-import h.parser.parse_tree;
-import h.parser.parser;
+import iris.common;
+import iris.core;
+import iris.core.formatter;
+import iris.parser.convertor;
+import iris.parser.parse_tree;
+import iris.parser.parser;
 
-namespace h::parser
+namespace iris::parser
 {
     static std::filesystem::path const g_test_source_files_path = std::filesystem::path{ TEST_SOURCE_FILES_PATH };
 
@@ -21,7 +21,7 @@ namespace h::parser
     )
     {
         std::filesystem::path const input_file_path = g_test_source_files_path / input_file;
-        std::optional<std::pmr::u8string> const file_contents = h::common::get_file_utf8_contents(input_file_path);
+        std::optional<std::pmr::u8string> const file_contents = iris::common::get_file_utf8_contents(input_file_path);
         REQUIRE(file_contents.has_value());
         
         std::pmr::u8string const& source = file_contents.value();
@@ -30,7 +30,7 @@ namespace h::parser
         Parse_tree tree = parse(parser, source);
         Parse_node const root = get_root_node(tree);
 
-        std::optional<h::Module> const converted_module = parse_node_to_module(
+        std::optional<iris::Module> const converted_module = parse_node_to_module(
             tree,
             root,
             input_file_path,
@@ -50,7 +50,7 @@ namespace h::parser
                 .temporaries_allocator = temporaries_allocator,
             };
 
-            std::pmr::string const converted_text = h::format_module(
+            std::pmr::string const converted_text = iris::format_module(
                 converted_module.value(),
                 format_options
             );
@@ -64,537 +64,561 @@ namespace h::parser
         destroy_parser(std::move(parser));
     }
 
-    TEST_CASE("Converts array_slices.hltxt", "[Convertor]")
+    TEST_CASE("Converts array_slices.iris", "[Convertor]")
     {
-        std::string_view const input_file = "array_slices.hltxt";
+        std::string_view const input_file = "array_slices.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts assert_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts assert_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "assert_expressions.hltxt";
+        std::string_view const input_file = "assert_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts assignment_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts assignment_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "assignment_expressions.hltxt";
+        std::string_view const input_file = "assignment_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts binary_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts binary_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "binary_expressions.hltxt";
+        std::string_view const input_file = "binary_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts binary_expressions_precedence.hltxt", "[Convertor]")
+    TEST_CASE("Converts binary_expressions_precedence.iris", "[Convertor]")
     {
-        std::string_view const input_file = "binary_expressions_precedence.hltxt";
+        std::string_view const input_file = "binary_expressions_precedence.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts bit_fields.hltxt", "[Convertor]")
+    TEST_CASE("Converts bit_fields.iris", "[Convertor]")
     {
-        std::string_view const input_file = "bit_fields.hltxt";
+        std::string_view const input_file = "bit_fields.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts block_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts block_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "block_expressions.hltxt";
+        std::string_view const input_file = "block_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts booleans.hltxt", "[Convertor]")
+    TEST_CASE("Converts booleans.iris", "[Convertor]")
     {
-        std::string_view const input_file = "booleans.hltxt";
+        std::string_view const input_file = "booleans.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts break_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts break_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "break_expressions.hltxt";
+        std::string_view const input_file = "break_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_call_function_that_returns_bool.hltxt", "[Convertor]")
+    TEST_CASE("Converts char_literals.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_call_function_that_returns_bool.hltxt";
+        std::string_view const input_file = "char_literals.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_call_function_with_struct.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_call_function_that_returns_bool.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_call_function_with_struct.hltxt";
+        std::string_view const input_file = "c_interoperability_call_function_that_returns_bool.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_define_function_with_struct.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_call_function_with_struct.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_define_function_with_struct.hltxt";
+        std::string_view const input_file = "c_interoperability_call_function_with_struct.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_function_return_big_struct.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_define_function_with_struct.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_function_return_big_struct.hltxt";
+        std::string_view const input_file = "c_interoperability_define_function_with_struct.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_function_return_empty_struct.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_function_return_big_struct.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_function_return_empty_struct.hltxt";
+        std::string_view const input_file = "c_interoperability_function_return_big_struct.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_function_return_int.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_function_return_empty_struct.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_function_return_int.hltxt";
+        std::string_view const input_file = "c_interoperability_function_return_empty_struct.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_function_return_pointer.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_function_return_int.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_function_return_pointer.hltxt";
+        std::string_view const input_file = "c_interoperability_function_return_int.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_function_return_small_struct.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_function_return_pointer.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_function_return_small_struct.hltxt";
+        std::string_view const input_file = "c_interoperability_function_return_pointer.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_function_with_big_struct.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_function_return_small_struct.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_function_with_big_struct.hltxt";
+        std::string_view const input_file = "c_interoperability_function_return_small_struct.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_function_with_empty_struct.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_function_with_big_struct.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_function_with_empty_struct.hltxt";
+        std::string_view const input_file = "c_interoperability_function_with_big_struct.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_function_with_int_arguments.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_function_with_empty_struct.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_function_with_int_arguments.hltxt";
+        std::string_view const input_file = "c_interoperability_function_with_empty_struct.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_function_with_pointer.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_function_with_int_arguments.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_function_with_pointer.hltxt";
+        std::string_view const input_file = "c_interoperability_function_with_int_arguments.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts c_interoperability_function_with_small_struct.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_function_with_pointer.iris", "[Convertor]")
     {
-        std::string_view const input_file = "c_interoperability_function_with_small_struct.hltxt";
+        std::string_view const input_file = "c_interoperability_function_with_pointer.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts cast_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts c_interoperability_function_with_small_struct.iris", "[Convertor]")
     {
-        std::string_view const input_file = "cast_expressions.hltxt";
+        std::string_view const input_file = "c_interoperability_function_with_small_struct.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts comment_alias.hltxt", "[Convertor]")
+    TEST_CASE("Converts cast_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "comment_alias.hltxt";
+        std::string_view const input_file = "cast_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts comment_enums.hltxt", "[Convertor]")
+    TEST_CASE("Converts comment_alias.iris", "[Convertor]")
     {
-        std::string_view const input_file = "comment_enums.hltxt";
+        std::string_view const input_file = "comment_alias.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts comment_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts comment_enums.iris", "[Convertor]")
     {
-        std::string_view const input_file = "comment_expressions.hltxt";
+        std::string_view const input_file = "comment_enums.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts comment_functions.hltxt", "[Convertor]")
+    TEST_CASE("Converts comment_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "comment_functions.hltxt";
+        std::string_view const input_file = "comment_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts comment_global_variables.hltxt", "[Convertor]")
+    TEST_CASE("Converts comment_functions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "comment_global_variables.hltxt";
+        std::string_view const input_file = "comment_functions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts comment_module_declaration.hltxt", "[Convertor]")
+    TEST_CASE("Converts comment_global_variables.iris", "[Convertor]")
     {
-        std::string_view const input_file = "comment_module_declaration.hltxt";
+        std::string_view const input_file = "comment_global_variables.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts comment_structs.hltxt", "[Convertor]")
+    TEST_CASE("Converts comment_module_declaration.iris", "[Convertor]")
     {
-        std::string_view const input_file = "comment_structs.hltxt";
+        std::string_view const input_file = "comment_module_declaration.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts comment_unions.hltxt", "[Convertor]")
+    TEST_CASE("Converts comment_structs.iris", "[Convertor]")
     {
-        std::string_view const input_file = "comment_unions.hltxt";
+        std::string_view const input_file = "comment_structs.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts compile_time_for.hltxt", "[Convertor]")
+    TEST_CASE("Converts comment_unions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "compile_time_for.hltxt";
+        std::string_view const input_file = "comment_unions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts compile_time_if.hltxt", "[Convertor]")
+    TEST_CASE("Converts compile_time_for.iris", "[Convertor]")
     {
-        std::string_view const input_file = "compile_time_if.hltxt";
+        std::string_view const input_file = "compile_time_for.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts constant_array_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts compile_time_if.iris", "[Convertor]")
     {
-        std::string_view const input_file = "constant_array_expressions.hltxt";
+        std::string_view const input_file = "compile_time_if.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts debug_information_all.hltxt", "[Convertor]")
+    TEST_CASE("Converts compile_time_var.iris", "[Convertor]")
     {
-        std::string_view const input_file = "debug_information_all.hltxt";
+        std::string_view const input_file = "compile_time_var.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts debug_information_c_headers.hltxt", "[Convertor]")
+    TEST_CASE("Converts constant_array_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "debug_information_c_headers.hltxt";
+        std::string_view const input_file = "constant_array_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts debug_information_for_loop.hltxt", "[Convertor]")
+    TEST_CASE("Converts debug_information_all.iris", "[Convertor]")
     {
-        std::string_view const input_file = "debug_information_for_loop.hltxt";
+        std::string_view const input_file = "debug_information_all.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts debug_information_function_call.hltxt", "[Convertor]")
+    TEST_CASE("Converts debug_information_c_headers.iris", "[Convertor]")
     {
-        std::string_view const input_file = "debug_information_function_call.hltxt";
+        std::string_view const input_file = "debug_information_c_headers.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts debug_information_if.hltxt", "[Convertor]")
+    TEST_CASE("Converts debug_information_for_loop.iris", "[Convertor]")
     {
-        std::string_view const input_file = "debug_information_if.hltxt";
+        std::string_view const input_file = "debug_information_for_loop.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts debug_information_structs.hltxt", "[Convertor]")
+    TEST_CASE("Converts debug_information_function_call.iris", "[Convertor]")
     {
-        std::string_view const input_file = "debug_information_structs.hltxt";
+        std::string_view const input_file = "debug_information_function_call.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts debug_information_switch.hltxt", "[Convertor]")
+    TEST_CASE("Converts debug_information_if.iris", "[Convertor]")
     {
-        std::string_view const input_file = "debug_information_switch.hltxt";
+        std::string_view const input_file = "debug_information_if.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts debug_information_unions.hltxt", "[Convertor]")
+    TEST_CASE("Converts debug_information_structs.iris", "[Convertor]")
     {
-        std::string_view const input_file = "debug_information_unions.hltxt";
+        std::string_view const input_file = "debug_information_structs.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts debug_information_variables.hltxt", "[Convertor]")
+    TEST_CASE("Converts debug_information_switch.iris", "[Convertor]")
     {
-        std::string_view const input_file = "debug_information_variables.hltxt";
+        std::string_view const input_file = "debug_information_switch.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts debug_information_while_loop.hltxt", "[Convertor]")
+    TEST_CASE("Converts debug_information_unions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "debug_information_while_loop.hltxt";
+        std::string_view const input_file = "debug_information_unions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts decimal_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts debug_information_variables.iris", "[Convertor]")
     {
-        std::string_view const input_file = "decimal_expressions.hltxt";
+        std::string_view const input_file = "debug_information_variables.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts defer_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts debug_information_while_loop.iris", "[Convertor]")
     {
-        std::string_view const input_file = "defer_expressions.hltxt";
+        std::string_view const input_file = "debug_information_while_loop.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts defer_expressions_with_debug_information.hltxt", "[Convertor]")
+    TEST_CASE("Converts decimal_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "defer_expressions_with_debug_information.hltxt";
+        std::string_view const input_file = "decimal_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts dereference_and_access_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts defer_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "dereference_and_access_expressions.hltxt";
+        std::string_view const input_file = "defer_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts dynamic_array.hltxt", "[Convertor]")
+    TEST_CASE("Converts defer_expressions_with_debug_information.iris", "[Convertor]")
     {
-        std::string_view const input_file = "dynamic_array.hltxt";
+        std::string_view const input_file = "defer_expressions_with_debug_information.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts dynamic_array_usage.hltxt", "[Convertor]")
+    TEST_CASE("Converts dereference_and_access_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "dynamic_array_usage.hltxt";
+        std::string_view const input_file = "dereference_and_access_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts empty_return_expression.hltxt", "[Convertor]")
+    TEST_CASE("Converts dynamic_array.iris", "[Convertor]")
     {
-        std::string_view const input_file = "empty_return_expression.hltxt";
+        std::string_view const input_file = "dynamic_array.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts for_loop_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts dynamic_array_usage.iris", "[Convertor]")
     {
-        std::string_view const input_file = "for_loop_expressions.hltxt";
+        std::string_view const input_file = "dynamic_array_usage.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts function_contracts.hltxt", "[Convertor]")
+    TEST_CASE("Converts empty_return_expression.iris", "[Convertor]")
     {
-        std::string_view const input_file = "function_contracts.hltxt";
+        std::string_view const input_file = "empty_return_expression.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts function_pointers.hltxt", "[Convertor]")
+    TEST_CASE("Converts for_loop_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "function_pointers.hltxt";
+        std::string_view const input_file = "for_loop_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts hello_world.hltxt", "[Convertor]")
+    TEST_CASE("Converts function_contracts.iris", "[Convertor]")
     {
-        std::string_view const input_file = "hello_world.hltxt";
+        std::string_view const input_file = "function_contracts.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts instantiate_uninitialized.hltxt", "[Convertor]")
+    TEST_CASE("Converts function_pointers.iris", "[Convertor]")
     {
-        std::string_view const input_file = "instantiate_uninitialized.hltxt";
+        std::string_view const input_file = "function_pointers.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts hello_world.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "hello_world.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts instantiate_uninitialized.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "instantiate_uninitialized.iris";
         test_convertor(input_file);
     }
     
-    TEST_CASE("Converts instantiate_zero_initialized.hltxt", "[Convertor]")
+    TEST_CASE("Converts instantiate_zero_initialized.iris", "[Convertor]")
     {
-        std::string_view const input_file = "instantiate_zero_initialized.hltxt";
+        std::string_view const input_file = "instantiate_zero_initialized.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts if_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts if_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "if_expressions.hltxt";
+        std::string_view const input_file = "if_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts if_return_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts if_return_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "if_return_expressions.hltxt";
+        std::string_view const input_file = "if_return_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts module_with_dots.hltxt", "[Convertor]")
+    TEST_CASE("Converts module_with_dots.iris", "[Convertor]")
     {
-        std::string_view const input_file = "module_with_dots.hltxt";
+        std::string_view const input_file = "module_with_dots.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts multiple_modules_a.hltxt", "[Convertor]")
+    TEST_CASE("Converts multiple_modules_a.iris", "[Convertor]")
     {
-        std::string_view const input_file = "multiple_modules_a.hltxt";
+        std::string_view const input_file = "multiple_modules_a.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts multiple_modules_b.hltxt", "[Convertor]")
+    TEST_CASE("Converts multiple_modules_b.iris", "[Convertor]")
     {
-        std::string_view const input_file = "multiple_modules_b.hltxt";
+        std::string_view const input_file = "multiple_modules_b.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts multiple_modules_c.hltxt", "[Convertor]")
+    TEST_CASE("Converts multiple_modules_c.iris", "[Convertor]")
     {
-        std::string_view const input_file = "multiple_modules_c.hltxt";
+        std::string_view const input_file = "multiple_modules_c.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts null_pointers.hltxt", "[Convertor]")
+    TEST_CASE("Converts null_pointers.iris", "[Convertor]")
     {
-        std::string_view const input_file = "null_pointers.hltxt";
+        std::string_view const input_file = "null_pointers.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts numbers.hltxt", "[Convertor]")
+    TEST_CASE("Converts numbers.iris", "[Convertor]")
     {
-        std::string_view const input_file = "numbers.hltxt";
+        std::string_view const input_file = "numbers.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts numeric_casts.hltxt", "[Convertor]")
+    TEST_CASE("Converts numeric_casts.iris", "[Convertor]")
     {
-        std::string_view const input_file = "numeric_casts.hltxt";
+        std::string_view const input_file = "numeric_casts.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts pointers.hltxt", "[Convertor]")
+    TEST_CASE("Converts pointers.iris", "[Convertor]")
     {
-        std::string_view const input_file = "pointers.hltxt";
+        std::string_view const input_file = "pointers.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts size_of.hltxt", "[Convertor]")
+    TEST_CASE("Converts size_of.iris", "[Convertor]")
     {
-        std::string_view const input_file = "size_of.hltxt";
+        std::string_view const input_file = "size_of.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts soa_array_type.hltxt", "[Convertor]")
+    TEST_CASE("Converts soa_array_type.iris", "[Convertor]")
     {
-        std::string_view const input_file = "soa_array_type.hltxt";
+        std::string_view const input_file = "soa_array_type.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts soa_array_view_type.hltxt", "[Convertor]")
+    TEST_CASE("Converts soa_array_view_type.iris", "[Convertor]")
     {
-        std::string_view const input_file = "soa_array_view_type.hltxt";
+        std::string_view const input_file = "soa_array_view_type.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts switch_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts soa_array_view_from_pointer.iris", "[Convertor]")
     {
-        std::string_view const input_file = "switch_expressions.hltxt";
+        std::string_view const input_file = "soa_array_view_from_pointer.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts ternary_condition_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts switch_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "ternary_condition_expressions.hltxt";
+        std::string_view const input_file = "switch_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts test_framework.hltxt", "[Convertor]")
+    TEST_CASE("Converts type_of_in_constructor_type_argument.iris", "[Convertor]")
     {
-        std::string_view const input_file = "test_framework.hltxt";
+        std::string_view const input_file = "type_of_in_constructor_type_argument.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts unary_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts ternary_condition_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "unary_expressions.hltxt";
+        std::string_view const input_file = "ternary_condition_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts unique_name.hltxt", "[Convertor]")
+    TEST_CASE("Converts test_framework.iris", "[Convertor]")
     {
-        std::string_view const input_file = "unique_name.hltxt";
+        std::string_view const input_file = "test_framework.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts using_alias.hltxt", "[Convertor]")
+    TEST_CASE("Converts unary_expressions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "using_alias.hltxt";
+        std::string_view const input_file = "unary_expressions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts using_alias_from_modules.hltxt", "[Convertor]")
+    TEST_CASE("Converts unique_name.iris", "[Convertor]")
     {
-        std::string_view const input_file = "using_alias_from_modules.hltxt";
+        std::string_view const input_file = "unique_name.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts using_enum_flags.hltxt", "[Convertor]")
+    TEST_CASE("Converts using_alias.iris", "[Convertor]")
     {
-        std::string_view const input_file = "using_enum_flags.hltxt";
+        std::string_view const input_file = "using_alias.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts using_enums.hltxt", "[Convertor]")
+    TEST_CASE("Converts using_alias_from_modules.iris", "[Convertor]")
     {
-        std::string_view const input_file = "using_enums.hltxt";
+        std::string_view const input_file = "using_alias_from_modules.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts using_enums_from_modules.hltxt", "[Convertor]")
+    TEST_CASE("Converts using_enum_flags.iris", "[Convertor]")
     {
-        std::string_view const input_file = "using_enums_from_modules.hltxt";
+        std::string_view const input_file = "using_enum_flags.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts using_function_constructors.hltxt", "[Convertor]")
+    TEST_CASE("Converts using_enums.iris", "[Convertor]")
     {
-        std::string_view const input_file = "using_function_constructors.hltxt";
+        std::string_view const input_file = "using_enums.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts using_global_variables.hltxt", "[Convertor]")
+    TEST_CASE("Converts using_enums_from_modules.iris", "[Convertor]")
     {
-        std::string_view const input_file = "using_global_variables.hltxt";
+        std::string_view const input_file = "using_enums_from_modules.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts using_structs.hltxt", "[Convertor]")
+    TEST_CASE("Converts using_function_constructors.iris", "[Convertor]")
     {
-        std::string_view const input_file = "using_structs.hltxt";
+        std::string_view const input_file = "using_function_constructors.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts using_type_constructors.hltxt", "[Convertor]")
+    TEST_CASE("Converts using_global_variables.iris", "[Convertor]")
     {
-        std::string_view const input_file = "using_type_constructors.hltxt";
+        std::string_view const input_file = "using_global_variables.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts using_unions.hltxt", "[Convertor]")
+    TEST_CASE("Converts using_structs.iris", "[Convertor]")
     {
-        std::string_view const input_file = "using_unions.hltxt";
+        std::string_view const input_file = "using_structs.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts variables.hltxt", "[Convertor]")
+    TEST_CASE("Converts using_type_constructors.iris", "[Convertor]")
     {
-        std::string_view const input_file = "variables.hltxt";
+        std::string_view const input_file = "using_type_constructors.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts variadic_functions.hltxt", "[Convertor]")
+    TEST_CASE("Converts using_unions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "variadic_functions.hltxt";
+        std::string_view const input_file = "using_unions.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts void_pointer.hltxt", "[Convertor]")
+    TEST_CASE("Converts variables.iris", "[Convertor]")
     {
-        std::string_view const input_file = "void_pointer.hltxt";
+        std::string_view const input_file = "variables.iris";
         test_convertor(input_file);
     }
 
-    TEST_CASE("Converts while_loop_expressions.hltxt", "[Convertor]")
+    TEST_CASE("Converts variadic_functions.iris", "[Convertor]")
     {
-        std::string_view const input_file = "while_loop_expressions.hltxt";
+        std::string_view const input_file = "variadic_functions.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts void_pointer.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "void_pointer.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts while_loop_expressions.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "while_loop_expressions.iris";
         test_convertor(input_file);
     }
 

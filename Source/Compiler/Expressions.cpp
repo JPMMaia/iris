@@ -1,40 +1,26 @@
 module;
 
-#include <llvm/Analysis/ConstantFolding.h>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/DIBuilder.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
+#include <assert.h>
 
-#include <array>
-#include <format>
-#include <functional>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <variant>
-#include <vector>
+module iris.compiler.expressions;
 
-module h.compiler.expressions;
+import std;
+import llvm;
 
-import h.core;
-import h.core.declarations;
-import h.core.execution_engine;
-import h.core.types;
-import h.compiler.analysis;
-import h.compiler.clang_data;
-import h.compiler.clang_code_generation;
-import h.compiler.common;
-import h.compiler.debug_info;
-import h.compiler.instructions;
-import h.compiler.test_framework;
-import h.compiler.types;
+import iris.core;
+import iris.core.declarations;
+import iris.core.execution_engine;
+import iris.core.types;
+import iris.compiler.analysis;
+import iris.compiler.clang_data;
+import iris.compiler.clang_code_generation;
+import iris.compiler.common;
+import iris.compiler.debug_info;
+import iris.compiler.instructions;
+import iris.compiler.test_framework;
+import iris.compiler.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
     template <typename T1, typename T2>
     inline size_t constexpr offset_of(T1 T2::*member) {
@@ -42,7 +28,14 @@ namespace h::compiler
         return size_t(&(object.*member)) - size_t(&object);
     }
 
-    Expression_parameters set_core_module(Expression_parameters const& parameters, h::Module const& core_module)
+    static std::string format_error(std::string_view const message, std::optional<Source_position> const& source_position)
+    {
+        if (!source_position.has_value())
+            return std::format("{} (location unknown)", message);
+        return std::format("{} (at line {}, column {})", message, source_position->line, source_position->column);
+    }
+
+    Expression_parameters set_core_module(Expression_parameters const& parameters, iris::Module const& core_module)
     {
         if (&parameters.core_module == &core_module)
             return parameters;
@@ -68,18 +61,19 @@ namespace h::compiler
             .expression_type = parameters.expression_type,
             .debug_info = parameters.debug_info,
             .contract_options = parameters.contract_options,
+            .enable_bounds_checks = parameters.enable_bounds_checks,
             .source_position = parameters.source_position,
             .temporaries_allocator = parameters.temporaries_allocator,
         };
     }
 
-    std::optional<Module const*> get_module(std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies, std::string_view const name)
+    std::optional<Module const*> get_module(std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies, std::string_view const name)
     {
         auto const location = core_module_dependencies.find(name.data());
         if (location == core_module_dependencies.end())
             return std::nullopt;
 
-        return &location->second;
+        return location->second;
     }
 
     std::optional<std::string_view> get_module_name_from_alias(Module const& module, std::string_view const alias_name)
@@ -91,15 +85,17 @@ namespace h::compiler
         return location->module_name;
     }
 
+    llvm::Constant* fold_constant(llvm::Value* value, llvm::DataLayout const& llvm_data_layout, std::optional<Source_position> const& source_position);
+
     std::optional<Value_and_type> get_global_variable_value_and_type(
-        h::Module const& global_variable_module,
-        h::Global_variable_declaration const& global_variable_declaration,
+        iris::Module const& global_variable_module,
+        iris::Global_variable_declaration const& global_variable_declaration,
         Expression_parameters const& parameters
     )
     {
         if (global_variable_declaration.global_type == Global_variable_type::Macro)
         {
-            Expression_parameters new_parameters = parameters;
+            Expression_parameters new_parameters = set_core_module(parameters, global_variable_module);
             new_parameters.expression_type = global_variable_declaration.type;
 
             Value_and_type const value = create_statement_value(
@@ -107,12 +103,26 @@ namespace h::compiler
                 new_parameters
             );
 
-            llvm::Constant* const constant = fold_constant(value.value, parameters.llvm_data_layout);
+            if (parameters.llvm_parent_function == nullptr)
+            {
+                llvm::Constant* const constant = fold_constant(value.value, parameters.llvm_data_layout, parameters.source_position);
+
+                return Value_and_type
+                {
+                    .name = global_variable_declaration.name,
+                    .value = constant,
+                    .type = value.type
+                };
+            }
+
+            llvm::Value* folded_or_runtime_value = value.value;
+            if (llvm::BinaryOperator::classof(value.value) || llvm::Constant::classof(value.value))
+                folded_or_runtime_value = fold_constant(value.value, parameters.llvm_data_layout, parameters.source_position);
 
             return Value_and_type
             {
                 .name = global_variable_declaration.name,
-                .value = constant,
+                .value = folded_or_runtime_value,
                 .type = value.type
             };
         }
@@ -124,9 +134,9 @@ namespace h::compiler
                 return std::nullopt;
             }
 
-            h::compiler::Scope scope{};
-            std::optional<h::Type_reference> type = get_expression_type(
-                global_variable_module,
+            iris::compiler::Scope scope{};
+            std::optional<iris::Type_reference> type = get_expression_type(
+                global_variable_module.name,
                 parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
                 scope,
                 global_variable_declaration.initial_value,
@@ -161,7 +171,8 @@ namespace h::compiler
     static std::pair<Block_info const*, Blocks_to_pop_count> find_target_block(
         std::span<Block_info const> const blocks,
         std::size_t const break_count,
-        std::span<Block_type const> const target_block_types
+        std::span<Block_type const> const target_block_types,
+        std::optional<Source_position> const& source_position
     )
     {
         std::uint64_t target_break_count = break_count <= 1 ? 1 : break_count;
@@ -184,7 +195,7 @@ namespace h::compiler
             }
         }
 
-        throw std::runtime_error{ std::format("Could not find block to break!") };
+        throw std::runtime_error{ format_error("Could not find block to break!", source_position) };
     }
 
     static void create_local_variable_debug_description(
@@ -327,15 +338,16 @@ namespace h::compiler
 
     llvm::Constant* fold_constant(
         llvm::Value* const value,
-        llvm::DataLayout const& llvm_data_layout
+        llvm::DataLayout const& llvm_data_layout,
+        std::optional<Source_position> const& source_position
     )
     {
         if (llvm::BinaryOperator::classof(value))
         {
             llvm::BinaryOperator* const binary_operator = static_cast<llvm::BinaryOperator*>(value);
 
-            llvm::Constant* const left_hand_side = fold_constant(binary_operator->getOperand(0), llvm_data_layout);
-            llvm::Constant* const right_hand_side = fold_constant(binary_operator->getOperand(1), llvm_data_layout);
+            llvm::Constant* const left_hand_side = fold_constant(binary_operator->getOperand(0), llvm_data_layout, source_position);
+            llvm::Constant* const right_hand_side = fold_constant(binary_operator->getOperand(1), llvm_data_layout, source_position);
 
             llvm::Constant* const folded_constant = llvm::ConstantFoldBinaryOpOperands(
                 binary_operator->getOpcode(),
@@ -345,7 +357,7 @@ namespace h::compiler
             );
 
             if (folded_constant == nullptr)
-                throw std::runtime_error{ "Could not unfold binary operation constant!" };
+                throw std::runtime_error{ format_error("Could not unfold binary operation constant!", source_position) };
 
             return folded_constant;
         }
@@ -355,7 +367,7 @@ namespace h::compiler
         }
         else
         {
-            throw std::runtime_error{ "Could not unfold constant!" };
+            throw std::runtime_error{ format_error("Could not unfold constant!", source_position) };
         }
     }
 
@@ -370,9 +382,9 @@ namespace h::compiler
         );
 
         if (statement_value.value == nullptr)
-            throw std::runtime_error{ "Could not fold constant!" };
+            throw std::runtime_error{ format_error("Could not fold constant!", parameters.source_position) };
 
-        return fold_constant(statement_value.value, parameters.llvm_data_layout);
+        return fold_constant(statement_value.value, parameters.llvm_data_layout, parameters.source_position);
     }
 
     static std::pmr::string replace_string_literal_special_values(std::string_view const value)
@@ -440,7 +452,7 @@ namespace h::compiler
 
         auto const enum_value_location = std::find_if(declaration.values.begin(), declaration.values.end(), is_enum_value);
         if (enum_value_location == declaration.values.end())
-            throw std::runtime_error{ std::format("Unknown enum value '{}.{}' referenced.", declaration.name, enum_value_name) };
+            throw std::runtime_error{ format_error(std::format("Unknown enum value '{}.{}' referenced.", declaration.name, enum_value_name), std::nullopt) };
 
         auto const enum_value_index = std::distance(declaration.values.begin(), enum_value_location);
 
@@ -461,7 +473,7 @@ namespace h::compiler
         Value_and_type const& left_hand_side,
         Statement const& statement,
         Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies
     )
     {
         if (left_hand_side.value == nullptr)
@@ -506,6 +518,19 @@ namespace h::compiler
             else if (std::holds_alternative<Variable_expression>(left_hand_side_expression.data))
             {
                 Variable_expression const& variable_expression = std::get<Variable_expression>(left_hand_side_expression.data);
+
+                if (variable_expression.name == "Type_kind")
+                {
+                    return Custom_type_reference
+                    {
+                        .module_reference =
+                        {
+                            .name = "iris.builtin",
+                        },
+                        .name = variable_expression.name
+                    };
+                }
+
                 return Custom_type_reference
                 {
                     .module_reference =
@@ -537,7 +562,7 @@ namespace h::compiler
     )
     {
         if (left_hand_side.value == nullptr)
-            throw std::runtime_error{ "create_access_struct_member(): left_hand_side.value == nullptr" };
+            throw std::runtime_error{ format_error("create_access_struct_member(): left_hand_side.value == nullptr", parameters.source_position) };
 
         Value_and_type value = generate_load_struct_member_instructions(
             parameters.clang_module_data,
@@ -563,7 +588,7 @@ namespace h::compiler
     )
     {
         if (left_hand_side.value == nullptr)
-            throw std::runtime_error{ "create_access_union_member(): left_hand_side.value == nullptr" };
+            throw std::runtime_error{ format_error("create_access_union_member(): left_hand_side.value == nullptr", parameters.source_position) };
 
         llvm::Type* const union_llvm_type = type_reference_to_llvm_type(
             parameters.llvm_context,
@@ -574,7 +599,7 @@ namespace h::compiler
 
         auto const member_location = std::find(union_declaration.member_names.begin(), union_declaration.member_names.end(), access_member_name);
         if (member_location == union_declaration.member_names.end())
-            throw std::runtime_error{ std::format("'{}' does not exist in union type '{}'.", access_member_name, union_declaration.name) };
+            throw std::runtime_error{ format_error(std::format("'{}' does not exist in union type '{}'.", access_member_name, union_declaration.name), parameters.source_position) };
 
         unsigned const member_index = static_cast<unsigned>(std::distance(union_declaration.member_names.begin(), member_location));
 
@@ -708,7 +733,7 @@ namespace h::compiler
     )
     {
         Module const& core_module = parameters.core_module;
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies = parameters.core_module_dependencies;
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies = parameters.core_module_dependencies;
         llvm::Module& llvm_module = parameters.llvm_module;
         Declaration_database const& declaration_database = parameters.declaration_database;
         Enum_value_constants const& enum_value_constants = parameters.enum_value_constants;
@@ -725,7 +750,7 @@ namespace h::compiler
                 std::string_view const declaration_name = expression.member_name;
                 std::optional<Declaration> const declaration_optional = find_declaration(declaration_database, external_module.name, declaration_name);
                 if (!declaration_optional.has_value())
-                    throw std::runtime_error{ std::format("Could not find declaration '{}.{}' referenced.", external_module.name, declaration_name) };
+                    throw std::runtime_error{ format_error(std::format("Could not find declaration '{}.{}' referenced.", external_module.name, declaration_name), parameters.source_position) };
 
                 Declaration const& declaration = declaration_optional.value();
 
@@ -763,7 +788,7 @@ namespace h::compiler
                         parameters
                     );
                     if (!value_and_type.has_value())
-                        throw std::runtime_error{std::format("Internal error while trying to find global variable '{}.{}'", external_module.name, declaration_name)};
+                        throw std::runtime_error{ format_error(std::format("Internal error while trying to find global variable '{}.{}'", external_module.name, declaration_name), parameters.source_position) };
 
                     return *value_and_type;
                 }
@@ -778,7 +803,7 @@ namespace h::compiler
                         expression.member_name
                     );
                     if (!llvm_function)
-                        throw std::runtime_error{ std::format("Unknown function '{}.{}' referenced.", external_module.name, expression.member_name) };
+                        throw std::runtime_error{ format_error(std::format("Unknown function '{}.{}' referenced.", external_module.name, expression.member_name), parameters.source_position) };
 
                     return Value_and_type
                     {
@@ -802,24 +827,24 @@ namespace h::compiler
             }
         }
 
-        if (left_hand_side.type.has_value() && h::is_array_slice_type_reference(left_hand_side.type.value()))
+        if (left_hand_side.type.has_value() && iris::is_array_slice_type_reference(left_hand_side.type.value()))
         {
-            h::Array_slice_type const& array_slice_type = std::get<h::Array_slice_type>(left_hand_side.type->data);
+            iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(left_hand_side.type->data);
 
-            h::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
+            iris::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
 
             return create_access_struct_member(
                 left_hand_side,
                 expression.member_name,
-                "H.Builtin",
+                "iris.builtin",
                 struct_declaration,
                 parameters
             );
         }
 
-        if (left_hand_side.type.has_value() && h::is_soa_array_type_reference(left_hand_side.type.value()))
+        if (left_hand_side.type.has_value() && iris::is_soa_array_type_reference(left_hand_side.type.value()))
         {
-            h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(left_hand_side.type->data);
+            iris::Soa_array_type const& soa_array_type = std::get<iris::Soa_array_type>(left_hand_side.type->data);
 
             if (expression.member_name == "length")
             {
@@ -841,7 +866,7 @@ namespace h::compiler
             }
         }
 
-        if (left_hand_side.type.has_value() && h::is_soa_array_view_type_reference(left_hand_side.type.value()))
+        if (left_hand_side.type.has_value() && iris::is_soa_array_view_type_reference(left_hand_side.type.value()))
         {
             if (expression.member_name == "start_index")
             {
@@ -910,6 +935,20 @@ namespace h::compiler
                                     expression.member_name,
                                     enum_value_constants
                                 );
+                            }
+                            else if (std::holds_alternative<Struct_declaration const*>(underlying_declaration.value().data))
+                            {
+                                if (left_hand_side.value != nullptr)
+                                {
+                                    Struct_declaration const& struct_declaration = *std::get<Struct_declaration const*>(underlying_declaration.value().data);
+                                    return create_access_struct_member(
+                                        left_hand_side,
+                                        expression.member_name,
+                                        underlying_declaration->module_name,
+                                        struct_declaration,
+                                        parameters
+                                    );
+                                }
                             }
                         }
                     }
@@ -980,7 +1019,39 @@ namespace h::compiler
             }
         }
 
-        throw std::runtime_error{ "Could not process access expression!" };
+        throw std::runtime_error{ format_error("Could not process access expression!", parameters.source_position) };
+    }
+
+    static void create_bounds_check_instructions(
+        llvm::Value* const index_value,
+        llvm::Value* const size_value,
+        std::string_view const error_message,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::LLVMContext& llvm_context = parameters.llvm_context;
+        llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+
+        llvm::Value* const index_i64 = llvm_builder.CreateIntCast(
+            index_value,
+            llvm::Type::getInt64Ty(llvm_context),
+            false,
+            "bounds_check_index"
+        );
+
+        llvm::Value* const in_bounds = llvm_builder.CreateICmpULT(index_i64, size_value, "bounds_check_in_bounds");
+
+        llvm::BasicBlock* const pass_block = llvm::BasicBlock::Create(llvm_context, "bounds_check_pass", parameters.llvm_parent_function);
+        llvm::BasicBlock* const fail_block = llvm::BasicBlock::Create(llvm_context, "bounds_check_fail", parameters.llvm_parent_function);
+
+        llvm_builder.CreateCondBr(in_bounds, pass_block, fail_block);
+
+        llvm_builder.SetInsertPoint(fail_block);
+        create_log_error_instruction(llvm_context, parameters.llvm_module, llvm_builder, error_message);
+        create_abort_instruction(llvm_context, parameters.llvm_module, llvm_builder);
+        llvm_builder.CreateUnreachable();
+
+        llvm_builder.SetInsertPoint(pass_block);
     }
 
     Value_and_type create_access_array_expression_value(
@@ -998,7 +1069,7 @@ namespace h::compiler
         Value_and_type const index_value = create_loaded_expression_value(expression.index.expression_index, statement, parameters);
         llvm::Value* const index_llvm_value = index_value.value;
 
-        h::Expression const& indexed_expression = statement.expressions[expression.expression.expression_index];
+        iris::Expression const& indexed_expression = statement.expressions[expression.expression.expression_index];
         if (std::holds_alternative<Dereference_and_access_expression>(indexed_expression.data))
         {
             Dereference_and_access_expression const& access_expression = std::get<Dereference_and_access_expression>(indexed_expression.data);
@@ -1014,13 +1085,21 @@ namespace h::compiler
                     access_expression.member_name
                 );
                 if (member_location == soa_info.struct_declaration->member_names.end())
-                    throw std::runtime_error{ std::format("'{}' does not exist in struct type '{}'.", access_expression.member_name, soa_info.struct_declaration->name) };
+                    throw std::runtime_error{ format_error(std::format("'{}' does not exist in struct type '{}'.", access_expression.member_name, soa_info.struct_declaration->name), parameters.source_position) };
 
                 std::size_t const member_index = static_cast<std::size_t>(std::distance(soa_info.struct_declaration->member_names.begin(), member_location));
                 Type_reference const& member_type = soa_info.struct_declaration->member_types[member_index];
                 llvm::Type* const member_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, member_type, type_database);
 
                 llvm::Value* const data_pointer = load_soa_data_pointer(soa_value, parameters);
+
+                if (parameters.enable_bounds_checks)
+                {
+                    llvm::Value* const size_value = llvm_builder.getInt64(soa_info.soa_array_type->size);
+                    std::string const error_message = std::format("Out-of-bounds SOA array access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                    create_bounds_check_instructions(index_llvm_value, size_value, error_message, parameters);
+                }
+
                 llvm::Value* const element_pointer = create_soa_member_element_pointer(
                     data_pointer,
                     soa_info.layout.members[member_index],
@@ -1046,7 +1125,7 @@ namespace h::compiler
                     access_expression.member_name
                 );
                 if (member_location == soa_info.struct_declaration->member_names.end())
-                    throw std::runtime_error{ std::format("'{}' does not exist in struct type '{}'.", access_expression.member_name, soa_info.struct_declaration->name) };
+                    throw std::runtime_error{ format_error(std::format("'{}' does not exist in struct type '{}'.", access_expression.member_name, soa_info.struct_declaration->name), parameters.source_position) };
 
                 std::size_t const member_index = static_cast<std::size_t>(std::distance(soa_info.struct_declaration->member_names.begin(), member_location));
                 Type_reference const& member_type = soa_info.struct_declaration->member_types[member_index];
@@ -1054,6 +1133,13 @@ namespace h::compiler
 
                 llvm::Value* const data_pointer = load_soa_array_view_data_pointer(soa_value, parameters);
                 llvm::Value* const length_value = load_soa_array_view_length(soa_value, parameters);
+
+                if (parameters.enable_bounds_checks)
+                {
+                    std::string const error_message = std::format("Out-of-bounds SOA array view access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                    create_bounds_check_instructions(index_llvm_value, length_value, error_message, parameters);
+                }
+
                 llvm::Value* const adjusted_index = create_soa_array_view_adjusted_index(soa_value, index_llvm_value, parameters);
                 llvm::Value* const element_pointer = create_soa_member_element_pointer(
                     data_pointer,
@@ -1076,11 +1162,19 @@ namespace h::compiler
 
         Value_and_type const left_hand_side_expression_value = create_expression_value(expression.expression.expression_index, statement, parameters);
         if (!left_hand_side_expression_value.type.has_value())
-            throw std::runtime_error{"Could not deduce type of left hand side."};
+            throw std::runtime_error{ format_error("Could not deduce type of left hand side.", parameters.source_position) };
 
         if (std::holds_alternative<Soa_array_type>(left_hand_side_expression_value.type->data))
         {
             Soa_array_type_info const soa_info = get_soa_array_type_info(left_hand_side_expression_value.type.value(), parameters);
+
+            if (parameters.enable_bounds_checks)
+            {
+                llvm::Value* const size_value = llvm_builder.getInt64(soa_info.soa_array_type->size);
+                std::string const error_message = std::format("Out-of-bounds SOA array access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                create_bounds_check_instructions(index_llvm_value, size_value, error_message, parameters);
+            }
+
             llvm::Value* const data_pointer = load_soa_data_pointer(left_hand_side_expression_value, parameters);
 
             llvm::Type* const element_llvm_type = type_reference_to_llvm_type(
@@ -1143,6 +1237,13 @@ namespace h::compiler
             Soa_array_view_type_info const soa_info = get_soa_array_view_type_info(left_hand_side_expression_value.type.value(), parameters);
             llvm::Value* const data_pointer = load_soa_array_view_data_pointer(left_hand_side_expression_value, parameters);
             llvm::Value* const length_value = load_soa_array_view_length(left_hand_side_expression_value, parameters);
+
+            if (parameters.enable_bounds_checks)
+            {
+                std::string const error_message = std::format("Out-of-bounds SOA array view access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                create_bounds_check_instructions(index_llvm_value, length_value, error_message, parameters);
+            }
+
             llvm::Value* const adjusted_index = create_soa_array_view_adjusted_index(left_hand_side_expression_value, index_llvm_value, parameters);
 
             llvm::Type* const element_llvm_type = type_reference_to_llvm_type(
@@ -1205,11 +1306,20 @@ namespace h::compiler
 
         std::optional<Type_reference> element_type = get_element_or_pointee_type(*left_hand_side_expression_value.type);
         if (!element_type.has_value())
-            throw std::runtime_error{"Cannot find element type of array access."};
-
-        if (h::is_array_slice_type_reference(*left_hand_side_expression_value.type))
+            throw std::runtime_error{ format_error("Cannot find element type of array access.", parameters.source_position) };
+        
+        if (is_array_slice_type_reference(*left_hand_side_expression_value.type))
         {
             llvm::Type* const array_slice_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, left_hand_side_expression_value.type.value(), type_database);
+
+            if (parameters.enable_bounds_checks)
+            {
+                llvm::Value* const pointer_to_length = llvm_builder.CreateStructGEP(array_slice_llvm_type, left_hand_side_expression_value.value, 1);
+                llvm::Value* const length = create_load_instruction(llvm_builder, llvm_data_layout, llvm::Type::getInt64Ty(llvm_context), pointer_to_length);
+                std::string const error_message = std::format("Out-of-bounds array slice access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                create_bounds_check_instructions(index_llvm_value, length, error_message, parameters);
+            }
+
             llvm::Value* const pointer_to_data_pointer = llvm_builder.CreateStructGEP(
                 array_slice_llvm_type,
                 left_hand_side_expression_value.value,
@@ -1236,6 +1346,15 @@ namespace h::compiler
         }
 
         bool const using_pointer = is_pointer(*left_hand_side_expression_value.type);
+
+        if (parameters.enable_bounds_checks && !using_pointer)
+        {
+            Constant_array_type const& constant_array_type = std::get<Constant_array_type>(left_hand_side_expression_value.type->data);
+            llvm::Value* const size_value = llvm_builder.getInt64(constant_array_type.size);
+            std::string const error_message = std::format("Out-of-bounds constant array access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+            create_bounds_check_instructions(index_llvm_value, size_value, error_message, parameters);
+        }
+
         Type_reference const& type_reference_to_use =
             using_pointer ?
             element_type.value() :
@@ -1252,8 +1371,6 @@ namespace h::compiler
             using_pointer ? llvm::ArrayRef<llvm::Value*>{index_llvm_value} : llvm::ArrayRef<llvm::Value*>{llvm_builder.getInt32(0), index_llvm_value},
             "array_element_pointer"
         );
-
-        // TODO add an option to the compiler to make access inbounds for safety. All out-of-bounds accesses will then cause an abort.
         
         return Value_and_type
         {
@@ -1268,7 +1385,8 @@ namespace h::compiler
         Value_and_type const& left_hand_side,
         Value_and_type const& right_hand_side,
         Binary_operation operation,
-        Declaration_database const& declaration_database
+        Declaration_database const& declaration_database,
+        std::optional<Source_position> const& source_position
     );
 
     Value_and_type create_assignment_additional_operation_instruction(
@@ -1292,7 +1410,7 @@ namespace h::compiler
             right_hand_side_parameters.expression_type = left_hand_side_value.type;
             Value_and_type const right_hand_side_value = create_loaded_expression_value(right_hand_side.expression_index, statement, right_hand_side_parameters);
 
-            Value_and_type const result = create_binary_operation_instruction(llvm_builder, left_hand_side_value, right_hand_side_value, operation, parameters.declaration_database);
+            Value_and_type const result = create_binary_operation_instruction(llvm_builder, left_hand_side_value, right_hand_side_value, operation, parameters.declaration_database, parameters.source_position);
 
             return result;
         }
@@ -1311,7 +1429,7 @@ namespace h::compiler
         Expression_parameters const& parameters
     )
     {
-        h::Function_condition const condition = {
+        iris::Function_condition const condition = {
             .description = expression.message.value_or(""),
             .condition = expression.statement
         };
@@ -1357,7 +1475,7 @@ namespace h::compiler
         );
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
         
         Expression const left_hand_side_expression = statement.expressions[expression.left_hand_side.expression_index];
         if (left_hand_side.value != nullptr && std::holds_alternative<Access_expression>(left_hand_side_expression.data))
@@ -1405,7 +1523,7 @@ namespace h::compiler
 
             Scope const scope = create_type_analysis_scope(parameters);
             std::optional<Type_reference> const array_base_expression_type = get_expression_type(
-                parameters.core_module,
+                parameters.core_module.name,
                 parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
                 scope,
                 statement,
@@ -1610,17 +1728,35 @@ namespace h::compiler
         Value_and_type const& left_hand_side,
         Value_and_type const& right_hand_side,
         Binary_operation const operation,
-        Declaration_database const& declaration_database
+        Declaration_database const& declaration_database,
+        std::optional<Source_position> const& source_position
     )
     {
         if (!left_hand_side.type.has_value() || !right_hand_side.type.has_value())
-            throw std::runtime_error{ "Left or right side type is null!" };
+            throw std::runtime_error{ format_error("Left or right side type is null!", source_position) };
 
         if (!are_types_compatible(declaration_database, *left_hand_side.type, *right_hand_side.type))
-            throw std::runtime_error{ "Left and right side types do not match!" };
+            throw std::runtime_error{ format_error("Left and right side types do not match!", source_position) };
 
         std::optional<Type_reference> const underling_type = get_underlying_type(declaration_database, left_hand_side.type.value());
         Type_reference const& type = underling_type.has_value() ? underling_type.value() : left_hand_side.type.value();
+
+        auto const create_bool_value = [&llvm_builder](llvm::Value* condition_value) -> Value_and_type
+        {
+            llvm::Value* result_value = condition_value;
+            if (condition_value->getType()->isIntegerTy() && !condition_value->getType()->isIntegerTy(1))
+            {
+                llvm::Value* const zero_value = llvm::ConstantInt::get(condition_value->getType(), 0);
+                result_value = llvm_builder.CreateICmpNE(condition_value, zero_value);
+            }
+
+            return Value_and_type
+            {
+                .name = "",
+                .value = result_value,
+                .type = create_bool_type_reference()
+            };
+        };
 
         switch (operation)
         {
@@ -2042,18 +2178,24 @@ namespace h::compiler
             break;
         }
         case Binary_operation::Logical_and: {
+            Value_and_type const left_bool_value = create_bool_value(left_hand_side.value);
+            Value_and_type const right_bool_value = create_bool_value(right_hand_side.value);
+
             return Value_and_type
             {
                 .name = "",
-                .value = llvm_builder.CreateAnd(left_hand_side.value, right_hand_side.value),
+                .value = llvm_builder.CreateAnd(left_bool_value.value, right_bool_value.value),
                 .type = create_bool_type_reference()
             };
         }
         case Binary_operation::Logical_or: {
+            Value_and_type const left_bool_value = create_bool_value(left_hand_side.value);
+            Value_and_type const right_bool_value = create_bool_value(right_hand_side.value);
+
             return Value_and_type
             {
                 .name = "",
-                .value = llvm_builder.CreateOr(left_hand_side.value, right_hand_side.value),
+                .value = llvm_builder.CreateOr(left_bool_value.value, right_bool_value.value),
                 .type = create_bool_type_reference()
             };
         }
@@ -2150,7 +2292,7 @@ namespace h::compiler
         }
         }
 
-        throw std::runtime_error{ std::format("Binary operation '{}' not implemented!", static_cast<std::uint32_t>(operation)) };
+        throw std::runtime_error{ format_error(std::format("Binary operation '{}' not implemented!", static_cast<std::uint32_t>(operation)), source_position) };
     }
 
     Value_and_type create_binary_expression_value(
@@ -2165,7 +2307,7 @@ namespace h::compiler
         Value_and_type const& right_hand_side = create_loaded_expression_value(expression.right_hand_side.expression_index, statement, parameters);
         Binary_operation const operation = expression.operation;
 
-        Value_and_type value = create_binary_operation_instruction(llvm_builder, left_hand_side, right_hand_side, operation, parameters.declaration_database);
+        Value_and_type value = create_binary_operation_instruction(llvm_builder, left_hand_side, right_hand_side, operation, parameters.declaration_database, parameters.source_position);
         return value;
     }
 
@@ -2176,7 +2318,7 @@ namespace h::compiler
     {
         std::span<Statement const> statements = block_expression.statements;
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             push_debug_lexical_block_scope(*parameters.debug_info, *parameters.source_position);
 
         std::pmr::vector<Block_info> all_block_infos{ parameters.blocks.begin(), parameters.blocks.end() };
@@ -2193,7 +2335,7 @@ namespace h::compiler
             true
         );
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             pop_debug_scope(*parameters.debug_info);
 
         return Value_and_type
@@ -2218,14 +2360,14 @@ namespace h::compiler
             Block_type::While_loop,
         };
         std::pair<Block_info const*, Blocks_to_pop_count> const target_block_result = 
-            find_target_block(blocks, break_expression.loop_count, target_block_types);
+            find_target_block(blocks, break_expression.loop_count, target_block_types, parameters.source_position);
         llvm::BasicBlock* const target_block = target_block_result.first->after_block;
         Blocks_to_pop_count const blocks_to_pop_count = target_block_result.second;
 
         create_instructions_pop_blocks(parameters, blocks_to_pop_count);
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         llvm_builder.CreateBr(target_block);
 
@@ -2239,18 +2381,21 @@ namespace h::compiler
 
     Value_and_type create_call_expression_value_common(
         std::pmr::vector<bool> const& is_expression_address_of,
+        std::span<std::optional<Type_reference> const> const argument_types,
         llvm::Value* const llvm_function_callee,
         llvm::FunctionType* const llvm_function_type,
         std::span<llvm::Value* const> const llvm_arguments,
         Function_pointer_type const& function_pointer_type,
+        std::optional<Source_position> const& source_position,
         Expression_parameters const& parameters
     )
     {
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, source_position);
 
         llvm::Value* call_instruction = generate_function_call(
             is_expression_address_of,
+            argument_types,
             parameters.llvm_context,
             parameters.llvm_builder,
             parameters.llvm_data_layout,
@@ -2297,16 +2442,16 @@ namespace h::compiler
     )
     {
         if (!std::holds_alternative<Soa_array_type>(type_reference.data))
-            throw std::runtime_error{ "Expected Soa_array type." };
+            throw std::runtime_error{ format_error("Expected Soa_array type.", parameters.source_position) };
 
         Soa_array_type const& soa_array_type = std::get<Soa_array_type>(type_reference.data);
         if (soa_array_type.value_type.empty())
-            throw std::runtime_error{ "Soa_array value_type is not specified." };
+            throw std::runtime_error{ format_error("Soa_array value_type is not specified.", parameters.source_position) };
 
         Type_reference const& element_type = soa_array_type.value_type.front();
         Custom_type_reference const* const custom_type_reference = std::get_if<Custom_type_reference>(&element_type.data);
         if (custom_type_reference == nullptr)
-            throw std::runtime_error{ "Soa_array element type must be a struct type." };
+            throw std::runtime_error{ format_error("Soa_array element type must be a struct type.", parameters.source_position) };
 
         std::optional<Declaration> const declaration = find_declaration(
             parameters.declaration_database,
@@ -2314,7 +2459,7 @@ namespace h::compiler
             custom_type_reference->name
         );
         if (!declaration.has_value() || !std::holds_alternative<Struct_declaration const*>(declaration->data))
-            throw std::runtime_error{ "Soa_array element type must resolve to a struct declaration." };
+            throw std::runtime_error{ format_error("Soa_array element type must resolve to a struct declaration.", parameters.source_position) };
 
         Struct_declaration const& struct_declaration = *std::get<Struct_declaration const*>(declaration->data);
 
@@ -2340,16 +2485,16 @@ namespace h::compiler
     )
     {
         if (!std::holds_alternative<Soa_array_view_type>(type_reference.data))
-            throw std::runtime_error{ "Expected Soa_array_view type." };
+            throw std::runtime_error{ format_error("Expected Soa_array_view type.", parameters.source_position) };
 
         Soa_array_view_type const& soa_array_view_type = std::get<Soa_array_view_type>(type_reference.data);
         if (soa_array_view_type.value_type.empty())
-            throw std::runtime_error{ "Soa_array_view value_type is not specified." };
+            throw std::runtime_error{ format_error("Soa_array_view value_type is not specified.", parameters.source_position) };
 
         Type_reference const& element_type = soa_array_view_type.value_type.front();
         Custom_type_reference const* const custom_type_reference = std::get_if<Custom_type_reference>(&element_type.data);
         if (custom_type_reference == nullptr)
-            throw std::runtime_error{ "Soa_array_view element type must be a struct type." };
+            throw std::runtime_error{ format_error("Soa_array_view element type must be a struct type.", parameters.source_position) };
 
         std::optional<Declaration> const declaration = find_declaration(
             parameters.declaration_database,
@@ -2357,7 +2502,7 @@ namespace h::compiler
             custom_type_reference->name
         );
         if (!declaration.has_value() || !std::holds_alternative<Struct_declaration const*>(declaration->data))
-            throw std::runtime_error{ "Soa_array_view element type must resolve to a struct declaration." };
+            throw std::runtime_error{ format_error("Soa_array_view element type must resolve to a struct declaration.", parameters.source_position) };
 
         Struct_declaration const& struct_declaration = *std::get<Struct_declaration const*>(declaration->data);
 
@@ -2385,7 +2530,7 @@ namespace h::compiler
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{ "Soa_array local storage requires a parent function." };
+            throw std::runtime_error{ format_error("Soa_array local storage requires a parent function.", parameters.source_position) };
 
         llvm::Type* const soa_llvm_type = type_reference_to_llvm_type(
             parameters.llvm_context,
@@ -2494,7 +2639,7 @@ namespace h::compiler
     )
     {
         if (member_index >= member_layouts.size())
-            throw std::runtime_error{ "Soa_array_view member index out of bounds." };
+            throw std::runtime_error{ format_error("Soa_array_view member index out of bounds.", parameters.source_position) };
 
         llvm::Value* block_offset = parameters.llvm_builder.getInt64(0);
         for (std::size_t previous_member_index = 0; previous_member_index < member_index; ++previous_member_index)
@@ -2539,7 +2684,7 @@ namespace h::compiler
     )
     {
         if (!soa_value.type.has_value() || soa_value.value == nullptr)
-            throw std::runtime_error{ "Cannot load Soa_array data pointer." };
+            throw std::runtime_error{ format_error("Cannot load Soa_array data pointer.", parameters.source_position) };
 
         llvm::Type* const soa_llvm_type = type_reference_to_llvm_type(
             parameters.llvm_context,
@@ -2565,7 +2710,7 @@ namespace h::compiler
     )
     {
         if (!soa_value.type.has_value() || soa_value.value == nullptr)
-            throw std::runtime_error{ "Cannot load Soa_array_view field." };
+            throw std::runtime_error{ format_error("Cannot load Soa_array_view field.", parameters.source_position) };
 
         llvm::Type* const soa_llvm_type = type_reference_to_llvm_type(
             parameters.llvm_context,
@@ -2677,10 +2822,10 @@ namespace h::compiler
         Expression_parameters const& parameters
     )
     {
-        h::Module const& struct_core_module =
+        iris::Module const& struct_core_module =
             soa_info.module_name == parameters.core_module.name ?
             parameters.core_module :
-            parameters.core_module_dependencies.at(soa_info.module_name.data());
+            *parameters.core_module_dependencies.at(soa_info.module_name.data());
 
         for (std::uint64_t element_index = 0; element_index < soa_info.soa_array_type->size; ++element_index)
         {
@@ -2748,18 +2893,18 @@ namespace h::compiler
     }
 
     Value_and_type instantiate_array_slice(
-        std::pmr::vector<h::Type_reference> const& element_type,
+        std::pmr::vector<iris::Type_reference> const& element_type,
         Value_and_type const& data_value,
         Value_and_type const& length_value,
         Expression_parameters const& parameters
     )
     {
-        h::Type_reference const array_slice_type_reference = h::create_array_slice_type_reference(element_type, true);
+        iris::Type_reference const array_slice_type_reference = iris::create_array_slice_type_reference(element_type, true);
         llvm::Type* const llvm_array_slice_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, array_slice_type_reference, parameters.type_database);
 
         llvm::AllocaInst* const struct_alloca = create_alloca_instruction(parameters.llvm_builder, parameters.llvm_data_layout, *parameters.llvm_parent_function, llvm_array_slice_type);
 
-        h::Struct_declaration const struct_declaration = h::create_array_slice_type_struct_declaration(element_type);
+        iris::Struct_declaration const struct_declaration = iris::create_array_slice_type_struct_declaration(element_type);
 
         generate_store_struct_member_instructions(
             parameters.clang_module_data,
@@ -2768,7 +2913,7 @@ namespace h::compiler
             parameters.llvm_data_layout,
             struct_alloca,
             "data",
-            "H.Builtin",
+            "iris.builtin",
             struct_declaration,
             data_value,
             parameters.type_database
@@ -2781,7 +2926,7 @@ namespace h::compiler
             parameters.llvm_data_layout,
             struct_alloca,
             "length",
-            "H.Builtin",
+            "iris.builtin",
             struct_declaration,
             length_value,
             parameters.type_database
@@ -2797,7 +2942,7 @@ namespace h::compiler
 
     Value_and_type allocate_stack_array(
         Call_expression const& call_expression,
-        h::Instance_call_expression const& instance_call_expression,
+        iris::Instance_call_expression const& instance_call_expression,
         Statement const& statement,
         Expression_parameters const& parameters
     )
@@ -2831,31 +2976,31 @@ namespace h::compiler
         Expression_parameters const& parameters
     )
     {
-        h::Expression const& left_hand_side = statement.expressions[expression.expression.expression_index];
+        iris::Expression const& left_hand_side = statement.expressions[expression.expression.expression_index];
 
-        if (std::holds_alternative<h::Access_expression>(left_hand_side.data))
+        if (std::holds_alternative<iris::Access_expression>(left_hand_side.data))
         {
-            h::Access_expression const& access_expression = std::get<h::Access_expression>(left_hand_side.data);
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(left_hand_side.data);
 
             if (access_expression.member_name == "view")
             {
                 if (expression.arguments.size() != 0 && expression.arguments.size() != 2)
-                    throw std::runtime_error{"Soa_array.view() expects 0 or 2 arguments."};
+                    throw std::runtime_error{ format_error("Soa_array.view() expects 0 or 2 arguments.", parameters.source_position) };
 
                 Value_and_type const soa_value = create_expression_value(access_expression.expression.expression_index, statement, parameters);
                 if (!soa_value.type.has_value())
-                    throw std::runtime_error{"Cannot deduce Soa_array receiver type for view()."};
+                    throw std::runtime_error{ format_error("Cannot deduce Soa_array receiver type for view().", parameters.source_position) };
 
                 std::optional<Type_reference> const underlying_receiver_type = get_underlying_type(
                     parameters.declaration_database,
                     soa_value.type.value()
                 );
                 if (!underlying_receiver_type.has_value() || !std::holds_alternative<Soa_array_type>(underlying_receiver_type->data))
-                    throw std::runtime_error{"view() receiver must be Soa_array."};
+                    throw std::runtime_error{ format_error("view() receiver must be Soa_array.", parameters.source_position) };
 
                 Soa_array_type const& soa_array_type = std::get<Soa_array_type>(underlying_receiver_type->data);
                 if (soa_array_type.value_type.empty())
-                    throw std::runtime_error{"Soa_array value_type is not specified for view()."};
+                    throw std::runtime_error{ format_error("Soa_array value_type is not specified for view().", parameters.source_position) };
 
                 bool is_view_mutable = false;
                 if (parameters.expression_type.has_value() && std::holds_alternative<Soa_array_view_type>(parameters.expression_type->data))
@@ -2878,8 +3023,7 @@ namespace h::compiler
                 );
 
                 if (parameters.llvm_parent_function == nullptr)
-                    throw std::runtime_error{"Soa_array.view() requires a parent function."};
-
+                    throw std::runtime_error{ format_error("Soa_array.view() requires a parent function.", parameters.source_position) };
                 llvm::AllocaInst* const soa_view_alloca = create_alloca_instruction(
                     parameters.llvm_builder,
                     parameters.llvm_data_layout,
@@ -2927,14 +3071,14 @@ namespace h::compiler
             }
         }
 
-        if (std::holds_alternative<h::Instance_call_expression>(left_hand_side.data))
+        if (std::holds_alternative<iris::Instance_call_expression>(left_hand_side.data))
         {
-            h::Instance_call_expression const& instance_call_expression = std::get<h::Instance_call_expression>(left_hand_side.data);
+            iris::Instance_call_expression const& instance_call_expression = std::get<iris::Instance_call_expression>(left_hand_side.data);
 
-            h::Expression const& instance_call_left_expression = statement.expressions[instance_call_expression.left_hand_side.expression_index];
-            if (std::holds_alternative<h::Variable_expression>(instance_call_left_expression.data))
+            iris::Expression const& instance_call_left_expression = statement.expressions[instance_call_expression.left_hand_side.expression_index];
+            if (std::holds_alternative<iris::Variable_expression>(instance_call_left_expression.data))
             {
-                h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(instance_call_left_expression.data);
+                iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(instance_call_left_expression.data);
                 
                 if (variable_expression.name == "create_stack_array_uninitialized")
                 {
@@ -2957,25 +3101,127 @@ namespace h::compiler
                         .type = destination_type_value.type
                     };
                 }
+                else if (variable_expression.name == "create_soa_array_view_from_pointer")
+                {
+                    if (expression.arguments.size() != 2)
+                        throw std::runtime_error{ format_error("create_soa_array_view_from_pointer() expects two arguments!", parameters.source_position) };
+
+                    Value_and_type const element_type_value = create_statement_value(instance_call_expression.arguments[0], parameters);
+
+                    bool is_view_mutable = false;
+                    if (parameters.expression_type.has_value() && std::holds_alternative<Soa_array_view_type>(parameters.expression_type->data))
+                        is_view_mutable = std::get<Soa_array_view_type>(parameters.expression_type->data).is_mutable;
+
+                    iris::Type_reference const soa_array_view_type_reference
+                    {
+                        .data = Soa_array_view_type
+                        {
+                            .value_type = {element_type_value.type.value()},
+                            .is_mutable = is_view_mutable,
+                        }
+                    };
+
+                    llvm::Type* const soa_view_llvm_type = type_reference_to_llvm_type(
+                        parameters.llvm_context,
+                        parameters.llvm_data_layout,
+                        soa_array_view_type_reference,
+                        parameters.type_database
+                    );
+
+                    llvm::AllocaInst* const soa_view_alloca = create_alloca_instruction(
+                        parameters.llvm_builder,
+                        parameters.llvm_data_layout,
+                        *parameters.llvm_parent_function,
+                        soa_view_llvm_type,
+                        "soa_array_view"
+                    );
+
+                    Value_and_type const data_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
+                    Value_and_type const length_value = create_loaded_expression_value(expression.arguments[1].expression_index, statement, parameters);
+
+                    llvm::Value* const start_index_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 0);
+                    create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, parameters.llvm_builder.getInt64(0), start_index_field);
+
+                    llvm::Value* const end_index_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 1);
+                    create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, length_value.value, end_index_field);
+
+                    llvm::Value* const length_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 2);
+                    create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, length_value.value, length_field);
+
+                    llvm::Value* const data_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 3);
+                    create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, data_value.value, data_field);
+
+                    return Value_and_type
+                    {
+                        .name = "",
+                        .value = soa_view_alloca,
+                        .type = soa_array_view_type_reference
+                    };
+                }
+                else if (variable_expression.name == "calculate_soa_array_size_bytes")
+                {
+                    if (expression.arguments.size() != 1)
+                        throw std::runtime_error{ format_error("calculate_soa_array_size_bytes() expects one argument!", parameters.source_position) };
+
+                    Value_and_type const element_type_value = create_statement_value(instance_call_expression.arguments[0], parameters);
+
+                    iris::Type_reference const& element_type = element_type_value.type.value();
+                    iris::Custom_type_reference const* const custom_type_reference = std::get_if<iris::Custom_type_reference>(&element_type.data);
+                    if (custom_type_reference == nullptr)
+                        throw std::runtime_error{ format_error("calculate_soa_array_size_bytes() element type must be a struct type.", parameters.source_position) };
+
+                    Soa_layout const layout = calculate_soa_layout(
+                        parameters.llvm_data_layout,
+                        parameters.type_database,
+                        custom_type_reference->module_reference.name,
+                        custom_type_reference->name,
+                        1
+                    );
+
+                    Value_and_type const capacity_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
+
+                    llvm::Value* total_size = parameters.llvm_builder.getInt64(0);
+                    for (Soa_member_layout const& member : layout.members)
+                    {
+                        total_size = create_runtime_aligned_soa_offset(total_size, member.element_alignment, parameters);
+                        llvm::Value* const block_size = parameters.llvm_builder.CreateMul(
+                            capacity_value.value,
+                            parameters.llvm_builder.getInt64(member.element_size),
+                            "soa_member_block_size"
+                        );
+                        total_size = parameters.llvm_builder.CreateAdd(total_size, block_size, "soa_member_block_offset");
+                    }
+
+                    return Value_and_type
+                    {
+                        .name = "",
+                        .value = total_size,
+                        .type = iris::create_integer_type_type_reference(64, true)
+                    };
+                }
             }
         }
-        else if (std::holds_alternative<h::Variable_expression>(left_hand_side.data))
+        else if (std::holds_alternative<iris::Variable_expression>(left_hand_side.data))
         {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_hand_side.data);
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_hand_side.data);
             
             if (variable_expression.name == "check")
             {
                 if (expression.arguments.size() != 1)
-                    throw std::runtime_error{"check() expects one argument!"};
+                    throw std::runtime_error{ format_error("check() expects one argument!", parameters.source_position) };
 
                 std::pmr::string const source_file_path =
                     parameters.core_module.source_file_path.has_value() ? 
                     std::pmr::string{parameters.core_module.source_file_path->generic_string()} :
                     std::pmr::string{};
 
-                std::uint64_t const line = parameters.source_position.has_value() ? parameters.source_position->line : 0;
+                std::optional<Source_position> const statement_source_position = get_statement_source_position(statement);
+                std::uint64_t const line = statement_source_position.has_value() ? statement_source_position->line : 0;
+
+                if (parameters.debug_info != nullptr)
+                    set_debug_location(parameters.llvm_builder, *parameters.debug_info, statement_source_position);
                 
-                h::Function_pointer_type const function_pointer_type = create_test_check_function_pointer_type();
+                iris::Function_pointer_type const function_pointer_type = create_test_check_function_pointer_type();
                 
                 llvm::FunctionType* const llvm_function_type = convert_to_llvm_function_type(
                     parameters.clang_module_data,
@@ -2984,27 +3230,34 @@ namespace h::compiler
                 );
 
                 std::pmr::vector<bool> const is_expression_address_of{false, false, false};
-                llvm::Function* const llvm_function_callee = parameters.llvm_module.getFunction("hlang_test_check");
+                llvm::Function* const llvm_function_callee = parameters.llvm_module.getFunction("iris_test_check");
 
                 std::pmr::vector<llvm::Value*> llvm_arguments{parameters.temporaries_allocator};
                 llvm_arguments.resize(3);
 
+                std::pmr::vector<std::optional<Type_reference>> argument_types{parameters.temporaries_allocator};
+                argument_types.resize(3);
+
                 {
                     Expression_parameters new_parameters = parameters;
-                    new_parameters.expression_type = h::create_bool_type_reference();
+                    new_parameters.expression_type = iris::create_bool_type_reference();
+                    new_parameters.source_position = statement_source_position;
                     Value_and_type const condition_value = create_expression_value(expression.arguments[0].expression_index, statement, new_parameters);
                     llvm_arguments[0] = condition_value.value;
+                    argument_types[0] = condition_value.type;
                 }
                                 
-                llvm_arguments[1] = create_c_string_constant(parameters.llvm_context, parameters.llvm_module, source_file_path, "hlang_test_source_file_path");
+                llvm_arguments[1] = create_c_string_constant(parameters.llvm_context, parameters.llvm_module, source_file_path, "iris_test_source_file_path");
                 llvm_arguments[2] = llvm::ConstantInt::get(llvm::Type::getIntNTy(parameters.llvm_context, 64), line);
 
                 Value_and_type result = create_call_expression_value_common(
                     is_expression_address_of,
+                    argument_types,
                     llvm_function_callee,
                     llvm_function_type,
                     llvm_arguments,
                     function_pointer_type,
+                    statement_source_position,
                     parameters
                 );
 
@@ -3013,14 +3266,14 @@ namespace h::compiler
             else if (variable_expression.name == "create_array_slice_from_pointer")
             {
                 if (expression.arguments.size() != 2)
-                    throw std::runtime_error{"create_array_slice_from_pointer() expects two arguments!"};
+                    throw std::runtime_error{ format_error("create_array_slice_from_pointer() expects two arguments!", parameters.source_position) };
 
                 Value_and_type const data_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
                 if (!data_value.type.has_value())
-                    throw std::runtime_error{"Cannot find deduce argument 0 type of create_array_slice_from_pointer()"};
+                    throw std::runtime_error{ format_error("Cannot find deduce argument 0 type of create_array_slice_from_pointer()", parameters.source_position) };
 
-                std::optional<h::Type_reference> element_type_optional = remove_pointer(data_value.type.value());
-                std::pmr::vector<h::Type_reference> const element_type = element_type_optional.has_value() ? std::pmr::vector<h::Type_reference>{element_type_optional.value()} : std::pmr::vector<h::Type_reference>{};
+                std::optional<iris::Type_reference> element_type_optional = remove_pointer(data_value.type.value());
+                std::pmr::vector<iris::Type_reference> const element_type = element_type_optional.has_value() ? std::pmr::vector<iris::Type_reference>{element_type_optional.value()} : std::pmr::vector<iris::Type_reference>{};
 
                 Value_and_type const length_value = create_loaded_expression_value(expression.arguments[1].expression_index, statement, parameters);
 
@@ -3034,18 +3287,18 @@ namespace h::compiler
             else if (variable_expression.name == "offset_pointer")
             {
                 if (expression.arguments.size() != 2)
-                    throw std::runtime_error{"offset_pointer() expects two arguments!"};
+                    throw std::runtime_error{ format_error("offset_pointer() expects two arguments!", parameters.source_position) };
 
                 Value_and_type const pointer_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
                 if (!pointer_value.type.has_value())
-                    throw std::runtime_error{"Cannot find deduce argument 0 type of offset_pointer()"};
+                    throw std::runtime_error{ format_error("Cannot find deduce argument 0 type of offset_pointer()", parameters.source_position) };
 
-                if (!h::is_pointer(pointer_value.type.value()))
-                    throw std::runtime_error{"Argument 0 type of offset_pointer() must be a pointer!"};
+                if (!iris::is_pointer(pointer_value.type.value()))
+                    throw std::runtime_error{ format_error("Argument 0 type of offset_pointer() must be a pointer!", parameters.source_position) };
 
                 auto const get_type_alloc_size = [&]() -> std::uint64_t
                 {
-                    std::optional<h::Type_reference> const value_type = remove_pointer(pointer_value.type.value());
+                    std::optional<iris::Type_reference> const value_type = remove_pointer(pointer_value.type.value());
 
                     // For *Void assume 1 byte offsets:
                     if (!value_type.has_value())
@@ -3078,10 +3331,10 @@ namespace h::compiler
 
     bool is_taking_address_of_expression(
         Statement const& statement,
-        h::Expression const& expression
+        iris::Expression const& expression
     )
     {
-        return h::is_expression_address_of(expression) || h::is_offset_pointer(statement, expression);
+        return iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression);
     }
 
     std::pmr::vector<bool> create_is_taking_address_of_expressions_array(
@@ -3094,7 +3347,7 @@ namespace h::compiler
         
         for (unsigned i = 0; i < expression.arguments.size(); ++i)
         {
-            h::Expression const& argument_expression = statement.expressions[expression.arguments[i].expression_index];
+            iris::Expression const& argument_expression = statement.expressions[expression.arguments[i].expression_index];
             bool const is_taking_address_of = is_taking_address_of_expression(statement, argument_expression);
             output.push_back(is_taking_address_of);
         }
@@ -3109,7 +3362,25 @@ namespace h::compiler
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{"Can only create calls inside functions!"};
+        {
+            std::string position = "unknown";
+            if (parameters.source_position.has_value())
+            {
+                position = std::format(
+                    "{}:{}",
+                    parameters.source_position->line,
+                    parameters.source_position->column
+                );
+            }
+
+            throw std::runtime_error{
+                std::format(
+                    "Can only create calls inside functions! module='{}' position='{}'",
+                    parameters.core_module.name,
+                    position
+                )
+            };
+        }
 
         {
             std::optional<Value_and_type> const value = create_builtin_call_expression_value(expression, statement, parameters);
@@ -3120,10 +3391,11 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator = parameters.temporaries_allocator;
 
         Value_and_type const left_hand_side = create_loaded_expression_value(expression.expression.expression_index, statement, parameters);
-        if (!left_hand_side.type.has_value() || !std::holds_alternative<Function_pointer_type>(left_hand_side.type.value().data))
-            throw std::runtime_error{ std::format("Left hand side of call expression is not a function!") };
+        std::optional<Type_reference> const resolved_lhs_type = left_hand_side.type.has_value() ? get_underlying_type(parameters.declaration_database, left_hand_side.type.value()) : std::nullopt;
+        if (!resolved_lhs_type.has_value() || !std::holds_alternative<Function_pointer_type>(resolved_lhs_type.value().data))
+            throw std::runtime_error{ format_error(std::format("Left hand side of call expression is not a function!"), parameters.source_position) };
 
-        Function_pointer_type const& function_pointer_type = std::get<Function_pointer_type>(left_hand_side.type.value().data);
+        Function_pointer_type const& function_pointer_type = std::get<Function_pointer_type>(resolved_lhs_type.value().data);
 
         llvm::FunctionType* const llvm_function_type = convert_to_llvm_function_type(
             parameters.clang_module_data,
@@ -3133,6 +3405,9 @@ namespace h::compiler
 
         std::pmr::vector<llvm::Value*> llvm_arguments{ temporaries_allocator };
         llvm_arguments.resize(expression.arguments.size());
+
+        std::pmr::vector<std::optional<Type_reference>> argument_types{temporaries_allocator};
+        argument_types.resize(expression.arguments.size());
 
         for (unsigned i = 0; i < expression.arguments.size(); ++i)
         {
@@ -3145,6 +3420,7 @@ namespace h::compiler
 
             std::size_t const output_index = i;
             llvm_arguments[output_index] = temporary.value;
+            argument_types[output_index] = temporary.type;
         }
 
         std::pmr::vector<bool> const is_taking_address_of_array = create_is_taking_address_of_expressions_array(
@@ -3154,10 +3430,12 @@ namespace h::compiler
 
         return create_call_expression_value_common(
             is_taking_address_of_array,
+            argument_types,
             left_hand_side.value,
             llvm_function_type,
             llvm_arguments,
             function_pointer_type,
+            parameters.source_position,
             parameters
         );
     }
@@ -3166,7 +3444,8 @@ namespace h::compiler
         Type_reference const& source_core_type,
         llvm::Type const& source_llvm_type,
         Type_reference const& destination_core_type,
-        llvm::Type const& destination_llvm_type
+        llvm::Type const& destination_llvm_type,
+        std::optional<Source_position> const& source_position
     )
     {
         if (source_llvm_type.isIntegerTy())
@@ -3227,7 +3506,7 @@ namespace h::compiler
             return std::nullopt;
         }
 
-        throw std::runtime_error{ std::format("Invalid cast!") };
+        throw std::runtime_error{ format_error("Invalid cast!", source_position) };
     }
 
     static Value_and_type create_decimal_cast_expression_value(
@@ -3237,7 +3516,8 @@ namespace h::compiler
         Type_reference const& source_type,
         Type_reference const& destination_type,
         llvm::Type* const source_llvm_type,
-        llvm::Type* const destination_llvm_type
+        llvm::Type* const destination_llvm_type,
+        std::optional<Source_position> const& source_position
     )
     {
         bool const source_is_decimal = is_decimal(source_type);
@@ -3355,7 +3635,7 @@ namespace h::compiler
             }
         }
 
-        throw std::runtime_error{ "Decimal cast not fully implemented for requested type combination." };
+        throw std::runtime_error{ format_error("Decimal cast not fully implemented for requested type combination.", source_position) };
     }
 
     Value_and_type create_cast_expression_value(
@@ -3371,15 +3651,13 @@ namespace h::compiler
 
         Value_and_type const source = create_loaded_expression_value(expression.source.expression_index, statement, parameters);
         if (!source.type.has_value())
-            throw std::runtime_error{"Source type is void!"};
+            throw std::runtime_error{ format_error("Source type is void!", parameters.source_position) };
 
         std::optional<Type_reference> const source_type = get_underlying_type(parameters.declaration_database, source.type.value());
         std::optional<Type_reference> const destination_type = get_underlying_type(parameters.declaration_database, expression.destination_type);
 
         if (!source_type.has_value() || !destination_type.has_value())
-            throw std::runtime_error{"Could not find underlyng source and/or destination types!"};
-
-        // If types are equal, then ignore the cast:
+            throw std::runtime_error{ format_error("Could not find underlyng source and/or destination types!", parameters.source_position) };
         if (source_type == destination_type)
         {
             return
@@ -3406,11 +3684,12 @@ namespace h::compiler
                 source_type.value(),
                 destination_type.value(),
                 source_llvm_type,
-                destination_llvm_type
+                destination_llvm_type,
+                parameters.source_position
             );
         }
 
-        std::optional<llvm::Instruction::CastOps> const cast_type = get_cast_type(source_type.value(), *source_llvm_type, destination_type.value(), *destination_llvm_type);
+        std::optional<llvm::Instruction::CastOps> const cast_type = get_cast_type(source_type.value(), *source_llvm_type, destination_type.value(), *destination_llvm_type, parameters.source_position);
         if (!cast_type.has_value())
         {
             return
@@ -3464,12 +3743,13 @@ namespace h::compiler
         llvm::Module& llvm_module,
         Module const& core_module,
         Declaration_database const& declaration_database,
-        Type_database const& type_database
+        Type_database const& type_database,
+        std::optional<Source_position> const& source_position
     )
     {
         std::optional<Type_reference> const underlying_type_optional = get_underlying_type(declaration_database, expression.type);
         if (!underlying_type_optional.has_value())
-            throw std::runtime_error{ "Could not find underlying constant type!" };
+            throw std::runtime_error{ format_error("Could not find underlying constant type!", source_position) };
 
         Type_reference const& type = underlying_type_optional.value();
 
@@ -3539,8 +3819,41 @@ namespace h::compiler
                     .type = type
                 };
             }
+            case Fundamental_type::C_char: {
+                llvm::Type* const llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, type, type_database);
+
+                std::string_view const char_data = expression.data;
+                std::uint64_t char_value = 0;
+                if (!char_data.empty() && char_data[0] == '\\' && char_data.size() == 2)
+                {
+                    switch (char_data[1])
+                    {
+                    case '\\': char_value = 92; break;
+                    case '\'':  char_value = 39; break;
+                    case 'n':  char_value = 10; break;
+                    case 't':  char_value = 9;  break;
+                    case 'r':  char_value = 13; break;
+                    default:   char_value = static_cast<std::uint64_t>(static_cast<unsigned char>(char_data[1])); break;
+                    }
+                }
+                else if (!char_data.empty())
+                {
+                    char_value = static_cast<std::uint64_t>(static_cast<unsigned char>(char_data[0]));
+                }
+
+                unsigned const number_of_bits = llvm_type->getIntegerBitWidth();
+                llvm::APInt const char_int_value{ number_of_bits, char_value, true };
+
+                llvm::Value* const instruction = llvm::ConstantInt::get(llvm_type, char_int_value);
+
+                return
+                {
+                    .name = "",
+                    .value = instruction,
+                    .type = type
+                };
+            }
             case Fundamental_type::C_bool:
-            case Fundamental_type::C_char:
             case Fundamental_type::C_schar:
             case Fundamental_type::C_uchar:
             case Fundamental_type::C_short:
@@ -3636,7 +3949,7 @@ namespace h::compiler
             };
         }
 
-        throw std::runtime_error{ "Constant expression not handled!" };
+        throw std::runtime_error{ format_error("Constant expression not handled!", source_position) };
     }
 
     static std::optional<Value_and_type> create_constant_array_with_constant_elements(
@@ -3681,10 +3994,10 @@ namespace h::compiler
         {
             Soa_array_type_info const soa_info = get_soa_array_type_info(parameters.expression_type.value(), parameters);
             if (parameters.llvm_parent_function == nullptr)
-                throw std::runtime_error{ "Soa_array global initialization is not implemented yet." };
+                throw std::runtime_error{ format_error("Soa_array global initialization is not implemented yet.", parameters.source_position) };
 
             if (soa_info.soa_array_type->size != expression.array_data.size() && !expression.array_data.empty())
-                throw std::runtime_error{ std::format("Expected initializer list with size {} but got {} elements.", soa_info.soa_array_type->size, expression.array_data.size()) };
+                throw std::runtime_error{ format_error(std::format("Expected initializer list with size {} but got {} elements.", soa_info.soa_array_type->size, expression.array_data.size()), parameters.source_position) };
 
             auto const [soa_alloca, data_pointer] = create_soa_array_storage(
                 parameters.expression_type.value(),
@@ -3713,7 +4026,7 @@ namespace h::compiler
                     );
 
                     if (!element_values[index].type.has_value() || element_values[index].type.value() != *soa_info.element_type)
-                        throw std::runtime_error{ "Type mismatch between Soa_array initializer element and Soa_array element type." };
+                        throw std::runtime_error{ format_error("Type mismatch between Soa_array initializer element and Soa_array element type.", parameters.source_position) };
                 }
 
                 initialize_soa_array_storage_from_values(data_pointer, element_values, soa_info, parameters);
@@ -3730,7 +4043,7 @@ namespace h::compiler
         if (parameters.expression_type.has_value() && std::holds_alternative<Soa_array_view_type>(parameters.expression_type->data))
         {
             if (parameters.llvm_parent_function == nullptr)
-                throw std::runtime_error{ "Soa_array_view global initialization is not implemented yet." };
+                throw std::runtime_error{ format_error("Soa_array_view global initialization is not implemented yet.", parameters.source_position) };
 
             llvm::Type* const soa_view_llvm_type = type_reference_to_llvm_type(
                 llvm_context,
@@ -3770,18 +4083,18 @@ namespace h::compiler
         }
 
         if (!array_data_values.empty() && !array_data_values[0].type.has_value())
-            throw std::runtime_error{"Could not deduce element type of initializer list."};
+            throw std::runtime_error{ format_error("Could not deduce element type of initializer list.", parameters.source_position) };
 
         for (std::size_t index = 1; index < array_data_values.size(); ++index)
         {
             if (array_data_values[0].type != array_data_values[index].type)
-                throw std::runtime_error{"Type mismatch between elements of the initializer list."};
+                throw std::runtime_error{ format_error("Type mismatch between elements of the initializer list.", parameters.source_position) };
         }
 
         if (parameters.expression_type.has_value() && !is_array_slice_type_reference(parameters.expression_type.value()))
         {
             if (!std::holds_alternative<Constant_array_type>(parameters.expression_type->data))
-                throw std::runtime_error{"Cannot assign initializer list to type."};
+                throw std::runtime_error{ format_error("Cannot assign initializer list to type.", parameters.source_position) };
 
             Constant_array_type const& requested_array_type = std::get<Constant_array_type>(parameters.expression_type->data);
             if (requested_array_type.size > 0 && expression.array_data.size() == 0 && !requested_array_type.value_type.empty())
@@ -3809,9 +4122,9 @@ namespace h::compiler
             }
 
             if (requested_array_type.size != expression.array_data.size())
-                throw std::runtime_error{std::format("Expected initializer list with size {} but got {} elements.", requested_array_type.size, expression.array_data.size())};
+                throw std::runtime_error{ format_error(std::format("Expected initializer list with size {} but got {} elements.", requested_array_type.size, expression.array_data.size()), parameters.source_position) };
         }
-
+        
         if (expression.array_data.empty())
         {
             llvm::Type* const llvm_int32_type = llvm::Type::getInt32Ty(llvm_context);
@@ -3882,14 +4195,14 @@ namespace h::compiler
             Block_type::While_loop,
         };
         std::pair<Block_info const*, Blocks_to_pop_count> const target_block_result = 
-            find_target_block(block_infos, 1, target_block_types);
+            find_target_block(block_infos, 1, target_block_types, parameters.source_position);
         llvm::BasicBlock* const target_block = target_block_result.first->repeat_block;
         Blocks_to_pop_count const blocks_to_pop_count = target_block_result.second;
 
         create_instructions_pop_blocks(parameters, blocks_to_pop_count);
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         llvm_builder.CreateBr(target_block);
 
@@ -3932,7 +4245,7 @@ namespace h::compiler
                         std::string_view const module_name = find_module_name(parameters.core_module, custom_type_reference.module_reference);
                         std::string_view const declaration_name = custom_type_reference.name;
             
-                        std::optional<Declaration> const declaration = find_declaration(parameters.declaration_database, module_name, declaration_name);
+                        std::optional<Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, module_name, declaration_name);
             
                         if (declaration.has_value())
                         {
@@ -3966,7 +4279,7 @@ namespace h::compiler
             }
         }
 
-        throw std::runtime_error{"Could not create dereference and access expression value!"};
+        throw std::runtime_error{ format_error("Could not create dereference and access expression value!", parameters.source_position) };
     }
 
     Value_and_type create_for_loop_expression_value(
@@ -3976,7 +4289,7 @@ namespace h::compiler
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{"Can only create for loops inside functions!"};
+            throw std::runtime_error{ format_error("Can only create for loops inside functions!", parameters.source_position) };
 
         llvm::LLVMContext& llvm_context = parameters.llvm_context;
         llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
@@ -3988,13 +4301,13 @@ namespace h::compiler
         std::span<Block_info const> block_infos = parameters.blocks;
         std::span<Value_and_type const> const local_variables = parameters.local_variables;
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             push_debug_lexical_block_scope(*parameters.debug_info, *parameters.source_position);
 
         Value_and_type const& range_begin_temporary = create_loaded_expression_value(expression.range_begin.expression_index, statement, parameters);
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         // Loop variable declaration:
         Type_reference const& variable_type = range_begin_temporary.type.value();
@@ -4022,7 +4335,7 @@ namespace h::compiler
             );
 
             if (parameters.debug_info != nullptr)
-                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
             Value_and_type const loaded_variable_value
             {
@@ -4032,7 +4345,7 @@ namespace h::compiler
             };
 
             Binary_operation const compare_operation = expression.range_comparison_operation;
-            Value_and_type const condition_value = create_binary_operation_instruction(llvm_builder, loaded_variable_value, range_end_value, compare_operation, parameters.declaration_database);
+            Value_and_type const condition_value = create_binary_operation_instruction(llvm_builder, loaded_variable_value, range_end_value, compare_operation, parameters.declaration_database, parameters.source_position);
 
             llvm_builder.CreateCondBr(condition_value.value, then_block, after_block);
         }
@@ -4080,10 +4393,10 @@ namespace h::compiler
             Value_and_type const step_by_value =
                 expression.step_by.has_value() ?
                 create_loaded_expression_value(expression.step_by.value().expression_index, statement, parameters) :
-                create_constant_expression_value(default_step_constant, llvm_context, llvm_data_layout, llvm_module, core_module, parameters.declaration_database, type_database);
+                create_constant_expression_value(default_step_constant, llvm_context, llvm_data_layout, llvm_module, core_module, parameters.declaration_database, type_database, parameters.source_position);
 
             if (parameters.debug_info != nullptr)
-                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
             llvm::Value* const loaded_value_value = create_load_instruction(llvm_builder, llvm_data_layout, variable_llvm_type, variable_value.value);
             llvm::Value* new_variable_value = llvm_builder.CreateAdd(loaded_value_value, step_by_value.value);
@@ -4092,7 +4405,7 @@ namespace h::compiler
             llvm_builder.CreateBr(condition_block);
         }
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             pop_debug_scope(*parameters.debug_info);
 
         // After the loop:
@@ -4192,7 +4505,7 @@ namespace h::compiler
 
                 llvm_builder.SetInsertPoint(then_block);
 
-                if (parameters.debug_info != nullptr)
+                if (parameters.debug_info != nullptr && serie.block_source_range.has_value())
                     push_debug_lexical_block_scope(*parameters.debug_info, serie.block_source_range->start);
 
                 create_statement_values(
@@ -4204,14 +4517,14 @@ namespace h::compiler
                 if (!ends_with_terminator_statement(serie.then_statements))
                     llvm_builder.CreateBr(end_if_block);
 
-                if (parameters.debug_info != nullptr)
+                if (parameters.debug_info != nullptr && serie.block_source_range.has_value())
                     pop_debug_scope(*parameters.debug_info);
 
                 llvm_builder.SetInsertPoint(else_block);
             }
             else
             {
-                if (parameters.debug_info != nullptr)
+                if (parameters.debug_info != nullptr && serie.block_source_range.has_value())
                     push_debug_lexical_block_scope(*parameters.debug_info, serie.block_source_range->start);
 
                 create_statement_values(
@@ -4223,7 +4536,7 @@ namespace h::compiler
                 if (!ends_with_terminator_statement(serie.then_statements))
                     llvm_builder.CreateBr(end_if_block);
 
-                if (parameters.debug_info != nullptr)
+                if (parameters.debug_info != nullptr && serie.block_source_range.has_value())
                     pop_debug_scope(*parameters.debug_info);
 
                 llvm_builder.SetInsertPoint(end_if_block);
@@ -4408,10 +4721,10 @@ namespace h::compiler
                 }
                 else
                 {
-                    h::Module const& struct_core_module =
+                    iris::Module const& struct_core_module =
                         module_name == parameters.core_module.name ?
                         parameters.core_module :
-                        parameters.core_module_dependencies.at(module_name.data());
+                        *parameters.core_module_dependencies.at(module_name.data());
                     Expression_parameters new_parameters = set_core_module(parameters, struct_core_module);
                     new_parameters.expression_type = member_type;
 
@@ -4447,12 +4760,12 @@ namespace h::compiler
                 Type_reference const& member_type = struct_declaration.member_types[member_index];
 
                 if (member_index >= expression.members.size())
-                    throw std::runtime_error{ std::format("The struct member '{}' of struct '{}.{}' is not explicitly initialized!", member_name, module_name, struct_declaration.name) };
+                    throw std::runtime_error{ format_error(std::format("The struct member '{}' of struct '{}.{}' is not explicitly initialized!", member_name, module_name, struct_declaration.name), parameters.source_position) };
 
                 Instantiate_member_value_pair const& pair = expression.members[member_index];
 
                 if (pair.member_name != member_name)
-                    throw std::runtime_error{ std::format("Expected struct member '{}' of struct '{}.{}' instead of '{}' while instantiating struct!", member_name, module_name, struct_declaration.name, pair.member_name) };
+                    throw std::runtime_error{ format_error(std::format("Expected struct member '{}' of struct '{}.{}' instead of '{}' while instantiating struct!", member_name, module_name, struct_declaration.name, pair.member_name), parameters.source_position) };
 
                 Expression_parameters new_parameters = parameters;
                 new_parameters.expression_type = member_type;
@@ -4504,7 +4817,7 @@ namespace h::compiler
         }
         else
         {
-            throw std::runtime_error{ "Instantiate_expression_type not handled!" };
+            throw std::runtime_error{ format_error("Instantiate_expression_type not handled!", parameters.source_position) };
         }
     }
 
@@ -4532,7 +4845,7 @@ namespace h::compiler
             [&member_value_pair](std::pmr::string const& member_name) { return member_name == member_value_pair.member_name; }
         );
         if (member_name_location == union_declaration.member_names.end())
-            throw std::runtime_error{ std::format("Could not find member '{}' while instantiating union ''!", member_value_pair.member_name, union_declaration.name) };
+            throw std::runtime_error{ format_error(std::format("Could not find member '{}' while instantiating union ''!", member_value_pair.member_name, union_declaration.name), parameters.source_position) };
 
         auto const member_index = std::distance(union_declaration.member_names.begin(), member_name_location);
         Type_reference const& member_type = union_declaration.member_types[member_index];
@@ -4574,7 +4887,7 @@ namespace h::compiler
 
         llvm::Type* const llvm_union_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, union_type_reference, type_database);
         if (!llvm::StructType::classof(llvm_union_type))
-            throw std::runtime_error{ "llvm_union_type must be a StructType!" };
+            throw std::runtime_error{ format_error("llvm_union_type must be a StructType!", parameters.source_position) };
 
         if (parameters.llvm_parent_function == nullptr)
         {
@@ -4597,10 +4910,10 @@ namespace h::compiler
         }
 
         if (expression.type != Instantiate_expression_type::Default)
-            throw std::runtime_error{ "Unions only support default Instantiate_expression_type!" };
+            throw std::runtime_error{ format_error("Unions only support default Instantiate_expression_type!", parameters.source_position) };
 
         if (expression.members.size() > 1)
-            throw std::runtime_error{ "Instantiating a union requires specifying either zero or one member!" };
+            throw std::runtime_error{ format_error("Instantiating a union requires specifying either zero or one member!", parameters.source_position) };
 
         if (expression.members.empty())
         {
@@ -4622,7 +4935,7 @@ namespace h::compiler
 
         auto const member_name_location = std::find_if(union_declaration.member_names.begin(), union_declaration.member_names.end(), [&member_value_pair](std::pmr::string const& member_name) { return member_name == member_value_pair.member_name; });
         if (member_name_location == union_declaration.member_names.end())
-            throw std::runtime_error{ std::format("Could not find member '{}' while instantiating union ''!", member_value_pair.member_name, union_declaration.name) };
+            throw std::runtime_error{ format_error(std::format("Could not find member '{}' while instantiating union ''!", member_value_pair.member_name, union_declaration.name), parameters.source_position) };
 
         auto const member_index = std::distance(union_declaration.member_names.begin(), member_name_location);
         Type_reference const& member_type = union_declaration.member_types[member_index];
@@ -4651,7 +4964,7 @@ namespace h::compiler
     {
         Value_and_type const left_hand_side_value = create_expression_value(expression.left_hand_side.expression_index, statement, parameters);
         if (!left_hand_side_value.type.has_value() || !std::holds_alternative<Custom_type_reference>(left_hand_side_value.type.value().data))
-            throw std::runtime_error{ "Left hand side of instance call is not a custom type reference!" };
+            throw std::runtime_error{ format_error("Left hand side of instance call is not a custom type reference!", parameters.source_position) };
 
         Custom_type_reference const& custom_type_reference = std::get<Custom_type_reference>(left_hand_side_value.type.value().data);
 
@@ -4660,7 +4973,7 @@ namespace h::compiler
             custom_type_reference
         );
         if (function_constructor == nullptr)
-            throw std::runtime_error{ "Could not find function constructor!" };
+            throw std::runtime_error{ format_error("Could not find function constructor!", parameters.source_position) };
 
         std::pmr::polymorphic_allocator<> allocator = {}; // TODO
 
@@ -4673,7 +4986,7 @@ namespace h::compiler
         std::string const mangled_name = mangle_instance_call_name(key);
         llvm::Function* const llvm_function = get_llvm_function(key.module_name, parameters.llvm_module, mangled_name, std::nullopt);
         if (llvm_function == nullptr)
-            throw std::runtime_error{ std::format("Could not find function '{}'", mangled_name) };
+            throw std::runtime_error{ format_error(std::format("Could not find function '{}'", mangled_name), parameters.source_position) };
 
         std::optional<Function_expression> const function_expression = get_instance_call_function_expression(
             parameters.declaration_database,
@@ -4681,7 +4994,7 @@ namespace h::compiler
             key
         );
         if (!function_expression.has_value())
-            throw std::runtime_error{ "Could not find function expression!" };
+            throw std::runtime_error{ format_error("Could not find function expression!", parameters.source_position) };
 
         Function_declaration const& function_declaration = function_expression->declaration;
         Type_reference type_reference = create_function_type_type_reference(
@@ -4748,14 +5061,14 @@ namespace h::compiler
         Declaration_database const& declaration_database = parameters.declaration_database;
 
         if (!parameters.expression_type.has_value())
-            throw std::runtime_error{ "Could not infer type while trying to instantiate!" };
+            throw std::runtime_error{ format_error("Could not infer type while trying to instantiate!", parameters.source_position) };
 
         std::optional<Type_reference> const type_reference_optional = get_underlying_type(parameters.declaration_database, parameters.expression_type.value());
         if (!type_reference_optional.has_value())
-            throw std::runtime_error{ "Could not find type to instantiate!" };
+            throw std::runtime_error{ format_error("Could not find type to instantiate!", parameters.source_position) };
         Type_reference const& type_reference = type_reference_optional.value();
 
-        if (std::holds_alternative<h::Soa_array_type>(type_reference.data))
+        if (std::holds_alternative<iris::Soa_array_type>(type_reference.data))
         {
             Soa_array_type_info const soa_info = get_soa_array_type_info(type_reference, parameters);
             auto const [soa_alloca, data_pointer] = create_soa_array_storage(
@@ -4776,11 +5089,11 @@ namespace h::compiler
             }
             else if (expression.type == Instantiate_expression_type::Explicit)
             {
-                throw std::runtime_error{ "Explicit Soa_array brace initialization is not implemented. Use [ ... ] initializer syntax." };
+                throw std::runtime_error{ format_error("Explicit Soa_array brace initialization is not implemented. Use [ ... ] initializer syntax.", parameters.source_position) };
             }
             else if (expression.type != Instantiate_expression_type::Uninitialized)
             {
-                throw std::runtime_error{ "Instantiate_expression_type not handled for Soa_array." };
+                throw std::runtime_error{ format_error("Instantiate_expression_type not handled for Soa_array.", parameters.source_position) };
             }
 
             return Value_and_type
@@ -4791,10 +5104,10 @@ namespace h::compiler
             };
         }
 
-        if (std::holds_alternative<h::Soa_array_view_type>(type_reference.data))
+        if (std::holds_alternative<iris::Soa_array_view_type>(type_reference.data))
         {
             if (parameters.llvm_parent_function == nullptr)
-                throw std::runtime_error{ "Soa_array_view local storage requires a parent function." };
+                throw std::runtime_error{ format_error("Soa_array_view local storage requires a parent function.", parameters.source_position) };
 
             llvm::Type* const soa_view_llvm_type = type_reference_to_llvm_type(
                 parameters.llvm_context,
@@ -4819,11 +5132,11 @@ namespace h::compiler
             }
             else if (expression.type == Instantiate_expression_type::Explicit)
             {
-                throw std::runtime_error{ "Explicit Soa_array_view brace initialization is not implemented." };
+                throw std::runtime_error{ format_error("Explicit Soa_array_view brace initialization is not implemented.", parameters.source_position) };
             }
             else if (expression.type != Instantiate_expression_type::Uninitialized)
             {
-                throw std::runtime_error{ "Instantiate_expression_type not handled for Soa_array_view." };
+                throw std::runtime_error{ format_error("Instantiate_expression_type not handled for Soa_array_view.", parameters.source_position) };
             }
 
             return Value_and_type
@@ -4834,12 +5147,56 @@ namespace h::compiler
             };
         }
 
-        if (std::holds_alternative<h::Array_slice_type>(type_reference.data))
+        if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
         {
-            h::Array_slice_type const& array_slice_type = std::get<h::Array_slice_type>(type_reference.data);
-            h::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
+            iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(type_reference.data);
+            iris::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
 
-            return create_instantiate_struct_expression_value(statement, expression, parameters, "H.Builtin", struct_declaration, type_reference);
+            return create_instantiate_struct_expression_value(statement, expression, parameters, "iris.builtin", struct_declaration, type_reference);
+        }
+
+        if (is_primitive_type(type_reference) || is_constant_array_type_reference(type_reference) || is_enum_type(declaration_database, type_reference))
+        {
+            if (parameters.llvm_parent_function == nullptr)
+                throw std::runtime_error{ format_error("Primitive instantiate expression is not supported as a global constant!", parameters.source_position) };
+
+            llvm::LLVMContext& llvm_context = parameters.llvm_context;
+            llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
+            llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+            Type_database const& type_database = parameters.type_database;
+
+            llvm::Type* const llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, type_reference, type_database);
+            llvm::AllocaInst* const alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, llvm_type);
+
+            if (expression.type != Instantiate_expression_type::Uninitialized)
+            {
+                llvm::Constant* zero_value = nullptr;
+                if (is_pointer(type_reference) || is_null_pointer_type(type_reference) || is_function_pointer(type_reference))
+                {
+                    zero_value = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(llvm_type));
+                }
+                else if (is_floating_point(type_reference))
+                {
+                    zero_value = llvm::ConstantFP::get(llvm_type, 0.0);
+                }
+                else if (std::holds_alternative<iris::Constant_array_type>(type_reference.data))
+                {
+                    zero_value = llvm::ConstantAggregateZero::get(llvm_type);
+                }
+                else
+                {
+                    // integers, bool, c_bool, byte, decimal, enums
+                    zero_value = llvm::ConstantInt::get(llvm_type, 0);
+                }
+                create_store_instruction(llvm_builder, llvm_data_layout, zero_value, alloca);
+            }
+
+            return Value_and_type
+            {
+                .name = "",
+                .value = alloca,
+                .type = type_reference
+            };
         }
 
         std::optional<Declaration_to_instantiate> const found_instance = get_declaration_type_to_instantiate(
@@ -4847,7 +5204,7 @@ namespace h::compiler
             type_reference
         );
         if (!found_instance.has_value())
-            throw std::runtime_error{ "Could not instantiate type!" };
+            throw std::runtime_error{ format_error("Could not instantiate type!", parameters.source_position) };
         
         Custom_type_reference const* custom_type_reference = found_instance->type_reference;
         std::string_view const declaration_module_name = custom_type_reference->module_reference.name;
@@ -4865,7 +5222,7 @@ namespace h::compiler
             return create_instantiate_union_expression_value(statement, expression, parameters, declaration_module_name, union_declaration, type_reference);
         }
 
-        throw std::runtime_error{ std::format("Instantiate_expression can only be used to instantiate either structs or unions! Tried to instantiate '{}.{}'", declaration_module_name, custom_type_reference->name) };
+        throw std::runtime_error{ format_error(std::format("Instantiate_expression can only be used to instantiate either structs or unions! Tried to instantiate '{}.{}'", declaration_module_name, custom_type_reference->name), parameters.source_position) };
     }
 
     Value_and_type create_null_pointer_expression_value(
@@ -4906,7 +5263,7 @@ namespace h::compiler
             create_instructions_at_return(parameters);
 
             if (parameters.debug_info != nullptr)
-                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
             llvm::Value* const instruction = llvm_builder.CreateRetVoid();
 
@@ -4932,11 +5289,11 @@ namespace h::compiler
             std::pmr::vector<Value_and_type> return_values;
             return_values.reserve(1);
 
-            h::Function_declaration const& function_declaration = *parameters.function_declaration.value();
+            iris::Function_declaration const& function_declaration = *parameters.function_declaration.value();
             if (!function_declaration.output_parameter_names.empty())
             {
                 if (function_declaration.output_parameter_names.size() > 1)
-                    throw std::runtime_error{"Postconditions do not support multiple return types yet! Not implemented!"};
+                    throw std::runtime_error{ format_error("Postconditions do not support multiple return types yet! Not implemented!", parameters.source_position) };
 
                 Value_and_type return_value = temporary;
                 return_value.name = function_declaration.output_parameter_names[0];
@@ -4958,9 +5315,9 @@ namespace h::compiler
         }
         
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
-        h::Expression const& expression_to_return = statement.expressions[expression.expression->expression_index];
+        iris::Expression const& expression_to_return = statement.expressions[expression.expression->expression_index];
         bool const is_taking_address_of = is_taking_address_of_expression(statement, expression_to_return);
 
         llvm::Value* const instruction = generate_function_return_instruction(
@@ -5023,7 +5380,7 @@ namespace h::compiler
         std::uint64_t const number_of_cases = static_cast<std::uint64_t>(expression.cases.size());
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         Value_and_type const& switch_value = create_loaded_expression_value(expression.value.expression_index, statement, parameters);
 
@@ -5132,7 +5489,7 @@ namespace h::compiler
         llvm::BasicBlock* const else_end_block = llvm_builder.GetInsertBlock();
 
         if (then_value.type.has_value() && else_value.type.has_value() && then_value.type.value() != else_value.type.value())
-            throw std::runtime_error{ "Ternary condition then and else statements must have the same type!" };
+            throw std::runtime_error{ format_error("Ternary condition then and else statements must have the same type!", parameters.source_position) };
 
         // End:
         llvm_builder.SetInsertPoint(end_block);
@@ -5321,7 +5678,7 @@ namespace h::compiler
                         if (global_variable.has_value())
                         {
                             if (!global_variable->type.has_value())
-                                throw std::runtime_error{std::format("Could not deduce type of global variable '{}'", global_variable_declaration.name)};
+                                throw std::runtime_error{ format_error(std::format("Could not deduce type of global variable '{}'", global_variable_declaration.name), parameters.source_position) };
                             
                             return Value_and_type
                             {
@@ -5336,9 +5693,9 @@ namespace h::compiler
 
             // Try access expressions:
             {
-                h::Expression const& expression_to_get_address_of = statement.expressions[expression.expression.expression_index];
+                iris::Expression const& expression_to_get_address_of = statement.expressions[expression.expression.expression_index];
 
-                if (std::holds_alternative<h::Access_expression>(expression_to_get_address_of.data) || std::holds_alternative<h::Access_array_expression>(expression_to_get_address_of.data) || std::holds_alternative<h::Dereference_and_access_expression>(expression_to_get_address_of.data))
+                if (std::holds_alternative<iris::Access_expression>(expression_to_get_address_of.data) || std::holds_alternative<iris::Access_array_expression>(expression_to_get_address_of.data) || std::holds_alternative<iris::Dereference_and_access_expression>(expression_to_get_address_of.data))
                 {
                     std::pmr::vector<Type_reference> element_type;
                     if (value_expression.type.has_value())
@@ -5355,7 +5712,7 @@ namespace h::compiler
         }
         }
 
-        throw std::runtime_error{ std::format("Unary operation '{}' not implemented!", static_cast<std::uint32_t>(operation)) };
+        throw std::runtime_error{ format_error(std::format("Unary operation '{}' not implemented!", static_cast<std::uint32_t>(operation)), parameters.source_position) };
     }
 
     Value_and_type create_variable_declaration_expression_value(
@@ -5365,7 +5722,7 @@ namespace h::compiler
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{"Can only create variables inside functions!"};
+            throw std::runtime_error{ format_error("Can only create variables inside functions!", parameters.source_position) };
 
         llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
         llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
@@ -5373,7 +5730,7 @@ namespace h::compiler
         Value_and_type const& right_hand_side = create_loaded_expression_value(expression.right_hand_side.expression_index, statement, parameters);
 
         if (parameters.debug_info != nullptr)
-            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+            set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
 
         llvm::AllocaInst* const alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, right_hand_side.value->getType(), expression.name.c_str());
         if (alloca == nullptr)
@@ -5402,32 +5759,32 @@ namespace h::compiler
 
     Value_and_type create_variable_declaration_with_type_expression_value(
         Variable_declaration_with_type_expression const& expression,
-        h::Statement const& statement,
+        iris::Statement const& statement,
         Expression_parameters const& parameters
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{"Can only create variables inside functions!"};
+            throw std::runtime_error{ format_error("Can only create variables inside functions!", parameters.source_position) };
 
         llvm::LLVMContext& llvm_context = parameters.llvm_context;
         llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
         llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
         Type_database& type_database = parameters.type_database;
 
-        std::optional<Type_reference> const core_type_optional = h::get_variable_declaration_with_type_expression_type(statement, expression);
+        std::optional<Type_reference> const core_type_optional = iris::get_variable_declaration_with_type_expression_type(statement, expression);
         if (!core_type_optional.has_value())
-            throw std::runtime_error{"Variable declaration with type has invalid type expression!"};
+            throw std::runtime_error{ format_error("Variable declaration with type has invalid type expression!", parameters.source_position) };
 
         Type_reference const& core_type = core_type_optional.value();
 
         llvm::Type* const llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, core_type, type_database);
 
-        h::Expression const& right_hand_side_expression = statement.expressions[expression.right_hand_side.expression_index];
-        bool const is_right_side_instantiate_expression = std::holds_alternative<h::Instantiate_expression>(right_hand_side_expression.data);
+        iris::Expression const& right_hand_side_expression = statement.expressions[expression.right_hand_side.expression_index];
+        bool const is_right_side_instantiate_expression = std::holds_alternative<iris::Instantiate_expression>(right_hand_side_expression.data);
         if (is_right_side_instantiate_expression)
         {
             if (parameters.debug_info != nullptr)
-                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
         }
 
         Expression_parameters new_parameters = parameters;
@@ -5466,7 +5823,7 @@ namespace h::compiler
         if (store_value)
         {
             if (parameters.debug_info != nullptr)
-                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position->line, parameters.source_position->column);
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
             
             create_store_instruction(llvm_builder, llvm_data_layout, loaded_value, alloca);
         }
@@ -5513,7 +5870,7 @@ namespace h::compiler
                     };
 
                     std::optional<Type_reference> const expected_element_type = get_element_or_pointee_type(expected_type);
-                    std::pmr::vector<h::Type_reference> const element_type{expected_element_type.value()};
+                    std::pmr::vector<iris::Type_reference> const element_type{expected_element_type.value()};
 
                     Value_and_type const array_slice = instantiate_array_slice(
                         element_type,
@@ -5527,7 +5884,7 @@ namespace h::compiler
 
                 std::optional<Type_reference> const expected_element_type = get_element_or_pointee_type(expected_type);
 
-                std::pmr::vector<h::Type_reference> const element_type{expected_element_type.value()};
+                std::pmr::vector<iris::Type_reference> const element_type{expected_element_type.value()};
 
                 llvm::Type* const constant_array_llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, value.type.value(), parameters.type_database);
 
@@ -5569,7 +5926,7 @@ namespace h::compiler
         Expression_parameters const& parameters
     )
     {
-        char const* const variable_name = expression.name.c_str();
+        std::string_view const variable_name = expression.name;
 
         auto const is_variable = [variable_name](Value_and_type const& element) -> bool
         {
@@ -5597,11 +5954,41 @@ namespace h::compiler
 
         // Search for functions in this module:
         {
-            llvm::Function* const llvm_function = get_llvm_function(parameters.core_module, parameters.llvm_module, variable_name);
-            if (llvm_function != nullptr)
+            // TODO review this...
+            std::optional<Function_declaration const*> const function_declaration = find_function_declaration(parameters.core_module, variable_name);
+            if (function_declaration.has_value())
             {
-                std::optional<Function_declaration const*> const function_declaration = find_function_declaration(parameters.core_module, variable_name);
-                Function_declaration const* function_declaration_value = function_declaration.value();
+                Function_declaration const* const function_declaration_value = function_declaration.value();
+
+                llvm::Function* llvm_function = get_llvm_function(parameters.core_module, parameters.llvm_module, variable_name);
+                if (llvm_function == nullptr)
+                {
+                    Type_reference const function_type_reference = create_function_type_type_reference(
+                        function_declaration_value->type,
+                        function_declaration_value->input_parameter_names,
+                        function_declaration_value->output_parameter_names
+                    );
+
+                    Function_pointer_type const& function_pointer_type = std::get<Function_pointer_type>(function_type_reference.data);
+                    llvm::FunctionType* const llvm_function_type = convert_to_llvm_function_type(
+                        parameters.clang_module_data,
+                        parameters.declaration_database,
+                        function_pointer_type.type
+                    );
+
+                    llvm_function = &to_function(
+                        parameters.llvm_context,
+                        parameters.llvm_data_layout,
+                        parameters.clang_module_data,
+                        parameters.core_module.name,
+                        *llvm_function_type,
+                        *function_declaration.value(),
+                        parameters.type_database,
+                        parameters.declaration_database
+                    );
+
+                    parameters.llvm_module.getFunctionList().push_back(llvm_function);
+                }
 
                 Type_reference type = create_function_type_type_reference(function_declaration_value->type, function_declaration_value->input_parameter_names, function_declaration_value->output_parameter_names);
 
@@ -5678,18 +6065,33 @@ namespace h::compiler
             }
         }
 
-        throw std::runtime_error{ std::format("Undefined variable '{}'", variable_name) };
+        // Search for builtin types:
+        {
+            if (variable_name == "Type_kind")
+            {
+                Type_reference type = create_custom_type_reference("iris.builtin", "Type_kind");
+
+                return Value_and_type
+                {
+                    .name = expression.name,
+                    .value = nullptr,
+                    .type = std::move(type)
+                };
+            }
+        }
+
+        throw std::runtime_error{ format_error(std::format("Undefined variable '{}'", variable_name), parameters.source_position) };
     }
 
-    bool is_true_constant(h::Statement const& statement)
+    bool is_true_constant(iris::Statement const& statement)
     {
         if (statement.expressions.size() != 1)
             return false;
 
-        h::Expression const& expression = statement.expressions[0];
-        if (std::holds_alternative<h::Constant_expression>(expression.data))
+        iris::Expression const& expression = statement.expressions[0];
+        if (std::holds_alternative<iris::Constant_expression>(expression.data))
         {
-            h::Constant_expression const& constant_expression = std::get<h::Constant_expression>(expression.data);
+            iris::Constant_expression const& constant_expression = std::get<iris::Constant_expression>(expression.data);
             if (is_bool(constant_expression.type))
             {
                 return constant_expression.data == "true";
@@ -5724,7 +6126,7 @@ namespace h::compiler
 
         llvm_builder.SetInsertPoint(then_block);
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             push_debug_lexical_block_scope(*parameters.debug_info, *parameters.source_position);
 
         create_statement_values(
@@ -5734,14 +6136,14 @@ namespace h::compiler
         );
         if (!ends_with_terminator_statement(expression.then_statements))
         {
-            h::Expression const& condition_expression = expression.condition.expressions[0];
+            iris::Expression const& condition_expression = expression.condition.expressions[0];
             if (parameters.debug_info != nullptr && condition_expression.source_range.has_value())
                 set_debug_location(parameters.llvm_builder, *parameters.debug_info, condition_expression.source_range->start.line, condition_expression.source_range->start.column);
 
             llvm_builder.CreateBr(condition_block);
         }
 
-        if (parameters.debug_info != nullptr)
+        if (parameters.debug_info != nullptr && parameters.source_position.has_value())
             pop_debug_scope(*parameters.debug_info);
 
         llvm_builder.SetInsertPoint(after_block);
@@ -5773,7 +6175,7 @@ namespace h::compiler
                 }
             );
 
-            h::Expression const& condition_expression = expression.condition.expressions[0];
+            iris::Expression const& condition_expression = expression.condition.expressions[0];
             if (parameters.debug_info != nullptr && condition_expression.source_range.has_value())
                 set_debug_location(parameters.llvm_builder, *parameters.debug_info, condition_expression.source_range->start.line, condition_expression.source_range->start.column);
 
@@ -5849,6 +6251,10 @@ namespace h::compiler
             Source_position const source_position = expression.source_range->start;
             new_parameters.source_position = source_position;
         }
+        else
+        {
+            new_parameters.source_position = std::nullopt;
+        }
 
         if (std::holds_alternative<Access_expression>(expression.data))
         {
@@ -5898,7 +6304,7 @@ namespace h::compiler
         else if (std::holds_alternative<Constant_expression>(expression.data))
         {
             Constant_expression const& data = std::get<Constant_expression>(expression.data);
-            return create_constant_expression_value(data, new_parameters.llvm_context, new_parameters.llvm_data_layout, new_parameters.llvm_module, new_parameters.core_module, new_parameters.declaration_database, new_parameters.type_database);
+            return create_constant_expression_value(data, new_parameters.llvm_context, new_parameters.llvm_data_layout, new_parameters.llvm_module, new_parameters.core_module, new_parameters.declaration_database, new_parameters.type_database, new_parameters.source_position);
         }
         else if (std::holds_alternative<Constant_array_expression>(expression.data))
         {
@@ -5913,7 +6319,7 @@ namespace h::compiler
         else if (std::holds_alternative<Defer_expression>(expression.data))
         {
             if (parameters.defer_expressions_per_block.empty())
-                throw std::runtime_error{"Can only have defer expressions inside function blocks!"};
+                throw std::runtime_error{ format_error("Can only have defer expressions inside function blocks!", parameters.source_position) };
 
             std::pmr::vector<Statement>& current_block_defer_expressions = parameters.defer_expressions_per_block.back();
             current_block_defer_expressions.push_back(statement);
@@ -5955,7 +6361,7 @@ namespace h::compiler
         }
         else if (std::holds_alternative<Reflection_expression>(expression.data))
         {
-            throw std::runtime_error{"Reflection_expression should have been handled in the Compile_time_pass!"};
+            throw std::runtime_error{ format_error("Reflection_expression should have been handled in the Compile_time_pass!", parameters.source_position) };
         }
         else if (std::holds_alternative<Return_expression>(expression.data))
         {
@@ -6005,7 +6411,7 @@ namespace h::compiler
         else
         {
             //static_assert(always_false_v<Expression_type>, "non-exhaustive visitor!");
-            throw std::runtime_error{ "Did not handle expression type!" };
+            throw std::runtime_error{ format_error("Did not handle expression type!", parameters.source_position) };
         }
     }
 
@@ -6021,6 +6427,15 @@ namespace h::compiler
         return false;
     }
 
+    static bool is_global_array_variable(llvm::Value* const value)
+    {
+        if (!llvm::GlobalVariable::classof(value))
+            return false;
+
+        llvm::GlobalVariable const* const global_variable = static_cast<llvm::GlobalVariable*>(value);
+        return global_variable->getValueType()->isArrayTy();
+    }
+
     Value_and_type load_if_needed(
         Value_and_type const& value,
         std::size_t const expression_index,
@@ -6030,14 +6445,14 @@ namespace h::compiler
     {
         if (value.value != nullptr && value.type.has_value() && value.value->getType()->isPointerTy())
         {
-            if (std::holds_alternative<Null_pointer_type>(value.type->data))
+            if (std::holds_alternative<Null_pointer_type>(value.type->data) && !llvm::AllocaInst::classof(value.value) && !llvm::GetElementPtrInst::classof(value.value) && !llvm::GlobalVariable::classof(value.value))
                 return value;
 
-            h::Expression const& expression = statement.expressions[expression_index];
+            iris::Expression const& expression = statement.expressions[expression_index];
 
-            if (llvm::AllocaInst::classof(value.value) || llvm::GetElementPtrInst::classof(value.value))
+            if (llvm::AllocaInst::classof(value.value) || llvm::GetElementPtrInst::classof(value.value) || llvm::GlobalVariable::classof(value.value))
             {
-                if (h::is_expression_address_of(expression) || h::is_offset_pointer(statement, expression))
+                if (iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression) || is_global_array_variable(value.value))
                 {
                     return value;
                 }
@@ -6123,7 +6538,7 @@ namespace h::compiler
 
         for (Statement const& statement : statements)
         {
-            if (!is_comment(statement))
+            if (!is_comment(statement) && !statement.expressions.empty())
             {
                 new_parameters.local_variables = all_local_variables;
 
@@ -6244,9 +6659,9 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_condition const& function_condition,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_condition const& function_condition,
         Condition_type const condition_type,
         Expression_parameters const& expression_parameters
     )
@@ -6258,7 +6673,7 @@ namespace h::compiler
 
         bool const is_boolean_expression = condition_value.type.has_value() && (is_bool(*condition_value.type) || is_c_bool(*condition_value.type));
         if (!is_boolean_expression)
-            throw std::runtime_error{std::format("In function '{}', condition '{}', expression does not evaluate to a boolean value.", function_declaration.name, function_condition.description)};
+            throw std::runtime_error{ format_error(std::format("In function '{}', condition '{}', expression does not evaluate to a boolean value.", function_declaration.name, function_condition.description), expression_parameters.source_position) };
         
         llvm::BasicBlock* const success_block = llvm::BasicBlock::Create(llvm_context, "condition_success", &llvm_function);
         llvm::BasicBlock* const fail_block = llvm::BasicBlock::Create(llvm_context, "condition_fail", &llvm_function);
@@ -6281,8 +6696,8 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         Expression_parameters const& expression_parameters
     )
     {
@@ -6307,8 +6722,8 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         Expression_parameters const& expression_parameters
     )
     {

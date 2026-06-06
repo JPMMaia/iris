@@ -1,6 +1,6 @@
 add_library(clang_target STATIC)
 target_include_directories(clang_target PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-target_link_libraries(clang_target PUBLIC llvm_target)
+target_link_libraries(clang_target PRIVATE llvm_target)
 target_sources(clang_target PUBLIC FILE_SET modules TYPE CXX_MODULES
    FILES "clang.cppm"
 )
@@ -9,12 +9,17 @@ target_sources(clang_target PUBLIC FILE_SET modules TYPE CXX_MODULES
 find_package(Clang CONFIG REQUIRED)
 target_include_directories(clang_target PRIVATE ${CLANG_INCLUDE_DIRS})
 
+if (MSVC)
+   target_compile_options(clang_target PUBLIC "/D_SCL_SECURE_NO_WARNINGS")
+endif ()
+
 if(WIN32)
    target_link_libraries(
       clang_target
       PRIVATE
       clangBasic
       clangCodeGen
+      clangDriver
       libclang
    )
 else()
@@ -26,14 +31,9 @@ else()
    target_link_libraries(clang_target PRIVATE ${clang_cpp_library})
 
    find_library(llvm_library LLVM REQUIRED)
-   target_link_libraries(clang_target PUBLIC ${llvm_library})
+   target_link_libraries(clang_target PRIVATE ${llvm_library})
 
 endif()
-
-if (WIN32)
-   find_program(LIBCLANG_DLL_LOCATION "libclang.dll" REQUIRED)
-   install(FILES ${LIBCLANG_DLL_LOCATION} TYPE BIN CONFIGURATIONS Debug Release)
-endif ()
 
 if (WIN32)
    find_program(PROGRAM_CLANG_CL "clang-cl.exe" REQUIRED)
@@ -42,17 +42,18 @@ if (WIN32)
    add_custom_command(
       TARGET clang_target
       POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG_CL} ${CMAKE_CURRENT_BINARY_DIR}/clang-cl.exe
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG_CL} ${CMAKE_BINARY_DIR}/bin/$<CONFIG>/clang-cl.exe
+      COMMAND ${CMAKE_COMMAND} -DPROGRAM="${PROGRAM_CLANG_CL}" -DDESTINATION="${CMAKE_BINARY_DIR}/bin/$<CONFIG>" -P "${CMAKE_SOURCE_DIR}/Scripts/copy_runtime_dependencies.cmake"
    )
 else()
-   find_program(PROGRAM_CLANG "clang++.exe" REQUIRED)
+   find_program(PROGRAM_CLANG "clang++" REQUIRED)
    install(FILES ${PROGRAM_CLANG} TYPE BIN CONFIGURATIONS Debug Release)
 
    add_custom_command(
       TARGET clang_target
       POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG} ${CMAKE_CURRENT_BINARY_DIR}/clang++
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROGRAM_CLANG} ${CMAKE_BINARY_DIR}/Source/Compiler/clang++
    )
 endif ()
 
-compile_cxx_header_unit(clang_target "clang.h" "angle" "clang/clang.h" "clang.unit")
+compile_cxx_header_unit(clang_target "clang.h" "angle" "clang/clang.h" "clang.unit" "")

@@ -2,29 +2,29 @@ module;
 
 #include <cassert>
 
-module h.core.expressions;
+module iris.core.expressions;
 
 import std;
 
-import h.core;
-import h.core.expressions_visitor;
-import h.core.types;
+import iris.core;
+import iris.core.expressions_visitor;
+import iris.core.types;
 
-namespace h
+namespace iris
 {
-    h::Statement create_statement(std::pmr::vector<h::Expression> expressions)
+    iris::Statement create_statement(std::pmr::vector<iris::Expression> expressions)
     {
-        return h::Statement
+        return iris::Statement
         {
             .expressions = std::move(expressions)
         };
     }
 
-    h::Expression create_call_expression(std::uint64_t const left_hand_side_expression, std::pmr::vector<Expression_index> arguments)
+    iris::Expression create_call_expression(std::uint64_t const left_hand_side_expression, std::pmr::vector<Expression_index> arguments)
     {
-        return h::Expression
+        return iris::Expression
         {
-            .data = h::Call_expression
+            .data = iris::Call_expression
             {
                 .expression = {.expression_index = left_hand_side_expression},
                 .arguments = std::move(arguments)
@@ -32,11 +32,11 @@ namespace h
         };
     }
 
-    h::Expression create_constant_expression(Type_reference type_reference, std::string_view const data)
+    iris::Expression create_constant_expression(Type_reference type_reference, std::string_view const data)
     {
-        return h::Expression
+        return iris::Expression
         {
-            .data = h::Constant_expression
+            .data = iris::Constant_expression
             {
                 .type = std::move(type_reference),
                 .data = std::pmr::string{ data }
@@ -44,22 +44,22 @@ namespace h
         };
     }
 
-    h::Expression create_constant_array_expression(std::pmr::vector<h::Statement> array_data)
+    iris::Expression create_constant_array_expression(std::pmr::vector<iris::Statement> array_data)
     {
-        return h::Expression
+        return iris::Expression
         {
-            .data = h::Constant_array_expression
+            .data = iris::Constant_array_expression
             {
                 .array_data = std::move(array_data)
             }
         };
     }
 
-    void add_enum_value_expressions(h::Statement& statement, std::string_view const enum_name, std::string_view const member_name)
+    void add_enum_value_expressions(iris::Statement& statement, std::string_view const enum_name, std::string_view const member_name)
     {
-        h::Expression access_expression
+        iris::Expression access_expression
         {
-            .data = h::Access_expression
+            .data = iris::Access_expression
             {
                 .expression = {
                     .expression_index = statement.expressions.size() + 1
@@ -70,9 +70,9 @@ namespace h
 
         statement.expressions.push_back(std::move(access_expression));
 
-        h::Expression variable_expression
+        iris::Expression variable_expression
         {
-            .data = h::Variable_expression
+            .data = iris::Variable_expression
             {
                 .name = std::pmr::string{ enum_name },
             }
@@ -81,18 +81,18 @@ namespace h
         statement.expressions.push_back(std::move(variable_expression));
     }
 
-    std::pmr::vector<h::Expression> create_enum_value_expressions(std::string_view const enum_name, std::string_view const member_name)
+    std::pmr::vector<iris::Expression> create_enum_value_expressions(std::string_view const enum_name, std::string_view const member_name)
     {
-        h::Statement statement = {};
+        iris::Statement statement = {};
         add_enum_value_expressions(statement, enum_name, member_name);
         return statement.expressions;
     }
 
-    h::Expression create_instantiate_expression(Instantiate_expression_type const type, std::pmr::vector<Instantiate_member_value_pair> members)
+    iris::Expression create_instantiate_expression(Instantiate_expression_type const type, std::pmr::vector<Instantiate_member_value_pair> members)
     {
-        return h::Expression
+        return iris::Expression
         {
-            .data = h::Instantiate_expression
+            .data = iris::Instantiate_expression
             {
                 .type = type,
                 .members = std::move(members)
@@ -100,16 +100,16 @@ namespace h
         };
     }
 
-    h::Expression create_null_pointer_expression()
+    iris::Expression create_null_pointer_expression()
     {
-        return create_expression(h::Null_pointer_expression{});
+        return create_expression(iris::Null_pointer_expression{});
     }
 
-    h::Expression create_variable_expression(std::pmr::string name)
+    iris::Expression create_variable_expression(std::pmr::string name)
     {
-        return h::Expression
+        return iris::Expression
         {
-            .data = h::Variable_expression
+            .data = iris::Variable_expression
             {
                 .name = std::move(name),
             }
@@ -117,7 +117,7 @@ namespace h
     }
 
     void invalidate_expression_and_descendants(
-        h::Statement& statement,
+        iris::Statement& statement,
         std::size_t const expression_index,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -125,38 +125,38 @@ namespace h
         std::pmr::vector<std::size_t> indices_to_invalidate{temporaries_allocator};
         indices_to_invalidate.reserve(statement.expressions.size());
         
-        auto const invalidate_descendants = [&](h::Statement const& statement, h::Expression const& expression) -> bool
+        auto const invalidate_descendants = [&](iris::Statement const& statement, iris::Expression const& expression) -> bool
         {
             std::size_t const index = find_expression_index(statement, expression);
             indices_to_invalidate.push_back(index);
             return false;
         };
 
-        h::Expression const& expression_to_invalidate = statement.expressions[expression_index];
+        iris::Expression const& expression_to_invalidate = statement.expressions[expression_index];
         visit_expressions_recursively(statement, expression_to_invalidate, invalidate_descendants);
 
         for (std::size_t index : indices_to_invalidate)
-            statement.expressions[index] = h::Expression{.data = h::Invalid_expression{}};
+            statement.expressions[index] = iris::Expression{.data = iris::Invalid_expression{}};
     }
 
     std::size_t get_or_create_expression_slot(
-        std::pmr::vector<h::Expression>& expressions
+        std::pmr::vector<iris::Expression>& expressions
     )
     {
         for (std::size_t index = 0; index < expressions.size(); ++index)
         {
-            h::Expression const& expression = expressions[index];
-            if (std::holds_alternative<h::Invalid_expression>(expression.data))
+            iris::Expression const& expression = expressions[index];
+            if (std::holds_alternative<iris::Invalid_expression>(expression.data))
                 return index;
         }
 
-        expressions.push_back(h::Expression{.data = h::Invalid_expression{}});
+        expressions.push_back(iris::Expression{.data = iris::Invalid_expression{}});
         return expressions.size() - 1;
     }
 
     std::size_t find_expression_index(
-        h::Statement const& statement,
-        h::Expression const& expression
+        iris::Statement const& statement,
+        iris::Expression const& expression
     )
     {
         for (std::size_t index = 0; index < statement.expressions.size(); ++index)
@@ -169,9 +169,9 @@ namespace h
     }
 
     void replace_expression(
-        h::Statement& statement,
-        h::Expression const& expression,
-        h::Statement const& new_statement,
+        iris::Statement& statement,
+        iris::Expression const& expression,
+        iris::Statement const& new_statement,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -188,7 +188,7 @@ namespace h
     }
 
     void offset_expression_indices(
-        h::Expression& expression,
+        iris::Expression& expression,
         std::uint64_t const offset
     )
     {
@@ -302,8 +302,8 @@ namespace h
     }
 
     void add_expressions_to_expressions(
-        std::pmr::vector<h::Expression>& output,
-        std::span<h::Expression const> const expressions
+        std::pmr::vector<iris::Expression>& output,
+        std::span<iris::Expression const> const expressions
     )
     {
         std::size_t const offset = output.size();

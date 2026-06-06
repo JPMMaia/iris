@@ -1,0 +1,242 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Iris Artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "type"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique artifact name within the repository."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+(\\.\\d+){0,2}$",
+      "description": "Semantic version of the artifact (e.g. \"0.1.0\")."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["executable", "library"],
+      "description": "Whether this artifact produces an executable or a library."
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Artifacts this one depends on, resolved by name through the repository.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the dependency artifact as declared in the repository."
+          }
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "description": "One or more source groups that describe the files belonging to this artifact.",
+      "items": {
+        "$ref": "#/definitions/source_group"
+      }
+    },
+    "public_include_directories": {
+      "type": "array",
+      "description": "Directories exposed to dependents as include search paths. Relative paths are resolved from the artifact file location.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "executable": {
+      "type": "object",
+      "description": "Entry-point configuration. Required when type is \"executable\".",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Path to the Iris source file that contains the entry point, relative to the artifact file."
+        },
+        "entry_point": {
+          "type": "string",
+          "description": "Mangled or qualified name of the entry-point function."
+        }
+      }
+    },
+    "library": {
+      "type": "object",
+      "description": "Library-specific configuration. Used when type is \"library\".",
+      "additionalProperties": false,
+      "properties": {
+        "external_libraries": {
+          "type": "object",
+          "description": "Maps platform target keys (e.g. \"windows-dynamic-debug\") to arrays of native library names to link.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "copy": {
+      "type": "array",
+      "description": "Files or directories to copy into the build directory. Source paths are relative to the artifact file location; destination paths are relative to the build directory.",
+      "items": {
+        "$ref": "#/definitions/copy_entry"
+      }
+    }
+  },
+  "definitions": {
+    "copy_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "destination"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Path to a source file or directory to copy. Relative paths are resolved from the artifact file location."
+        },
+        "destination": {
+          "type": "string",
+          "description": "Destination path in the build directory. Relative paths are resolved from the build directory root."
+        }
+      }
+    },
+    "source_group_common": {
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Kind of source group."
+        },
+        "include": {
+          "type": "array",
+          "description": "Glob patterns selecting which files belong to this source group. Relative to the artifact file location.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "additional_flags": {
+          "type": "array",
+          "description": "Extra compiler flags passed when processing files in this source group.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "source_group": {
+      "type": "object",
+      "required": ["type"],
+      "allOf": [
+        { "$ref": "#/definitions/source_group_common" }
+      ],
+      "if": {
+        "properties": { "type": { "const": "iris" } }
+      },
+      "then": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {},
+          "include": {},
+          "additional_flags": {}
+        }
+      },
+      "else": {
+        "if": {
+          "properties": { "type": { "const": "c++" } }
+        },
+        "then": {
+          "additionalProperties": false,
+          "properties": {
+            "type": {},
+            "include": {},
+            "additional_flags": {}
+          }
+        },
+        "else": {
+          "if": {
+            "properties": { "type": { "const": "export_c_header" } }
+          },
+          "then": {
+            "additionalProperties": false,
+            "properties": {
+              "type": {},
+              "include": {},
+              "additional_flags": {},
+              "output_directory": {
+                "type": "string",
+                "description": "Directory where generated C headers are written. Relative to the artifact file location."
+              }
+            }
+          },
+          "else": {
+            "if": {
+              "properties": { "type": { "const": "import_c_header" } }
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "type": {},
+                "include": {},
+                "additional_flags": {},
+                "headers": {
+                  "type": "array",
+                  "description": "C headers to import as Iris modules.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["name", "header"],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Iris module name for the imported header (e.g. \"c.stdio\")."
+                      },
+                      "header": {
+                        "type": "string",
+                        "description": "Header filename to locate in the search paths (e.g. \"stdio.h\")."
+                      },
+                      "dependencies": {
+                        "type": "array",
+                        "description": "Other imported header module names this header depends on.",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "allow_errors": {
+                        "type": "boolean",
+                        "description": "When true, parsing errors in this header are non-fatal."
+                      }
+                    }
+                  }
+                },
+                "search_paths": {
+                  "type": "array",
+                  "description": "Directories in which to search for the listed header files.",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "public_prefixes": {
+                  "type": "array",
+                  "description": "Symbol prefixes that are considered part of the public API.",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "remove_prefixes": {
+                  "type": "array",
+                  "description": "Symbol prefixes to strip when generating Iris identifiers.",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

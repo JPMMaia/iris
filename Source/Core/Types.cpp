@@ -1,28 +1,21 @@
 module;
 
-#include <format>
-#include <functional>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <variant>
-#include <vector>
+#include <charconv>
 
-module h.core.types;
+module iris.core.types;
 
-import h.common;
-import h.core;
+import std;
 
-namespace h
+import iris.common;
+import iris.core;
+
+namespace iris
 {
     Type_reference create_array_slice_type_reference(std::pmr::vector<Type_reference> element_type, bool const is_mutable)
     {
         return
         {
-            .data = h::Array_slice_type
+            .data = iris::Array_slice_type
             {
                 .element_type = std::move(element_type),
                 .is_mutable = is_mutable,
@@ -218,7 +211,7 @@ namespace h
             );
 
             if (location == core_module.dependencies.alias_imports.end())
-                h::common::print_message_and_exit(std::format("Could not find import alias '{}' in module '{}'", type.module_reference.name, core_module.name));
+                iris::common::print_message_and_exit(std::format("Could not find import alias '{}' in module '{}'", type.module_reference.name, core_module.name));
 
             type.module_reference.name = location->module_name;
         }
@@ -262,7 +255,7 @@ namespace h
     {
         return Type_reference
         {
-            .data = h::Function_pointer_type
+            .data = iris::Function_pointer_type
             {
                 .type = function_type,
                 .input_parameter_names = std::move(input_parameter_names),
@@ -584,6 +577,14 @@ namespace h
         return false;
     }
 
+    bool is_primitive_type(Type_reference const& type)
+    {
+        return is_integer(type) || is_floating_point(type) ||
+               is_bool(type) || is_c_bool(type) || is_byte(type) ||
+               is_decimal(type) || is_pointer(type) || is_null_pointer_type(type) ||
+               is_function_pointer(type);
+    }
+
     std::optional<Type_reference> get_element_or_pointee_type(Type_reference const& type)
     {
         if (std::holds_alternative<Array_slice_type>(type.data))
@@ -624,37 +625,37 @@ namespace h
 
     std::optional<std::string_view> get_type_module_name(Type_reference const& type)
     {
-        if (std::holds_alternative<h::Custom_type_reference>(type.data))
+        if (std::holds_alternative<iris::Custom_type_reference>(type.data))
         {
-            h::Custom_type_reference const& data = std::get<h::Custom_type_reference>(type.data);
+            iris::Custom_type_reference const& data = std::get<iris::Custom_type_reference>(type.data);
             return data.module_reference.name;
         }
-        else if (std::holds_alternative<h::Type_instance>(type.data))
+        else if (std::holds_alternative<iris::Type_instance>(type.data))
         {
-            h::Type_instance const& data = std::get<h::Type_instance>(type.data);
+            iris::Type_instance const& data = std::get<iris::Type_instance>(type.data);
             return data.type_constructor.module_reference.name;
         }
 
         return std::nullopt;
     }
 
-    h::Struct_declaration create_array_slice_type_struct_declaration(std::pmr::vector<Type_reference> const& element_type)
+    iris::Struct_declaration create_array_slice_type_struct_declaration(std::pmr::vector<Type_reference> const& element_type)
     {
-        h::Type_reference const uint64_type
+        iris::Type_reference const uint64_type
         {
-            .data = h::Integer_type
+            .data = iris::Integer_type
             {
                 .number_of_bits = 64,
                 .is_signed = false
             }
         };
 
-        return h::Struct_declaration
+        return iris::Struct_declaration
         {
             .name = "Generic_array_slice",
             .member_types = {
-                h::create_pointer_type_type_reference(element_type, false),
-                h::create_integer_type_type_reference(64, false)
+                iris::create_pointer_type_type_reference(element_type, false),
+                iris::create_integer_type_type_reference(64, false)
             },
             .member_names = {
                 "data",
@@ -665,15 +666,15 @@ namespace h
                 std::nullopt
             },
             .member_default_values = {
-                h::Statement{ 
+                iris::Statement{ 
                     .expressions = {
-                        h::Expression{ .data = h::Null_pointer_expression{} }
+                        iris::Expression{ .data = iris::Null_pointer_expression{} }
                     }
                 },
-                h::Statement{
+                iris::Statement{
                     .expressions = {
-                        h::Expression{
-                            .data = h::Constant_expression {
+                        iris::Expression{
+                            .data = iris::Constant_expression {
                                 .type = uint64_type,
                                 .data = "0"
                             }
@@ -749,6 +750,17 @@ namespace h
 
                 type_reference = replacement_type.value();
             }
+            else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
+            {
+                Custom_type_reference const& custom_type_reference = std::get<Custom_type_reference>(type_reference.data);
+                std::optional<Type_reference> const replacement_type = get_instance_argument_type(
+                    constructor_parameters,
+                    instance_arguments,
+                    custom_type_reference.name
+                );
+                if (replacement_type.has_value())
+                    type_reference = replacement_type.value();
+            }
             else if (std::holds_alternative<Array_slice_type>(type_reference.data))
             {
                 Array_slice_type& array_slice_type = std::get<Array_slice_type>(type_reference.data);
@@ -786,6 +798,15 @@ namespace h
             {
                 Soa_array_type& soa_array_type = std::get<Soa_array_type>(type_reference.data);
                 for (Type_reference& value_type : soa_array_type.value_type)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(value_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+            }
+            else if (std::holds_alternative<Soa_array_view_type>(type_reference.data))
+            {
+                Soa_array_view_type& soa_array_view_type = std::get<Soa_array_view_type>(type_reference.data);
+                for (Type_reference& value_type : soa_array_view_type.value_type)
                 {
                     if (!replace_parameter_types_by_instance_arguments_impl(value_type, constructor_parameters, instance_arguments))
                         return false;

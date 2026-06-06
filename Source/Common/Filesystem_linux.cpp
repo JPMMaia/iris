@@ -5,11 +5,11 @@ module;
 #include <string>
 #include <string_view>
 
-module h.common.filesystem;
+module iris.common.filesystem;
 
-import h.common;
+import iris.common;
 
-namespace h::common
+namespace iris::common
 {
     std::filesystem::path get_executable_directory()
     {

@@ -1,10 +1,9 @@
-add_library(H_common)
-add_library(H::Common ALIAS H_common)
+add_library(Iris_common SHARED)
+add_library(Iris::Common ALIAS Iris_common)
 
-target_compile_features(H_common PRIVATE cxx_std_23)
-target_compile_definitions(H_common PUBLIC "_SCL_SECURE_NO_WARNINGS")
+target_compile_features(Iris_common PRIVATE cxx_std_23)
 
-target_sources(H_common
+target_sources(Iris_common
    PUBLIC FILE_SET modules TYPE CXX_MODULES
       FILES
          "Common.cppm"
@@ -16,15 +15,16 @@ target_sources(H_common
 )
 
 if(WIN32)
-   target_sources(H_common PRIVATE
+   target_sources(Iris_common PRIVATE
       "Filesystem_windows.cpp"
    )
 else()
-   target_sources(H_common PRIVATE
+   target_sources(Iris_common PRIVATE
       "Filesystem_linux.cpp"
    )
 endif()
 
-if (MSVC)
-   target_link_libraries(H_common PUBLIC std_module)
-endif ()
+target_link_libraries(Iris_common PUBLIC std_module)
+
+target_generate_module_exports(Iris_common)
+install(TARGETS Iris_common)

@@ -10,9 +10,9 @@ module;
 #include <unistd.h>
 #include <sys/wait.h>
 
-module h.compiler.linker;
+module iris.compiler.linker;
 
-namespace h::compiler
+namespace iris::compiler
 {
     bool invoke_mold(
         std::span<char const* const> const arguments

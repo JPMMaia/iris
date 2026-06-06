@@ -1,0 +1,11 @@
+module compile_time_var;
+
+function foo() -> ()
+{
+    compile_time var kind = true;
+
+    compile_time if kind
+    {
+        return;
+    }
+}

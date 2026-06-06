@@ -3,9 +3,9 @@ module;
 #include <memory_resource>
 #include <string>
 
-module h.compiler.target;
+module iris.compiler.target;
 
-namespace h::compiler
+namespace iris::compiler
 {
     Target get_default_target()
     {

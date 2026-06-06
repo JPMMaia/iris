@@ -5,34 +5,34 @@ module;
 
 #include <lsp/types.h>
 
-export module h.language_server.inlay_hints;
+export module iris.language_server.inlay_hints;
 
-import h.core;
-import h.core.declarations;
+import iris.core;
+import iris.core.declarations;
 
-namespace h::language_server
+namespace iris::language_server
 {
     export std::pmr::vector<lsp::InlayHint> create_function_inlay_hints(
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_definition const& function_definition,
-        h::Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_definition const& function_definition,
+        iris::Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator,
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 
     void create_inlay_hint_variable_type_label_aux(
         std::vector<lsp::InlayHintLabelPart>& parts,
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database,
-        std::optional<h::Type_reference> const& type_optional,
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database,
+        std::optional<iris::Type_reference> const& type_optional,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     std::vector<lsp::InlayHintLabelPart> create_inlay_hint_variable_type_label(
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database,
-        h::Type_reference const& type,
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database,
+        iris::Type_reference const& type,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 }

@@ -1,0 +1,20 @@
+{
+    "name": "Export_c_header",
+    "version": "0.1.0",
+    "type": "library",
+    "dependencies": [],
+    "sources": [
+        {
+            "type": "iris",
+            "include": [
+                "./**/*.iris"
+            ]
+        },
+        {
+            "type": "export_c_header",
+            "include": [
+                "./module_a.iris"
+            ]
+        }
+    ]
+}

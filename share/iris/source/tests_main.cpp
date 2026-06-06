@@ -1,0 +1,379 @@
+#include <cstdio>
+#include <cstring>
+#include <filesystem>
+#include <numeric>
+#include <regex>
+#include <optional>
+#include <span>
+#include <sstream>
+#include <string_view>
+#include <vector>
+
+static constexpr char const* ANSI_GREEN = "\033[32m";
+static constexpr char const* ANSI_RED   = "\033[31m";
+static constexpr char const* ANSI_RESET = "\033[0m";
+
+using Test_function_pointer = void(*)();
+
+extern "C" uint64_t iris_get_test_count();
+extern "C" char const* const* iris_get_test_names();
+extern "C" char const* iris_get_test_source_file(uint64_t test_index);
+extern "C" uint64_t const* iris_get_test_source_file_lines();
+extern "C" Test_function_pointer* iris_get_tests();
+
+extern "C" struct iris_test_context
+{
+    bool success = true;
+};
+
+static iris_test_context* g_iris_current_test_context;
+
+extern "C" void iris_test_check(bool const condition, char const* const source_file_path, uint64_t const line)
+{
+    if (g_iris_current_test_context == nullptr)
+        return;
+
+    if (!condition)
+    {
+        g_iris_current_test_context->success = false;
+        std::fprintf(stderr, "Test check failed @ \"%s:%llu\"\n", source_file_path, line);
+        std::fflush(stderr);
+    }
+}
+
+static std::span<char const* const> get_all_test_names()
+{
+    std::uint64_t const count = iris_get_test_count();
+    char const* const* const tests = iris_get_test_names();
+    return { tests, count };
+}
+
+static std::span<std::uint64_t const> get_all_source_file_lines()
+{
+    std::uint64_t const count = iris_get_test_count();
+    std::uint64_t const* const lines = iris_get_test_source_file_lines();
+    return { lines, count };
+}
+
+static std::optional<std::string_view> search_argument(int const argc, char const* const argv[], std::string_view const name)
+{
+    for (int index = 0; index < argc; ++index)
+    {
+        std::string_view const current = argv[index];
+        if (current.starts_with(name))
+            return current;
+    }
+
+    return std::nullopt;
+}
+
+static bool should_print_help(int const argc, char const* const argv[])
+{
+    std::optional<std::string_view> const argument = search_argument(argc, argv, "--help");
+    return argument.has_value();
+}
+
+static bool should_list_tests(int const argc, char const* const argv[])
+{
+    std::optional<std::string_view> const argument = search_argument(argc, argv, "--list-tests");
+    return argument.has_value();
+}
+
+static bool should_output_json(int const argc, char const* const argv[])
+{
+    std::optional<std::string_view> const argument = search_argument(argc, argv, "--output-format");
+    if (argument.has_value())
+        return argument->starts_with("--output-format=json");
+
+    return false;
+}
+
+static std::filesystem::path get_output_json_file_path(int const argc, char const* const argv[])
+{
+    std::string_view const argument_start = "--output-format=json:";
+    std::optional<std::string_view> const argument = search_argument(argc, argv, argument_start);
+    if (argument.has_value())
+        return argument->substr(argument_start.size());
+
+    return "test_detail.json";
+}
+
+static std::pmr::vector<std::uint64_t> filter_tests(int const argc, char const* const argv[], std::span<char const* const> const all_test_names)
+{
+    std::string_view const argument_prefix = "--test-name=";
+    bool const has_test_name_arguments = std::any_of(argv, argv + argc, [&](std::string_view const argument) { return argument.starts_with(argument_prefix); });
+    if (has_test_name_arguments)
+    {
+        std::pmr::vector<std::uint64_t> filtered_tests;
+        filtered_tests.reserve(all_test_names.size());
+
+        for (int index = 1; index < argc; ++index)
+        {
+            std::string_view const argument = argv[index];
+            if (argument.starts_with(argument_prefix))
+            {
+                std::string_view const test_name = argument.substr(argument_prefix.size());
+                auto const location = std::find_if(all_test_names.begin(), all_test_names.end(), [&](std::string_view const& current) -> bool { return current == test_name; });
+                if (location != all_test_names.end())
+                {
+                    auto const test_index = std::distance(all_test_names.begin(), location);
+                    filtered_tests.push_back(test_index);
+                }
+            }
+        }
+
+        return filtered_tests;
+    }
+
+    std::pmr::vector<std::uint64_t> filtered_tests;
+    filtered_tests.resize(all_test_names.size());
+    std::iota(filtered_tests.begin(), filtered_tests.end(), std::uint64_t{ 0 });
+    return filtered_tests;
+}
+
+static std::pmr::vector<Test_function_pointer> get_tests_function_pointers(std::span<std::uint64_t const> const tests_indices)
+{
+    std::pmr::vector<Test_function_pointer> output;
+    output.reserve(tests_indices.size());
+
+    Test_function_pointer* const tests = iris_get_tests();
+
+    for (std::uint64_t const test_index : tests_indices)
+        output.push_back(tests[test_index]);
+
+    return output;
+}
+
+static std::pmr::vector<char const*> get_filtered_test_names(std::span<std::uint64_t const> const tests_indices, std::span<char const* const> const all_test_names)
+{
+    std::pmr::vector<char const*> output;
+    output.reserve(tests_indices.size());
+
+    for (std::uint64_t const test_index : tests_indices)
+        output.push_back(all_test_names[test_index]);
+
+    return output;
+}
+
+static void print_test_names(std::span<char const* const> const test_names)
+{
+    using namespace std::literals;
+
+    std::stringstream stream;
+
+    std::string_view current_module_name = "";
+
+    for (std::string_view const test : test_names)
+    {
+        std::uint64_t const position = test.find("."sv);
+
+        std::string_view const test_module_name = test.substr(0, position);
+        if (test_module_name != current_module_name)
+        {
+            current_module_name = test_module_name;
+            stream << test_module_name << ".\n";
+        }
+
+        std::string_view const test_function_name = test.substr(position + 1);
+        stream << "  " << test_function_name << '\n';
+    }
+
+    std::string const output = stream.str();
+    std::puts(output.c_str());
+}
+
+static void print_test_names_json(std::filesystem::path const& output_file_path)
+{
+    using namespace std::literals;
+
+    // Write JSON matching the format expected by find_tests():
+    // { "suites": [ { "name": "<module>", "tests": [ { "name":"<module>.<test>", "file":"<path>", "line": 551 } ] } ] }
+
+    // attempt to open the target file with C API
+    const std::string path_string = output_file_path.generic_string();
+    FILE* output = nullptr;
+    fopen_s(&output, path_string.c_str(), "w");
+    if (output == nullptr)
+    {
+        std::fprintf(stderr, "Failed to open json output file '%s' for writing\n", path_string.c_str());
+        return;
+    }
+
+    struct Test_case_info
+    {
+        std::string_view name;
+        std::uint64_t index;
+    };
+    
+    std::span<char const* const> const test_names = get_all_test_names();
+    std::span<std::uint64_t const> const source_file_lines = get_all_source_file_lines();
+
+    // group tests by module in order encountered
+    std::pmr::vector<std::pair<std::string_view, std::pmr::vector<Test_case_info>>> modules;
+    modules.reserve(test_names.size());
+
+    for (std::uint64_t index = 0; index < test_names.size(); ++index)
+    {
+        std::string_view const test = test_names[index];
+        std::uint64_t const position = test.find("."sv);
+        std::string_view module = position == std::string_view::npos ? test : test.substr(0, position);
+        std::string_view name = position == std::string_view::npos ? test : test.substr(position + 1);
+
+        if (modules.empty() || modules.back().first != module)
+            modules.emplace_back(module, std::pmr::vector<Test_case_info>());
+        modules.back().second.push_back({name, index});
+    }
+
+    auto json_escape = [](std::string_view s) -> std::string
+    {
+        std::string out;
+        out.reserve(s.size());
+        for (char c : s)
+        {
+            switch (c)
+            {
+            case '\\': out += "\\\\"; break;
+            case '"': out += "\\\""; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    char buf[7];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
+                    out += buf;
+                }
+                else {
+                    out += c;
+                }
+            }
+        }
+        return out;
+    };
+
+
+    bool first_suite = true;
+    std::fprintf(output, "{\"suites\": [");
+    for (auto const& [module, test_case_infos] : modules)
+    {
+        if (!first_suite)
+            std::fprintf(output, ",");
+        first_suite = false;
+
+        const std::string esc_module = json_escape(module);
+        std::fprintf(output, "{\"name\":\"%s\",\"tests\": [", esc_module.c_str());
+
+        bool first_test = true;
+        for (Test_case_info const& test_case_info : test_case_infos)
+        {
+            if (!first_test) std::fprintf(output, ",");
+            first_test = false;
+
+            std::string_view const source_file = iris_get_test_source_file(test_case_info.index);
+            std::uint64_t const line = source_file_lines[test_case_info.index];
+
+            std::string const full = std::string(module) + "." + std::string(test_case_info.name);
+            const std::string full_escaped = json_escape(full);
+            const std::string file_escaped = json_escape(source_file);
+
+            std::fprintf(output, "{\"name\":\"%s\",\"file\":\"%s\",\"line\":%llu}", full_escaped.c_str(), file_escaped.c_str(), line);
+        }
+
+        std::fprintf(output, "]}");
+    }
+    std::fprintf(output, "]}\n");
+    std::fclose(output);
+}
+
+struct Test_results
+{
+    std::uint64_t failed_count = 0;
+    std::uint64_t success_count = 0;
+};
+
+static Test_results run_tests(std::span<Test_function_pointer const> const tests_function_pointers, std::span<char const* const> const test_names)
+{
+    Test_results results = {};
+
+    for (std::uint64_t i = 0; i < tests_function_pointers.size(); ++i)
+    {
+        iris_test_context current_test_context = {};
+
+        std::printf("[ RUN      ] \"%s\"\n", test_names[i]);
+        std::fflush(stdout);
+
+        g_iris_current_test_context = &current_test_context;
+        tests_function_pointers[i]();
+        g_iris_current_test_context = nullptr;
+
+        if (current_test_context.success)
+        {
+            std::printf("[       %sOK%s ] \"%s\"\n", ANSI_GREEN, ANSI_RESET, test_names[i]);
+            results.success_count += 1;
+        }
+        else
+        {
+            std::printf("[     %sFAIL%s ] \"%s\"\n", ANSI_RED, ANSI_RESET, test_names[i]);
+            results.failed_count += 1;
+        }
+    }
+
+    return results;
+}
+
+static void print_help(char const* const program_name)
+{
+    std::printf(
+        "Usage: %s [OPTIONS]\n"
+        "\n"
+        "Options:\n"
+        "  --help                              Show this help message and exit\n"
+        "  --list-tests                        List all available test names and exit\n"
+        "  --output-format=json[:<file>]       Write test list as JSON (default file: test_detail.json); use with --list-tests\n"
+        "  --test-name=<name>                  Run only the test with this name (repeatable)\n",
+        program_name
+    );
+}
+
+void print_test_results(Test_results const& test_results)
+{
+    if (test_results.failed_count > 0)
+        std::printf("%s%llu tests failed%s\n", ANSI_RED, test_results.failed_count, ANSI_RESET);
+}
+
+int main(int const argc, char const* const argv[])
+{
+    if (argc >= 2)
+    {
+        if (should_print_help(argc, argv))
+        {
+            print_help(argv[0]);
+            return 0;
+        }
+
+        if (should_list_tests(argc, argv))
+        {
+            if (should_output_json(argc, argv))
+            {
+                std::filesystem::path const output_file_path = get_output_json_file_path(argc, argv);
+                print_test_names_json(output_file_path);
+            }
+            else
+            {
+                std::span<char const* const> const all_test_names = get_all_test_names();
+                print_test_names(all_test_names);
+            }
+            return 0;
+        }
+    }
+
+    std::span<char const* const> const all_test_names = get_all_test_names();
+    std::pmr::vector<std::uint64_t> const filtered_test_indices = filter_tests(argc, argv, all_test_names);
+    std::pmr::vector<Test_function_pointer> const tests_function_pointers = get_tests_function_pointers(filtered_test_indices);
+    std::pmr::vector<char const*> const filtered_test_names = get_filtered_test_names(filtered_test_indices, all_test_names);
+
+    Test_results const results = run_tests(tests_function_pointers, filtered_test_names);
+    print_test_results(results);
+
+    return results.failed_count == 0 ? 0 : -1;
+}

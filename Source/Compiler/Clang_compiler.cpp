@@ -1,34 +1,27 @@
 module;
 
-#include <clang/Basic/Diagnostic.h>
-#include <clang/Basic/LangOptions.h>
-#include <clang/CodeGen/CodeGenAction.h>
-#include <clang/Driver/Compilation.h>
-#include <clang/Driver/Driver.h>
-#include <clang/Frontend/CompilerInstance.h>
-#include <clang/Frontend/CompilerInvocation.h>
-#include <clang/Frontend/TextDiagnosticPrinter.h>
-#include <clang/Lex/PreprocessorOptions.h>
-#include <llvm/Support/VirtualFileSystem.h>
+#include <stdio.h>
 
-#include <cstdio>
-#include <filesystem>
-#include <span>
-#include <string>
+module iris.compiler.clang_compiler;
 
-module h.compiler.clang_compiler;
+import std;
+import llvm;
+import clang;
 
-import h.common;
-import h.common.filesystem;
+import iris.common;
+import iris.common.filesystem;
+import iris.compiler.clang_data;
 
-namespace h::compiler
+namespace iris::compiler
 {
+    clang::CompilerInstance& get_compiler_instance(Clang_data const& clang_data);
+
     std::filesystem::path find_clang(bool const use_clang_cl)
     {
         std::filesystem::path const local_path{use_clang_cl ? "clang-cl.exe" : "clang++"};
-        std::filesystem::path const absolute_path = h::common::get_executable_directory() / local_path;
+        std::filesystem::path const absolute_path = iris::common::get_executable_directory() / local_path;
         if (!std::filesystem::exists(absolute_path))
-            h::common::print_message_and_exit(std::format("Could not find clang in '{}'", absolute_path.generic_string()));
+            iris::common::print_message_and_exit(std::format("Could not find clang in '{}'", absolute_path.generic_string()));
 
         return absolute_path;
     }
@@ -46,16 +39,31 @@ namespace h::compiler
         }
     }
 
-    static void add_include_directory_argument(std::pmr::vector<std::pmr::string>& arguments, std::string_view const& value, bool const use_clang_cl)
+    static void add_include_directory_argument(std::pmr::vector<std::pmr::string>& arguments, std::string_view const& value, bool const use_clang_cl, bool const is_system_directory)
     {
-        if (use_clang_cl)
+        if (is_system_directory)
         {
-            arguments.push_back("/clang:-I" + std::pmr::string{value});
+            if (use_clang_cl)
+            {
+                arguments.push_back("/clang:-isystem" + std::pmr::string{value});
+            }
+            else
+            {
+                arguments.push_back("-isystem");
+                arguments.push_back(std::pmr::string{value});
+            }
         }
         else
         {
-            arguments.push_back("-I");
-            arguments.push_back(std::pmr::string{value});
+            if (use_clang_cl)
+            {
+                arguments.push_back("/clang:-I" + std::pmr::string{value});
+            }
+            else
+            {
+                arguments.push_back("-I");
+                arguments.push_back(std::pmr::string{value});
+            }
         }
     }
 
@@ -106,16 +114,22 @@ namespace h::compiler
 
         arguments.push_back(std::pmr::string{clang_path.generic_string()});
 
-        std::filesystem::path const builtin_include_directory = h::common::get_builtin_include_directory();
-        add_include_directory_argument(arguments, builtin_include_directory.generic_string(), use_clang_cl);
+        std::pmr::vector<std::filesystem::path> const default_header_search_directories = iris::common::get_default_header_search_directories();
+        for (std::filesystem::path const& include_directory : default_header_search_directories)
+        {
+            add_include_directory_argument(arguments, include_directory.generic_string(), use_clang_cl, true);
+        }
+
+        std::filesystem::path const builtin_include_directory = iris::common::get_builtin_include_directory();
+        add_include_directory_argument(arguments, builtin_include_directory.generic_string(), use_clang_cl, false);
 
         std::filesystem::path const build_directory = build_artifacts_directory.parent_path();
         std::filesystem::path const generated_headers_directory = std::filesystem::weakly_canonical(build_directory / "include");
-        add_include_directory_argument(arguments, generated_headers_directory.generic_string(), use_clang_cl);
+        add_include_directory_argument(arguments, generated_headers_directory.generic_string(), use_clang_cl, false);
 
         for (std::pmr::string const& include_directory : include_directories)
         {
-            add_include_directory_argument(arguments, include_directory, use_clang_cl);
+            add_include_directory_argument(arguments, include_directory, use_clang_cl, false);
         }
 
         for (std::pmr::string const& additional_flag : additional_flags)
@@ -132,6 +146,8 @@ namespace h::compiler
                 arguments.push_back("/MDd");
             else
                 arguments.push_back("/MD");
+            
+            arguments.push_back("/EHsc");
         }
 
         if (output_dependency_file_path.has_value())
@@ -162,7 +178,7 @@ namespace h::compiler
     }
 
     bool compile_cpp(
-        clang::CompilerInstance& clang_compiler_instance,
+        Clang_data const& clang_data,
         std::string_view const target_triple,
         std::filesystem::path const& source_file_path,
         std::filesystem::path const& output_file_path,
@@ -175,9 +191,11 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
+        clang::CompilerInstance& clang_compiler_instance = get_compiler_instance(clang_data);
+
         llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> diagnostic_ids{new clang::DiagnosticIDs{}};
-        llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> diagnostic_options{new clang::DiagnosticOptions{}};
-        clang::TextDiagnosticPrinter diagnostic_printer{llvm::outs(), diagnostic_options.get()};
+        clang::DiagnosticOptions diagnostic_options{};
+        clang::TextDiagnosticPrinter diagnostic_printer{llvm::outs(), diagnostic_options};
         clang::DiagnosticsEngine diagnostics_engine{diagnostic_ids, diagnostic_options, &diagnostic_printer, false};
 
         std::filesystem::path const clang_path = find_clang(use_clang_cl);

@@ -1,43 +1,36 @@
-module;
+export module iris.compiler.analysis;
 
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <variant>
-#include <vector>
+import std;
 
-export module h.compiler.analysis;
+import iris.core;
+import iris.core.declarations;
+import iris.compiler.diagnostic;
 
-import h.core;
-import h.core.declarations;
-import h.compiler.diagnostic;
-
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Variable
     {
         std::pmr::string name;
-        h::Type_reference type;
+        iris::Type_reference type;
         bool is_mutable;
         bool is_compile_time;
-        std::optional<h::Source_position> source_position;
+        std::optional<iris::Source_position> source_position;
     };
 
     export Variable create_variable(
         std::pmr::string name,
-        h::Type_reference type,
+        iris::Type_reference type,
         bool is_mutable,
         bool is_compile_time,
-        std::optional<h::Source_position> source_position
+        std::optional<iris::Source_position> source_position
     );
 
     export Variable create_variable(
         std::pmr::string name,
-        h::Type_reference type,
+        iris::Type_reference type,
         bool is_mutable,
         bool is_compile_time,
-        std::optional<h::Source_range> source_range
+        std::optional<iris::Source_range> source_range
     );
 
     export using Block_expression_variant = std::variant<
@@ -63,130 +56,130 @@ namespace h::compiler
     };
 
     export Analysis_result process_module(
-        h::Module& core_module,
-        h::Declaration_database& declaration_database,
+        iris::Module& core_module,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     void process_declarations(
         Analysis_result& result,
-        h::Module& core_module,
+        iris::Module& core_module,
         Module_declarations& declarations,
         Module_definitions& definitions,
-        h::Declaration_database& declaration_database,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     void process_function(
         Analysis_result& result,
-        h::Module& core_module,
-        h::Function_declaration& function_declaration,
-        h::Function_definition& function_definition,
-        h::Declaration_database& declaration_database,
+        iris::Module& core_module,
+        iris::Function_declaration& function_declaration,
+        iris::Function_definition& function_definition,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     void process_block(
         Analysis_result& result,
-        h::Module& core_module,
-        h::Function_declaration const* function_declaration,
+        iris::Module& core_module,
+        iris::Function_declaration const* function_declaration,
         Scope& scope,
         std::span<Statement> const statements,
-        h::Declaration_database& declaration_database,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     void process_statements(
         Analysis_result& result,
-        h::Module& core_module,
-        h::Function_declaration const* function_declaration,
+        iris::Module& core_module,
+        iris::Function_declaration const* function_declaration,
         Scope& scope,
         std::span<Statement> const statements,
-        h::Declaration_database& declaration_database,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     void process_statement(
         Analysis_result& result,
-        h::Module& core_module,
-        h::Function_declaration const* function_declaration,
+        iris::Module& core_module,
+        iris::Function_declaration const* function_declaration,
         Scope& scope,
-        h::Statement& statement,
-        std::optional<h::Type_reference> const& expected_statement_type,
-        h::Declaration_database& declaration_database,
+        iris::Statement& statement,
+        std::optional<iris::Type_reference> const& expected_statement_type,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
-    std::optional<h::Statement> process_expression(
+    std::optional<iris::Statement> process_expression(
         Analysis_result& result,
-        h::Module& core_module,
-        h::Function_declaration const* function_declaration,
+        iris::Module& core_module,
+        iris::Function_declaration const* function_declaration,
         Scope& scope,
-        h::Statement& statement,
-        h::Expression& expression,
+        iris::Statement& statement,
+        iris::Expression& expression,
         std::size_t const expression_index,
-        h::Declaration_database& declaration_database,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     export struct Type_info
     {
-        h::Type_reference type = {};
+        iris::Type_reference type = {};
         bool is_mutable = false;
     };
 
-    export Type_info create_type_info(h::Type_reference type, bool is_mutable);
-    export std::optional<Type_info> create_type_info(std::optional<h::Type_reference> type, bool is_mutable);
+    export Type_info create_type_info(iris::Type_reference type, bool is_mutable);
+    export std::optional<Type_info> create_type_info(std::optional<iris::Type_reference> type, bool is_mutable);
 
     export std::optional<Type_info> get_expression_type_info(
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Expression const& expression,
-        std::optional<h::Type_reference> const& expected_expression_type,
-        h::Declaration_database const& declaration_database
+        iris::Statement const& statement,
+        iris::Expression const& expression,
+        std::optional<iris::Type_reference> const& expected_expression_type,
+        iris::Declaration_database const& declaration_database
     );
 
-    export std::optional<h::Type_reference> get_expression_type(
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
+    export std::optional<iris::Type_reference> get_expression_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        std::optional<h::Type_reference> const& expected_statement_type,
-        h::Declaration_database const& declaration_database
+        iris::Statement const& statement,
+        std::optional<iris::Type_reference> const& expected_statement_type,
+        iris::Declaration_database const& declaration_database
     );
 
-    export std::optional<h::Type_reference> get_expression_type(
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
+    export std::optional<iris::Type_reference> get_expression_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Expression const& expression,
-        std::optional<h::Type_reference> const& expected_expression_type,
+        iris::Statement const& statement,
+        iris::Expression const& expression,
+        std::optional<iris::Type_reference> const& expected_expression_type,
         Declaration_database const& declaration_database
     );
 
     export struct Deduced_instance_call
     {
-        h::Custom_type_reference custom_type_reference;
-        h::Function_constructor const& function_constructor;
+        iris::Custom_type_reference custom_type_reference;
+        iris::Function_constructor const& function_constructor;
         std::pmr::vector<Statement> arguments;
     };
 
     export std::optional<Deduced_instance_call> deduce_instance_call_arguments(
-        h::Declaration_database const& declaration_database,
-        h::Module const& core_module,
+        iris::Declaration_database const& declaration_database,
+        std::string_view const module_name,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Call_expression const& call_expression,
+        iris::Statement const& statement,
+        iris::Call_expression const& call_expression,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
@@ -201,7 +194,7 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& allocator
     );
 
-    std::optional<h::Type_reference> get_declaration_member_type(
+    std::optional<iris::Type_reference> get_declaration_member_type(
         Declaration const& declaration,
         std::string_view const member_name
     );
@@ -209,8 +202,8 @@ namespace h::compiler
     export struct Declaration_member_info
     {
         std::string_view member_name;
-        h::Type_reference member_type;
-        std::optional<h::Source_position> member_source_position;
+        iris::Type_reference member_type;
+        std::optional<iris::Source_position> member_source_position;
     };
 
     export std::pmr::vector<Declaration_member_info> get_declaration_member_infos(
@@ -218,25 +211,19 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 
-    export void add_import_usage(
-        h::Module& core_module,
-        std::string_view const alias,
-        std::string_view const usage
-    );
-
     export void add_parameters_to_scope(
         Scope& scope,
         std::span<std::pmr::string const> const parameter_names,
-        std::span<h::Type_reference const> const parameter_types,
+        std::span<iris::Type_reference const> const parameter_types,
         std::optional<std::pmr::vector<Source_position>> const parameter_source_positions
     );
 
     export std::optional<Scope> calculate_scope(
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_definition const& function_definition,
-        h::Declaration_database const& declaration_database,
-        h::Source_position const& source_position
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_definition const& function_definition,
+        iris::Declaration_database const& declaration_database,
+        iris::Source_position const& source_position
     );
 
     export Variable const* find_variable_from_scope(
@@ -246,46 +233,46 @@ namespace h::compiler
 
     export template <typename Function>
     void visit_statements_using_scope(
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
         Scope& scope,
-        std::span<h::Statement const> const statements,
-        h::Declaration_database const& declaration_database,
+        std::span<iris::Statement const> const statements,
+        iris::Declaration_database const& declaration_database,
         Function&& callback
     )
     {
         std::size_t const initial_variable_count = scope.variables.size();
 
-        for (h::Statement const& statement : statements)
+        for (iris::Statement const& statement : statements)
         {
             callback(statement, scope);
 
             if (!statement.expressions.empty())
             {
-                h::Expression const& expression = statement.expressions[0];
+                iris::Expression const& expression = statement.expressions[0];
 
-                if (std::holds_alternative<h::Block_expression>(expression.data))
+                if (std::holds_alternative<iris::Block_expression>(expression.data))
                 {
-                    h::Block_expression const& block_expression = std::get<h::Block_expression>(expression.data);
-                    visit_statements_using_scope(core_module, function_declaration, scope, block_expression.statements, declaration_database, callback);
+                    iris::Block_expression const& block_expression = std::get<iris::Block_expression>(expression.data);
+                    visit_statements_using_scope(module_name, function_declaration, scope, block_expression.statements, declaration_database, callback);
                 }
-                else if (std::holds_alternative<h::If_expression>(expression.data))
+                else if (std::holds_alternative<iris::If_expression>(expression.data))
                 {
-                    h::If_expression const& if_expression = std::get<h::If_expression>(expression.data);
+                    iris::If_expression const& if_expression = std::get<iris::If_expression>(expression.data);
 
-                    for (h::Condition_statement_pair const& pair : if_expression.series)
+                    for (iris::Condition_statement_pair const& pair : if_expression.series)
                     {
                         if (pair.condition.has_value())
                             callback(pair.condition.value(), scope);
 
-                        visit_statements_using_scope(core_module, function_declaration, scope, pair.then_statements, declaration_database, callback);
+                        visit_statements_using_scope(module_name, function_declaration, scope, pair.then_statements, declaration_database, callback);
                     }
                 }
-                else if (std::holds_alternative<h::For_loop_expression>(expression.data))
+                else if (std::holds_alternative<iris::For_loop_expression>(expression.data))
                 {
-                    h::For_loop_expression const& for_loop_expression = std::get<h::For_loop_expression>(expression.data);
+                    iris::For_loop_expression const& for_loop_expression = std::get<iris::For_loop_expression>(expression.data);
 
-                    std::optional<h::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[for_loop_expression.range_begin.expression_index], std::nullopt, declaration_database);
+                    std::optional<iris::Type_reference> const type_reference = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[for_loop_expression.range_begin.expression_index], std::nullopt, declaration_database);
                     if (type_reference.has_value())
                     {
                         scope.variables.push_back(
@@ -294,38 +281,38 @@ namespace h::compiler
                     }
 
                     callback(for_loop_expression.range_end, scope);
-                    visit_statements_using_scope(core_module, function_declaration, scope, for_loop_expression.then_statements, declaration_database, callback);
+                    visit_statements_using_scope(module_name, function_declaration, scope, for_loop_expression.then_statements, declaration_database, callback);
 
                     if (type_reference.has_value())
                         scope.variables.pop_back();
                 }
-                else if (std::holds_alternative<h::Ternary_condition_expression>(expression.data))
+                else if (std::holds_alternative<iris::Ternary_condition_expression>(expression.data))
                 {
-                    h::Ternary_condition_expression const& ternary_condition_expression = std::get<h::Ternary_condition_expression>(expression.data);
+                    iris::Ternary_condition_expression const& ternary_condition_expression = std::get<iris::Ternary_condition_expression>(expression.data);
 
                     callback(ternary_condition_expression.then_statement, scope);
                     callback(ternary_condition_expression.else_statement, scope);
                 }
-                else if (std::holds_alternative<h::Switch_expression>(expression.data))
+                else if (std::holds_alternative<iris::Switch_expression>(expression.data))
                 {
-                    h::Switch_expression const& switch_expression = std::get<h::Switch_expression>(expression.data);
+                    iris::Switch_expression const& switch_expression = std::get<iris::Switch_expression>(expression.data);
 
-                    for (h::Switch_case_expression_pair const& pair : switch_expression.cases)
-                        visit_statements_using_scope(core_module, function_declaration, scope, pair.statements, declaration_database, callback);
+                    for (iris::Switch_case_expression_pair const& pair : switch_expression.cases)
+                        visit_statements_using_scope(module_name, function_declaration, scope, pair.statements, declaration_database, callback);
                 }
-                else if (std::holds_alternative<h::Variable_declaration_expression>(expression.data))
+                else if (std::holds_alternative<iris::Variable_declaration_expression>(expression.data))
                 {
-                    h::Variable_declaration_expression const& data = std::get<h::Variable_declaration_expression>(expression.data);
-                    std::optional<h::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.right_hand_side.expression_index], std::nullopt, declaration_database);
+                    iris::Variable_declaration_expression const& data = std::get<iris::Variable_declaration_expression>(expression.data);
+                    std::optional<iris::Type_reference> const type_reference = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.right_hand_side.expression_index], std::nullopt, declaration_database);
                     if (type_reference.has_value())
                         scope.variables.push_back(
                             create_variable(data.name, type_reference.value(), data.is_mutable, false, expression.source_range)
                         );
                 }
-                else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(expression.data))
+                else if (std::holds_alternative<iris::Variable_declaration_with_type_expression>(expression.data))
                 {
-                    h::Variable_declaration_with_type_expression const& data = std::get<h::Variable_declaration_with_type_expression>(expression.data);
-                    std::optional<h::Type_reference> const type_reference = h::get_variable_declaration_with_type_expression_type(statement, data);
+                    iris::Variable_declaration_with_type_expression const& data = std::get<iris::Variable_declaration_with_type_expression>(expression.data);
+                    std::optional<iris::Type_reference> const type_reference = iris::get_variable_declaration_with_type_expression_type(statement, data);
                     if (type_reference.has_value())
                     {
                         scope.variables.push_back(
@@ -333,11 +320,11 @@ namespace h::compiler
                         );
                     }
                 }
-                else if (std::holds_alternative<h::While_loop_expression>(expression.data))
+                else if (std::holds_alternative<iris::While_loop_expression>(expression.data))
                 {
-                    h::While_loop_expression const& while_loop_expression = std::get<h::While_loop_expression>(expression.data);
+                    iris::While_loop_expression const& while_loop_expression = std::get<iris::While_loop_expression>(expression.data);
 
-                    visit_statements_using_scope(core_module, function_declaration, scope, while_loop_expression.then_statements, declaration_database, callback);
+                    visit_statements_using_scope(module_name, function_declaration, scope, while_loop_expression.then_statements, declaration_database, callback);
                 }
             }
         }

@@ -1,32 +1,25 @@
 module;
 
-#include <algorithm>
-#include <cassert>
-#include <format>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <stdexcept>
-#include <string>
-#include <variant>
-#include <vector>
+#include <assert.h>
 
-module h.compiler.analysis;
+module iris.compiler.analysis;
 
-import h.compiler.diagnostic;
-import h.compiler.validation;
-import h.core;
-import h.core.declarations;
-import h.core.types;
+import std;
 
-namespace h::compiler
+import iris.compiler.diagnostic;
+import iris.compiler.validation;
+import iris.core;
+import iris.core.declarations;
+import iris.core.types;
+
+namespace iris::compiler
 {
     Variable create_variable(
         std::pmr::string name,
-        h::Type_reference type,
+        iris::Type_reference type,
         bool is_mutable,
         bool is_compile_time,
-        std::optional<h::Source_position> source_position
+        std::optional<iris::Source_position> source_position
     )
     {
         return
@@ -41,10 +34,10 @@ namespace h::compiler
 
     Variable create_variable(
         std::pmr::string name,
-        h::Type_reference type,
+        iris::Type_reference type,
         bool is_mutable,
         bool is_compile_time,
-        std::optional<h::Source_range> source_range
+        std::optional<iris::Source_range> source_range
     )
     {
         return
@@ -53,13 +46,13 @@ namespace h::compiler
             .type = std::move(type),
             .is_mutable = is_mutable,
             .is_compile_time = is_compile_time,
-            .source_position = source_range.has_value() ? std::optional<h::Source_position>{source_range->start} : std::optional<h::Source_position>{std::nullopt},
+            .source_position = source_range.has_value() ? std::optional<iris::Source_position>{source_range->start} : std::optional<iris::Source_position>{std::nullopt},
         };
     }
 
     Analysis_result process_module(
-        h::Module& core_module,
-        h::Declaration_database& declaration_database,
+        iris::Module& core_module,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -68,7 +61,7 @@ namespace h::compiler
 
         if (options.validate)
         {
-            std::pmr::vector<h::compiler::Diagnostic> const diagnostics = validate_module(
+            std::pmr::vector<iris::compiler::Diagnostic> const diagnostics = validate_module(
                 core_module,
                 declaration_database,
                 temporaries_allocator
@@ -87,15 +80,15 @@ namespace h::compiler
 
     void process_declarations(
         Analysis_result& result,
-        h::Module& core_module,
+        iris::Module& core_module,
         Module_declarations& declarations,
         Module_definitions& definitions,
-        h::Declaration_database& declaration_database,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        for (h::Function_declaration& declaration : declarations.function_declarations)
+        for (iris::Function_declaration& declaration : declarations.function_declarations)
         {
             auto location = std::find_if(
                 definitions.function_definitions.begin(),
@@ -112,7 +105,7 @@ namespace h::compiler
     void add_parameters_to_scope(
         Scope& scope,
         std::span<std::pmr::string const> const parameter_names,
-        std::span<h::Type_reference const> const parameter_types,
+        std::span<iris::Type_reference const> const parameter_types,
         std::optional<std::pmr::vector<Source_position>> const parameter_source_positions
     )
     {
@@ -124,7 +117,7 @@ namespace h::compiler
                     parameter_types[parameter_index],
                     false,
                     false,
-                    parameter_source_positions.has_value() ? std::optional<h::Source_position>{(*parameter_source_positions)[parameter_index]} : std::optional<h::Source_position>{std::nullopt}
+                    parameter_source_positions.has_value() ? std::optional<iris::Source_position>{(*parameter_source_positions)[parameter_index]} : std::optional<iris::Source_position>{std::nullopt}
                 )
             );
         }
@@ -132,10 +125,10 @@ namespace h::compiler
 
     void process_function(
         Analysis_result& result,
-        h::Module& core_module,
-        h::Function_declaration& function_declaration,
-        h::Function_definition& function_definition,
-        h::Declaration_database& declaration_database,
+        iris::Module& core_module,
+        iris::Function_declaration& function_declaration,
+        iris::Function_definition& function_definition,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -145,7 +138,7 @@ namespace h::compiler
 
         add_parameters_to_scope(scope, function_declaration.input_parameter_names, function_declaration.type.input_parameter_types, function_declaration.input_parameter_source_positions);
 
-        for (h::Function_condition& condition : function_declaration.preconditions)
+        for (iris::Function_condition& condition : function_declaration.preconditions)
         {
             process_statement(
                 result,
@@ -163,7 +156,7 @@ namespace h::compiler
         {
             add_parameters_to_scope(scope, function_declaration.output_parameter_names, function_declaration.type.output_parameter_types, function_declaration.output_parameter_source_positions);
 
-            for (h::Function_condition& condition : function_declaration.postconditions)
+            for (iris::Function_condition& condition : function_declaration.postconditions)
             {
                 process_statement(
                     result,
@@ -198,11 +191,11 @@ namespace h::compiler
 
     void process_block(
         Analysis_result& result,
-        h::Module& core_module,
-        h::Function_declaration const* const function_declaration,
+        iris::Module& core_module,
+        iris::Function_declaration const* const function_declaration,
         Scope& scope,
         std::span<Statement> const statements,
-        h::Declaration_database& declaration_database,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -232,11 +225,11 @@ namespace h::compiler
 
     void process_statements(
         Analysis_result& result,
-        h::Module& core_module,
-        h::Function_declaration const* const function_declaration,
+        iris::Module& core_module,
+        iris::Function_declaration const* const function_declaration,
         Scope& scope,
         std::span<Statement> const statements,
-        h::Declaration_database& declaration_database,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -259,12 +252,12 @@ namespace h::compiler
 
     void process_statement(
         Analysis_result& result,
-        h::Module& core_module,
-        h::Function_declaration const* const function_declaration,
+        iris::Module& core_module,
+        iris::Function_declaration const* const function_declaration,
         Scope& scope,
-        h::Statement& statement,
-        std::optional<h::Type_reference> const& expected_statement_type,
-        h::Declaration_database& declaration_database,
+        iris::Statement& statement,
+        std::optional<iris::Type_reference> const& expected_statement_type,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -273,9 +266,9 @@ namespace h::compiler
         for (std::size_t index = 0; index < count; ++index)
         {
             std::size_t reverse_index = count - index - 1;
-            h::Expression& expression = statement.expressions[reverse_index];
+            iris::Expression& expression = statement.expressions[reverse_index];
 
-            std::optional<h::Statement> new_statement = process_expression(
+            std::optional<iris::Statement> new_statement = process_expression(
                 result,
                 core_module,
                 function_declaration,
@@ -307,22 +300,22 @@ namespace h::compiler
         }
     }
 
-    std::optional<h::Statement> process_expression(
+    std::optional<iris::Statement> process_expression(
         Analysis_result& result,
-        h::Module& core_module,
-        h::Function_declaration const* const function_declaration,
+        iris::Module& core_module,
+        iris::Function_declaration const* const function_declaration,
         Scope& scope,
-        h::Statement& statement,
-        h::Expression& expression,
+        iris::Statement& statement,
+        iris::Expression& expression,
         std::size_t const expression_index,
-        h::Declaration_database& declaration_database,
+        iris::Declaration_database& declaration_database,
         Analysis_options const& options,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        if (std::holds_alternative<h::Block_expression>(expression.data))
+        if (std::holds_alternative<iris::Block_expression>(expression.data))
         {
-            h::Block_expression& data = std::get<h::Block_expression>(expression.data);
+            iris::Block_expression& data = std::get<iris::Block_expression>(expression.data);
             process_block(
                 result,
                 core_module,
@@ -334,9 +327,9 @@ namespace h::compiler
                 temporaries_allocator
             );
         }
-        else if (std::holds_alternative<h::Constant_array_expression>(expression.data))
+        else if (std::holds_alternative<iris::Constant_array_expression>(expression.data))
         {
-            h::Constant_array_expression& data = std::get<h::Constant_array_expression>(expression.data);
+            iris::Constant_array_expression& data = std::get<iris::Constant_array_expression>(expression.data);
             process_statements(
                 result,
                 core_module,
@@ -348,11 +341,11 @@ namespace h::compiler
                 temporaries_allocator
             );
         }
-        else if (std::holds_alternative<h::For_loop_expression>(expression.data))
+        else if (std::holds_alternative<iris::For_loop_expression>(expression.data))
         {
-            h::For_loop_expression& data = std::get<h::For_loop_expression>(expression.data);
+            iris::For_loop_expression& data = std::get<iris::For_loop_expression>(expression.data);
 
-            std::optional<h::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.range_begin.expression_index], std::nullopt, declaration_database);
+            std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module.name, nullptr, scope, statement, statement.expressions[data.range_begin.expression_index], std::nullopt, declaration_database);
             if (type_reference.has_value())
             {
                 scope.variables.push_back(
@@ -382,9 +375,9 @@ namespace h::compiler
                 temporaries_allocator
             );
         }
-        else if (std::holds_alternative<h::Function_expression>(expression.data))
+        else if (std::holds_alternative<iris::Function_expression>(expression.data))
         {
-            h::Function_expression& data = std::get<h::Function_expression>(expression.data);
+            iris::Function_expression& data = std::get<iris::Function_expression>(expression.data);
             process_function(
                 result,
                 core_module,
@@ -395,9 +388,9 @@ namespace h::compiler
                 temporaries_allocator
             );
         }
-        else if (std::holds_alternative<h::Instance_call_expression>(expression.data))
+        else if (std::holds_alternative<iris::Instance_call_expression>(expression.data))
         {
-            h::Instance_call_expression& data = std::get<h::Instance_call_expression>(expression.data);
+            iris::Instance_call_expression& data = std::get<iris::Instance_call_expression>(expression.data);
             process_statements(
                 result,
                 core_module,
@@ -409,10 +402,10 @@ namespace h::compiler
                 temporaries_allocator
             );
         }
-        else if (std::holds_alternative<h::If_expression>(expression.data))
+        else if (std::holds_alternative<iris::If_expression>(expression.data))
         {
-            h::If_expression& data = std::get<h::If_expression>(expression.data);
-            for (h::Condition_statement_pair& serie : data.series)
+            iris::If_expression& data = std::get<iris::If_expression>(expression.data);
+            for (iris::Condition_statement_pair& serie : data.series)
             {
                 if (serie.condition.has_value())
                 {
@@ -441,10 +434,10 @@ namespace h::compiler
                 );
             }
         }
-        else if (std::holds_alternative<h::Switch_expression>(expression.data))
+        else if (std::holds_alternative<iris::Switch_expression>(expression.data))
         {
-            h::Switch_expression& data = std::get<h::Switch_expression>(expression.data);
-            for (h::Switch_case_expression_pair& serie : data.cases)
+            iris::Switch_expression& data = std::get<iris::Switch_expression>(expression.data);
+            for (iris::Switch_case_expression_pair& serie : data.cases)
             {
                 process_block(
                     result,
@@ -458,9 +451,9 @@ namespace h::compiler
                 );
             }
         }
-        else if (std::holds_alternative<h::Ternary_condition_expression>(expression.data))
+        else if (std::holds_alternative<iris::Ternary_condition_expression>(expression.data))
         {
-            h::Ternary_condition_expression& data = std::get<h::Ternary_condition_expression>(expression.data);
+            iris::Ternary_condition_expression& data = std::get<iris::Ternary_condition_expression>(expression.data);
             process_statement(
                 result,
                 core_module,
@@ -484,10 +477,10 @@ namespace h::compiler
                 temporaries_allocator
             );
         }
-        else if (std::holds_alternative<h::Variable_declaration_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_declaration_expression>(expression.data))
         {
-            h::Variable_declaration_expression& data = std::get<h::Variable_declaration_expression>(expression.data);
-            std::optional<h::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.right_hand_side.expression_index], std::nullopt, declaration_database);
+            iris::Variable_declaration_expression& data = std::get<iris::Variable_declaration_expression>(expression.data);
+            std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module.name, nullptr, scope, statement, statement.expressions[data.right_hand_side.expression_index], std::nullopt, declaration_database);
             if (type_reference.has_value())
                 scope.variables.push_back(
                     create_variable(data.name, type_reference.value(), data.is_mutable, false, expression.source_range)
@@ -495,11 +488,11 @@ namespace h::compiler
             
             // TODO error if type is nullopt
         }
-        else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_declaration_with_type_expression>(expression.data))
         {
-            h::Variable_declaration_with_type_expression& data = std::get<h::Variable_declaration_with_type_expression>(expression.data);
+            iris::Variable_declaration_with_type_expression& data = std::get<iris::Variable_declaration_with_type_expression>(expression.data);
 
-            std::optional<h::Type_reference> const variable_type = h::get_variable_declaration_with_type_expression_type(statement, data);
+            std::optional<iris::Type_reference> const variable_type = iris::get_variable_declaration_with_type_expression_type(statement, data);
             if (variable_type.has_value())
             {
                 scope.variables.push_back(
@@ -507,9 +500,9 @@ namespace h::compiler
                 );
             }
         }
-        else if (std::holds_alternative<h::While_loop_expression>(expression.data))
+        else if (std::holds_alternative<iris::While_loop_expression>(expression.data))
         {
-            h::While_loop_expression& data = std::get<h::While_loop_expression>(expression.data);
+            iris::While_loop_expression& data = std::get<iris::While_loop_expression>(expression.data);
             process_statement(
                 result,
                 core_module,
@@ -536,20 +529,20 @@ namespace h::compiler
         return std::nullopt;
     }
 
-    std::optional<h::Type_reference> get_expression_type(
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
+    std::optional<iris::Type_reference> get_expression_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        std::optional<h::Type_reference> const& expected_statement_type,
-        h::Declaration_database const& declaration_database
+        iris::Statement const& statement,
+        std::optional<iris::Type_reference> const& expected_statement_type,
+        iris::Declaration_database const& declaration_database
     )
     {
         if (statement.expressions.empty())
             return std::nullopt;
 
         return get_expression_type(
-            core_module,
+            module_name,
             function_declaration,
             scope,
             statement,
@@ -560,38 +553,38 @@ namespace h::compiler
     }
 
     
-    h::Function_declaration const* get_function_declaration_to_call(
-        h::Module const& core_module,
-        h::Statement const& statement,
-        h::Expression const& expression,
-        h::Declaration_database const& declaration_database
+    iris::Function_declaration const* get_function_declaration_to_call(
+        std::string_view const module_name,
+        iris::Statement const& statement,
+        iris::Expression const& expression,
+        iris::Declaration_database const& declaration_database
     )
     {
-        if (std::holds_alternative<h::Access_expression>(expression.data))
+        if (std::holds_alternative<iris::Access_expression>(expression.data))
         {
-            //h::Access_expression const& access_expression = std::get<h::Access_expression>(expression.data); // TODO
+            //iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data); // TODO
             assert(false);
         }
-        else if (std::holds_alternative<h::Variable_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
-            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
+            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
 
-            std::optional<Declaration> const declaration = find_declaration(declaration_database, core_module.name, variable_expression.name);
-            if (declaration.has_value() && std::holds_alternative<h::Function_declaration const*>(declaration->data))
-                return std::get<h::Function_declaration const*>(declaration->data);
+            std::optional<Declaration> const declaration = find_declaration(declaration_database, module_name, variable_expression.name);
+            if (declaration.has_value() && std::holds_alternative<iris::Function_declaration const*>(declaration->data))
+                return std::get<iris::Function_declaration const*>(declaration->data);
         }
 
         return nullptr;
     }
 
-    std::optional<h::Type_reference> get_type_to_instantiate(
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
+    std::optional<iris::Type_reference> get_type_to_instantiate(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Expression const& expression,
-        h::Instantiate_expression const& instantiate_expression,
-        h::Declaration_database const& declaration_database
+        iris::Statement const& statement,
+        iris::Expression const& expression,
+        iris::Instantiate_expression const& instantiate_expression,
+        iris::Declaration_database const& declaration_database
     )
     {
         std::uint64_t expression_index = statement.expressions.size();
@@ -609,16 +602,16 @@ namespace h::compiler
 
         for (std::size_t index = 0; index < statement.expressions.size(); ++index)
         {
-            h::Expression const& current_expression = statement.expressions[index];
+            iris::Expression const& current_expression = statement.expressions[index];
             
-            if (std::holds_alternative<h::Assignment_expression>(current_expression.data))
+            if (std::holds_alternative<iris::Assignment_expression>(current_expression.data))
             {
-                h::Assignment_expression const& assignment_expression = std::get<h::Assignment_expression>(current_expression.data);
+                iris::Assignment_expression const& assignment_expression = std::get<iris::Assignment_expression>(current_expression.data);
 
                 if (assignment_expression.right_hand_side.expression_index == expression_index)
                 {
-                    std::optional<h::Type_reference> const left_hand_side_type = get_expression_type(
-                        core_module,
+                    std::optional<iris::Type_reference> const left_hand_side_type = get_expression_type(
+                        module_name,
                         function_declaration,
                         scope,
                         statement,
@@ -629,17 +622,17 @@ namespace h::compiler
                     return left_hand_side_type;
                 }
             }
-            else if (std::holds_alternative<h::Call_expression>(current_expression.data))
+            else if (std::holds_alternative<iris::Call_expression>(current_expression.data))
             {
-                h::Call_expression const& call_expression = std::get<h::Call_expression>(current_expression.data);
+                iris::Call_expression const& call_expression = std::get<iris::Call_expression>(current_expression.data);
 
                 for (std::size_t argument_index = 0; argument_index < call_expression.arguments.size(); ++argument_index)
                 {
-                    h::Expression_index const& argument_expression = call_expression.arguments[argument_index];
+                    iris::Expression_index const& argument_expression = call_expression.arguments[argument_index];
                     if (argument_expression.expression_index == expression_index)
                     {
-                        h::Function_declaration const* const function_declaration_to_call = get_function_declaration_to_call(
-                            core_module,
+                        iris::Function_declaration const* const function_declaration_to_call = get_function_declaration_to_call(
+                            module_name,
                             statement,
                             statement.expressions[call_expression.expression.expression_index],
                             declaration_database
@@ -651,16 +644,16 @@ namespace h::compiler
                     }
                 }
             }
-            else if (std::holds_alternative<h::Instantiate_expression>(current_expression.data))
+            else if (std::holds_alternative<iris::Instantiate_expression>(current_expression.data))
             {
-                h::Instantiate_expression const& parent_instantiate_expression = std::get<h::Instantiate_expression>(current_expression.data);
+                iris::Instantiate_expression const& parent_instantiate_expression = std::get<iris::Instantiate_expression>(current_expression.data);
 
-                for (h::Instantiate_member_value_pair const& member : parent_instantiate_expression.members)
+                for (iris::Instantiate_member_value_pair const& member : parent_instantiate_expression.members)
                 {
                     if (member.value.expression_index == expression_index)
                     {
-                        std::optional<h::Type_reference> const current_expression_type = get_expression_type(
-                            core_module,
+                        std::optional<iris::Type_reference> const current_expression_type = get_expression_type(
+                            module_name,
                             function_declaration,
                             scope,
                             statement,
@@ -671,11 +664,41 @@ namespace h::compiler
                         if (!current_expression_type.has_value())
                             return std::nullopt;
 
+                        {
+                            std::optional<iris::Type_reference> const underlying_expression_type = get_underlying_type(
+                                declaration_database,
+                                current_expression_type.value()
+                            );
+                            if (underlying_expression_type.has_value() && std::holds_alternative<iris::Type_instance>(underlying_expression_type->data))
+                            {
+                                iris::Type_instance const& type_instance = std::get<iris::Type_instance>(underlying_expression_type->data);
+                                iris::Declaration_instance_storage const storage = instantiate_type_instance(declaration_database, type_instance);
+                                if (std::holds_alternative<iris::Struct_declaration>(storage.data))
+                                {
+                                    iris::Struct_declaration const& struct_declaration = std::get<iris::Struct_declaration>(storage.data);
+
+                                    auto const location = std::find_if(
+                                        struct_declaration.member_names.begin(),
+                                        struct_declaration.member_names.end(),
+                                        [&](std::pmr::string const& member_name) -> bool {
+                                            return member_name == member.member_name;
+                                        }
+                                    );
+                                    if (location != struct_declaration.member_names.end())
+                                    {
+                                        std::size_t const member_index = std::distance(struct_declaration.member_names.begin(), location);
+                                        return struct_declaration.member_types[member_index];
+                                    }
+                                }
+                                return std::nullopt;
+                            }
+                        }
+
                         std::optional<Declaration> const& declaration = find_underlying_declaration(declaration_database, current_expression_type.value());
                         if (!declaration.has_value())
                             return std::nullopt;
 
-                        std::optional<h::Type_reference> const current_member_type = get_declaration_member_type(
+                        std::optional<iris::Type_reference> const current_member_type = get_declaration_member_type(
                             declaration.value(),
                             member.member_name
                         );
@@ -684,9 +707,9 @@ namespace h::compiler
                     }
                 }
             }
-            else if (std::holds_alternative<h::Return_expression>(current_expression.data))
+            else if (std::holds_alternative<iris::Return_expression>(current_expression.data))
             {
-                h::Return_expression const& return_expression = std::get<h::Return_expression>(current_expression.data);
+                iris::Return_expression const& return_expression = std::get<iris::Return_expression>(current_expression.data);
                 if (return_expression.expression.has_value() && return_expression.expression->expression_index == expression_index)
                 {
                     if (function_declaration != nullptr && !function_declaration->type.output_parameter_types.empty())
@@ -695,18 +718,18 @@ namespace h::compiler
                         return std::nullopt;
                 }
             }
-            else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(current_expression.data))
+            else if (std::holds_alternative<iris::Variable_declaration_with_type_expression>(current_expression.data))
             {
-                h::Variable_declaration_with_type_expression const& declaration_expression = std::get<h::Variable_declaration_with_type_expression>(current_expression.data);
+                iris::Variable_declaration_with_type_expression const& declaration_expression = std::get<iris::Variable_declaration_with_type_expression>(current_expression.data);
                 if (declaration_expression.right_hand_side.expression_index == expression_index)
-                    return h::get_variable_declaration_with_type_expression_type(statement, declaration_expression);
+                    return iris::get_variable_declaration_with_type_expression_type(statement, declaration_expression);
             }
         }
 
         return std::nullopt;
     }
 
-    Type_info create_type_info(h::Type_reference type, bool is_mutable)
+    Type_info create_type_info(iris::Type_reference type, bool is_mutable)
     {
         return Type_info
         {
@@ -715,7 +738,7 @@ namespace h::compiler
         };
     }
 
-    std::optional<Type_info> create_type_info(std::optional<h::Type_reference> type, bool is_mutable)
+    std::optional<Type_info> create_type_info(std::optional<iris::Type_reference> type, bool is_mutable)
     {
         if (!type.has_value())
             return std::nullopt;
@@ -728,7 +751,7 @@ namespace h::compiler
     }
 
     std::optional<Type_info> get_implicit_function_type(
-        h::Declaration_database const& declaration_database,
+        iris::Declaration_database const& declaration_database,
         std::string_view const declaration_module_name,
         std::string_view const member_name
     )
@@ -741,9 +764,9 @@ namespace h::compiler
         if (!implicit_declaration.has_value())
             return std::nullopt;
 
-        if (std::holds_alternative<h::Function_declaration const*>(implicit_declaration->data))
+        if (std::holds_alternative<iris::Function_declaration const*>(implicit_declaration->data))
         {
-            h::Function_declaration const& implicit_function_declaration = *std::get<h::Function_declaration const*>(implicit_declaration->data);
+            iris::Function_declaration const& implicit_function_declaration = *std::get<iris::Function_declaration const*>(implicit_declaration->data);
             return Type_info
             {
                 .type = create_function_type_type_reference(implicit_function_declaration.type, implicit_function_declaration.input_parameter_names, implicit_function_declaration.output_parameter_names),
@@ -755,7 +778,7 @@ namespace h::compiler
     }
 
      std::optional<Type_info> get_instanced_function_type(
-        h::Declaration_database const& declaration_database,
+        iris::Declaration_database const& declaration_database,
         Instance_call_key const& key
     )
     {
@@ -796,36 +819,36 @@ namespace h::compiler
     }
 
     std::optional<Type_info> get_expression_type_info(
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Expression const& expression,
-        std::optional<h::Type_reference> const& expected_expression_type,
-        h::Declaration_database const& declaration_database
+        iris::Statement const& statement,
+        iris::Expression const& expression,
+        std::optional<iris::Type_reference> const& expected_expression_type,
+        iris::Declaration_database const& declaration_database
     )
     {
-        if (std::holds_alternative<h::Access_expression>(expression.data))
+        if (std::holds_alternative<iris::Access_expression>(expression.data))
         {
-            Access_expression const& data = std::get<h::Access_expression>(expression.data);
+            Access_expression const& data = std::get<iris::Access_expression>(expression.data);
             
-            std::optional<Type_info> const type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
-            std::optional<h::Type_reference> const type_reference = type_info.has_value() ? std::optional<h::Type_reference>{type_info->type} : std::optional<h::Type_reference>{std::nullopt};
+            std::optional<Type_info> const type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+            std::optional<iris::Type_reference> const type_reference = type_info.has_value() ? std::optional<iris::Type_reference>{type_info->type} : std::optional<iris::Type_reference>{std::nullopt};
 
             bool const is_import_alias_or_enum_name = !type_reference.has_value();
             if (is_import_alias_or_enum_name)
             {
-                h::Expression const& left_hand_side_expression = statement.expressions[data.expression.expression_index];
+                iris::Expression const& left_hand_side_expression = statement.expressions[data.expression.expression_index];
                 
-                if (std::holds_alternative<h::Variable_expression>(left_hand_side_expression.data))
+                if (std::holds_alternative<iris::Variable_expression>(left_hand_side_expression.data))
                 {
-                    h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_hand_side_expression.data);
+                    iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_hand_side_expression.data);
 
                     // Try import alias:
                     {
                         std::optional<Declaration> const declaration_optional = find_declaration_using_import_alias(
                             declaration_database,
-                            core_module,
+                            module_name,
                             variable_expression.name,
                             data.member_name
                         );
@@ -858,7 +881,7 @@ namespace h::compiler
                                         };    
                                     }
 
-                                    std::optional<h::Type_reference> value_type = get_expression_type(core_module, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
+                                    std::optional<iris::Type_reference> value_type = get_expression_type(module_name, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
                                     if (!value_type.has_value())
                                         return std::nullopt;
 
@@ -870,7 +893,7 @@ namespace h::compiler
                                 }
 
                                 Import_module_with_alias const* import_alias = find_import_module_with_alias(
-                                    core_module,
+                                    get_module_dependencies(declaration_database, module_name),
                                     variable_expression.name
                                 );
                                 assert(import_alias != nullptr);
@@ -888,7 +911,7 @@ namespace h::compiler
                     {
                         std::optional<Declaration> const declaration_optional = find_underlying_declaration(
                             declaration_database,
-                            core_module.name,
+                            module_name,
                             variable_expression.name
                         );
 
@@ -898,7 +921,7 @@ namespace h::compiler
                             {
                                 return Type_info
                                 {
-                                    .type = create_custom_type_reference(core_module.name, variable_expression.name),
+                                    .type = create_custom_type_reference(module_name, variable_expression.name),
                                     .is_mutable = false,
                                 };
                             }
@@ -908,9 +931,9 @@ namespace h::compiler
 
                 return std::nullopt;
             }
-            else if (std::holds_alternative<h::Array_slice_type>(type_reference.value().data))
+            else if (std::holds_alternative<iris::Array_slice_type>(type_reference.value().data))
             {
-                h::Array_slice_type const& array_slice_type = std::get<h::Array_slice_type>(type_reference.value().data);
+                iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(type_reference.value().data);
 
                 if (data.member_name == "data")
                 {
@@ -924,14 +947,14 @@ namespace h::compiler
                 {
                     return Type_info
                     {
-                        .type = h::create_integer_type_type_reference(64, false),
+                        .type = iris::create_integer_type_type_reference(64, false),
                         .is_mutable = false,
                     };
                 }
 
                 return std::nullopt;
             }
-            else if (std::holds_alternative<h::Soa_array_type>(type_reference.value().data))
+            else if (std::holds_alternative<iris::Soa_array_type>(type_reference.value().data))
             {
                 if (data.member_name == "data")
                 {
@@ -945,7 +968,7 @@ namespace h::compiler
                 {
                     return Type_info
                     {
-                        .type = h::create_integer_type_type_reference(64, false),
+                        .type = iris::create_integer_type_type_reference(64, false),
                         .is_mutable = false,
                     };
                 }
@@ -960,7 +983,7 @@ namespace h::compiler
 
                 return std::nullopt;
             }
-            else if (std::holds_alternative<h::Soa_array_view_type>(type_reference.value().data))
+            else if (std::holds_alternative<iris::Soa_array_view_type>(type_reference.value().data))
             {
                 if (data.member_name == "data")
                 {
@@ -974,16 +997,47 @@ namespace h::compiler
                 {
                     return Type_info
                     {
-                        .type = h::create_integer_type_type_reference(64, false),
+                        .type = iris::create_integer_type_type_reference(64, false),
                         .is_mutable = false,
                     };
                 }
 
                 return std::nullopt;
             }
-            else if (std::holds_alternative<h::Custom_type_reference>(type_reference.value().data))
+            else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.value().data))
             {
-                h::Custom_type_reference const custom_type_reference = std::get<h::Custom_type_reference>(type_reference.value().data);
+                iris::Custom_type_reference const custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.value().data);
+
+                std::optional<Type_reference> const underlying_type = get_underlying_type(
+                    declaration_database,
+                    type_reference.value()
+                );
+                if (underlying_type.has_value() && std::holds_alternative<iris::Type_instance>(underlying_type->data))
+                {
+                    Type_instance const& type_instance = std::get<iris::Type_instance>(underlying_type->data);
+                    Declaration_instance_storage const storage = instantiate_type_instance(declaration_database, type_instance);
+                    if (std::holds_alternative<iris::Struct_declaration>(storage.data))
+                    {
+                        Struct_declaration const& struct_declaration = std::get<iris::Struct_declaration>(storage.data);
+
+                        auto const location = std::find_if(
+                            struct_declaration.member_names.begin(),
+                            struct_declaration.member_names.end(),
+                            [&](std::pmr::string const& member_name) -> bool {
+                                return member_name == data.member_name;
+                            }
+                        );
+                        if (location != struct_declaration.member_names.end())
+                        {
+                            std::size_t const member_index = std::distance(struct_declaration.member_names.begin(), location);
+                            return Type_info
+                            {
+                                .type = struct_declaration.member_types[member_index],
+                                .is_mutable = type_info->is_mutable,
+                            };
+                        }
+                    }
+                }
                 
                 std::optional<Declaration> const declaration = find_underlying_declaration(
                     declaration_database,
@@ -1013,10 +1067,10 @@ namespace h::compiler
                 if (implicit_function_type.has_value())
                     return implicit_function_type;
 
-                std::optional<h::Custom_type_reference> const type_instance_name = unmangle_type_instance_name(custom_type_reference.name);
+                std::optional<iris::Custom_type_reference> const type_instance_name = unmangle_type_instance_name(custom_type_reference.name);
                 if (type_instance_name.has_value())
                 {
-                    h::Type_reference const& implicit_custom_type_reference = create_custom_type_reference(type_instance_name->module_reference.name, data.member_name);
+                    iris::Type_reference const& implicit_custom_type_reference = create_custom_type_reference(type_instance_name->module_reference.name, data.member_name);
                     std::optional<Declaration> const implicit_declaration = find_declaration(
                         declaration_database,
                         type_instance_name->module_reference.name,
@@ -1034,13 +1088,13 @@ namespace h::compiler
 
                 return std::nullopt;
             }
-            else if (std::holds_alternative<h::Type_instance>(type_reference.value().data))
+            else if (std::holds_alternative<iris::Type_instance>(type_reference.value().data))
             {
-                Type_instance const& type_instance = std::get<h::Type_instance>(type_reference.value().data);
+                Type_instance const& type_instance = std::get<iris::Type_instance>(type_reference.value().data);
                 Declaration_instance_storage const storage = instantiate_type_instance(declaration_database, type_instance);
-                if (std::holds_alternative<h::Struct_declaration>(storage.data))
+                if (std::holds_alternative<iris::Struct_declaration>(storage.data))
                 {
-                    Struct_declaration const& struct_declaration = std::get<h::Struct_declaration>(storage.data);
+                    Struct_declaration const& struct_declaration = std::get<iris::Struct_declaration>(storage.data);
                     
                     auto const location = std::find_if(
                         struct_declaration.member_names.begin(),
@@ -1060,7 +1114,7 @@ namespace h::compiler
                     }
                     
                     // If member is not found, then try to find function in the module
-                    h::Type_reference const& custom_type_reference = create_custom_type_reference(type_instance.type_constructor.module_reference.name, data.member_name);
+                    iris::Type_reference const& custom_type_reference = create_custom_type_reference(type_instance.type_constructor.module_reference.name, data.member_name);
                     std::optional<Declaration> const declaration = find_declaration(
                         declaration_database,
                         custom_type_reference
@@ -1078,17 +1132,17 @@ namespace h::compiler
 
             return std::nullopt; // TODO@instances
         }
-        else if (std::holds_alternative<h::Access_array_expression>(expression.data))
+        else if (std::holds_alternative<iris::Access_array_expression>(expression.data))
         {
-            h::Access_array_expression const& data = std::get<h::Access_array_expression>(expression.data);
+            iris::Access_array_expression const& data = std::get<iris::Access_array_expression>(expression.data);
 
-            h::Expression const& left_hand_side_expression = statement.expressions[data.expression.expression_index];
-            if (std::holds_alternative<h::Dereference_and_access_expression>(left_hand_side_expression.data))
+            iris::Expression const& left_hand_side_expression = statement.expressions[data.expression.expression_index];
+            if (std::holds_alternative<iris::Dereference_and_access_expression>(left_hand_side_expression.data))
             {
-                h::Dereference_and_access_expression const& dereference_and_access_expression = std::get<h::Dereference_and_access_expression>(left_hand_side_expression.data);
+                iris::Dereference_and_access_expression const& dereference_and_access_expression = std::get<iris::Dereference_and_access_expression>(left_hand_side_expression.data);
 
                 std::optional<Type_info> const soa_type_info = get_expression_type_info(
-                    core_module,
+                    module_name,
                     nullptr,
                     scope,
                     statement,
@@ -1099,12 +1153,12 @@ namespace h::compiler
                 if (
                     soa_type_info.has_value() &&
                     (
-                        std::holds_alternative<h::Soa_array_type>(soa_type_info->type.data) ||
-                        std::holds_alternative<h::Soa_array_view_type>(soa_type_info->type.data)
+                        std::holds_alternative<iris::Soa_array_type>(soa_type_info->type.data) ||
+                        std::holds_alternative<iris::Soa_array_view_type>(soa_type_info->type.data)
                     )
                 )
                 {
-                    std::optional<h::Type_reference> const element_type = h::get_element_or_pointee_type(soa_type_info->type);
+                    std::optional<iris::Type_reference> const element_type = iris::get_element_or_pointee_type(soa_type_info->type);
                     if (!element_type.has_value())
                         return std::nullopt;
 
@@ -1115,7 +1169,7 @@ namespace h::compiler
                     if (!declaration.has_value())
                         return std::nullopt;
 
-                    std::optional<h::Type_reference> const member_type = get_declaration_member_type(
+                    std::optional<iris::Type_reference> const member_type = get_declaration_member_type(
                         declaration.value(),
                         dereference_and_access_expression.member_name
                     );
@@ -1123,8 +1177,8 @@ namespace h::compiler
                         return std::nullopt;
 
                     bool const is_member_mutable =
-                        std::holds_alternative<h::Soa_array_view_type>(soa_type_info->type.data) ?
-                        std::get<h::Soa_array_view_type>(soa_type_info->type.data).is_mutable :
+                        std::holds_alternative<iris::Soa_array_view_type>(soa_type_info->type.data) ?
+                        std::get<iris::Soa_array_view_type>(soa_type_info->type.data).is_mutable :
                         soa_type_info->is_mutable;
 
                     return Type_info
@@ -1135,14 +1189,14 @@ namespace h::compiler
                 }
             }
 
-            std::optional<Type_info> const lhs_type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);;
-            std::optional<h::Type_reference> const lhs_type_reference = lhs_type_info.has_value() ? std::optional<h::Type_reference>{lhs_type_info->type} : std::optional<h::Type_reference>{std::nullopt};
+            std::optional<Type_info> const lhs_type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);;
+            std::optional<iris::Type_reference> const lhs_type_reference = lhs_type_info.has_value() ? std::optional<iris::Type_reference>{lhs_type_info->type} : std::optional<iris::Type_reference>{std::nullopt};
             if (!lhs_type_reference.has_value())
                 return std::nullopt;
 
-            if (std::holds_alternative<h::Array_slice_type>(lhs_type_reference->data))
+            if (std::holds_alternative<iris::Array_slice_type>(lhs_type_reference->data))
             {
-                h::Array_slice_type const& array_type = std::get<h::Array_slice_type>(lhs_type_reference->data);
+                iris::Array_slice_type const& array_type = std::get<iris::Array_slice_type>(lhs_type_reference->data);
                 if (array_type.element_type.empty())
                     return std::nullopt;
 
@@ -1152,9 +1206,9 @@ namespace h::compiler
                     .is_mutable = array_type.is_mutable,
                 };
             }
-            else if (std::holds_alternative<h::Constant_array_type>(lhs_type_reference->data))
+            else if (std::holds_alternative<iris::Constant_array_type>(lhs_type_reference->data))
             {
-                h::Constant_array_type const& array_type = std::get<h::Constant_array_type>(lhs_type_reference->data);
+                iris::Constant_array_type const& array_type = std::get<iris::Constant_array_type>(lhs_type_reference->data);
                 if (array_type.value_type.empty())
                     return std::nullopt;
 
@@ -1164,9 +1218,9 @@ namespace h::compiler
                     .is_mutable = lhs_type_info->is_mutable,
                 };
             }
-            else if (std::holds_alternative<h::Soa_array_type>(lhs_type_reference->data))
+            else if (std::holds_alternative<iris::Soa_array_type>(lhs_type_reference->data))
             {
-                h::Soa_array_type const& array_type = std::get<h::Soa_array_type>(lhs_type_reference->data);
+                iris::Soa_array_type const& array_type = std::get<iris::Soa_array_type>(lhs_type_reference->data);
                 if (array_type.value_type.empty())
                     return std::nullopt;
 
@@ -1176,9 +1230,9 @@ namespace h::compiler
                     .is_mutable = lhs_type_info->is_mutable,
                 };
             }
-            else if (std::holds_alternative<h::Soa_array_view_type>(lhs_type_reference->data))
+            else if (std::holds_alternative<iris::Soa_array_view_type>(lhs_type_reference->data))
             {
-                h::Soa_array_view_type const& array_type = std::get<h::Soa_array_view_type>(lhs_type_reference->data);
+                iris::Soa_array_view_type const& array_type = std::get<iris::Soa_array_view_type>(lhs_type_reference->data);
                 if (array_type.value_type.empty())
                     return std::nullopt;
 
@@ -1188,9 +1242,9 @@ namespace h::compiler
                     .is_mutable = array_type.is_mutable,
                 };
             }
-            else if (std::holds_alternative<h::Pointer_type>(lhs_type_reference->data))
+            else if (std::holds_alternative<iris::Pointer_type>(lhs_type_reference->data))
             {
-                h::Pointer_type const& pointer_type = std::get<h::Pointer_type>(lhs_type_reference->data);
+                iris::Pointer_type const& pointer_type = std::get<iris::Pointer_type>(lhs_type_reference->data);
                 if (pointer_type.element_type.empty())
                     return std::nullopt;
                 
@@ -1203,39 +1257,39 @@ namespace h::compiler
 
             return std::nullopt;
         }
-        else if (std::holds_alternative<h::Binary_expression>(expression.data))
+        else if (std::holds_alternative<iris::Binary_expression>(expression.data))
         {
-            Binary_expression const& data = std::get<h::Binary_expression>(expression.data);
+            Binary_expression const& data = std::get<iris::Binary_expression>(expression.data);
 
             switch (data.operation)
             {
-                case h::Binary_operation::Equal:
-                case h::Binary_operation::Not_equal:
-                case h::Binary_operation::Less_than:
-                case h::Binary_operation::Less_than_or_equal_to:
-                case h::Binary_operation::Greater_than:
-                case h::Binary_operation::Greater_than_or_equal_to:
-                case h::Binary_operation::Logical_and:
-                case h::Binary_operation::Logical_or:
-                case h::Binary_operation::Has: {
+                case iris::Binary_operation::Equal:
+                case iris::Binary_operation::Not_equal:
+                case iris::Binary_operation::Less_than:
+                case iris::Binary_operation::Less_than_or_equal_to:
+                case iris::Binary_operation::Greater_than:
+                case iris::Binary_operation::Greater_than_or_equal_to:
+                case iris::Binary_operation::Logical_and:
+                case iris::Binary_operation::Logical_or:
+                case iris::Binary_operation::Has: {
                     return Type_info
                     {
                         .type = create_bool_type_reference(),
                         .is_mutable = false,
                     };
                 }
-                case h::Binary_operation::Add:
-                case h::Binary_operation::Subtract:
-                case h::Binary_operation::Multiply:
-                case h::Binary_operation::Divide:
-                case h::Binary_operation::Modulus:
-                case h::Binary_operation::Bitwise_and:
-                case h::Binary_operation::Bitwise_or:
-                case h::Binary_operation::Bitwise_xor:
-                case h::Binary_operation::Bit_shift_left:
-                case h::Binary_operation::Bit_shift_right:
+                case iris::Binary_operation::Add:
+                case iris::Binary_operation::Subtract:
+                case iris::Binary_operation::Multiply:
+                case iris::Binary_operation::Divide:
+                case iris::Binary_operation::Modulus:
+                case iris::Binary_operation::Bitwise_and:
+                case iris::Binary_operation::Bitwise_or:
+                case iris::Binary_operation::Bitwise_xor:
+                case iris::Binary_operation::Bit_shift_left:
+                case iris::Binary_operation::Bit_shift_right:
                 default: {
-                    std::optional<h::Type_reference> type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.left_hand_side.expression_index], std::nullopt, declaration_database);
+                    std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.left_hand_side.expression_index], std::nullopt, declaration_database);
                     if (!type.has_value())
                         return std::nullopt;
 
@@ -1247,15 +1301,15 @@ namespace h::compiler
                 }
             }
         }
-        else if (std::holds_alternative<h::Call_expression>(expression.data))
+        else if (std::holds_alternative<iris::Call_expression>(expression.data))
         {
-            Call_expression const& data = std::get<h::Call_expression>(expression.data);
+            Call_expression const& data = std::get<iris::Call_expression>(expression.data);
 
-            std::optional<h::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+            std::optional<iris::Type_reference> const type_reference = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
 
-            if (type_reference.has_value() && std::holds_alternative<h::Builtin_type_reference>(type_reference.value().data))
+            if (type_reference.has_value() && std::holds_alternative<iris::Builtin_type_reference>(type_reference.value().data))
             {
-                h::Builtin_type_reference const& builtin_type_reference = std::get<h::Builtin_type_reference>(type_reference.value().data);
+                iris::Builtin_type_reference const& builtin_type_reference = std::get<iris::Builtin_type_reference>(type_reference.value().data);
                 
                 if (builtin_type_reference.value == "check")
                 {
@@ -1263,12 +1317,12 @@ namespace h::compiler
                 }
                 else if (builtin_type_reference.value == "create_array_slice_from_pointer")
                 {
-                    std::pmr::vector<h::Type_reference> element_type;
+                    std::pmr::vector<iris::Type_reference> element_type;
                     bool is_mutable = false;
 
                     if (data.arguments.size() > 0)
                     {
-                        std::optional<Type_info> const first_argument_type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
+                        std::optional<Type_info> const first_argument_type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
                         if (first_argument_type_info.has_value() && std::holds_alternative<Pointer_type>(first_argument_type_info->type.data))
                         {
                             Pointer_type const& pointer_type = std::get<Pointer_type>(first_argument_type_info->type.data);
@@ -1300,7 +1354,7 @@ namespace h::compiler
                     if (data.arguments.size() == 0)
                         return std::nullopt;
                     
-                    std::optional<Type_info> const first_argument_type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
+                    std::optional<Type_info> const first_argument_type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
                     return first_argument_type_info;
                 }
                 else if (builtin_type_reference.value == "reinterpret_as")
@@ -1312,16 +1366,34 @@ namespace h::compiler
                         .is_mutable = false,
                     };
                 }
+                else if (builtin_type_reference.value == "create_soa_array_view_from_pointer")
+                {
+                    // This will generate a validation error as there is no element type.
+                    return Type_info
+                    {
+                        .type = {},
+                        .is_mutable = false,
+                    };
+                }
+                else if (builtin_type_reference.value == "calculate_soa_array_size_bytes")
+                {
+                    // This will generate a validation error as there is no element type.
+                    return Type_info
+                    {
+                        .type = {},
+                        .is_mutable = false,
+                    };
+                }
                 else if (builtin_type_reference.value == "soa_array_view")
                 {
-                    h::Expression const& callable_expression = statement.expressions[data.expression.expression_index];
+                    iris::Expression const& callable_expression = statement.expressions[data.expression.expression_index];
 
                     std::optional<Type_info> receiver_type_info = std::nullopt;
-                    if (std::holds_alternative<h::Access_expression>(callable_expression.data))
+                    if (std::holds_alternative<iris::Access_expression>(callable_expression.data))
                     {
-                        h::Access_expression const& access_expression = std::get<h::Access_expression>(callable_expression.data);
+                        iris::Access_expression const& access_expression = std::get<iris::Access_expression>(callable_expression.data);
                         receiver_type_info = get_expression_type_info(
-                            core_module,
+                            module_name,
                             nullptr,
                             scope,
                             statement,
@@ -1330,11 +1402,11 @@ namespace h::compiler
                             declaration_database
                         );
                     }
-                    else if (std::holds_alternative<h::Dereference_and_access_expression>(callable_expression.data))
+                    else if (std::holds_alternative<iris::Dereference_and_access_expression>(callable_expression.data))
                     {
-                        h::Dereference_and_access_expression const& access_expression = std::get<h::Dereference_and_access_expression>(callable_expression.data);
+                        iris::Dereference_and_access_expression const& access_expression = std::get<iris::Dereference_and_access_expression>(callable_expression.data);
                         receiver_type_info = get_expression_type_info(
-                            core_module,
+                            module_name,
                             nullptr,
                             scope,
                             statement,
@@ -1347,20 +1419,20 @@ namespace h::compiler
                     if (!receiver_type_info.has_value())
                         return std::nullopt;
 
-                    std::optional<h::Type_reference> const underlying_receiver_type = get_underlying_type(
+                    std::optional<iris::Type_reference> const underlying_receiver_type = get_underlying_type(
                         declaration_database,
                         receiver_type_info->type
                     );
-                    if (!underlying_receiver_type.has_value() || !std::holds_alternative<h::Soa_array_type>(underlying_receiver_type->data))
+                    if (!underlying_receiver_type.has_value() || !std::holds_alternative<iris::Soa_array_type>(underlying_receiver_type->data))
                         return std::nullopt;
 
-                    h::Soa_array_type const& soa_array_type = std::get<h::Soa_array_type>(underlying_receiver_type->data);
+                    iris::Soa_array_type const& soa_array_type = std::get<iris::Soa_array_type>(underlying_receiver_type->data);
                     if (soa_array_type.value_type.empty())
                         return std::nullopt;
 
-                    h::Type_reference const soa_array_view_type =
+                    iris::Type_reference const soa_array_view_type =
                     {
-                        .data = h::Soa_array_view_type
+                        .data = iris::Soa_array_view_type
                         {
                             .value_type = {soa_array_type.value_type[0]},
                             .is_mutable = receiver_type_info->is_mutable,
@@ -1374,11 +1446,11 @@ namespace h::compiler
                     };
                 }
             }
-            else if (!type_reference.has_value() || !std::holds_alternative<h::Function_pointer_type>(type_reference.value().data))
+            else if (!type_reference.has_value() || !std::holds_alternative<iris::Function_pointer_type>(type_reference.value().data))
             {
                 std::optional<Deduced_instance_call> const deduced_instance_call = deduce_instance_call_arguments(
                     declaration_database,
-                    core_module,
+                    module_name,
                     scope,
                     statement,
                     data,
@@ -1411,7 +1483,7 @@ namespace h::compiler
                 return std::nullopt;
             }
 
-            h::Function_pointer_type const& function_pointer_type = std::get<h::Function_pointer_type>(type_reference.value().data);
+            iris::Function_pointer_type const& function_pointer_type = std::get<iris::Function_pointer_type>(type_reference.value().data);
 
             if (function_pointer_type.type.output_parameter_types.empty())
                 return std::nullopt;
@@ -1422,27 +1494,27 @@ namespace h::compiler
                 .is_mutable = false,
             };
         }
-        else if (std::holds_alternative<h::Cast_expression>(expression.data))
+        else if (std::holds_alternative<iris::Cast_expression>(expression.data))
         {
-            Cast_expression const& data = std::get<h::Cast_expression>(expression.data);
+            Cast_expression const& data = std::get<iris::Cast_expression>(expression.data);
             return Type_info
             {
                 .type = data.destination_type,
                 .is_mutable = false,
             };
         }
-        else if (std::holds_alternative<h::Constant_expression>(expression.data))
+        else if (std::holds_alternative<iris::Constant_expression>(expression.data))
         {
-            Constant_expression const& data = std::get<h::Constant_expression>(expression.data);
+            Constant_expression const& data = std::get<iris::Constant_expression>(expression.data);
             return Type_info
             {
                 .type = data.type,
                 .is_mutable = false,
             };
         }
-        else if (std::holds_alternative<h::Constant_array_expression>(expression.data))
+        else if (std::holds_alternative<iris::Constant_array_expression>(expression.data))
         {
-            Constant_array_expression const& data = std::get<h::Constant_array_expression>(expression.data);
+            Constant_array_expression const& data = std::get<iris::Constant_array_expression>(expression.data);
             if (data.array_data.empty())
             {
                 if (expected_expression_type.has_value())
@@ -1462,7 +1534,7 @@ namespace h::compiler
                 };
             }
 
-            std::optional<h::Type_reference> const element_type = get_expression_type(core_module, nullptr, scope, data.array_data[0], std::nullopt, declaration_database);
+            std::optional<iris::Type_reference> const element_type = get_expression_type(module_name, nullptr, scope, data.array_data[0], std::nullopt, declaration_database);
             if (!element_type.has_value())
                 return std::nullopt;
 
@@ -1472,10 +1544,10 @@ namespace h::compiler
                 .is_mutable = false,
             };
         }
-        else if (std::holds_alternative<h::Defer_expression>(expression.data))
+        else if (std::holds_alternative<iris::Defer_expression>(expression.data))
         {
-            Defer_expression const& data = std::get<h::Defer_expression>(expression.data);
-            std::optional<Type_reference> type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression_to_defer.expression_index], std::nullopt, declaration_database);
+            Defer_expression const& data = std::get<iris::Defer_expression>(expression.data);
+            std::optional<Type_reference> type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression_to_defer.expression_index], std::nullopt, declaration_database);
             if (!type.has_value())
                 return std::nullopt;
 
@@ -1485,25 +1557,58 @@ namespace h::compiler
                 .is_mutable = false,
             };
         }
-        else if (std::holds_alternative<h::Dereference_and_access_expression>(expression.data))
+        else if (std::holds_alternative<iris::Dereference_and_access_expression>(expression.data))
         {
-            Dereference_and_access_expression const& data = std::get<h::Dereference_and_access_expression>(expression.data);
+            Dereference_and_access_expression const& data = std::get<iris::Dereference_and_access_expression>(expression.data);
 
-            std::optional<Type_reference> const left_side_type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+            std::optional<Type_reference> const left_side_type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
             if (!left_side_type.has_value() || !is_non_void_pointer(left_side_type.value()) || !is_pointer(left_side_type.value()))
                 return std::nullopt;
 
-            h::Pointer_type const& pointer_type = std::get<h::Pointer_type>(left_side_type->data);
+            iris::Pointer_type const& pointer_type = std::get<iris::Pointer_type>(left_side_type->data);
 
             std::optional<Type_reference> const left_side_value_type = remove_pointer(left_side_type.value());
             if (!left_side_value_type.has_value())
                 return std::nullopt;
 
+            if (std::holds_alternative<iris::Custom_type_reference>(left_side_value_type->data))
+            {
+                std::optional<Type_reference> const underlying_type = get_underlying_type(
+                    declaration_database,
+                    left_side_value_type.value()
+                );
+                if (underlying_type.has_value() && std::holds_alternative<iris::Type_instance>(underlying_type->data))
+                {
+                    Type_instance const& type_instance = std::get<iris::Type_instance>(underlying_type->data);
+                    Declaration_instance_storage const storage = instantiate_type_instance(declaration_database, type_instance);
+                    if (std::holds_alternative<iris::Struct_declaration>(storage.data))
+                    {
+                        Struct_declaration const& struct_declaration = std::get<iris::Struct_declaration>(storage.data);
+                        auto const location = std::find_if(
+                            struct_declaration.member_names.begin(),
+                            struct_declaration.member_names.end(),
+                            [&](std::pmr::string const& member_name) -> bool {
+                                return member_name == data.member_name;
+                            }
+                        );
+                        if (location != struct_declaration.member_names.end())
+                        {
+                            std::size_t const member_index = std::distance(struct_declaration.member_names.begin(), location);
+                            return Type_info
+                            {
+                                .type = struct_declaration.member_types[member_index],
+                                .is_mutable = pointer_type.is_mutable,
+                            };
+                        }
+                    }
+                }
+            }
+
             std::optional<Declaration> const declaration = find_declaration(declaration_database, left_side_value_type.value());
             if (!declaration.has_value())
                 return std::nullopt;
 
-            std::optional<h::Type_reference> member_type = get_declaration_member_type(
+            std::optional<iris::Type_reference> member_type = get_declaration_member_type(
                 declaration.value(),
                 data.member_name
             );
@@ -1523,31 +1628,31 @@ namespace h::compiler
                 .is_mutable = pointer_type.is_mutable,
             };
         }
-        else if (std::holds_alternative<h::Instance_call_expression>(expression.data))
+        else if (std::holds_alternative<iris::Instance_call_expression>(expression.data))
         {
-            Instance_call_expression const& data = std::get<h::Instance_call_expression>(expression.data);
+            Instance_call_expression const& data = std::get<iris::Instance_call_expression>(expression.data);
 
             // Check builtin functions:
             {
-                h::Expression const& left_hand_side = statement.expressions[data.left_hand_side.expression_index];
-                if (std::holds_alternative<h::Variable_expression>(left_hand_side.data))
+                iris::Expression const& left_hand_side = statement.expressions[data.left_hand_side.expression_index];
+                if (std::holds_alternative<iris::Variable_expression>(left_hand_side.data))
                 {
-                    h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(left_hand_side.data);
+                    iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(left_hand_side.data);
                     
                     if (variable_expression.name == "create_stack_array_uninitialized")
                     {
-                        std::pmr::vector<h::Type_reference> element_type;
+                        std::pmr::vector<iris::Type_reference> element_type;
                         if (data.arguments.size() > 0)
                         {
-                            h::Statement const argument = data.arguments[0];
-                            if (!argument.expressions.empty() && std::holds_alternative<h::Type_expression>(argument.expressions[0].data))
+                            iris::Statement const argument = data.arguments[0];
+                            if (!argument.expressions.empty() && std::holds_alternative<iris::Type_expression>(argument.expressions[0].data))
                             {
-                                h::Type_expression const& type_expression = std::get<h::Type_expression>(argument.expressions[0].data);
+                                iris::Type_expression const& type_expression = std::get<iris::Type_expression>(argument.expressions[0].data);
                                 element_type.push_back(type_expression.type);
                             }
                         }
 
-                        h::Function_type function_type
+                        iris::Function_type function_type
                         {
                             .input_parameter_types = {create_integer_type_type_reference(64, false)},
                             .output_parameter_types = {create_array_slice_type_reference(element_type, true)},
@@ -1562,18 +1667,27 @@ namespace h::compiler
                     }
                     else if (variable_expression.name == "reinterpret_as")
                     {
-                        std::pmr::vector<h::Type_reference> element_type;
+                        std::pmr::vector<iris::Type_reference> element_type;
                         if (data.arguments.size() > 0)
                         {
-                            h::Statement const argument = data.arguments[0];
-                            if (!argument.expressions.empty() && std::holds_alternative<h::Type_expression>(argument.expressions[0].data))
+                            iris::Statement const argument = data.arguments[0];
+                            if (!argument.expressions.empty())
                             {
-                                h::Type_expression const& type_expression = std::get<h::Type_expression>(argument.expressions[0].data);
-                                element_type.push_back(type_expression.type);
+                                if (std::holds_alternative<iris::Type_expression>(argument.expressions[0].data))
+                                {
+                                    iris::Type_expression const& type_expression = std::get<iris::Type_expression>(argument.expressions[0].data);
+                                    element_type.push_back(type_expression.type);
+                                }
+                                else if (std::holds_alternative<iris::Reflection_expression>(argument.expressions[0].data))
+                                {
+                                    std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, argument, argument.expressions[0], std::nullopt, declaration_database);
+                                    if (type.has_value())
+                                        element_type.push_back(type.value());
+                                }
                             }
                         }
 
-                        h::Function_type function_type
+                        iris::Function_type function_type
                         {
                             .input_parameter_types = { create_fundamental_type_type_reference(Fundamental_type::Any_type) },
                             .output_parameter_types = { element_type },
@@ -1586,12 +1700,67 @@ namespace h::compiler
                             .is_mutable = false,
                         };
                     }
+                    else if (variable_expression.name == "create_soa_array_view_from_pointer")
+                    {
+                        std::pmr::vector<iris::Type_reference> element_type;
+                        if (data.arguments.size() > 0)
+                        {
+                            iris::Statement const argument = data.arguments[0];
+                            if (!argument.expressions.empty() && std::holds_alternative<iris::Type_expression>(argument.expressions[0].data))
+                            {
+                                iris::Type_expression const& type_expression = std::get<iris::Type_expression>(argument.expressions[0].data);
+                                element_type.push_back(type_expression.type);
+                            }
+                        }
+
+                        bool const is_mutable = !data.arguments_mutability.empty() ? data.arguments_mutability.front() : false;
+
+                        iris::Type_reference const output_type
+                        {
+                            .data = iris::Soa_array_view_type
+                            {
+                                .value_type = element_type,
+                                .is_mutable = is_mutable,
+                            }
+                        };
+
+                        iris::Function_type function_type
+                        {
+                            .input_parameter_types = {
+                                create_pointer_type_type_reference({}, false),
+                                create_integer_type_type_reference(64, false)
+                            },
+                            .output_parameter_types = {output_type},
+                            .is_variadic = false,
+                        };
+
+                        return Type_info
+                        {
+                            .type = create_function_type_type_reference(std::move(function_type), {"data", "length"}, {"result"}),
+                            .is_mutable = false,
+                        };
+                    }
+                    else if (variable_expression.name == "calculate_soa_array_size_bytes")
+                    {
+                        iris::Function_type function_type
+                        {
+                            .input_parameter_types = { create_integer_type_type_reference(64, false) },
+                            .output_parameter_types = { create_integer_type_type_reference(64, false) },
+                            .is_variadic = false,
+                        };
+
+                        return Type_info
+                        {
+                            .type = create_function_type_type_reference(std::move(function_type), {"capacity"}, {"result"}),
+                            .is_mutable = false,
+                        };
+                    }
                 }
             }
 
             std::optional<Custom_type_reference> custom_type_reference = get_function_constructor_type_reference(
                 declaration_database,
-                core_module,
+                module_name,
                 statement.expressions[data.left_hand_side.expression_index],
                 statement
             );
@@ -1606,15 +1775,15 @@ namespace h::compiler
 
             return get_instanced_function_type(declaration_database, key);
         }
-        else if (std::holds_alternative<h::Instantiate_expression>(expression.data))
+        else if (std::holds_alternative<iris::Instantiate_expression>(expression.data))
         {
-            h::Instantiate_expression const& instantiate_expression = std::get<h::Instantiate_expression>(expression.data);
+            iris::Instantiate_expression const& instantiate_expression = std::get<iris::Instantiate_expression>(expression.data);
 
-            std::optional<h::Type_reference> const type_to_instantiate =
+            std::optional<iris::Type_reference> const type_to_instantiate =
                 expected_expression_type.has_value() ?
                 expected_expression_type.value() :            
                 get_type_to_instantiate(
-                    core_module,
+                    module_name,
                     function_declaration,
                     scope,
                     statement,
@@ -1626,7 +1795,7 @@ namespace h::compiler
             if (!type_to_instantiate.has_value())
                 return std::nullopt;
 
-            if (std::holds_alternative<h::Array_slice_type>(type_to_instantiate->data))
+            if (std::holds_alternative<iris::Array_slice_type>(type_to_instantiate->data))
             {
                 return Type_info
                 {
@@ -1635,7 +1804,7 @@ namespace h::compiler
                 };
             }
 
-            if (std::holds_alternative<h::Soa_array_type>(type_to_instantiate->data))
+            if (std::holds_alternative<iris::Soa_array_type>(type_to_instantiate->data))
             {
                 return Type_info
                 {
@@ -1644,7 +1813,16 @@ namespace h::compiler
                 };
             }
 
-            if (std::holds_alternative<h::Soa_array_view_type>(type_to_instantiate->data))
+            if (std::holds_alternative<iris::Soa_array_view_type>(type_to_instantiate->data))
+            {
+                return Type_info
+                {
+                    .type = type_to_instantiate.value(),
+                    .is_mutable = false,
+                };
+            }
+
+            if (is_primitive_type(type_to_instantiate.value()) || is_constant_array_type_reference(type_to_instantiate.value()))
             {
                 return Type_info
                 {
@@ -1660,7 +1838,7 @@ namespace h::compiler
             if (!declaration.has_value())
                 return std::nullopt;
 
-            if (std::holds_alternative<h::Struct_declaration const*>(declaration->data) || std::holds_alternative<h::Union_declaration const*>(declaration->data) || std::holds_alternative<h::Type_constructor const*>(declaration->data))
+            if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data) || std::holds_alternative<iris::Union_declaration const*>(declaration->data) || std::holds_alternative<iris::Type_constructor const*>(declaration->data) || std::holds_alternative<iris::Enum_declaration const*>(declaration->data))
             {
                 return Type_info
                 {
@@ -1671,7 +1849,7 @@ namespace h::compiler
 
             return std::nullopt;
         }
-        else if (std::holds_alternative<h::Null_pointer_expression>(expression.data))
+        else if (std::holds_alternative<iris::Null_pointer_expression>(expression.data))
         {
             return Type_info
             {
@@ -1679,10 +1857,10 @@ namespace h::compiler
                 .is_mutable = false,
             };
         }
-        else if (std::holds_alternative<h::Parenthesis_expression>(expression.data))
+        else if (std::holds_alternative<iris::Parenthesis_expression>(expression.data))
         {
-            Parenthesis_expression const& data = std::get<h::Parenthesis_expression>(expression.data);
-            std::optional<h::Type_reference> type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+            Parenthesis_expression const& data = std::get<iris::Parenthesis_expression>(expression.data);
+            std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
             if (!type.has_value())
                 return std::nullopt;
 
@@ -1692,25 +1870,56 @@ namespace h::compiler
                 .is_mutable = false,
             };
         }
-        else if (std::holds_alternative<h::Reflection_expression>(expression.data))
+        else if (std::holds_alternative<iris::Reflection_expression>(expression.data))
         {
-            Reflection_expression const& data = std::get<h::Reflection_expression>(expression.data);
+            Reflection_expression const& data = std::get<iris::Reflection_expression>(expression.data);
 
             if (data.name == "size_of" || data.name == "alignment_of")
             {
                 return Type_info
                 {
-                    .type = h::create_integer_type_type_reference(64, false),
+                    .type = iris::create_integer_type_type_reference(64, false),
                     .is_mutable = false,
                 };   
+            }
+            else if (data.name == "member_count" || data.name == "member_offset" || data.name == "member_type")
+            {
+                return Type_info
+                {
+                    .type = iris::create_integer_type_type_reference(64, false),
+                    .is_mutable = false,
+                };
+            }
+            else if (data.name == "member_name" || data.name == "type_name")
+            {
+                return Type_info
+                {
+                    .type = create_c_string_type_reference(false),
+                    .is_mutable = false,
+                };
+            }
+            else if (data.name == "get_type_kind")
+            {
+                return Type_info
+                {
+                    .type = create_custom_type_reference("iris.builtin", "Type_kind"),
+                    .is_mutable = false,
+                };
+            }
+            else if (data.name == "type_of")
+            {
+                if (data.arguments.empty())
+                    return std::nullopt;
+                
+                return get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
             }
 
             return std::nullopt;
         }
-        else if (std::holds_alternative<h::Ternary_condition_expression>(expression.data))
+        else if (std::holds_alternative<iris::Ternary_condition_expression>(expression.data))
         {
-            Ternary_condition_expression const& data = std::get<h::Ternary_condition_expression>(expression.data);
-            std::optional<h::Type_reference> type = get_expression_type(core_module, nullptr, scope, data.then_statement, std::nullopt, declaration_database);
+            Ternary_condition_expression const& data = std::get<iris::Ternary_condition_expression>(expression.data);
+            std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, data.then_statement, std::nullopt, declaration_database);
             if (!type.has_value())
                 return std::nullopt;
 
@@ -1720,13 +1929,13 @@ namespace h::compiler
                 .is_mutable = false,
             };
         }
-        else if (std::holds_alternative<h::Unary_expression>(expression.data))
+        else if (std::holds_alternative<iris::Unary_expression>(expression.data))
         {
-            Unary_expression const& data = std::get<h::Unary_expression>(expression.data);
+            Unary_expression const& data = std::get<iris::Unary_expression>(expression.data);
 
             switch (data.operation)
             {
-                case h::Unary_operation::Not:
+                case iris::Unary_operation::Not:
                 {
                     return Type_info
                     {
@@ -1734,14 +1943,14 @@ namespace h::compiler
                         .is_mutable = false,
                     };
                 }
-                case h::Unary_operation::Bitwise_not:
-                case h::Unary_operation::Minus:
-                case h::Unary_operation::Pre_increment:
-                case h::Unary_operation::Post_increment:
-                case h::Unary_operation::Pre_decrement:
-                case h::Unary_operation::Post_decrement:
+                case iris::Unary_operation::Bitwise_not:
+                case iris::Unary_operation::Minus:
+                case iris::Unary_operation::Pre_increment:
+                case iris::Unary_operation::Post_increment:
+                case iris::Unary_operation::Pre_decrement:
+                case iris::Unary_operation::Post_decrement:
                 {
-                    std::optional<h::Type_reference> type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+                    std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
                     if (!type.has_value())
                         return std::nullopt;
 
@@ -1751,9 +1960,9 @@ namespace h::compiler
                         .is_mutable = false,
                     };
                 }
-                case h::Unary_operation::Indirection:
+                case iris::Unary_operation::Indirection:
                 {
-                    std::optional<h::Type_reference> const expression_type = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+                    std::optional<iris::Type_reference> const expression_type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
                     if (!expression_type.has_value())
                         return std::nullopt;
 
@@ -1774,9 +1983,9 @@ namespace h::compiler
                         return std::nullopt;
                     }
                 }
-                case h::Unary_operation::Address_of:
+                case iris::Unary_operation::Address_of:
                 {
-                    std::optional<Type_info> const expression_type_info = get_expression_type_info(core_module, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+                    std::optional<Type_info> const expression_type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
                     if (!expression_type_info.has_value())
                     {
                         return Type_info
@@ -1796,9 +2005,9 @@ namespace h::compiler
 
             return std::nullopt;
         }
-        else if (std::holds_alternative<h::Variable_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
-            Variable_expression const& data = std::get<h::Variable_expression>(expression.data);
+            Variable_expression const& data = std::get<iris::Variable_expression>(expression.data);
 
             // Try variable:
             {
@@ -1823,7 +2032,7 @@ namespace h::compiler
             {
                 std::optional<Declaration> const declaration_optional = find_declaration(
                     declaration_database,
-                    core_module.name,
+                    module_name,
                     data.name
                 );
                 if (declaration_optional.has_value())
@@ -1840,7 +2049,7 @@ namespace h::compiler
                             };
                         }
 
-                        std::optional<h::Type_reference> type = get_expression_type(core_module, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
+                        std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
                         if (!type.has_value())
                             return std::nullopt;
                     
@@ -1877,6 +2086,27 @@ namespace h::compiler
                         .is_mutable = false,
                     };
                 }
+
+                if (data.name == "Type_kind")
+                {
+                    std::optional<Declaration> const declaration_optional = find_underlying_declaration(
+                        declaration_database,
+                        "iris.builtin",
+                        "Type_kind"
+                    );
+
+                    if (declaration_optional.has_value())
+                    {
+                        if (std::holds_alternative<Enum_declaration const*>(declaration_optional->data))
+                        {
+                            return Type_info
+                            {
+                                .type = create_custom_type_reference("iris.builtin", "Type_kind"),
+                                .is_mutable = false,
+                            };
+                        }
+                    }
+                }
             }
 
             return std::nullopt;
@@ -1887,18 +2117,18 @@ namespace h::compiler
         }
     }
 
-    std::optional<h::Type_reference> get_expression_type(
-        h::Module const& core_module,
-        h::Function_declaration const* const function_declaration,
+    std::optional<iris::Type_reference> get_expression_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Expression const& expression,
-        std::optional<h::Type_reference> const& expected_expression_type,
-        h::Declaration_database const& declaration_database
+        iris::Statement const& statement,
+        iris::Expression const& expression,
+        std::optional<iris::Type_reference> const& expected_expression_type,
+        iris::Declaration_database const& declaration_database
     )
     {
         std::optional<Type_info> type_info = get_expression_type_info(
-            core_module,
+            module_name,
             function_declaration,
             scope,
             statement,
@@ -1914,14 +2144,14 @@ namespace h::compiler
 
     std::optional<Custom_type_reference> get_function_constructor_type_reference_using_scope(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
+        std::string_view const module_name,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Expression const& expression
+        iris::Statement const& statement,
+        iris::Expression const& expression
     )
     {
-        std::optional<h::Type_reference> const expression_type = get_expression_type(
-            core_module,
+        std::optional<iris::Type_reference> const expression_type = get_expression_type(
+            module_name,
             nullptr,
             scope,
             statement,
@@ -1929,32 +2159,32 @@ namespace h::compiler
             std::nullopt,
             declaration_database
         );
-        if (expression_type.has_value() && std::holds_alternative<h::Custom_type_reference>(expression_type.value().data))
+        if (expression_type.has_value() && std::holds_alternative<iris::Custom_type_reference>(expression_type.value().data))
         {
-            return std::get<h::Custom_type_reference>(expression_type.value().data);
+            return std::get<iris::Custom_type_reference>(expression_type.value().data);
         }
 
         return get_function_constructor_type_reference(
             declaration_database,
-            core_module,
+            module_name,
             expression,
             statement
         );
     }
 
-    std::optional<h::Type_reference> get_instance_call_implicit_first_argument(
-        h::Module const& core_module,
+    std::optional<iris::Type_reference> get_instance_call_implicit_first_argument(
+        std::string_view const module_name,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Expression const& left_hand_side,
-        h::Declaration_database const& declaration_database
+        iris::Statement const& statement,
+        iris::Expression const& left_hand_side,
+        iris::Declaration_database const& declaration_database
     )
     {
-        if (std::holds_alternative<h::Access_expression>(left_hand_side.data))
+        if (std::holds_alternative<iris::Access_expression>(left_hand_side.data))
         {
-            Access_expression const& data = std::get<h::Access_expression>(left_hand_side.data);
-            std::optional<h::Type_reference> const type_reference = get_expression_type(
-                core_module,
+            Access_expression const& data = std::get<iris::Access_expression>(left_hand_side.data);
+            std::optional<iris::Type_reference> const type_reference = get_expression_type(
+                module_name,
                 nullptr,
                 scope,
                 statement,
@@ -1973,9 +2203,9 @@ namespace h::compiler
     }
 
     void deduce_type(
-        h::Function_constructor const& function_constructor,
-        h::Type_reference const& parameter_type,
-        h::Type_reference const& argument_type,
+        iris::Function_constructor const& function_constructor,
+        iris::Type_reference const& parameter_type,
+        iris::Type_reference const& argument_type,
         std::pmr::vector<std::optional<Type_reference>>& deduced_parameters
     )
     {
@@ -1983,13 +2213,13 @@ namespace h::compiler
         {
             Parameter_type const& value = std::get<Parameter_type>(parameter_type.data);
 
-            auto const is_parameter = [&](h::Function_constructor_parameter const& parameter) -> bool {
+            auto const is_parameter = [&](iris::Function_constructor_parameter const& parameter) -> bool {
                 return parameter.name == value.name;
             };
 
             auto const location = std::find_if(function_constructor.parameters.begin(), function_constructor.parameters.end(), is_parameter);
             if (location == function_constructor.parameters.end())
-                throw std::runtime_error{ std::format("Could not find parameter type '{}'", value.name) };
+                return;
             
             std::size_t const parameter_index = std::distance(function_constructor.parameters.begin(), location);
             deduced_parameters[parameter_index] = argument_type;
@@ -2048,19 +2278,19 @@ namespace h::compiler
     }
 
     std::optional<Deduced_instance_call> deduce_instance_call_arguments(
-        h::Declaration_database const& declaration_database,
-        h::Module const& core_module,
+        iris::Declaration_database const& declaration_database,
+        std::string_view const module_name,
         Scope const& scope,
-        h::Statement const& statement,
-        h::Call_expression const& call_expression,
+        iris::Statement const& statement,
+        iris::Call_expression const& call_expression,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        h::Expression const& left_hand_side = statement.expressions[call_expression.expression.expression_index];
+        iris::Expression const& left_hand_side = statement.expressions[call_expression.expression.expression_index];
 
         std::optional<Custom_type_reference> const custom_type_reference = get_function_constructor_type_reference_using_scope(
             declaration_database,
-            core_module,
+            module_name,
             scope,
             statement,
             left_hand_side
@@ -2075,8 +2305,8 @@ namespace h::compiler
         if (function_constructor == nullptr)
             return std::nullopt;
 
-        std::optional<h::Type_reference> const implicit_first_argument_type = get_instance_call_implicit_first_argument(
-            core_module,
+        std::optional<iris::Type_reference> const implicit_first_argument_type = get_instance_call_implicit_first_argument(
+            module_name,
             scope,
             statement,
             left_hand_side,
@@ -2091,10 +2321,10 @@ namespace h::compiler
 
         for (std::size_t argument_index = 0; argument_index < call_expression.arguments.size(); ++argument_index)
         {
-            h::Expression const& argument_expression = statement.expressions[call_expression.arguments[argument_index].expression_index];
+            iris::Expression const& argument_expression = statement.expressions[call_expression.arguments[argument_index].expression_index];
 
-            std::optional<h::Type_reference> argument_type = get_expression_type(
-                core_module,
+            std::optional<iris::Type_reference> argument_type = get_expression_type(
+                module_name,
                 nullptr,
                 scope,
                 statement,
@@ -2103,7 +2333,7 @@ namespace h::compiler
                 declaration_database
             );
             if (!argument_type.has_value())
-                throw std::runtime_error("Argument type is not valid.");
+                return std::nullopt;
 
             std::size_t const output_argument_index = implicit_first_argument_type.has_value() ? argument_index + 1 : argument_index;
             argument_types[output_argument_index] = argument_type.value();
@@ -2126,18 +2356,18 @@ namespace h::compiler
             deduced_parameters.clear();
             deduced_parameters.resize(function_constructor->parameters.size());
 
-            if (std::holds_alternative<h::Instance_call_expression>(left_hand_side.data))
+            if (std::holds_alternative<iris::Instance_call_expression>(left_hand_side.data))
             {
-                h::Instance_call_expression const& instance_call_expression = std::get<h::Instance_call_expression>(left_hand_side.data);
+                iris::Instance_call_expression const& instance_call_expression = std::get<iris::Instance_call_expression>(left_hand_side.data);
                 for (std::size_t index = 0; index < instance_call_expression.arguments.size(); ++index)
                 {
-                    h::Statement const& argument_statement = instance_call_expression.arguments[index];
+                    iris::Statement const& argument_statement = instance_call_expression.arguments[index];
                     if (argument_statement.expressions.size() == 1)
                     {
-                        h::Expression const& argument_expression = argument_statement.expressions[0];
-                        if (std::holds_alternative<h::Type_expression>(argument_expression.data))
+                        iris::Expression const& argument_expression = argument_statement.expressions[0];
+                        if (std::holds_alternative<iris::Type_expression>(argument_expression.data))
                         {
-                            h::Type_expression const& type_expression = std::get<h::Type_expression>(argument_expression.data);
+                            iris::Type_expression const& type_expression = std::get<iris::Type_expression>(argument_expression.data);
                             deduced_parameters[index] = type_expression.type;
                         }
                     }
@@ -2173,7 +2403,7 @@ namespace h::compiler
             }
         }
 
-        throw std::runtime_error("Could not deduce instance call arguments.");
+        return std::nullopt;
     }
 
     std::pmr::vector<Function_expression const*> get_all_possible_function_expressions(
@@ -2235,20 +2465,20 @@ namespace h::compiler
         return statements;
     }
 
-    std::optional<h::Type_reference> get_declaration_member_type(
+    std::optional<iris::Type_reference> get_declaration_member_type(
         Declaration const& declaration,
         std::string_view const member_name
     )
     {
-        if (std::holds_alternative<h::Enum_declaration const*>(declaration.data))
+        if (std::holds_alternative<iris::Enum_declaration const*>(declaration.data))
         {
-            h::Enum_declaration const& enum_declaration = *std::get<h::Enum_declaration const*>(declaration.data);
+            iris::Enum_declaration const& enum_declaration = *std::get<iris::Enum_declaration const*>(declaration.data);
 
-            return h::create_custom_type_reference(declaration.module_name, enum_declaration.name);
+            return iris::create_custom_type_reference(declaration.module_name, enum_declaration.name);
         }
-        else if (std::holds_alternative<h::Struct_declaration const*>(declaration.data))
+        else if (std::holds_alternative<iris::Struct_declaration const*>(declaration.data))
         {
-            h::Struct_declaration const& struct_declaration = *std::get<h::Struct_declaration const*>(declaration.data);
+            iris::Struct_declaration const& struct_declaration = *std::get<iris::Struct_declaration const*>(declaration.data);
 
             auto const location = std::find_if(
                 struct_declaration.member_names.begin(),
@@ -2264,9 +2494,9 @@ namespace h::compiler
             std::size_t const member_index = std::distance(struct_declaration.member_names.begin(), location);
             return struct_declaration.member_types[member_index];
         }
-        else if (std::holds_alternative<h::Union_declaration const*>(declaration.data))
+        else if (std::holds_alternative<iris::Union_declaration const*>(declaration.data))
         {
-            h::Union_declaration const& union_declaration = *std::get<h::Union_declaration const*>(declaration.data);
+            iris::Union_declaration const& union_declaration = *std::get<iris::Union_declaration const*>(declaration.data);
             
             auto const location = std::find_if(
                 union_declaration.member_names.begin(),
@@ -2303,7 +2533,7 @@ namespace h::compiler
 
             for (std::size_t member_index = 0; member_index < enum_declaration.values.size(); ++member_index)
             {
-                h::Enum_value const& enum_value = enum_declaration.values[member_index];
+                iris::Enum_value const& enum_value = enum_declaration.values[member_index];
                 Declaration_member_info member_info =
                 {
                     .member_name = enum_value.name,
@@ -2363,37 +2593,18 @@ namespace h::compiler
         return members;
     }
 
-    void add_import_usage(
-        h::Module& core_module,
-        std::string_view const alias,
-        std::string_view const usage
-    )
-    {
-        h::Import_module_with_alias* import_module = h::find_import_module_with_alias(core_module, alias);
-        if (import_module != nullptr)
-        {
-            auto const location = std::find_if(
-                import_module->usages.begin(),
-                import_module->usages.end(),
-                [&](std::pmr::string const& current_usage) -> bool { return current_usage == usage; }
-            );
-            if (location == import_module->usages.end())
-                import_module->usages.push_back(std::pmr::string{usage});
-        }
-    }
-
     std::optional<Scope> calculate_scope(
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_definition const& function_definition,
-        h::Declaration_database const& declaration_database,
-        h::Source_position const& source_position
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_definition const& function_definition,
+        iris::Declaration_database const& declaration_database,
+        iris::Source_position const& source_position
     )
     {
         std::optional<Scope> output = std::nullopt;
         std::optional<Scope> last_scope = std::nullopt;
 
-         auto const process_statement = [&](h::Statement const& statement, h::compiler::Scope const& scope) -> void {
+         auto const process_statement = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> void {
 
             if (output.has_value())
                 return;
@@ -2404,7 +2615,7 @@ namespace h::compiler
                 return;
             }
 
-            h::Expression const& first_expression = statement.expressions[0];
+            iris::Expression const& first_expression = statement.expressions[0];
             if (first_expression.source_range.has_value())
             {
                 if (range_contains_position(first_expression.source_range.value(), source_position) && !is_add_scope_expression(first_expression))
@@ -2415,20 +2626,20 @@ namespace h::compiler
                 {
                     output = scope;
 
-                    if (std::holds_alternative<h::Variable_declaration_expression>(first_expression.data))
+                    if (std::holds_alternative<iris::Variable_declaration_expression>(first_expression.data))
                     {
-                        h::Variable_declaration_expression const& variable = std::get<h::Variable_declaration_expression>(first_expression.data);
-                        std::optional<h::Type_reference> const type_reference = get_expression_type(core_module, nullptr, scope, statement, statement.expressions[variable.right_hand_side.expression_index], std::nullopt, declaration_database);
+                        iris::Variable_declaration_expression const& variable = std::get<iris::Variable_declaration_expression>(first_expression.data);
+                        std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module.name, nullptr, scope, statement, statement.expressions[variable.right_hand_side.expression_index], std::nullopt, declaration_database);
                         if (type_reference.has_value())
                             output->variables.push_back(
                                 create_variable(variable.name, type_reference.value(), variable.is_mutable, false, first_expression.source_range)
                             );
                     }
-                    else if (std::holds_alternative<h::Variable_declaration_with_type_expression>(first_expression.data))
+                    else if (std::holds_alternative<iris::Variable_declaration_with_type_expression>(first_expression.data))
                     {
-                        h::Variable_declaration_with_type_expression const& variable = std::get<h::Variable_declaration_with_type_expression>(first_expression.data);
+                        iris::Variable_declaration_with_type_expression const& variable = std::get<iris::Variable_declaration_with_type_expression>(first_expression.data);
 
-                        std::optional<h::Type_reference> const variable_type = h::get_variable_declaration_with_type_expression_type(statement, variable);
+                        std::optional<iris::Type_reference> const variable_type = iris::get_variable_declaration_with_type_expression_type(statement, variable);
                         if (variable_type.has_value())
                         {
                             output->variables.push_back(
@@ -2440,16 +2651,16 @@ namespace h::compiler
             }
         };
 
-        h::compiler::Scope scope = {};
-        h::compiler::add_parameters_to_scope(
+        iris::compiler::Scope scope = {};
+        iris::compiler::add_parameters_to_scope(
             scope,
             function_declaration.input_parameter_names,
             function_declaration.type.input_parameter_types,
             function_declaration.input_parameter_source_positions
         );
 
-        h::compiler::visit_statements_using_scope(
-            core_module,
+        iris::compiler::visit_statements_using_scope(
+            core_module.name,
             &function_declaration,
             scope,
             function_definition.statements,

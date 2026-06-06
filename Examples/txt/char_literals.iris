@@ -1,0 +1,11 @@
+module Char_literals;
+
+export function foo() -> ()
+{
+    var plain = 'a';
+    var escaped_quote = '\'';
+    var escaped_backslash = '\\';
+    var escaped_newline = '\n';
+    var escaped_tab = '\t';
+    var escaped_carriage_return = '\r';
+}

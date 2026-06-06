@@ -6,9 +6,9 @@
 #include <string>
 #include <vector>
 
-import h.tools.tests_results_replacer;
+import iris.tools.tests_results_replacer;
 
-namespace h::tools::tests_results_replacer
+namespace iris::tools::tests_results_replacer
 {
     TEST_CASE("Extract expected and actual results")
     {
@@ -112,7 +112,7 @@ entry:
         std::string_view const input_text = R"INPUT(
 TEST_CASE("First test")
 {
-    char const* const input_file = "first.hl";
+    char const* const input_file = "first.irisb";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -128,7 +128,7 @@ First expected result
 
 TEST_CASE("Second test")
 {
-    char const* const input_file = "second.hl";
+    char const* const input_file = "second.irisb";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -148,7 +148,7 @@ Second expected result
         std::string_view const expected_output_text = R"INPUT(
 TEST_CASE("First test")
 {
-    char const* const input_file = "first.hl";
+    char const* const input_file = "first.irisb";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -164,7 +164,7 @@ First actual result
 
 TEST_CASE("Second test")
 {
-    char const* const input_file = "second.hl";
+    char const* const input_file = "second.irisb";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {

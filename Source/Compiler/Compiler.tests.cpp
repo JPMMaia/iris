@@ -15,30 +15,30 @@
 #include <llvm/Passes/StandardInstrumentations.h>
 #include <llvm/Target/TargetMachine.h>
 
-import h.binary_serializer;
-import h.core;
-import h.core.declarations;
-import h.core.struct_layout;
-import h.common;
-import h.common.filesystem;
-import h.compiler;
-import h.compiler.artifact;
-import h.compiler.clang_code_generation;
-import h.compiler.clang_data;
-import h.compiler.common;
-import h.compiler.expressions;
-import h.compiler.types;
-import h.json_serializer.operators;
-import h.c_header_converter;
-import h.parser.convertor;
-import h.parser.parse_tree;
-import h.parser.parser;
+import iris.binary_serializer;
+import iris.core;
+import iris.core.declarations;
+import iris.core.struct_layout;
+import iris.common;
+import iris.common.filesystem;
+import iris.compiler;
+import iris.compiler.artifact;
+import iris.compiler.clang_code_generation;
+import iris.compiler.clang_data;
+import iris.compiler.common;
+import iris.compiler.expressions;
+import iris.compiler.types;
+import iris.json_serializer.operators;
+import iris.c_header_converter;
+import iris.parser.convertor;
+import iris.parser.parse_tree;
+import iris.parser.parser;
 
-using h::json::operators::operator<<;
+using iris::json::operators::operator<<;
 
 #include <catch2/catch_all.hpp>
 
-namespace h
+namespace iris
 {
   static std::filesystem::path const g_test_source_files_path = std::filesystem::path{ TEST_SOURCE_FILES_PATH };
   static std::filesystem::path const g_standard_library_path = std::filesystem::path{ C_STANDARD_LIBRARY_PATH };
@@ -46,8 +46,8 @@ namespace h
 
   std::filesystem::path find_c_header_path(std::string_view const filename)
   {
-    std::pmr::vector<std::filesystem::path> header_search_directories = h::common::get_default_header_search_directories();
-    std::optional<std::filesystem::path> const header_path = h::compiler::find_c_header_path(filename, header_search_directories);
+    std::pmr::vector<std::filesystem::path> header_search_directories = iris::common::get_default_header_search_directories();
+    std::optional<std::filesystem::path> const header_path = iris::compiler::find_c_header_path(filename, header_search_directories);
     REQUIRE(header_path.has_value());
     return header_path.value();
   }
@@ -61,7 +61,7 @@ namespace h
     std::lock_guard<std::mutex> lock{mutex};
 
     std::filesystem::path const input_file_path = find_c_header_path(filename);
-    std::filesystem::path const output_file_path = (g_standard_library_path / filename).replace_extension(".hl");
+    std::filesystem::path const output_file_path = (g_standard_library_path / filename).replace_extension(".irisb");
 
     if (std::filesystem::exists(output_file_path))
       return output_file_path;
@@ -69,8 +69,11 @@ namespace h
     if (!std::filesystem::exists(output_file_path.parent_path()))
       std::filesystem::create_directories(output_file_path.parent_path());
 
-    h::c::Options const options = {};
-    std::optional<h::Module> const header_module = h::c::import_header_and_write_to_file(
+    std::pmr::vector<std::filesystem::path> header_search_directories = iris::common::get_default_header_search_directories();
+    iris::c::Options const options = {
+      .include_directories = header_search_directories,
+    };
+    std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(
       header_name,
       input_file_path,
       output_file_path,
@@ -90,10 +93,14 @@ namespace h
   )
   {
     std::filesystem::path const header_file_path = output_directory / header_filename;
-    h::common::write_to_file(header_file_path, header_content);
+    iris::common::write_to_file(header_file_path, header_content);
 
+    std::pmr::vector<std::filesystem::path> header_search_directories = iris::common::get_default_header_search_directories();
+    iris::c::Options const options = {
+      .include_directories = header_search_directories,
+    };
     std::filesystem::path const header_module_file_path = output_directory / header_module_filename;
-    std::optional<h::Module> const header_module = h::c::import_header_and_write_to_file(header_module_name, header_file_path, header_module_file_path, {});
+    std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(header_module_name, header_file_path, header_module_file_path, options);
     REQUIRE(header_module.has_value());
 
     return header_module_file_path;
@@ -103,18 +110,18 @@ namespace h
     std::filesystem::path const& source_file_path
   )
   {
-    std::optional<h::Module> const core_module = h::parser::parse_and_convert_to_module(
+    std::optional<iris::Module> const core_module = iris::parser::parse_and_convert_to_module(
         source_file_path,
         {},
         {}
     );
     REQUIRE(core_module.has_value());
 
-    std::filesystem::path const output_file_path = g_tests_output_directory_path / std::format("{}.hlb", core_module.value().name);
+    std::filesystem::path const output_file_path = g_tests_output_directory_path / std::format("{}.irisb", core_module.value().name);
     if (!std::filesystem::exists(output_file_path.parent_path()))
       std::filesystem::create_directories(output_file_path.parent_path());
 
-    h::binary_serializer::write_module_to_file(output_file_path, core_module.value(), {});
+    iris::binary_serializer::write_module_to_file(output_file_path, core_module.value(), {});
 
     return output_file_path;
   }
@@ -131,32 +138,66 @@ namespace h
     return llvm_ir.substr(current_index, llvm_ir.size());
   }
 
+  std::optional<std::string_view> find_metadata_id_for_file(
+    std::string_view const llvm_ir,
+    std::string_view const filename
+  )
+  {
+    std::string const token = std::format("= !DIFile(filename: \"{}\"", filename);
+    std::size_t const location = llvm_ir.find(token);
+    if (location == std::string_view::npos)
+      return std::nullopt;
+
+    std::size_t const line_start = llvm_ir.rfind('\n', location);
+    if (line_start == std::string_view::npos)
+      return std::nullopt;
+
+    std::size_t const id_start = line_start + 1;
+    std::size_t const id_end = llvm_ir.find(' ', id_start);
+    if (id_end == std::string_view::npos || id_end <= id_start)
+      return std::nullopt;
+
+    return llvm_ir.substr(id_start, id_end - id_start);
+  }
+
   struct Test_options
   {
     bool debug = false;
     std::string_view target_triple = "x86_64-pc-linux-gnu";
-    h::compiler::Contract_options contract_options = h::compiler::Contract_options::Log_error_and_abort;
+    iris::compiler::Contract_options contract_options = iris::compiler::Contract_options::Log_error_and_abort;
+    bool enable_bounds_checks = false;
     bool is_test_mode = false;
   };
 
-  void test_create_llvm_module(
+  static void add_test_mode_dependencies(
+    iris::Module& core_module,
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path>& module_name_to_file_path_map
+  )
+  {
+    module_name_to_file_path_map.emplace("c.inttypes", import_c_header_and_get_file_path("c.inttypes", "inttypes.h"));
+    module_name_to_file_path_map.emplace("c.stdio", import_c_header_and_get_file_path("c.stdio", "stdio.h"));
+    module_name_to_file_path_map.emplace("c.string", import_c_header_and_get_file_path("c.string", "string.h"));
+    module_name_to_file_path_map.emplace("iris.json", parse_and_get_file_path(iris::common::get_json_module_file_path()));
+    core_module.dependencies.alias_imports.push_back({"iris.json", "iris_json"});
+  }
+
+  std::string create_llvm_ir_body(
     std::string_view const input_file,
-    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-    std::string_view const expected_llvm_ir,
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> module_name_to_file_path_map,
     Test_options const test_options = {}
   )
   {
     std::filesystem::path const input_file_path = g_test_source_files_path / input_file;
-    std::optional<std::pmr::u8string> input_content = h::common::get_file_utf8_contents(input_file_path);
+    std::optional<std::pmr::u8string> input_content = iris::common::get_file_utf8_contents(input_file_path);
     REQUIRE(input_content.has_value());
 
-    h::parser::Parser parser = h::parser::create_parser();
+    iris::parser::Parser parser = iris::parser::create_parser();
 
-    h::parser::Parse_tree parse_tree = h::parser::parse(parser, std::move(input_content.value()));
+    iris::parser::Parse_tree parse_tree = iris::parser::parse(parser, std::move(input_content.value()));
 
-    h::parser::Parse_node const root = get_root_node(parse_tree);
+    iris::parser::Parse_node const root = get_root_node(parse_tree);
 
-    std::optional<h::Module> core_module = h::parser::parse_node_to_module(
+    std::optional<iris::Module> core_module = iris::parser::parse_node_to_module(
       parse_tree,
       root,
       input_file_path,
@@ -165,31 +206,99 @@ namespace h
     );
     REQUIRE(core_module.has_value());
 
-    h::compiler::Compilation_options const compilation_options
+    if (test_options.is_test_mode)
+      add_test_mode_dependencies(core_module.value(), module_name_to_file_path_map);
+
+    iris::compiler::Compilation_options const compilation_options
     {
       .target_triple = test_options.target_triple,
       .is_optimized = false,
       .debug = test_options.debug,
       .contract_options = test_options.contract_options,
+      .enable_bounds_checks = test_options.enable_bounds_checks,
       .is_test_mode = test_options.is_test_mode,
     };
 
-    h::compiler::LLVM_data llvm_data = h::compiler::initialize_llvm(compilation_options);
+    iris::compiler::LLVM_data llvm_data = iris::compiler::initialize_llvm(compilation_options);
 
-    h::compiler::LLVM_module_data llvm_module_data = h::compiler::create_llvm_module(llvm_data, core_module.value(), module_name_to_file_path_map, compilation_options);
-    std::string const llvm_ir = h::compiler::to_string(*llvm_module_data.module);
+    // Read header/dependency modules from the file-path map.
+    std::pmr::vector<iris::Module> core_modules;
+    core_modules.reserve(module_name_to_file_path_map.size());
+    iris::compiler::add_builtin_module(core_modules);
+    
+    std::pmr::vector<iris::Module> header_modules;
+    header_modules.reserve(module_name_to_file_path_map.size());
+    
+    for (auto const& [name, path] : module_name_to_file_path_map)
+    {
+      std::optional<iris::Module> dependency = iris::compiler::read_core_module(path);
+      if (dependency.has_value())
+      {
+        if (path.extension().generic_string() == ".h")
+          header_modules.push_back(std::move(dependency.value()));
+        else
+          core_modules.push_back(std::move(dependency.value()));
+      }
+    }
+    core_modules.push_back(core_module.value());
 
-    std::string_view const llvm_ir_body = exclude_header(llvm_ir);
+    std::pmr::vector<iris::Module const*> header_module_pointers;
+    header_module_pointers.reserve(header_modules.size());
+    for (iris::Module const& header_module : header_modules)
+      header_module_pointers.push_back(&header_module);
+
+    iris::compiler::Preprocessed_modules preprocessed = iris::compiler::preprocess_modules(
+      llvm_data,
+      header_module_pointers,
+      core_modules,
+      compilation_options,
+      {},
+      {}
+    );
+
+    auto const transformed_location = std::find_if(
+      preprocessed.transformed_core_modules.begin(),
+      preprocessed.transformed_core_modules.end(),
+      [&](iris::Module const& transformed) -> bool { return transformed.name == core_module->name; }
+    );
+    REQUIRE(transformed_location != preprocessed.transformed_core_modules.end());
+    iris::Module const& transformed_core_module = *transformed_location;
+
+    std::unique_ptr<llvm::Module> llvm_module = iris::compiler::create_llvm_module(
+      llvm_data,
+      transformed_core_module,
+      preprocessed.sorted_modules,
+      module_name_to_file_path_map,
+      preprocessed.declaration_database,
+      compilation_options
+    );
+    std::string const llvm_ir = iris::compiler::to_string(*llvm_module);
+
+    iris::parser::destroy_tree(std::move(parse_tree));
+    iris::parser::destroy_parser(std::move(parser));
+
+    return std::string{exclude_header(llvm_ir)};
+  }
+
+  void test_create_llvm_module(
+    std::string_view const input_file,
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> module_name_to_file_path_map,
+    std::string_view const expected_llvm_ir,
+    Test_options const test_options = {}
+  )
+  {
+    std::string const llvm_ir_body = create_llvm_ir_body(
+      input_file,
+      std::move(module_name_to_file_path_map),
+      test_options
+    );
 
     CHECK(llvm_ir_body == expected_llvm_ir);
-
-    h::parser::destroy_tree(std::move(parse_tree));
-    h::parser::destroy_parser(std::move(parser));
   }
 
   TEST_CASE("Compile Address Of", "[LLVM_IR]")
   {
-    char const* const input_file = "address_of.hltxt";
+    char const* const input_file = "address_of.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -224,20 +333,20 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Array Slices", "[LLVM_IR]")
   {
-    char const* const input_file = "array_slices.hltxt";
+    char const* const input_file = "array_slices.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
     };
 
     std::string const expected_llvm_ir = std::format(R"(
-%struct.H_Builtin_Generic_array_slice = type {{ ptr, i64 }}
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
 
 ; Function Attrs: convergent
 define void @Array_slices_take(ptr %"arguments[0].integers_0", i64 %"arguments[0].integers_1") #0 !dbg !3 {{
 entry:
-  %integers = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  call void @llvm.dbg.declare(metadata ptr %integers, metadata !14, metadata !DIExpression()), !dbg !19
+  %integers = alloca %struct.iris_builtin_Generic_array_slice, align 8
+    #dbg_declare(ptr %integers, !14, !DIExpression(), !19)
   %data = alloca ptr, align 8, !dbg !20
   %length = alloca i64, align 8, !dbg !21
   %v0 = alloca i32, align 4, !dbg !21
@@ -249,40 +358,40 @@ entry:
   store ptr %"arguments[0].integers_0", ptr %0, align 8
   %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %integers, i32 0, i32 1
   store i64 %"arguments[0].integers_1", ptr %1, align 8
-  %2 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !20
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !20
   %3 = load ptr, ptr %2, align 8, !dbg !20
-  call void @llvm.dbg.declare(metadata ptr %data, metadata !25, metadata !DIExpression()), !dbg !26
+    #dbg_declare(ptr %data, !25, !DIExpression(), !26)
   store ptr %3, ptr %data, align 8, !dbg !26
-  %4 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 1, !dbg !26
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 1, !dbg !26
   %5 = load i64, ptr %4, align 8, !dbg !26
-  call void @llvm.dbg.declare(metadata ptr %length, metadata !27, metadata !DIExpression()), !dbg !21
+    #dbg_declare(ptr %length, !27, !DIExpression(), !21)
   store i64 %5, ptr %length, align 8, !dbg !21
-  %6 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !21
+  %6 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !21
   %7 = load ptr, ptr %6, align 8, !dbg !21
   %array_slice_element_pointer = getelementptr i32, ptr %7, i32 0, !dbg !21
   %8 = load i32, ptr %array_slice_element_pointer, align 4, !dbg !21
-  call void @llvm.dbg.declare(metadata ptr %v0, metadata !28, metadata !DIExpression()), !dbg !22
+    #dbg_declare(ptr %v0, !28, !DIExpression(), !22)
   store i32 %8, ptr %v0, align 4, !dbg !22
-  %9 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !22
+  %9 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !22
   %10 = load ptr, ptr %9, align 8, !dbg !22
   %array_slice_element_pointer1 = getelementptr i32, ptr %10, i32 1, !dbg !22
   %11 = load i32, ptr %array_slice_element_pointer1, align 4, !dbg !22
-  call void @llvm.dbg.declare(metadata ptr %v1, metadata !29, metadata !DIExpression()), !dbg !23
+    #dbg_declare(ptr %v1, !29, !DIExpression(), !23)
   store i32 %11, ptr %v1, align 4, !dbg !23
-  %12 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !23
+  %12 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !23
   %13 = load ptr, ptr %12, align 8, !dbg !23
   %array_slice_element_pointer2 = getelementptr i32, ptr %13, i32 2, !dbg !23
   %14 = load i32, ptr %array_slice_element_pointer2, align 4, !dbg !23
-  call void @llvm.dbg.declare(metadata ptr %v2, metadata !30, metadata !DIExpression()), !dbg !31
+    #dbg_declare(ptr %v2, !30, !DIExpression(), !31)
   store i32 %14, ptr %v2, align 4, !dbg !31
-  call void @llvm.dbg.declare(metadata ptr %index, metadata !32, metadata !DIExpression()), !dbg !24
+    #dbg_declare(ptr %index, !32, !DIExpression(), !24)
   store i32 3, ptr %index, align 4, !dbg !24
   %15 = load i32, ptr %index, align 4, !dbg !24
-  %16 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !24
+  %16 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0, !dbg !24
   %17 = load ptr, ptr %16, align 8, !dbg !24
   %array_slice_element_pointer3 = getelementptr i32, ptr %17, i32 %15, !dbg !24
   %18 = load i32, ptr %array_slice_element_pointer3, align 4, !dbg !24
-  call void @llvm.dbg.declare(metadata ptr %v3, metadata !33, metadata !DIExpression()), !dbg !34
+    #dbg_declare(ptr %v3, !33, !DIExpression(), !34)
   store i32 %18, ptr %v3, align 4, !dbg !34
   ret void, !dbg !34
 }}
@@ -292,18 +401,18 @@ define void @Array_slices_run() #0 !dbg !35 {{
 entry:
   %array = alloca [4 x i32], i64 4, align 4, !dbg !39
   %a = alloca [4 x i32], align 4, !dbg !39
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !40
-  %1 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !41
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !40
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !41
   %array4 = alloca [1 x i32], i64 1, align 4, !dbg !42
-  %2 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !42
+  %2 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !42
   %b = alloca i32, align 4, !dbg !43
   %c = alloca ptr, align 8, !dbg !43
-  %3 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !44
-  %d = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !45
+  %3 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !44
+  %d = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !45
   %f = alloca i32, align 4, !dbg !46
   %g = alloca ptr, align 8, !dbg !46
-  %4 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !47
-  %h = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !47
+  %4 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !47
+  %h = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !47
   %i = alloca ptr, align 8, !dbg !48
   %j = alloca ptr, align 8, !dbg !49
   %array_element_pointer = getelementptr [4 x i32], ptr %array, i32 0, i32 0, !dbg !39
@@ -315,21 +424,21 @@ entry:
   %array_element_pointer3 = getelementptr [4 x i32], ptr %array, i32 0, i32 3, !dbg !39
   store i32 3, ptr %array_element_pointer3, align 4, !dbg !39
   %5 = load [4 x i32], ptr %array, align 4, !dbg !39
-  call void @llvm.dbg.declare(metadata ptr %a, metadata !50, metadata !DIExpression()), !dbg !40
+    #dbg_declare(ptr %a, !50, !DIExpression(), !40)
   store [4 x i32] %5, ptr %a, align 4, !dbg !40
   %data_pointer = getelementptr [4 x i32], ptr %a, i32 0, i32 0, !dbg !40
-  %6 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !40
+  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !40
   store ptr %data_pointer, ptr %6, align 8, !dbg !40
-  %7 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !40
+  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !40
   store i64 4, ptr %7, align 8, !dbg !40
   %8 = getelementptr inbounds {{ ptr, i64 }}, ptr %0, i32 0, i32 0, !dbg !41
   %9 = load ptr, ptr %8, align 8, !dbg !41
   %10 = getelementptr inbounds {{ ptr, i64 }}, ptr %0, i32 0, i32 1, !dbg !41
   %11 = load i64, ptr %10, align 8, !dbg !41
   call void @Array_slices_take(ptr %9, i64 %11), !dbg !41
-  %12 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !41
+  %12 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !41
   store ptr null, ptr %12, align 8, !dbg !41
-  %13 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !41
+  %13 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !41
   store i64 0, ptr %13, align 8, !dbg !41
   %14 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 0, !dbg !42
   %15 = load ptr, ptr %14, align 8, !dbg !42
@@ -339,68 +448,64 @@ entry:
   %array_element_pointer5 = getelementptr [1 x i32], ptr %array4, i32 0, i32 0, !dbg !42
   store i32 4, ptr %array_element_pointer5, align 4, !dbg !42
   %data_pointer6 = getelementptr [1 x i32], ptr %array4, i32 0, i32 0, !dbg !42
-  %18 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %2, i32 0, i32 0, !dbg !42
+  %18 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 0, !dbg !42
   store ptr %data_pointer6, ptr %18, align 8, !dbg !42
-  %19 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %2, i32 0, i32 1, !dbg !42
+  %19 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 1, !dbg !42
   store i64 1, ptr %19, align 8, !dbg !42
   %20 = getelementptr inbounds {{ ptr, i64 }}, ptr %2, i32 0, i32 0, !dbg !52
   %21 = load ptr, ptr %20, align 8, !dbg !52
   %22 = getelementptr inbounds {{ ptr, i64 }}, ptr %2, i32 0, i32 1, !dbg !52
   %23 = load i64, ptr %22, align 8, !dbg !52
   call void @Array_slices_take(ptr %21, i64 %23), !dbg !52
-  call void @llvm.dbg.declare(metadata ptr %b, metadata !53, metadata !DIExpression()), !dbg !43
+    #dbg_declare(ptr %b, !53, !DIExpression(), !43)
   store i32 0, ptr %b, align 4, !dbg !43
-  call void @llvm.dbg.declare(metadata ptr %c, metadata !54, metadata !DIExpression()), !dbg !44
+    #dbg_declare(ptr %c, !54, !DIExpression(), !44)
   store ptr %b, ptr %c, align 8, !dbg !44
   %24 = load ptr, ptr %c, align 8, !dbg !44
-  %25 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %3, i32 0, i32 0, !dbg !44
+  %25 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 0, !dbg !44
   store ptr %24, ptr %25, align 8, !dbg !44
-  %26 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %3, i32 0, i32 1, !dbg !44
+  %26 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 1, !dbg !44
   store i64 1, ptr %26, align 8, !dbg !44
-  %27 = load %struct.H_Builtin_Generic_array_slice, ptr %3, align 8, !dbg !44
-  call void @llvm.dbg.declare(metadata ptr %d, metadata !55, metadata !DIExpression()), !dbg !45
-  store %struct.H_Builtin_Generic_array_slice %27, ptr %d, align 8, !dbg !45
+  %27 = load %struct.iris_builtin_Generic_array_slice, ptr %3, align 8, !dbg !44
+    #dbg_declare(ptr %d, !55, !DIExpression(), !45)
+  store %struct.iris_builtin_Generic_array_slice %27, ptr %d, align 8, !dbg !45
   %28 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 0, !dbg !60
   %29 = load ptr, ptr %28, align 8, !dbg !60
   %30 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 1, !dbg !60
   %31 = load i64, ptr %30, align 8, !dbg !60
   call void @Array_slices_take(ptr %29, i64 %31), !dbg !60
-  call void @llvm.dbg.declare(metadata ptr %f, metadata !61, metadata !DIExpression()), !dbg !46
+    #dbg_declare(ptr %f, !61, !DIExpression(), !46)
   store i32 0, ptr %f, align 4, !dbg !46
-  call void @llvm.dbg.declare(metadata ptr %g, metadata !62, metadata !DIExpression()), !dbg !47
+    #dbg_declare(ptr %g, !62, !DIExpression(), !47)
   store ptr %f, ptr %g, align 8, !dbg !47
   %32 = load ptr, ptr %g, align 8, !dbg !47
-  %33 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !47
+  %33 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !47
   store ptr %32, ptr %33, align 8, !dbg !47
-  %34 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !47
+  %34 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !47
   store i64 1, ptr %34, align 8, !dbg !47
-  %35 = load %struct.H_Builtin_Generic_array_slice, ptr %4, align 8, !dbg !47
-  call void @llvm.dbg.declare(metadata ptr %h, metadata !63, metadata !DIExpression()), !dbg !48
-  store %struct.H_Builtin_Generic_array_slice %35, ptr %h, align 8, !dbg !48
-  %36 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
+  %35 = load %struct.iris_builtin_Generic_array_slice, ptr %4, align 8, !dbg !47
+    #dbg_declare(ptr %h, !63, !DIExpression(), !48)
+  store %struct.iris_builtin_Generic_array_slice %35, ptr %h, align 8, !dbg !48
+  %36 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
   %37 = load ptr, ptr %36, align 8, !dbg !48
-  call void @llvm.dbg.declare(metadata ptr %i, metadata !64, metadata !DIExpression()), !dbg !49
+    #dbg_declare(ptr %i, !64, !DIExpression(), !49)
   store ptr %37, ptr %i, align 8, !dbg !49
-  %38 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !49
+  %38 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !49
   %39 = load ptr, ptr %38, align 8, !dbg !49
   %array_element_pointer7 = getelementptr i32, ptr %39, i32 0, !dbg !49
-  call void @llvm.dbg.declare(metadata ptr %j, metadata !65, metadata !DIExpression()), !dbg !66
+    #dbg_declare(ptr %j, !65, !DIExpression(), !66)
   store ptr %array_element_pointer7, ptr %j, align 8, !dbg !66
   ret void, !dbg !66
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "array_slices.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "array_slices.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "take", linkageName: "Array_slices_take", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !13)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null, !6}}
@@ -472,53 +577,49 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Array Slices Instantiate", "[LLVM_IR]")
   {
-    char const* const input_file = "array_slices_instantiate.hltxt";
+    char const* const input_file = "array_slices_instantiate.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
     };
 
     std::string const expected_llvm_ir = std::format(R"(
-%struct.Array_slices_instantiate_My_struct = type {{ %struct.H_Builtin_Generic_array_slice }}
-%struct.H_Builtin_Generic_array_slice = type {{ ptr, i64 }}
+%struct.Array_slices_instantiate_My_struct = type {{ %struct.iris_builtin_Generic_array_slice }}
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
 
 ; Function Attrs: convergent
 define void @Array_slices_instantiate_run() #0 !dbg !3 {{
 entry:
   %v0 = alloca %struct.Array_slices_instantiate_My_struct, align 8, !dbg !7
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !7
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !7
   %value = alloca i32, align 4, !dbg !8
-  %s0 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !9
-  %1 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !7
+  %s0 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !9
+  %1 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !7
   store ptr null, ptr %1, align 8, !dbg !7
-  %2 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !7
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !7
   store i64 0, ptr %2, align 8, !dbg !7
-  %3 = load %struct.H_Builtin_Generic_array_slice, ptr %0, align 8, !dbg !7
+  %3 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8, !dbg !7
   %4 = getelementptr inbounds %struct.Array_slices_instantiate_My_struct, ptr %v0, i32 0, i32 0, !dbg !7
-  store %struct.H_Builtin_Generic_array_slice %3, ptr %4, align 8, !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %v0, metadata !10, metadata !DIExpression()), !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !21, metadata !DIExpression()), !dbg !8
+  store %struct.iris_builtin_Generic_array_slice %3, ptr %4, align 8, !dbg !7
+    #dbg_declare(ptr %v0, !10, !DIExpression(), !7)
+    #dbg_declare(ptr %value, !21, !DIExpression(), !8)
   store i32 0, ptr %value, align 4, !dbg !8
-  %5 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %s0, i32 0, i32 0, !dbg !9
+  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 0, !dbg !9
   store ptr %value, ptr %5, align 8, !dbg !9
-  %6 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %s0, i32 0, i32 1, !dbg !9
+  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 1, !dbg !9
   store i64 1, ptr %6, align 8, !dbg !9
-  call void @llvm.dbg.declare(metadata ptr %s0, metadata !22, metadata !DIExpression()), !dbg !9
+    #dbg_declare(ptr %s0, !22, !DIExpression(), !9)
   ret void, !dbg !9
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "array_slices_instantiate.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "array_slices_instantiate.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Array_slices_instantiate_run", scope: null, file: !2, line: 8, type: !4, scopeLine: 9, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null}}
@@ -550,7 +651,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Asserts", "[LLVM_IR]")
   {
-    char const* const input_file = "assert_expressions.hltxt";
+    char const* const input_file = "assert_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -600,7 +701,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Assignments", "[LLVM_IR]")
   {
-    char const* const input_file = "assignment_expressions.hltxt";
+    char const* const input_file = "assignment_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -714,7 +815,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Binary Expressions Precedence", "[LLVM_IR]")
   {
-    char const* const input_file = "binary_expressions_precedence.hltxt";
+    char const* const input_file = "binary_expressions_precedence.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -848,7 +949,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Binary Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "binary_expressions.hltxt";
+    char const* const input_file = "binary_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -991,8 +1092,11 @@ entry:
   %second_boolean = alloca i8, align 1
   %equal = alloca i1, align 1
   %not_equal = alloca i1, align 1
-  %logical_and = alloca i8, align 1
-  %logical_or = alloca i8, align 1
+  %logical_and = alloca i1, align 1
+  %logical_or = alloca i1, align 1
+  %mix = alloca i1, align 1
+  %mix_0 = alloca i1, align 1
+  %mix_1 = alloca i1, align 1
   %0 = zext i1 %"arguments[0].first_boolean" to i8
   store i8 %0, ptr %first_boolean, align 1
   %1 = zext i1 %"arguments[1].second_boolean" to i8
@@ -1007,12 +1111,37 @@ entry:
   store i1 %7, ptr %not_equal, align 1
   %8 = load i8, ptr %first_boolean, align 1
   %9 = load i8, ptr %second_boolean, align 1
-  %10 = and i8 %8, %9
-  store i8 %10, ptr %logical_and, align 1
-  %11 = load i8, ptr %first_boolean, align 1
-  %12 = load i8, ptr %second_boolean, align 1
-  %13 = or i8 %11, %12
-  store i8 %13, ptr %logical_or, align 1
+  %10 = icmp ne i8 %8, 0
+  %11 = icmp ne i8 %9, 0
+  %12 = and i1 %10, %11
+  store i1 %12, ptr %logical_and, align 1
+  %13 = load i8, ptr %first_boolean, align 1
+  %14 = load i8, ptr %second_boolean, align 1
+  %15 = icmp ne i8 %13, 0
+  %16 = icmp ne i8 %14, 0
+  %17 = or i1 %15, %16
+  store i1 %17, ptr %logical_or, align 1
+  %18 = load i8, ptr %first_boolean, align 1
+  %19 = load i8, ptr %first_boolean, align 1
+  %20 = load i8, ptr %second_boolean, align 1
+  %21 = icmp eq i8 %19, %20
+  %22 = icmp ne i8 %18, 0
+  %23 = and i1 %22, %21
+  store i1 %23, ptr %mix, align 1
+  %24 = load i8, ptr %first_boolean, align 1
+  %25 = load i8, ptr %first_boolean, align 1
+  %26 = load i8, ptr %second_boolean, align 1
+  %27 = icmp ne i8 %25, %26
+  %28 = icmp ne i8 %24, 0
+  %29 = or i1 %28, %27
+  store i1 %29, ptr %mix_0, align 1
+  %30 = load i8, ptr %first_boolean, align 1
+  %31 = load i8, ptr %second_boolean, align 1
+  %32 = icmp eq i8 %30, %31
+  %33 = load i8, ptr %first_boolean, align 1
+  %34 = icmp ne i8 %33, 0
+  %35 = and i1 %32, %34
+  store i1 %35, ptr %mix_1, align 1
   ret void
 }
 
@@ -1089,7 +1218,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Binary Expressions Types", "[LLVM_IR]")
   {
-    char const* const input_file = "binary_expressions_types.hltxt";
+    char const* const input_file = "binary_expressions_types.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1117,7 +1246,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Bit Fields", "[LLVM_IR]")
   {
-    char const* const input_file = "bit_fields.hltxt";
+    char const* const input_file = "bit_fields.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1281,7 +1410,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Block Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "block_expressions.hltxt";
+    char const* const input_file = "block_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1310,7 +1439,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Booleans", "[LLVM_IR]")
   {
-    char const* const input_file = "booleans.hltxt";
+    char const* const input_file = "booleans.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1335,7 +1464,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Break Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "break_expressions.hltxt";
+    char const* const input_file = "break_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1502,7 +1631,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Cast Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "cast_expressions.hltxt";
+    char const* const input_file = "cast_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1545,7 +1674,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Comment Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "comment_expressions.hltxt";
+    char const* const input_file = "comment_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1600,7 +1729,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Compile Time For", "[LLVM_IR]")
   {
-    char const* const input_file = "compile_time_for.hltxt";
+    char const* const input_file = "compile_time_for.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1632,7 +1761,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Compile Time If", "[LLVM_IR]")
   {
-    char const* const input_file = "compile_time_if.hltxt";
+    char const* const input_file = "compile_time_if.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1661,7 +1790,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Constant Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "constant_expressions.hltxt";
+    char const* const input_file = "constant_expressions.iris";
     
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "constant_expressions";
     std::filesystem::create_directories(root_directory_path);
@@ -1675,7 +1804,7 @@ My_flags g_global_2 = 0x000000002ULL;
 My_flags g_global_unused = 0x000000003ULL;
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.iris", "my_module", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1708,9 +1837,425 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Array Bounds Checks 0", "[LLVM_IR]")
+  {
+    char const* const input_file = "bounds_check_0.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
+
+@function_contract_error_string = private unnamed_addr constant [67 x i8] c"Out-of-bounds array slice access in 'Bounds_check_0.access_slice'!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [76 x i8] c"Out-of-bounds constant array access in 'Bounds_check_0.access_fixed_array'!\00"
+
+; Function Attrs: convergent
+define i32 @Bounds_check_0_access_slice(ptr %"arguments[0].integers_0", i64 %"arguments[0].integers_1", i32 noundef %"arguments[1].index") #0 {
+entry:
+  %integers = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %index = alloca i32, align 4
+  %0 = getelementptr inbounds { ptr, i64 }, ptr %integers, i32 0, i32 0
+  store ptr %"arguments[0].integers_0", ptr %0, align 8
+  %1 = getelementptr inbounds { ptr, i64 }, ptr %integers, i32 0, i32 1
+  store i64 %"arguments[0].integers_1", ptr %1, align 8
+  store i32 %"arguments[1].index", ptr %index, align 4
+  %2 = load i32, ptr %index, align 4
+  %3 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 1
+  %4 = load i64, ptr %3, align 8
+  %bounds_check_index = zext i32 %2 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %5 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %integers, i32 0, i32 0
+  %6 = load ptr, ptr %5, align 8
+  %array_slice_element_pointer = getelementptr i32, ptr %6, i32 %2
+  %7 = load i32, ptr %array_slice_element_pointer, align 4
+  ret i32 %7
+
+bounds_check_fail:                                ; preds = %entry
+  %8 = call i32 @puts(ptr @function_contract_error_string)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i32 @Bounds_check_0_access_fixed_array(i32 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %array = alloca [4 x i32], i64 4, align 4
+  %a = alloca [4 x i32], align 4
+  store i32 %"arguments[0].index", ptr %index, align 4
+  %array_element_pointer = getelementptr [4 x i32], ptr %array, i32 0, i32 0
+  store i32 0, ptr %array_element_pointer, align 4
+  %array_element_pointer1 = getelementptr [4 x i32], ptr %array, i32 0, i32 1
+  store i32 1, ptr %array_element_pointer1, align 4
+  %array_element_pointer2 = getelementptr [4 x i32], ptr %array, i32 0, i32 2
+  store i32 2, ptr %array_element_pointer2, align 4
+  %array_element_pointer3 = getelementptr [4 x i32], ptr %array, i32 0, i32 3
+  store i32 3, ptr %array_element_pointer3, align 4
+  %0 = load [4 x i32], ptr %array, align 4
+  store [4 x i32] %0, ptr %a, align 4
+  %1 = load i32, ptr %index, align 4
+  %bounds_check_index = zext i32 %1 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %array_element_pointer4 = getelementptr [4 x i32], ptr %a, i32 0, i32 %1
+  %2 = load i32, ptr %array_element_pointer4, align 4
+  ret i32 %2
+
+bounds_check_fail:                                ; preds = %entry
+  %3 = call i32 @puts(ptr @function_contract_error_string.1)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @puts(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_bounds_checks = true });
+  }
+
+  TEST_CASE("Compile Array Bounds Checks 1", "[LLVM_IR]")
+  {
+    char const* const input_file = "bounds_check_1.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%__hl_soa_array = type { ptr }
+%struct.Bounds_check_1_Particle = type { float, float }
+
+@function_contract_error_string = private unnamed_addr constant [77 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_element'!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [78 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_x'!\00"
+@function_contract_error_string.2 = private unnamed_addr constant [78 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_y'!\00"
+
+; Function Attrs: convergent
+define <2 x float> @Bounds_check_1_access_soa_array_element(i32 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %particles = alloca %__hl_soa_array, align 8
+  %soa_array_storage = alloca [32 x i8], align 4
+  %soa_element = alloca %struct.Bounds_check_1_Particle, align 4
+  store i32 %"arguments[0].index", ptr %index, align 4
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
+  %0 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  store ptr %soa_array_data, ptr %0, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
+  %1 = load i32, ptr %index, align 4
+  %bounds_check_index = zext i32 %1 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %2 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 0
+  %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 %1
+  %4 = load float, ptr %soa_member_element_pointer16, align 4
+  %5 = getelementptr inbounds %struct.Bounds_check_1_Particle, ptr %soa_element, i32 0, i32 0
+  store float %4, ptr %5, align 4
+  %soa_member_base_pointer17 = getelementptr i8, ptr %3, i64 16
+  %soa_member_element_pointer18 = getelementptr float, ptr %soa_member_base_pointer17, i32 %1
+  %6 = load float, ptr %soa_member_element_pointer18, align 4
+  %7 = getelementptr inbounds %struct.Bounds_check_1_Particle, ptr %soa_element, i32 0, i32 1
+  store float %6, ptr %7, align 4
+  %8 = getelementptr inbounds %struct.Bounds_check_1_Particle, ptr %soa_element, i32 0, i32 0
+  %9 = load <2 x float>, ptr %8, align 4
+  ret <2 x float> %9
+
+bounds_check_fail:                                ; preds = %entry
+  %10 = call i32 @puts(ptr @function_contract_error_string)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define float @Bounds_check_1_access_soa_array_member_x(i32 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %particles = alloca %__hl_soa_array, align 8
+  %soa_array_storage = alloca [32 x i8], align 4
+  store i32 %"arguments[0].index", ptr %index, align 4
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
+  %0 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  store ptr %soa_array_data, ptr %0, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
+  %1 = load i32, ptr %index, align 4
+  %2 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %bounds_check_index = zext i32 %1 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 0
+  %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 %1
+  %4 = load float, ptr %soa_member_element_pointer16, align 4
+  ret float %4
+
+bounds_check_fail:                                ; preds = %entry
+  %5 = call i32 @puts(ptr @function_contract_error_string.1)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define float @Bounds_check_1_access_soa_array_member_y(i32 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %particles = alloca %__hl_soa_array, align 8
+  %soa_array_storage = alloca [32 x i8], align 4
+  store i32 %"arguments[0].index", ptr %index, align 4
+  %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
+  %0 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  store ptr %soa_array_data, ptr %0, align 8
+  %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer, align 4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 0
+  store float 0.000000e+00, ptr %soa_member_element_pointer2, align 4
+  %soa_member_base_pointer3 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer4 = getelementptr float, ptr %soa_member_base_pointer3, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer4, align 4
+  %soa_member_base_pointer5 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer6 = getelementptr float, ptr %soa_member_base_pointer5, i64 1
+  store float 0.000000e+00, ptr %soa_member_element_pointer6, align 4
+  %soa_member_base_pointer7 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer8 = getelementptr float, ptr %soa_member_base_pointer7, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer8, align 4
+  %soa_member_base_pointer9 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer10 = getelementptr float, ptr %soa_member_base_pointer9, i64 2
+  store float 0.000000e+00, ptr %soa_member_element_pointer10, align 4
+  %soa_member_base_pointer11 = getelementptr i8, ptr %soa_array_data, i64 0
+  %soa_member_element_pointer12 = getelementptr float, ptr %soa_member_base_pointer11, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer12, align 4
+  %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
+  %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
+  store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
+  %1 = load i32, ptr %index, align 4
+  %2 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %bounds_check_index = zext i32 %1 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 16
+  %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 %1
+  %4 = load float, ptr %soa_member_element_pointer16, align 4
+  ret float %4
+
+bounds_check_fail:                                ; preds = %entry
+  %5 = call i32 @puts(ptr @function_contract_error_string.2)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @puts(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_bounds_checks = true });
+  }
+
+  TEST_CASE("Compile Array Bounds Checks 2", "[LLVM_IR]")
+  {
+    char const* const input_file = "bounds_check_2.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%__hl_soa_array_view = type { i64, i64, i64, ptr }
+%struct.Bounds_check_2_Particle = type { float, float }
+
+@function_contract_error_string = private unnamed_addr constant [87 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_element'!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [88 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_x'!\00"
+@function_contract_error_string.2 = private unnamed_addr constant [88 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_y'!\00"
+
+; Function Attrs: convergent
+define <2 x float> @Bounds_check_2_access_soa_array_view_element(ptr noundef byval(%__hl_soa_array_view) align 8 %"arguments[0].view", i32 noundef %"arguments[1].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %soa_element = alloca %struct.Bounds_check_2_Particle, align 4
+  store i32 %"arguments[1].index", ptr %index, align 4
+  %0 = load i32, ptr %index, align 4
+  %1 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %2 = load ptr, ptr %1, align 8
+  %3 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %4 = load i64, ptr %3, align 8
+  %bounds_check_index = zext i32 %0 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
+  %6 = load i64, ptr %5, align 8
+  %soa_index_i64 = zext i32 %0 to i64
+  %soa_adjusted_index = add i64 %6, %soa_index_i64
+  %soa_member_base_pointer = getelementptr i8, ptr %2, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 %soa_adjusted_index
+  %7 = load float, ptr %soa_member_element_pointer, align 4
+  %8 = getelementptr inbounds %struct.Bounds_check_2_Particle, ptr %soa_element, i32 0, i32 0
+  store float %7, ptr %8, align 4
+  %soa_member_block_size = mul i64 %4, 4
+  %soa_member_block_offset = add i64 0, %soa_member_block_size
+  %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
+  %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
+  %soa_member_base_pointer1 = getelementptr i8, ptr %2, i64 %soa_offset_aligned
+  %soa_member_element_pointer2 = getelementptr float, ptr %soa_member_base_pointer1, i64 %soa_adjusted_index
+  %9 = load float, ptr %soa_member_element_pointer2, align 4
+  %10 = getelementptr inbounds %struct.Bounds_check_2_Particle, ptr %soa_element, i32 0, i32 1
+  store float %9, ptr %10, align 4
+  %11 = getelementptr inbounds %struct.Bounds_check_2_Particle, ptr %soa_element, i32 0, i32 0
+  %12 = load <2 x float>, ptr %11, align 4
+  ret <2 x float> %12
+
+bounds_check_fail:                                ; preds = %entry
+  %13 = call i32 @puts(ptr @function_contract_error_string)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define float @Bounds_check_2_access_soa_array_view_member_x(ptr noundef byval(%__hl_soa_array_view) align 8 %"arguments[0].view", i32 noundef %"arguments[1].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  store i32 %"arguments[1].index", ptr %index, align 4
+  %0 = load i32, ptr %index, align 4
+  %1 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %2 = load ptr, ptr %1, align 8
+  %3 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %4 = load i64, ptr %3, align 8
+  %bounds_check_index = zext i32 %0 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
+  %6 = load i64, ptr %5, align 8
+  %soa_index_i64 = zext i32 %0 to i64
+  %soa_adjusted_index = add i64 %6, %soa_index_i64
+  %soa_member_base_pointer = getelementptr i8, ptr %2, i64 0
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 %soa_adjusted_index
+  %7 = load float, ptr %soa_member_element_pointer, align 4
+  ret float %7
+
+bounds_check_fail:                                ; preds = %entry
+  %8 = call i32 @puts(ptr @function_contract_error_string.1)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define float @Bounds_check_2_access_soa_array_view_member_y(ptr noundef byval(%__hl_soa_array_view) align 8 %"arguments[0].view", i32 noundef %"arguments[1].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  store i32 %"arguments[1].index", ptr %index, align 4
+  %0 = load i32, ptr %index, align 4
+  %1 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 3
+  %2 = load ptr, ptr %1, align 8
+  %3 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 2
+  %4 = load i64, ptr %3, align 8
+  %bounds_check_index = zext i32 %0 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %"arguments[0].view", i32 0, i32 0
+  %6 = load i64, ptr %5, align 8
+  %soa_index_i64 = zext i32 %0 to i64
+  %soa_adjusted_index = add i64 %6, %soa_index_i64
+  %soa_member_block_size = mul i64 %4, 4
+  %soa_member_block_offset = add i64 0, %soa_member_block_size
+  %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
+  %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
+  %soa_member_base_pointer = getelementptr i8, ptr %2, i64 %soa_offset_aligned
+  %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 %soa_adjusted_index
+  %7 = load float, ptr %soa_member_element_pointer, align 4
+  ret float %7
+
+bounds_check_fail:                                ; preds = %entry
+  %8 = call i32 @puts(ptr @function_contract_error_string.2)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @puts(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_bounds_checks = true });
+  }
+
   TEST_CASE("Compile Constant Arrays", "[LLVM_IR]")
   {
-    char const* const input_file = "constant_array_expressions.hltxt";
+    char const* const input_file = "constant_array_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1771,7 +2316,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
@@ -1782,7 +2327,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 
   TEST_CASE("Compile Soa Array Type", "[LLVM_IR]")
   {
-    char const* const input_file = "soa_array_type.hltxt";
+    char const* const input_file = "soa_array_type.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1807,7 +2352,7 @@ entry:
   %length = alloca i64, align 8
   %data = alloca ptr, align 8
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
-  %1 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %1 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   store ptr %soa_array_data, ptr %1, align 8
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
@@ -1833,7 +2378,7 @@ entry:
   %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
   %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
   store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
-  %2 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %2 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %3 = load ptr, ptr %2, align 8
   %soa_member_base_pointer15 = getelementptr i8, ptr %3, i64 0
   %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i32 1
@@ -1847,7 +2392,7 @@ entry:
   store float %6, ptr %7, align 4
   %8 = load %struct.soa_array_type_Particle, ptr %soa_element, align 4
   store %struct.soa_array_type_Particle %8, ptr %p1, align 4
-  %9 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %9 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %10 = load ptr, ptr %9, align 8
   %soa_member_base_pointer20 = getelementptr i8, ptr %10, i64 0
   %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i32 1
@@ -1864,7 +2409,7 @@ entry:
   %16 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 1
   store float 4.000000e+00, ptr %16, align 4
   %17 = load %struct.soa_array_type_Particle, ptr %0, align 4
-  %18 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %18 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %19 = load ptr, ptr %18, align 8
   store %struct.soa_array_type_Particle %17, ptr %soa_assignment_struct, align 4
   %20 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
@@ -1877,30 +2422,30 @@ entry:
   %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i32 1
   %23 = load float, ptr %22, align 4
   store float %23, ptr %soa_member_element_pointer27, align 4
-  %24 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %24 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %25 = load ptr, ptr %24, align 8
   %soa_member_base_pointer28 = getelementptr i8, ptr %25, i64 0
   %soa_member_element_pointer29 = getelementptr float, ptr %soa_member_base_pointer28, i32 2
   %26 = load float, ptr %soa_member_element_pointer29, align 4
   store float %26, ptr %x2, align 4
-  %27 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %27 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %28 = load ptr, ptr %27, align 8
   %soa_member_base_pointer30 = getelementptr i8, ptr %28, i64 0
   %soa_member_element_pointer31 = getelementptr float, ptr %soa_member_base_pointer30, i32 2
   store float 1.000000e+00, ptr %soa_member_element_pointer31, align 4
-  %29 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %29 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %30 = load ptr, ptr %29, align 8
   %soa_member_base_pointer32 = getelementptr i8, ptr %30, i64 16
   %soa_member_element_pointer33 = getelementptr float, ptr %soa_member_base_pointer32, i32 3
   %31 = load float, ptr %soa_member_element_pointer33, align 4
   store float %31, ptr %y3, align 4
-  %32 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %32 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %33 = load ptr, ptr %32, align 8
   %soa_member_base_pointer34 = getelementptr i8, ptr %33, i64 16
   %soa_member_element_pointer35 = getelementptr float, ptr %soa_member_base_pointer34, i32 3
   store float 2.000000e+00, ptr %soa_member_element_pointer35, align 4
   store i64 4, ptr %length, align 8
-  %34 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %34 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %35 = load ptr, ptr %34, align 8
   store ptr %35, ptr %data, align 8
   ret void
@@ -1914,7 +2459,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Soa Array Type Debug Information", "[LLVM_IR]")
   {
-    char const* const input_file = "soa_array_type_debug_information.hltxt";
+    char const* const input_file = "soa_array_type_debug_information.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -1929,7 +2474,7 @@ entry:
   %particles = alloca %__hl_soa_array, align 8, !dbg !7
   %soa_array_storage = alloca [32 x i8], align 4, !dbg !7
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0, !dbg !7
-  %0 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0, !dbg !7
+  %0 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0, !dbg !7
   store ptr %soa_array_data, ptr %0, align 8, !dbg !7
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0, !dbg !7
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0, !dbg !7
@@ -1955,22 +2500,18 @@ entry:
   %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16, !dbg !7
   %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3, !dbg !7
   store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4, !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %particles, metadata !8, metadata !DIExpression()), !dbg !7
+    #dbg_declare(ptr %particles, !8, !DIExpression(), !7)
   ret void, !dbg !7
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "soa_array_type_debug_information.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "soa_array_type_debug_information.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "soa_array_type_debug_information_run", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null}}
@@ -1990,7 +2531,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Soa Array View Type", "[LLVM_IR]")
   {
-    char const* const input_file = "soa_array_view_type.hltxt";
+    char const* const input_file = "soa_array_view_type.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2023,7 +2564,7 @@ entry:
   %soa_array_view58 = alloca %__hl_soa_array_view, align 8
   %full_view = alloca %__hl_soa_array_view, align 8
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
-  %1 = getelementptr inbounds %__hl_soa_array, ptr %soa_array, i32 0, i32 0
+  %1 = getelementptr inbounds nuw %__hl_soa_array, ptr %soa_array, i32 0, i32 0
   store ptr %soa_array_data, ptr %1, align 8
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
@@ -2051,35 +2592,35 @@ entry:
   store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
   %2 = load %__hl_soa_array, ptr %soa_array, align 8
   store %__hl_soa_array %2, ptr %particles, align 8
-  %3 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %4 = load ptr, ptr %3, align 8
-  %5 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
   store i32 1, ptr %5, align 4
-  %6 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
+  %6 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
   store i32 3, ptr %6, align 4
-  %7 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
+  %7 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
   store i64 4, ptr %7, align 8
-  %8 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
+  %8 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
   store ptr %4, ptr %8, align 8
   %9 = load %__hl_soa_array_view, ptr %soa_array_view, align 8
   store %__hl_soa_array_view %9, ptr %view, align 8
-  %10 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %10 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %11 = load i64, ptr %10, align 8
   store i64 %11, ptr %start_index, align 8
-  %12 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 1
+  %12 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 1
   %13 = load i64, ptr %12, align 8
   store i64 %13, ptr %end_index, align 8
-  %14 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %14 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %15 = load i64, ptr %14, align 8
   store i64 %15, ptr %length, align 8
-  %16 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %16 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %17 = load ptr, ptr %16, align 8
   store ptr %17, ptr %data, align 8
-  %18 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %18 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %19 = load ptr, ptr %18, align 8
-  %20 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %20 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %21 = load i64, ptr %20, align 8
-  %22 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %22 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %23 = load i64, ptr %22, align 8
   %soa_adjusted_index = add i64 %23, 0
   %soa_member_base_pointer15 = getelementptr i8, ptr %19, i64 0
@@ -2101,11 +2642,11 @@ entry:
   %29 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 1
   store float 4.000000e+00, ptr %29, align 4
   %30 = load %struct.soa_array_view_type_Particle, ptr %0, align 4
-  %31 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %31 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %32 = load ptr, ptr %31, align 8
-  %33 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %33 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %34 = load i64, ptr %33, align 8
-  %35 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %35 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %36 = load i64, ptr %35, align 8
   %soa_adjusted_index19 = add i64 %36, 0
   store %struct.soa_array_view_type_Particle %30, ptr %soa_assignment_struct, align 4
@@ -2123,21 +2664,21 @@ entry:
   %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i64 %soa_adjusted_index19
   %40 = load float, ptr %39, align 4
   store float %40, ptr %soa_member_element_pointer27, align 4
-  %41 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %41 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %42 = load ptr, ptr %41, align 8
-  %43 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %43 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %44 = load i64, ptr %43, align 8
-  %45 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %45 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %46 = load i64, ptr %45, align 8
   %soa_adjusted_index28 = add i64 %46, 0
   %soa_member_base_pointer29 = getelementptr i8, ptr %42, i64 0
   %soa_member_element_pointer30 = getelementptr float, ptr %soa_member_base_pointer29, i64 %soa_adjusted_index28
   store float 1.000000e+00, ptr %soa_member_element_pointer30, align 4
-  %47 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %47 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %48 = load ptr, ptr %47, align 8
-  %49 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %49 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %50 = load i64, ptr %49, align 8
-  %51 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %51 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %52 = load i64, ptr %51, align 8
   %soa_adjusted_index31 = add i64 %52, 1
   %soa_member_block_size32 = mul i64 %50, 4
@@ -2147,11 +2688,11 @@ entry:
   %soa_member_base_pointer36 = getelementptr i8, ptr %48, i64 %soa_offset_aligned35
   %soa_member_element_pointer37 = getelementptr float, ptr %soa_member_base_pointer36, i64 %soa_adjusted_index31
   store float 2.000000e+00, ptr %soa_member_element_pointer37, align 4
-  %53 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %53 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %54 = load ptr, ptr %53, align 8
-  %55 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %55 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %56 = load i64, ptr %55, align 8
-  %57 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %57 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %58 = load i64, ptr %57, align 8
   %soa_adjusted_index38 = add i64 %58, 0
   %soa_member_base_pointer40 = getelementptr i8, ptr %54, i64 0
@@ -2170,22 +2711,22 @@ entry:
   store float %61, ptr %62, align 4
   %63 = load %struct.soa_array_view_type_Particle, ptr %soa_element39, align 4
   store %struct.soa_array_view_type_Particle %63, ptr %p_0, align 4
-  %64 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %64 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %65 = load ptr, ptr %64, align 8
-  %66 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %66 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %67 = load i64, ptr %66, align 8
-  %68 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %68 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %69 = load i64, ptr %68, align 8
   %soa_adjusted_index48 = add i64 %69, 0
   %soa_member_base_pointer49 = getelementptr i8, ptr %65, i64 0
   %soa_member_element_pointer50 = getelementptr float, ptr %soa_member_base_pointer49, i64 %soa_adjusted_index48
   %70 = load float, ptr %soa_member_element_pointer50, align 4
   store float %70, ptr %x0, align 4
-  %71 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %71 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
   %72 = load ptr, ptr %71, align 8
-  %73 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %73 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
   %74 = load i64, ptr %73, align 8
-  %75 = getelementptr inbounds %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %75 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %76 = load i64, ptr %75, align 8
   %soa_adjusted_index51 = add i64 %76, 1
   %soa_member_block_size52 = mul i64 %74, 4
@@ -2196,15 +2737,15 @@ entry:
   %soa_member_element_pointer57 = getelementptr float, ptr %soa_member_base_pointer56, i64 %soa_adjusted_index51
   %77 = load float, ptr %soa_member_element_pointer57, align 4
   store float %77, ptr %y1, align 4
-  %78 = getelementptr inbounds %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %78 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   %79 = load ptr, ptr %78, align 8
-  %80 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
+  %80 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
   store i64 0, ptr %80, align 8
-  %81 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
+  %81 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
   store i64 4, ptr %81, align 8
-  %82 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
+  %82 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
   store i64 4, ptr %82, align 8
-  %83 = getelementptr inbounds %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
+  %83 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
   store ptr %79, ptr %83, align 8
   %84 = load %__hl_soa_array_view, ptr %soa_array_view58, align 8
   store %__hl_soa_array_view %84, ptr %full_view, align 8
@@ -2219,7 +2760,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Soa Array View Type Debug Information", "[LLVM_IR]")
   {
-    char const* const input_file = "soa_array_view_type_debug_information.hltxt";
+    char const* const input_file = "soa_array_view_type_debug_information.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2233,26 +2774,22 @@ define private void @soa_array_view_type_debug_information_run() #0 !dbg !3 {{
 entry:
   %view = alloca %__hl_soa_array_view, align 8, !dbg !7
   call void @llvm.memset.p0.i64(ptr align 8 %view, i8 0, i64 32, i1 false), !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %view, metadata !8, metadata !DIExpression()), !dbg !7
+    #dbg_declare(ptr %view, !8, !DIExpression(), !7)
   ret void, !dbg !7
 }}
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
-
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #2
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
 attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
-attributes #2 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "soa_array_view_type_debug_information.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "soa_array_view_type_debug_information.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "soa_array_view_type_debug_information_run", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null}}
@@ -2276,7 +2813,7 @@ attributes #2 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information C Headers", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_c_headers.hltxt";
+    char const* const input_file = "debug_information_c_headers.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "debug_information_c_headers";
     std::filesystem::create_directories(root_directory_path);
@@ -2291,7 +2828,7 @@ struct Vector2i
 Vector2i add(Vector2i lhs, Vector2i rhs);
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "vector2i.h", "vector2i.hltxt", "c.vector2i", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "vector2i.h", "vector2i.iris", "c.vector2i", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2315,12 +2852,12 @@ entry:
   store i32 1, ptr %1, align 4, !dbg !8
   %2 = getelementptr inbounds %struct.Vector2i, ptr %a, i32 0, i32 1, !dbg !8
   store i32 -1, ptr %2, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %a, metadata !12, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %a, !12, !DIExpression(), !8)
   %3 = getelementptr inbounds %struct.Vector2i, ptr %b, i32 0, i32 0, !dbg !9
   store i32 2, ptr %3, align 4, !dbg !9
   %4 = getelementptr inbounds %struct.Vector2i, ptr %b, i32 0, i32 1, !dbg !9
   store i32 -2, ptr %4, align 4, !dbg !9
-  call void @llvm.dbg.declare(metadata ptr %b, metadata !18, metadata !DIExpression()), !dbg !9
+    #dbg_declare(ptr %b, !18, !DIExpression(), !9)
   %5 = getelementptr inbounds %struct.Vector2i, ptr %a, i32 0, i32 0, !dbg !10
   %6 = load i64, ptr %5, align 4, !dbg !10
   %7 = getelementptr inbounds %struct.Vector2i, ptr %b, i32 0, i32 0, !dbg !10
@@ -2329,7 +2866,7 @@ entry:
   %10 = getelementptr inbounds %struct.Vector2i, ptr %0, i32 0, i32 0, !dbg !10
   store i64 %9, ptr %10, align 4, !dbg !10
   %11 = load %struct.Vector2i, ptr %0, align 4, !dbg !10
-  call void @llvm.dbg.declare(metadata ptr %c, metadata !19, metadata !DIExpression()), !dbg !11
+    #dbg_declare(ptr %c, !19, !DIExpression(), !11)
   store %struct.Vector2i %11, ptr %c, align 4, !dbg !11
   %12 = getelementptr inbounds %struct.Vector2i, ptr %c, i32 0, i32 0, !dbg !11
   %13 = load i32, ptr %12, align 4, !dbg !11
@@ -2339,18 +2876,14 @@ entry:
   ret i32 %16, !dbg !20
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_c_headers.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_c_headers.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 5, type: !4, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2376,7 +2909,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Array Slices", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_array_slices.hltxt";
+    char const* const input_file = "debug_information_array_slices.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "debug_information_c_headers";
     std::filesystem::create_directories(root_directory_path);
@@ -2391,7 +2924,7 @@ struct Vector2i
 Vector2i add(Vector2i lhs, Vector2i rhs);
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "vector2i.h", "vector2i.hltxt", "c.vector2i", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "vector2i.h", "vector2i.iris", "c.vector2i", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2399,7 +2932,7 @@ Vector2i add(Vector2i lhs, Vector2i rhs);
     };
 
     std::string const expected_llvm_ir = std::format(R"(
-%struct.H_Builtin_Generic_array_slice = type {{ ptr, i64 }}
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
 
 ; Function Attrs: convergent
 define void @Debug_information_run(ptr noundef %"arguments[0].integers", ptr noundef %"arguments[1].vectors", i64 noundef %"arguments[2].length") #0 !dbg !3 {{
@@ -2407,49 +2940,45 @@ entry:
   %integers = alloca ptr, align 8
   %vectors = alloca ptr, align 8
   %length = alloca i64, align 8
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !20
-  %a = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !20
-  %1 = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !21
-  %b = alloca %struct.H_Builtin_Generic_array_slice, align 8, !dbg !21
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !20
+  %a = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !20
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !21
+  %b = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !21
   store ptr %"arguments[0].integers", ptr %integers, align 8
-  call void @llvm.dbg.declare(metadata ptr %integers, metadata !17, metadata !DIExpression()), !dbg !22
+    #dbg_declare(ptr %integers, !17, !DIExpression(), !22)
   store ptr %"arguments[1].vectors", ptr %vectors, align 8
-  call void @llvm.dbg.declare(metadata ptr %vectors, metadata !18, metadata !DIExpression()), !dbg !23
+    #dbg_declare(ptr %vectors, !18, !DIExpression(), !23)
   store i64 %"arguments[2].length", ptr %length, align 8
-  call void @llvm.dbg.declare(metadata ptr %length, metadata !19, metadata !DIExpression()), !dbg !24
+    #dbg_declare(ptr %length, !19, !DIExpression(), !24)
   %2 = load ptr, ptr %integers, align 8, !dbg !20
   %3 = load i64, ptr %length, align 8, !dbg !20
-  %4 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !20
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !20
   store ptr %2, ptr %4, align 8, !dbg !20
-  %5 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !20
+  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !20
   store i64 %3, ptr %5, align 8, !dbg !20
-  %6 = load %struct.H_Builtin_Generic_array_slice, ptr %0, align 8, !dbg !20
-  call void @llvm.dbg.declare(metadata ptr %a, metadata !25, metadata !DIExpression()), !dbg !21
-  store %struct.H_Builtin_Generic_array_slice %6, ptr %a, align 8, !dbg !21
+  %6 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8, !dbg !20
+    #dbg_declare(ptr %a, !25, !DIExpression(), !21)
+  store %struct.iris_builtin_Generic_array_slice %6, ptr %a, align 8, !dbg !21
   %7 = load ptr, ptr %vectors, align 8, !dbg !21
   %8 = load i64, ptr %length, align 8, !dbg !21
-  %9 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !21
+  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !21
   store ptr %7, ptr %9, align 8, !dbg !21
-  %10 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !21
+  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !21
   store i64 %8, ptr %10, align 8, !dbg !21
-  %11 = load %struct.H_Builtin_Generic_array_slice, ptr %1, align 8, !dbg !21
-  call void @llvm.dbg.declare(metadata ptr %b, metadata !30, metadata !DIExpression()), !dbg !34
-  store %struct.H_Builtin_Generic_array_slice %11, ptr %b, align 8, !dbg !34
+  %11 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8, !dbg !21
+    #dbg_declare(ptr %b, !30, !DIExpression(), !34)
+  store %struct.iris_builtin_Generic_array_slice %11, ptr %b, align 8, !dbg !34
   ret void, !dbg !34
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_array_slices.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_array_slices.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 5, type: !4, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !16)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null, !6, !8, !15}}
@@ -2489,7 +3018,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Bit Fields", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_bit_fields.hltxt";
+    char const* const input_file = "debug_information_bit_fields.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2514,24 +3043,20 @@ entry:
   %7 = and i32 %6, 16777215, !dbg !13
   %8 = or i32 %7, 33554432, !dbg !13
   store i32 %8, ptr %5, align 4, !dbg !13
-  call void @llvm.dbg.declare(metadata ptr %instance, metadata !14, metadata !DIExpression()), !dbg !13
+    #dbg_declare(ptr %instance, !14, !DIExpression(), !13)
   %9 = getelementptr inbounds %struct.Debug_information_My_struct, ptr %instance, i32 0, i32 0, !dbg !15
   %10 = load i64, ptr %9, align 4, !dbg !15
   ret i64 %10, !dbg !15
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_bit_fields.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_bit_fields.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "instantiate", linkageName: "Debug_information_instantiate", scope: null, file: !2, line: 10, type: !4, scopeLine: 11, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !12)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2552,7 +3077,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information For Loop", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_for_loop.hltxt";
+    char const* const input_file = "debug_information_for_loop.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2563,10 +3088,10 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 define i32 @Debug_information_run() #0 !dbg !3 {{
 entry:
   %value = alloca i32, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !9, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %value, !9, !DIExpression(), !8)
   %index = alloca i32, align 4, !dbg !10
   store i32 0, ptr %value, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %index, metadata !12, metadata !DIExpression()), !dbg !10
+    #dbg_declare(ptr %index, !12, !DIExpression(), !10)
   store i32 0, ptr %index, align 4, !dbg !10
   br label %for_loop_condition, !dbg !10
 
@@ -2593,18 +3118,14 @@ for_loop_after:                                   ; preds = %for_loop_condition
   ret i32 %7, !dbg !14
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_for_loop.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_for_loop.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2624,7 +3145,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Function Call", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_function_call.hltxt";
+    char const* const input_file = "debug_information_function_call.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2636,7 +3157,7 @@ define i32 @Debug_information_run() #0 !dbg !3 {{
 entry:
   %value = alloca i32, align 4, !dbg !8
   %0 = call i32 @Debug_information_add(i32 noundef 1, i32 noundef 2), !dbg !9
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !10, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %value, !10, !DIExpression(), !8)
   store i32 %0, ptr %value, align 4, !dbg !8
   %1 = load i32, ptr %value, align 4, !dbg !11
   ret i32 %1, !dbg !11
@@ -2648,27 +3169,23 @@ entry:
   %lhs = alloca i32, align 4
   %rhs = alloca i32, align 4
   store i32 %"arguments[0].lhs", ptr %lhs, align 4
-  call void @llvm.dbg.declare(metadata ptr %lhs, metadata !16, metadata !DIExpression()), !dbg !18
+    #dbg_declare(ptr %lhs, !16, !DIExpression(), !18)
   store i32 %"arguments[1].rhs", ptr %rhs, align 4
-  call void @llvm.dbg.declare(metadata ptr %rhs, metadata !17, metadata !DIExpression()), !dbg !19
+    #dbg_declare(ptr %rhs, !17, !DIExpression(), !19)
   %0 = load i32, ptr %lhs, align 4, !dbg !20
   %1 = load i32, ptr %rhs, align 4, !dbg !20
   %2 = add i32 %0, %1, !dbg !20
   ret i32 %2, !dbg !21
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_function_call.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_function_call.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 8, type: !4, scopeLine: 9, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2693,9 +3210,78 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
   }
 
+  TEST_CASE("Compile Debug Information Imported Function Constructor", "[LLVM_IR]")
+  {
+    char const* const input_file = "debug_information_function_constructor_consumer.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "Debug_information_function_constructor_provider", parse_and_get_file_path(g_test_source_files_path / "debug_information_function_constructor_provider.iris") },
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+; Function Attrs: convergent
+define i32 @Debug_information_function_constructor_consumer_run() #0 !dbg !3 {{
+entry:
+  %value = alloca i32, align 4, !dbg !8
+  %0 = call i32 @Debug_information_function_constructor_provider__at__add__at__489334907677298949(i32 noundef 1, i32 noundef 2), !dbg !9
+    #dbg_declare(ptr %value, !10, !DIExpression(), !8)
+  store i32 %0, ptr %value, align 4, !dbg !8
+  %1 = load i32, ptr %value, align 4, !dbg !11
+  ret i32 %1, !dbg !11
+}}
+
+; Function Attrs: convergent
+define private i32 @Debug_information_function_constructor_provider__at__add__at__489334907677298949(i32 noundef %"arguments[0].lhs", i32 noundef %"arguments[1].rhs") #0 !dbg !12 {{
+entry:
+  %lhs = alloca i32, align 4
+  %rhs = alloca i32, align 4
+  store i32 %"arguments[0].lhs", ptr %lhs, align 4
+    #dbg_declare(ptr %lhs, !17, !DIExpression(), !19)
+  store i32 %"arguments[1].rhs", ptr %rhs, align 4
+    #dbg_declare(ptr %rhs, !18, !DIExpression(), !20)
+  %0 = load i32, ptr %lhs, align 4, !dbg !21
+  %1 = load i32, ptr %rhs, align 4, !dbg !21
+  %2 = add i32 %0, %1, !dbg !21
+  ret i32 %2, !dbg !22
+}}
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
+
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_function_constructor_consumer.iris", directory: "{}")
+!3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_function_constructor_consumer_run", scope: null, file: !2, line: 5, type: !4, scopeLine: 6, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
+!4 = !DISubroutineType(types: !5)
+!5 = !{{!6}}
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
+!7 = !{{}}
+!8 = !DILocation(line: 7, column: 5, scope: !3)
+!9 = !DILocation(line: 7, column: 17, scope: !3)
+!10 = !DILocalVariable(name: "value", scope: !3, file: !2, line: 7, type: !6)
+!11 = !DILocation(line: 8, column: 5, scope: !3)
+!12 = distinct !DISubprogram(name: "Debug_information_function_constructor_provider__at__add__at__489334907677298949", linkageName: "Debug_information_function_constructor_provider__at__add__at__489334907677298949", scope: null, file: !13, line: 5, type: !14, scopeLine: 5, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !16)
+!13 = !DIFile(filename: "debug_information_function_constructor_provider.iris", directory: "{}")
+!14 = !DISubroutineType(types: !15)
+!15 = !{{!6, !6, !6}}
+!16 = !{{!17, !18}}
+!17 = !DILocalVariable(name: "lhs", arg: 1, scope: !12, file: !13, line: 5, type: !6)
+!18 = !DILocalVariable(name: "rhs", arg: 2, scope: !12, file: !13, line: 5, type: !6)
+!19 = !DILocation(line: 5, column: 22, scope: !12)
+!20 = !DILocation(line: 5, column: 39, scope: !12)
+!21 = !DILocation(line: 5, column: 12, scope: !12)
+!22 = !DILocation(line: 7, column: 9, scope: !12)
+)", g_test_source_files_path.generic_string(), g_test_source_files_path.generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
+  }
+
   TEST_CASE("Compile Debug Information If", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_if.hltxt";
+    char const* const input_file = "debug_information_if.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2707,7 +3293,7 @@ define private i32 @Debug_information_run(i32 noundef %"arguments[0].value") #0 
 entry:
   %value = alloca i32, align 4
   store i32 %"arguments[0].value", ptr %value, align 4
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !8, metadata !DIExpression()), !dbg !9
+    #dbg_declare(ptr %value, !8, !DIExpression(), !9)
   %0 = load i32, ptr %value, align 4, !dbg !10
   %1 = icmp eq i32 %0, 0, !dbg !10
   br i1 %1, label %if_s0_then, label %if_s1_else, !dbg !10
@@ -2727,18 +3313,14 @@ if_s3_else:                                       ; preds = %if_s1_else
   ret i32 3, !dbg !16
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_if.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_if.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6, !6}}
@@ -2761,7 +3343,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Struct", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_structs.hltxt";
+    char const* const input_file = "debug_information_structs.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2778,24 +3360,20 @@ entry:
   store i32 1, ptr %0, align 4, !dbg !12
   %1 = getelementptr inbounds %struct.Debug_information_Vector2i, ptr %instance, i32 0, i32 1, !dbg !12
   store i32 2, ptr %1, align 4, !dbg !12
-  call void @llvm.dbg.declare(metadata ptr %instance, metadata !13, metadata !DIExpression()), !dbg !12
+    #dbg_declare(ptr %instance, !13, !DIExpression(), !12)
   %2 = getelementptr inbounds %struct.Debug_information_Vector2i, ptr %instance, i32 0, i32 0, !dbg !14
   %3 = load i64, ptr %2, align 4, !dbg !14
   ret i64 %3, !dbg !14
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_structs.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_structs.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "instantiate", linkageName: "Debug_information_instantiate", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !11)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2815,7 +3393,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Switch", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_switch.hltxt";
+    char const* const input_file = "debug_information_switch.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2827,7 +3405,7 @@ define private i32 @Debug_information_run(i32 noundef %"arguments[0].value") #0 
 entry:
   %value = alloca i32, align 4
   store i32 %"arguments[0].value", ptr %value, align 4
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !8, metadata !DIExpression()), !dbg !9
+    #dbg_declare(ptr %value, !8, !DIExpression(), !9)
   %0 = load i32, ptr %value, align 4, !dbg !10
   switch i32 %0, label %switch_case_default [
     i32 0, label %switch_case_i0_
@@ -2848,18 +3426,14 @@ switch_case_default:                              ; preds = %entry
   br label %switch_after, !dbg !14
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_switch.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_switch.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6, !6}}
@@ -2879,7 +3453,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Temporary Replacement", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_temporary_replacement.hltxt";
+    char const* const input_file = "debug_information_temporary_replacement.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2896,22 +3470,18 @@ entry:
   store ptr null, ptr %0, align 8, !dbg !7
   %1 = getelementptr inbounds %struct.Debug_information_temporary_replacement_My_struct, ptr %instance, i32 0, i32 1, !dbg !7
   store ptr null, ptr %1, align 8, !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %instance, metadata !8, metadata !DIExpression()), !dbg !7
+    #dbg_declare(ptr %instance, !8, !DIExpression(), !7)
   ret void, !dbg !7
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_temporary_replacement.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_temporary_replacement.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_temporary_replacement_run", scope: null, file: !2, line: 10, type: !4, scopeLine: 11, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null}}
@@ -2931,7 +3501,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Union", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_unions.hltxt";
+    char const* const input_file = "debug_information_unions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2945,24 +3515,20 @@ define private i32 @Debug_information_instantiate() #0 !dbg !3 {{
 entry:
   %instance = alloca %union.Debug_information_My_int, align 4, !dbg !13
   store i32 0, ptr %instance, align 4, !dbg !13
-  call void @llvm.dbg.declare(metadata ptr %instance, metadata !14, metadata !DIExpression()), !dbg !13
+    #dbg_declare(ptr %instance, !14, !DIExpression(), !13)
   %0 = getelementptr inbounds %union.Debug_information_My_int, ptr %instance, i32 0, i32 0, !dbg !15
   %1 = load i32, ptr %0, align 4, !dbg !15
   ret i32 %1, !dbg !15
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_unions.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_unions.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "instantiate", linkageName: "Debug_information_instantiate", scope: null, file: !2, line: 9, type: !4, scopeLine: 10, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !12)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -2983,7 +3549,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information Variables", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_variables.hltxt";
+    char const* const input_file = "debug_information_variables.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -2994,25 +3560,21 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 define i32 @Debug_information_run() #0 !dbg !3 {{
 entry:
   %i = alloca i32, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %i, metadata !9, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %i, !9, !DIExpression(), !8)
   store i32 0, ptr %i, align 4, !dbg !8
   store i32 2, ptr %i, align 4, !dbg !10
   %0 = load i32, ptr %i, align 4, !dbg !11
   ret i32 %0, !dbg !11
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_variables.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_variables.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -3029,7 +3591,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Debug Information While Loop", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_while_loop.hltxt";
+    char const* const input_file = "debug_information_while_loop.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3040,10 +3602,10 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 define i32 @Debug_information_run() #0 !dbg !3 {{
 entry:
   %value = alloca i32, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !9, metadata !DIExpression()), !dbg !8
+    #dbg_declare(ptr %value, !9, !DIExpression(), !8)
   %index = alloca i32, align 4, !dbg !10
   store i32 0, ptr %value, align 4, !dbg !8
-  call void @llvm.dbg.declare(metadata ptr %index, metadata !11, metadata !DIExpression()), !dbg !10
+    #dbg_declare(ptr %index, !11, !DIExpression(), !10)
   store i32 0, ptr %index, align 4, !dbg !10
   br label %while_loop_condition, !dbg !10
 
@@ -3084,18 +3646,14 @@ if_s1_after:                                      ; preds = %while_loop_then1
   br label %while_loop_then1, !dbg !23
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_while_loop.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_while_loop.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "run", linkageName: "Debug_information_run", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{!6}}
@@ -3124,7 +3682,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Decimal Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "decimal_expressions.hltxt";
+    char const* const input_file = "decimal_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3380,77 +3938,73 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Debug Information Decimal Types", "[LLVM_IR]")
   {
-    char const* const input_file = "debug_information_decimal_expressions.hltxt";
+    char const* const input_file = "debug_information_decimal_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
     };
 
-    char const* const expected_llvm_ir = R"(
+    std::string const expected_llvm_ir = std::format(R"(
 ; Function Attrs: convergent
-define void @Debug_information_decimal_expressions_decimal_constants() #0 !dbg !3 {
+define void @Debug_information_decimal_expressions_decimal_constants() #0 !dbg !3 {{
 entry:
   %a = alloca i32, align 4, !dbg !7
-  call void @llvm.dbg.declare(metadata ptr %a, metadata !8, metadata !DIExpression()), !dbg !14
+    #dbg_declare(ptr %a, !8, !DIExpression(), !14)
   %b = alloca i32, align 4, !dbg !14
   %c = alloca i64, align 8, !dbg !15
   %d = alloca i32, align 4, !dbg !16
   store i32 15, ptr %a, align 4, !dbg !14
-  call void @llvm.dbg.declare(metadata ptr %b, metadata !17, metadata !DIExpression()), !dbg !15
+    #dbg_declare(ptr %b, !17, !DIExpression(), !15)
   store i32 15700, ptr %b, align 4, !dbg !15
-  call void @llvm.dbg.declare(metadata ptr %c, metadata !22, metadata !DIExpression()), !dbg !16
+    #dbg_declare(ptr %c, !22, !DIExpression(), !16)
   store i64 1234567000, ptr %c, align 8, !dbg !16
-  call void @llvm.dbg.declare(metadata ptr %d, metadata !27, metadata !DIExpression()), !dbg !28
+    #dbg_declare(ptr %d, !27, !DIExpression(), !28)
   store i32 10000, ptr %d, align 4, !dbg !28
   ret void, !dbg !28
-}
+}}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
 
-attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
-attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
 
-!llvm.module.flags = !{!0}
-!llvm.dbg.cu = !{!1}
-
-!0 = !{i32 2, !"Debug Info Version", i32 3}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "debug_information_decimal_expressions.hltxt", directory: "C:/Users/JPMMa/Desktop/source/H/Examples/txt")
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "debug_information_decimal_expressions.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "decimal_constants", linkageName: "Debug_information_decimal_expressions_decimal_constants", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !6)
 !4 = !DISubroutineType(types: !5)
-!5 = !{null}
-!6 = !{}
+!5 = !{{null}}
+!6 = !{{}}
 !7 = !DILocation(line: 4, column: 1, scope: !3)
 !8 = !DILocalVariable(name: "a", scope: !3, file: !2, line: 5, type: !9)
-!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal2", scope: !10, size: 32, align: 32, elements: !11)
+!9 = !DICompositeType(tag: DW_TAG_structure_type, name: "iris::Decimal2", scope: !10, size: 32, align: 32, elements: !11)
 !10 = !DINamespace(name: "h", scope: null)
-!11 = !{!12}
+!11 = !{{!12}}
 !12 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !13, size: 32, align: 32)
-!13 = !DIBasicType(name: "h::Decimal2_storage", size: 32, encoding: DW_ATE_signed)
+!13 = !DIBasicType(name: "iris::Decimal2_storage", size: 32, encoding: DW_ATE_signed)
 !14 = !DILocation(line: 5, column: 5, scope: !3)
 !15 = !DILocation(line: 6, column: 5, scope: !3)
 !16 = !DILocation(line: 7, column: 5, scope: !3)
 !17 = !DILocalVariable(name: "b", scope: !3, file: !2, line: 6, type: !18)
-!18 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal4", scope: !10, size: 32, align: 32, elements: !19)
-!19 = !{!20}
+!18 = !DICompositeType(tag: DW_TAG_structure_type, name: "iris::Decimal4", scope: !10, size: 32, align: 32, elements: !19)
+!19 = !{{!20}}
 !20 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !21, size: 32, align: 32)
-!21 = !DIBasicType(name: "h::Decimal4_storage", size: 32, encoding: DW_ATE_signed)
+!21 = !DIBasicType(name: "iris::Decimal4_storage", size: 32, encoding: DW_ATE_signed)
 !22 = !DILocalVariable(name: "c", scope: !3, file: !2, line: 7, type: !23)
-!23 = !DICompositeType(tag: DW_TAG_structure_type, name: "h::Decimal7", scope: !10, size: 64, align: 64, elements: !24)
-!24 = !{!25}
+!23 = !DICompositeType(tag: DW_TAG_structure_type, name: "iris::Decimal7", scope: !10, size: 64, align: 64, elements: !24)
+!24 = !{{!25}}
 !25 = !DIDerivedType(tag: DW_TAG_member, name: "raw", scope: !10, baseType: !26, size: 64, align: 64)
-!26 = !DIBasicType(name: "h::Decimal7_storage", size: 64, encoding: DW_ATE_signed)
+!26 = !DIBasicType(name: "iris::Decimal7_storage", size: 64, encoding: DW_ATE_signed)
 !27 = !DILocalVariable(name: "d", scope: !3, file: !2, line: 8, type: !9)
 !28 = !DILocation(line: 8, column: 5, scope: !3)
-)";
+)", g_test_source_files_path.generic_string());
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
   }
 
   TEST_CASE("Compile Defer Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "defer_expressions.hltxt";
+    char const* const input_file = "defer_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3677,7 +4231,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Dereference and Access Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "dereference_and_access_expressions.hltxt";
+    char const* const input_file = "dereference_and_access_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3710,7 +4264,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Defer Expressions with Debug Information", "[LLVM_IR]")
   {
-    char const* const input_file = "defer_expressions_with_debug_information.hltxt";
+    char const* const input_file = "defer_expressions_with_debug_information.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3722,7 +4276,7 @@ define private void @Defer_expressions_with_debug_information_do_defer(i32 nound
 entry:
   %value = alloca i32, align 4
   store i32 %"arguments[0].value", ptr %value, align 4
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !8, metadata !DIExpression()), !dbg !9
+    #dbg_declare(ptr %value, !8, !DIExpression(), !9)
   ret void, !dbg !10
 }}
 
@@ -3734,28 +4288,24 @@ entry:
   %value_2 = alloca i32, align 4, !dbg !18
   %0 = zext i1 %"arguments[0].condition" to i8
   store i8 %0, ptr %condition, align 1
-  call void @llvm.dbg.declare(metadata ptr %condition, metadata !16, metadata !DIExpression()), !dbg !19
+    #dbg_declare(ptr %condition, !16, !DIExpression(), !19)
   store i32 %"arguments[1].value", ptr %value, align 4
-  call void @llvm.dbg.declare(metadata ptr %value, metadata !17, metadata !DIExpression()), !dbg !20
-  call void @llvm.dbg.declare(metadata ptr %value_2, metadata !21, metadata !DIExpression()), !dbg !18
+    #dbg_declare(ptr %value, !17, !DIExpression(), !20)
+    #dbg_declare(ptr %value_2, !21, !DIExpression(), !18)
   store i32 0, ptr %value_2, align 4, !dbg !18
   call void @Defer_expressions_with_debug_information_do_defer(i32 noundef 1), !dbg !22
   call void @Defer_expressions_with_debug_information_do_defer(i32 noundef 0), !dbg !23
   ret void, !dbg !24
 }}
 
-; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
-declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
-
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn memory(none) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
 
 !0 = !{{i32 2, !"Debug Info Version", i32 3}}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Hlang Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "defer_expressions_with_debug_information.hltxt", directory: "{}")
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "defer_expressions_with_debug_information.iris", directory: "{}")
 !3 = distinct !DISubprogram(name: "do_defer", linkageName: "Defer_expressions_with_debug_information_do_defer", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{{null, !6}}
@@ -3785,7 +4335,7 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Dynamic Array", "[LLVM_IR]")
   {
-    char const* const input_file = "dynamic_array.hltxt";
+    char const* const input_file = "dynamic_array.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -3798,30 +4348,30 @@ attributes #1 = {{ nocallback nofree nosync nounwind speculatable willreturn mem
 
   TEST_CASE("Compile Dynamic Array Usage", "[LLVM_IR]")
   {
-    char const* const input_file = "dynamic_array_usage.hltxt";
+    char const* const input_file = "dynamic_array_usage.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-      { "dynamic_array", parse_and_get_file_path(g_test_source_files_path / "dynamic_array.hltxt") },
+      { "dynamic_array", parse_and_get_file_path(g_test_source_files_path / "dynamic_array.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
 %struct.dynamic_array_Allocator = type { ptr, ptr }
-%"struct.dynamic_array@Dynamic_array@10870525800499546629" = type { ptr, i64, i64, %struct.dynamic_array_Allocator }
+%struct.dynamic_array__at__Dynamic_array__at__10870525800499546629 = type { ptr, i64, i64, %struct.dynamic_array_Allocator }
 
-@function_contract_error_string = private unnamed_addr constant [125 x i8] c"In function 'dynamic_array_usage.dynamic_array@create@9190698639914732028' precondition 'allocator.allocate != null' failed!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [127 x i8] c"In function 'dynamic_array_usage.dynamic_array@create@9190698639914732028' precondition 'allocator.deallocate != null' failed!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [119 x i8] c"In function 'dynamic_array_usage.dynamic_array@push_back@15363871578545837817' precondition 'instance != null' failed!\00"
-@function_contract_error_string.3 = private unnamed_addr constant [120 x i8] c"In function 'dynamic_array_usage.dynamic_array@push_back@15363871578545837817' assert 'Allocation did not fail' failed!\00"
-@function_contract_error_string.4 = private unnamed_addr constant [113 x i8] c"In function 'dynamic_array_usage.dynamic_array@get@11326571526526506051' precondition 'instance != null' failed!\00"
-@function_contract_error_string.5 = private unnamed_addr constant [121 x i8] c"In function 'dynamic_array_usage.dynamic_array@get@11326571526526506051' precondition 'index < instance->length' failed!\00"
+@function_contract_error_string = private unnamed_addr constant [135 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__create__at__9190698639914732028' precondition 'allocator.allocate != null' failed!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [137 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__create__at__9190698639914732028' precondition 'allocator.deallocate != null' failed!\00"
+@function_contract_error_string.2 = private unnamed_addr constant [129 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__push_back__at__15363871578545837817' precondition 'instance != null' failed!\00"
+@function_contract_error_string.3 = private unnamed_addr constant [130 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__push_back__at__15363871578545837817' assert 'Allocation did not fail' failed!\00"
+@function_contract_error_string.4 = private unnamed_addr constant [123 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__get__at__11326571526526506051' precondition 'instance != null' failed!\00"
+@function_contract_error_string.5 = private unnamed_addr constant [131 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__get__at__11326571526526506051' precondition 'index < instance->length' failed!\00"
 
 ; Function Attrs: convergent
 define private void @dynamic_array_usage_run() #0 {
 entry:
   %allocator = alloca %struct.dynamic_array_Allocator, align 8
-  %0 = alloca %"struct.dynamic_array@Dynamic_array@10870525800499546629", align 8
-  %instance = alloca %"struct.dynamic_array@Dynamic_array@10870525800499546629", align 8
+  %0 = alloca %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, align 8
+  %instance = alloca %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, align 8
   %element = alloca i32, align 4
   %1 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %allocator, i32 0, i32 0
   store ptr null, ptr %1, align 8
@@ -3831,20 +4381,20 @@ entry:
   %4 = load ptr, ptr %3, align 8
   %5 = getelementptr inbounds { ptr, ptr }, ptr %allocator, i32 0, i32 1
   %6 = load ptr, ptr %5, align 8
-  call void @"dynamic_array@create@9190698639914732028"(ptr dead_on_unwind noalias writable sret(%"struct.dynamic_array@Dynamic_array@10870525800499546629") align 8 %0, ptr %4, ptr %6)
-  %7 = load %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %0, align 8
-  store %"struct.dynamic_array@Dynamic_array@10870525800499546629" %7, ptr %instance, align 8
-  call void @"dynamic_array@push_back@15363871578545837817"(ptr noundef %instance, i32 noundef 1)
-  %8 = call i32 @"dynamic_array@get@11326571526526506051"(ptr noundef %instance, i64 noundef 0)
+  call void @dynamic_array__at__create__at__9190698639914732028(ptr dead_on_unwind noalias writable sret(%struct.dynamic_array__at__Dynamic_array__at__10870525800499546629) align 8 %0, ptr %4, ptr %6)
+  %7 = load %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %0, align 8
+  store %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629 %7, ptr %instance, align 8
+  call void @dynamic_array__at__push_back__at__15363871578545837817(ptr noundef %instance, i32 noundef 1)
+  %8 = call i32 @dynamic_array__at__get__at__11326571526526506051(ptr noundef %instance, i64 noundef 0)
   store i32 %8, ptr %element, align 4
   ret void
 }
 
 ; Function Attrs: convergent
-define private void @"dynamic_array@create@9190698639914732028"(ptr dead_on_unwind noalias writable sret(%"struct.dynamic_array@Dynamic_array@10870525800499546629") align 8 %return.instance, ptr %"arguments[0].allocator_0", ptr %"arguments[0].allocator_1") #0 {
+define private void @dynamic_array__at__create__at__9190698639914732028(ptr dead_on_unwind noalias writable sret(%struct.dynamic_array__at__Dynamic_array__at__10870525800499546629) align 8 %return.instance, ptr %"arguments[0].allocator_0", ptr %"arguments[0].allocator_1") #0 {
 entry:
   %allocator = alloca %struct.dynamic_array_Allocator, align 8
-  %0 = alloca %"struct.dynamic_array@Dynamic_array@10870525800499546629", align 8
+  %0 = alloca %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, align 8
   %1 = getelementptr inbounds { ptr, ptr }, ptr %allocator, i32 0, i32 0
   store ptr %"arguments[0].allocator_0", ptr %1, align 8
   %2 = getelementptr inbounds { ptr, ptr }, ptr %allocator, i32 0, i32 1
@@ -3866,14 +4416,14 @@ condition_fail:                                   ; preds = %entry
   unreachable
 
 condition_success1:                               ; preds = %condition_success
-  %10 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 0
+  %10 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %0, i32 0, i32 0
   store ptr null, ptr %10, align 8
-  %11 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 1
+  %11 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %0, i32 0, i32 1
   store i64 0, ptr %11, align 8
-  %12 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 2
+  %12 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %0, i32 0, i32 2
   store i64 0, ptr %12, align 8
   %13 = load %struct.dynamic_array_Allocator, ptr %allocator, align 8
-  %14 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %0, i32 0, i32 3
+  %14 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %0, i32 0, i32 3
   store %struct.dynamic_array_Allocator %13, ptr %14, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return.instance, ptr align 8 %0, i64 40, i1 false)
   ret void
@@ -3885,7 +4435,7 @@ condition_fail2:                                  ; preds = %condition_success
 }
 
 ; Function Attrs: convergent
-define private void @"dynamic_array@push_back@15363871578545837817"(ptr noundef %"arguments[0].instance", i32 noundef %"arguments[1].element") #0 {
+define private void @dynamic_array__at__push_back__at__15363871578545837817(ptr noundef %"arguments[0].instance", i32 noundef %"arguments[1].element") #0 {
 entry:
   %instance = alloca ptr, align 8
   %element = alloca i32, align 4
@@ -3901,10 +4451,10 @@ entry:
 
 condition_success:                                ; preds = %entry
   %2 = load ptr, ptr %instance, align 8
-  %3 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %2, i32 0, i32 1
+  %3 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %2, i32 0, i32 1
   %4 = load i64, ptr %3, align 8
   %5 = load ptr, ptr %instance, align 8
-  %6 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %5, i32 0, i32 2
+  %6 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %5, i32 0, i32 2
   %7 = load i64, ptr %6, align 8
   %8 = icmp eq i64 %4, %7
   br i1 %8, label %if_s0_then, label %if_s1_after
@@ -3916,7 +4466,7 @@ condition_fail:                                   ; preds = %entry
 
 if_s0_then:                                       ; preds = %condition_success
   %10 = load ptr, ptr %instance, align 8
-  %11 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %10, i32 0, i32 2
+  %11 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %10, i32 0, i32 2
   %12 = load i64, ptr %11, align 8
   %13 = add i64 %12, 1
   %14 = mul i64 2, %13
@@ -3925,7 +4475,7 @@ if_s0_then:                                       ; preds = %condition_success
   %16 = mul i64 %15, 4
   store i64 %16, ptr %allocation_size_in_bytes, align 8
   %17 = load ptr, ptr %instance, align 8
-  %18 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %17, i32 0, i32 3
+  %18 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %17, i32 0, i32 3
   %19 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %18, i32 0, i32 0
   %20 = load ptr, ptr %19, align 8
   %21 = load i64, ptr %allocation_size_in_bytes, align 8
@@ -3937,20 +4487,20 @@ if_s0_then:                                       ; preds = %condition_success
 
 if_s1_after:                                      ; preds = %condition_success1, %condition_success
   %25 = load ptr, ptr %instance, align 8
-  %26 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %25, i32 0, i32 1
+  %26 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %25, i32 0, i32 1
   %27 = load i64, ptr %26, align 8
   store i64 %27, ptr %index, align 8
   %28 = load i64, ptr %index, align 8
   %29 = load ptr, ptr %instance, align 8
-  %30 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %29, i32 0, i32 0
+  %30 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %29, i32 0, i32 0
   %31 = load ptr, ptr %30, align 8
   %array_element_pointer = getelementptr i32, ptr %31, i64 %28
   %32 = load i32, ptr %element, align 4
   store i32 %32, ptr %array_element_pointer, align 4
   %33 = load ptr, ptr %instance, align 8
-  %34 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %33, i32 0, i32 1
+  %34 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %33, i32 0, i32 1
   %35 = load ptr, ptr %instance, align 8
-  %36 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %35, i32 0, i32 1
+  %36 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %35, i32 0, i32 1
   %37 = load i64, ptr %36, align 8
   %38 = add i64 %37, 1
   store i64 %38, ptr %34, align 8
@@ -3958,11 +4508,11 @@ if_s1_after:                                      ; preds = %condition_success1,
 
 condition_success1:                               ; preds = %if_s0_then
   %39 = load ptr, ptr %instance, align 8
-  %40 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %39, i32 0, i32 0
+  %40 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %39, i32 0, i32 0
   %41 = load ptr, ptr %allocation, align 8
   store ptr %41, ptr %40, align 8
   %42 = load ptr, ptr %instance, align 8
-  %43 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %42, i32 0, i32 2
+  %43 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %42, i32 0, i32 2
   %44 = load i64, ptr %new_capacity, align 8
   store i64 %44, ptr %43, align 8
   br label %if_s1_after
@@ -3974,7 +4524,7 @@ condition_fail2:                                  ; preds = %if_s0_then
 }
 
 ; Function Attrs: convergent
-define private i32 @"dynamic_array@get@11326571526526506051"(ptr noundef %"arguments[0].instance", i64 noundef %"arguments[1].index") #0 {
+define private i32 @dynamic_array__at__get__at__11326571526526506051(ptr noundef %"arguments[0].instance", i64 noundef %"arguments[1].index") #0 {
 entry:
   %instance = alloca ptr, align 8
   %index = alloca i64, align 8
@@ -3987,7 +4537,7 @@ entry:
 condition_success:                                ; preds = %entry
   %2 = load i64, ptr %index, align 8
   %3 = load ptr, ptr %instance, align 8
-  %4 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %3, i32 0, i32 1
+  %4 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %3, i32 0, i32 1
   %5 = load i64, ptr %4, align 8
   %6 = icmp ult i64 %2, %5
   br i1 %6, label %condition_success1, label %condition_fail2
@@ -4000,7 +4550,7 @@ condition_fail:                                   ; preds = %entry
 condition_success1:                               ; preds = %condition_success
   %8 = load i64, ptr %index, align 8
   %9 = load ptr, ptr %instance, align 8
-  %10 = getelementptr inbounds %"struct.dynamic_array@Dynamic_array@10870525800499546629", ptr %9, i32 0, i32 0
+  %10 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %9, i32 0, i32 0
   %11 = load ptr, ptr %10, align 8
   %array_element_pointer = getelementptr i32, ptr %11, i64 %8
   %12 = load i32, ptr %array_element_pointer, align 4
@@ -4017,7 +4567,7 @@ declare i32 @puts(ptr)
 declare void @abort()
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -4028,7 +4578,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
 
   TEST_CASE("Compile Empty Return Expression", "[LLVM_IR]")
   {
-    char const* const input_file = "empty_return_expression.hltxt";
+    char const* const input_file = "empty_return_expression.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4049,7 +4599,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile For Loop Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "for_loop_expressions.hltxt";
+    char const* const input_file = "for_loop_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4170,7 +4720,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Function Pointers", "[LLVM_IR]")
   {
-    char const* const input_file = "function_pointers.hltxt";
+    char const* const input_file = "function_pointers.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4220,9 +4770,107 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Function Pointers through Alias", "[LLVM_IR]")
+  {
+    char const* const input_file = "function_pointer_through_alias.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define void @Function_pointer_through_alias_run() #0 {
+entry:
+  %system = alloca ptr, align 8
+  store ptr @Function_pointer_through_alias_foo, ptr %system, align 8
+  %0 = load ptr, ptr %system, align 8
+  call void %0()
+  ret void
+}
+
+; Function Attrs: convergent
+define private void @Function_pointer_through_alias_foo() #0 {
+entry:
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Function Pointers through Globals", "[LLVM_IR]")
+  {
+    char const* const input_file = "function_pointer_through_global.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.function_pointer_through_global__at__Holder__at__16854961200032185695 = type { ptr }
+
+@function_pointer_through_global_identity_hash_u64 = constant ptr @function_pointer_through_global__at__identity_hash__at__6786277289116093716
+@function_pointer_through_global_make_holder_u64 = constant ptr @function_pointer_through_global__at__make_holder__at__12710636169570723101
+
+; Function Attrs: convergent
+define private i64 @function_pointer_through_global__at__identity_hash__at__6786277289116093716(ptr noundef %"arguments[0].key") #0 {
+entry:
+  %key = alloca ptr, align 8
+  store ptr %"arguments[0].key", ptr %key, align 8
+  ret i64 0
+}
+
+; Function Attrs: convergent
+define private ptr @function_pointer_through_global__at__make_holder__at__12710636169570723101(ptr noundef %"arguments[0].hash_fn") #0 {
+entry:
+  %hash_fn = alloca ptr, align 8
+  %0 = alloca %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, align 8
+  store ptr %"arguments[0].hash_fn", ptr %hash_fn, align 8
+  %1 = load ptr, ptr %hash_fn, align 8
+  %2 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, i32 0, i32 0
+  store ptr %1, ptr %2, align 8
+  %3 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  ret ptr %4
+}
+
+; Function Attrs: convergent
+define private void @function_pointer_through_global_test_function_pointer_global_passthrough_abi() #0 {
+entry:
+  %0 = alloca %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, align 8
+  %holder = alloca %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, align 8
+  %x = alloca i64, align 8
+  %f = alloca ptr, align 8
+  %result = alloca i64, align 8
+  %1 = load ptr, ptr @function_pointer_through_global_make_holder_u64, align 8
+  %2 = load ptr, ptr @function_pointer_through_global_identity_hash_u64, align 8
+  %3 = call ptr %1(ptr noundef %2)
+  %4 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, i32 0, i32 0
+  store ptr %3, ptr %4, align 8
+  %5 = load %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, align 8
+  store %struct.function_pointer_through_global__at__Holder__at__16854961200032185695 %5, ptr %holder, align 8
+  store i64 1, ptr %x, align 8
+  %6 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %holder, i32 0, i32 0
+  %7 = load ptr, ptr %6, align 8
+  store ptr %7, ptr %f, align 8
+  %8 = load ptr, ptr %f, align 8
+  %9 = call i64 %8(ptr noundef %x)
+  store i64 %9, ptr %result, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile hello world!", "[LLVM_IR]")
   {
-    char const* const input_file = "hello_world.hltxt";
+    char const* const input_file = "hello_world.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4250,7 +4898,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile If Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "if_expressions.hltxt";
+    char const* const input_file = "if_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4380,9 +5028,86 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile If Expressions 2", "[LLVM_IR]")
+  {
+    char const* const input_file = "if_expressions_2.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.If_expressions_2_Container = type { %struct.iris_builtin_Generic_array_slice }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
+
+@function_contract_error_string = private unnamed_addr constant [66 x i8] c"Out-of-bounds array slice access in 'If_expressions_2.get_value'!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [66 x i8] c"Out-of-bounds array slice access in 'If_expressions_2.get_value'!\00"
+
+; Function Attrs: convergent
+define private i64 @If_expressions_2_get_value(i64 noundef %"arguments[0].id", ptr noundef %"arguments[1].container") #0 {
+entry:
+  %id = alloca i64, align 8
+  %container = alloca ptr, align 8
+  store i64 %"arguments[0].id", ptr %id, align 8
+  store ptr %"arguments[1].container", ptr %container, align 8
+  %0 = load i64, ptr %id, align 8
+  %1 = icmp eq i64 %0, 1
+  br i1 %1, label %if_s0_then, label %if_s1_else
+
+if_s0_then:                                       ; preds = %entry
+  %2 = load ptr, ptr %container, align 8
+  %3 = getelementptr inbounds %struct.If_expressions_2_Container, ptr %2, i32 0, i32 0
+  %4 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 1
+  %5 = load i64, ptr %4, align 8
+  %bounds_check_in_bounds = icmp ult i64 0, %5
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+if_s1_else:                                       ; preds = %entry
+  %6 = load ptr, ptr %container, align 8
+  %7 = getelementptr inbounds %struct.If_expressions_2_Container, ptr %6, i32 0, i32 0
+  %8 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %7, i32 0, i32 1
+  %9 = load i64, ptr %8, align 8
+  %bounds_check_in_bounds1 = icmp ult i64 1, %9
+  br i1 %bounds_check_in_bounds1, label %bounds_check_pass2, label %bounds_check_fail3
+
+bounds_check_pass:                                ; preds = %if_s0_then
+  %10 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  %array_slice_element_pointer = getelementptr i64, ptr %11, i64 0
+  %12 = load i64, ptr %array_slice_element_pointer, align 8
+  ret i64 %12
+
+bounds_check_fail:                                ; preds = %if_s0_then
+  %13 = call i32 @puts(ptr @function_contract_error_string)
+  call void @abort()
+  unreachable
+
+bounds_check_pass2:                               ; preds = %if_s1_else
+  %14 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %7, i32 0, i32 0
+  %15 = load ptr, ptr %14, align 8
+  %array_slice_element_pointer4 = getelementptr i64, ptr %15, i64 1
+  %16 = load i64, ptr %array_slice_element_pointer4, align 8
+  ret i64 %16
+
+bounds_check_fail3:                               ; preds = %if_s1_else
+  %17 = call i32 @puts(ptr @function_contract_error_string.1)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @puts(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_bounds_checks = true });
+  }
+
   TEST_CASE("Compile If Return Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "if_return_expressions.hltxt";
+    char const* const input_file = "if_return_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4411,9 +5136,46 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Input Output Macros", "[LLVM_IR]")
+  {
+    char const* const input_file = "input_output_macros.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "c.stdio", import_c_header_and_get_file_path("c.stdio", "stdio.h") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+@global_0 = internal constant [4 x i8] c"%s\0A\00"
+@global_1 = internal constant [13 x i8] c"Hello world!\00"
+@global_2 = internal constant [4 x i8] c"%s\0A\00"
+@global_3 = internal constant [13 x i8] c"Hello error!\00"
+
+; Function Attrs: convergent
+declare i32 @fprintf(ptr noundef, ptr noundef, ...) #0
+
+; Function Attrs: convergent
+define private void @Input_output_macros_run() #0 {
+entry:
+  %0 = call ptr @__acrt_iob_func(i32 noundef 1)
+  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_0, ptr noundef @global_1)
+  %2 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %3 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %2, ptr noundef @global_2, ptr noundef @global_3)
+  ret void
+}
+
+; Function Attrs: convergent
+declare ptr @__acrt_iob_func(i32 noundef) #0
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Implicit Arguments", "[LLVM_IR]")
   {
-    char const* const input_file = "implicit_arguments.hltxt";
+    char const* const input_file = "implicit_arguments.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4461,11 +5223,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Implicit Arguments External", "[LLVM_IR]")
   {
-    char const* const input_file = "implicit_arguments_external.hltxt";
+    char const* const input_file = "implicit_arguments_external.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-      { "Implicit_arguments", parse_and_get_file_path(g_test_source_files_path / "implicit_arguments.hltxt") },
+      { "Implicit_arguments", parse_and_get_file_path(g_test_source_files_path / "implicit_arguments.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -4502,11 +5264,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Instantiate Struct with Enum from Module", "[LLVM_IR]")
   {
-    char const* const input_file = "instantiate_struct_with_enum_from_module.hltxt";
+    char const* const input_file = "instantiate_struct_with_enum_from_module.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-      { "Instantiate_struct_with_enum", parse_and_get_file_path(g_test_source_files_path / "instantiate_struct_with_enum.hltxt") },
+      { "Instantiate_struct_with_enum", parse_and_get_file_path(g_test_source_files_path / "instantiate_struct_with_enum.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -4529,7 +5291,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
    TEST_CASE("Compile Instantiate Uninitialized", "[LLVM_IR]")
   {
-    char const* const input_file = "instantiate_uninitialized.hltxt";
+    char const* const input_file = "instantiate_uninitialized.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4553,7 +5315,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Instantiate Zero Initialized", "[LLVM_IR]")
   {
-    char const* const input_file = "instantiate_zero_initialized.hltxt";
+    char const* const input_file = "instantiate_zero_initialized.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4571,7 +5333,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
@@ -4581,9 +5343,42 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
   }
 
 
+  TEST_CASE("Compile Primitive Instantiate", "[LLVM_IR]")
+  {
+    char const* const input_file = "primitive_instantiate.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private void @Primitive_instantiate_run() #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca float, align 4
+  %c = alloca i8, align 1
+  %d = alloca ptr, align 8
+  %e = alloca i32, align 4
+  %f = alloca [4 x i32], align 4
+  store i32 0, ptr %a, align 4
+  store float 0.000000e+00, ptr %b, align 4
+  store i8 0, ptr %c, align 1
+  store ptr null, ptr %d, align 8
+  store i32 0, ptr %e, align 4
+  store [4 x i32] zeroinitializer, ptr %f, align 4
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Load Pointers", "[LLVM_IR]")
   {
-    char const* const input_file = "load_pointers.hltxt";
+    char const* const input_file = "load_pointers.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4598,6 +5393,7 @@ entry:
   %instance = alloca ptr, align 8
   %p0 = alloca ptr, align 8
   %v0 = alloca %struct.Load_pointers_My_struct, align 8
+  %n = alloca ptr, align 8
   store ptr %"arguments[0].instance", ptr %instance, align 8
   %0 = load ptr, ptr %instance, align 8
   %1 = getelementptr inbounds %struct.Load_pointers_My_struct, ptr %0, i32 0, i32 0
@@ -4616,6 +5412,16 @@ if_s1_after:                                      ; preds = %if_s0_then, %entry
   %array_element_pointer1 = getelementptr %struct.Load_pointers_My_struct, ptr %5, i32 0
   %6 = load %struct.Load_pointers_My_struct, ptr %array_element_pointer1, align 8
   store %struct.Load_pointers_My_struct %6, ptr %v0, align 8
+  store ptr null, ptr %n, align 8
+  %7 = load ptr, ptr %p0, align 8
+  %8 = load ptr, ptr %n, align 8
+  %9 = icmp eq ptr %7, %8
+  br i1 %9, label %if_s0_then2, label %if_s1_after3
+
+if_s0_then2:                                      ; preds = %if_s1_after
+  br label %if_s1_after3
+
+if_s1_after3:                                     ; preds = %if_s0_then2, %if_s1_after
   ret void
 }
 
@@ -4628,7 +5434,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Merge Functions", "[LLVM_IR]")
   {
-    char const* const input_file = "merge_functions.hltxt";
+    char const* const input_file = "merge_functions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4643,16 +5449,16 @@ entry:
   %p1 = alloca ptr, align 8
   store ptr %"arguments[0].external_pointer", ptr %external_pointer, align 8
   %0 = load ptr, ptr %external_pointer, align 8
-  %1 = call ptr @"Merge_functions@cast@10621281525101525598"(ptr noundef %0)
+  %1 = call ptr @Merge_functions__at__cast__at__10621281525101525598(ptr noundef %0)
   store ptr %1, ptr %p0, align 8
   %2 = load ptr, ptr %external_pointer, align 8
-  %3 = call ptr @"Merge_functions@cast@10621281525101525598"(ptr noundef %2)
+  %3 = call ptr @Merge_functions__at__cast__at__10621281525101525598(ptr noundef %2)
   store ptr %3, ptr %p1, align 8
   ret void
 }
 
 ; Function Attrs: convergent
-define private ptr @"Merge_functions@cast@10621281525101525598"(ptr noundef %"arguments[0].value") #0 {
+define private ptr @Merge_functions__at__cast__at__10621281525101525598(ptr noundef %"arguments[0].value") #0 {
 entry:
   %value = alloca ptr, align 8
   store ptr %"arguments[0].value", ptr %value, align 8
@@ -4669,7 +5475,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Module with Dots", "[LLVM_IR]")
   {
-    char const* const input_file = "module_with_dots.hltxt";
+    char const* const input_file = "module_with_dots.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4702,12 +5508,12 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Multiple Modules", "[LLVM_IR]")
   {
-    char const* const input_file = "multiple_modules_a.hltxt";
+    char const* const input_file = "multiple_modules_a.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-      { "MB", parse_and_get_file_path(g_test_source_files_path / "multiple_modules_b.hltxt") },
-      { "MC", parse_and_get_file_path(g_test_source_files_path / "multiple_modules_c.hltxt") },
+      { "MB", parse_and_get_file_path(g_test_source_files_path / "multiple_modules_b.iris") },
+      { "MC", parse_and_get_file_path(g_test_source_files_path / "multiple_modules_c.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -4744,46 +5550,76 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Null Pointers", "[LLVM_IR]")
   {
-    char const* const input_file = "null_pointers.hltxt";
+    char const* const input_file = "null_pointers.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
     };
 
-    char const* const expected_llvm_ir = R"(
+    std::string const expected_llvm_ir = std::format(R"(
 ; Function Attrs: convergent
-define i32 @Null_pointers_pointers(ptr noundef %"arguments[0].parameter") #0 {
+define i32 @Null_pointers_pointers(ptr noundef %"arguments[0].parameter") #0 !dbg !3 {{
 entry:
   %parameter = alloca ptr, align 8
+  %x = alloca ptr, align 8, !dbg !10
   store ptr %"arguments[0].parameter", ptr %parameter, align 8
-  %0 = load ptr, ptr %parameter, align 8
-  %1 = icmp eq ptr %0, null
-  br i1 %1, label %if_s0_then, label %if_s1_after
+    #dbg_declare(ptr %parameter, !9, !DIExpression(), !11)
+  %0 = load ptr, ptr %parameter, align 8, !dbg !12
+  %1 = icmp eq ptr %0, null, !dbg !12
+  br i1 %1, label %if_s0_then, label %if_s1_after, !dbg !12
 
 if_s0_then:                                       ; preds = %entry
-  ret i32 -1
+  ret i32 -1, !dbg !13
 
 if_s1_after:                                      ; preds = %entry
-  %2 = load ptr, ptr %parameter, align 8
-  %3 = icmp ne ptr %2, null
-  br i1 %3, label %if_s0_then1, label %if_s1_after2
+  %2 = load ptr, ptr %parameter, align 8, !dbg !15
+  %3 = icmp ne ptr %2, null, !dbg !15
+  br i1 %3, label %if_s0_then1, label %if_s1_after2, !dbg !15
 
 if_s0_then1:                                      ; preds = %if_s1_after
-  ret i32 1
+  ret i32 1, !dbg !16
 
 if_s1_after2:                                     ; preds = %if_s1_after
-  ret i32 0
-}
+    #dbg_declare(ptr %x, !18, !DIExpression(), !10)
+  store ptr null, ptr %x, align 8, !dbg !10
+  ret i32 0, !dbg !21
+}}
 
-attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
-)";
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
 
-    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+!llvm.module.flags = !{{!0}}
+!llvm.dbg.cu = !{{!1}}
+
+!0 = !{{i32 2, !"Debug Info Version", i32 3}}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "Iris Compiler", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "null_pointers.iris", directory: "{}")
+!3 = distinct !DISubprogram(name: "pointers", linkageName: "Null_pointers_pointers", scope: null, file: !2, line: 3, type: !4, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !8)
+!4 = !DISubroutineType(types: !5)
+!5 = !{{!6, !7}}
+!6 = !DIBasicType(name: "int32_t", size: 32, encoding: DW_ATE_signed)
+!7 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !6, size: 64)
+!8 = !{{!9}}
+!9 = !DILocalVariable(name: "parameter", arg: 1, scope: !3, file: !2, line: 3, type: !7)
+!10 = !DILocation(line: 15, column: 5, scope: !3)
+!11 = !DILocation(line: 3, column: 26, scope: !3)
+!12 = !DILocation(line: 5, column: 8, scope: !3)
+!13 = !DILocation(line: 7, column: 9, scope: !14)
+!14 = distinct !DILexicalBlock(scope: !3, file: !2, line: 6, column: 5)
+!15 = !DILocation(line: 10, column: 8, scope: !3)
+!16 = !DILocation(line: 12, column: 9, scope: !17)
+!17 = distinct !DILexicalBlock(scope: !3, file: !2, line: 11, column: 5)
+!18 = !DILocalVariable(name: "x", scope: !3, file: !2, line: 15, type: !19)
+!19 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !20, size: 64)
+!20 = !DIBasicType(name: "void", encoding: DW_ATE_unsigned)
+!21 = !DILocation(line: 17, column: 5, scope: !3)
+)", g_test_source_files_path.generic_string());
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
   }
 
   TEST_CASE("Compile Numbers", "[LLVM_IR]")
   {
-    char const* const input_file = "numbers.hltxt";
+    char const* const input_file = "numbers.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4825,7 +5661,7 @@ entry:
   store half 0xH3C00, ptr %my_float16, align 2
   store float 1.000000e+00, ptr %my_float32, align 4
   store double 1.000000e+00, ptr %my_float64, align 8
-  store i8 1, ptr %my_c_char, align 1
+  store i8 97, ptr %my_c_char, align 1
   store i16 1, ptr %my_c_short, align 2
   store i32 1, ptr %my_c_int, align 4
   store i32 1, ptr %my_c_long, align 4
@@ -4846,7 +5682,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Numeric_casts", "[LLVM_IR]")
   {
-    char const* const input_file = "numeric_casts.hltxt";
+    char const* const input_file = "numeric_casts.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4945,7 +5781,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Offset Pointer", "[LLVM_IR]")
   {
-    char const* const input_file = "offset_pointer.hltxt";
+    char const* const input_file = "offset_pointer.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -4993,7 +5829,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Passing Pointers to Functions", "[LLVM_IR]")
   {
-    char const* const input_file = "passing_pointers_to_functions.hltxt";
+    char const* const input_file = "passing_pointers_to_functions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5047,7 +5883,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Pointers", "[LLVM_IR]")
   {
-    char const* const input_file = "pointers.hltxt";
+    char const* const input_file = "pointers.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5084,7 +5920,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Reinterpret_as", "[LLVM_IR]")
   {
-    char const* const input_file = "reinterpret_as.hltxt";
+    char const* const input_file = "reinterpret_as.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5110,7 +5946,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Size_of", "[LLVM_IR]")
   {
-    char const* const input_file = "size_of.hltxt";
+    char const* const input_file = "size_of.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5135,41 +5971,41 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Stack Array Entry", "[LLVM_IR]")
   {
-    char const* const input_file = "stack_array_entry.hltxt";
+    char const* const input_file = "stack_array_entry.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
     };
 
     char const* const expected_llvm_ir = R"(
-%struct.H_Builtin_Generic_array_slice = type { ptr, i64 }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define void @Stack_array_entry_foo(i64 noundef %"arguments[0].length") #0 {
 entry:
   %length = alloca i64, align 8
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %array_0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %1 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %array_1 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %array_0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %array_1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   store i64 %"arguments[0].length", ptr %length, align 8
   %2 = load i64, ptr %length, align 8
   %stack_save_pointer = call ptr @llvm.stacksave.p0()
   %stack_array = alloca i32, i64 %2, align 16
-  %3 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
   store ptr %stack_array, ptr %3, align 8
-  %4 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 %2, ptr %4, align 8
-  %5 = load %struct.H_Builtin_Generic_array_slice, ptr %0, align 8
-  store %struct.H_Builtin_Generic_array_slice %5, ptr %array_0, align 8
+  %5 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8
+  store %struct.iris_builtin_Generic_array_slice %5, ptr %array_0, align 8
   %6 = load i64, ptr %length, align 8
   %stack_array1 = alloca i32, i64 %6, align 16
-  %7 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
   store ptr %stack_array1, ptr %7, align 8
-  %8 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
   store i64 %6, ptr %8, align 8
-  %9 = load %struct.H_Builtin_Generic_array_slice, ptr %1, align 8
-  store %struct.H_Builtin_Generic_array_slice %9, ptr %array_1, align 8
+  %9 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8
+  store %struct.iris_builtin_Generic_array_slice %9, ptr %array_1, align 8
   call void @llvm.stackrestore.p0(ptr %stack_save_pointer)
   ret void
 }
@@ -5189,34 +6025,34 @@ attributes #1 = { nocallback nofree nosync nounwind willreturn }
 
   TEST_CASE("Compile Stack Array Loop", "[LLVM_IR]")
   {
-    char const* const input_file = "stack_array_loop.hltxt";
+    char const* const input_file = "stack_array_loop.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
     };
 
     char const* const expected_llvm_ir = R"(
-%struct.H_Builtin_Generic_array_slice = type { ptr, i64 }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define void @Stack_array_loop_foo(i64 noundef %"arguments[0].length") #0 {
 entry:
   %length = alloca i64, align 8
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %array_0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %array_0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   %index = alloca i64, align 8
-  %1 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %array_1 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %array_1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   store i64 %"arguments[0].length", ptr %length, align 8
   %2 = load i64, ptr %length, align 8
   %stack_save_pointer = call ptr @llvm.stacksave.p0()
   %stack_array = alloca i32, i64 %2, align 16
-  %3 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
   store ptr %stack_array, ptr %3, align 8
-  %4 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 %2, ptr %4, align 8
-  %5 = load %struct.H_Builtin_Generic_array_slice, ptr %0, align 8
-  store %struct.H_Builtin_Generic_array_slice %5, ptr %array_0, align 8
+  %5 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8
+  store %struct.iris_builtin_Generic_array_slice %5, ptr %array_0, align 8
   store i64 1, ptr %index, align 8
   br label %for_loop_condition
 
@@ -5230,13 +6066,13 @@ for_loop_then:                                    ; preds = %for_loop_condition
   %9 = load i64, ptr %index, align 8
   %stack_save_pointer1 = call ptr @llvm.stacksave.p0()
   %stack_array2 = alloca i32, i64 %9, align 16
-  %10 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
   store ptr %stack_array2, ptr %10, align 8
-  %11 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  %11 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
   store i64 %9, ptr %11, align 8
-  %12 = load %struct.H_Builtin_Generic_array_slice, ptr %1, align 8
-  store %struct.H_Builtin_Generic_array_slice %12, ptr %array_1, align 8
-  %13 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %array_1, i32 0, i32 0
+  %12 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8
+  store %struct.iris_builtin_Generic_array_slice %12, ptr %array_1, align 8
+  %13 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %array_1, i32 0, i32 0
   %14 = load ptr, ptr %13, align 8
   %array_slice_element_pointer = getelementptr i32, ptr %14, i32 0
   %15 = load i64, ptr %index, align 8
@@ -5271,7 +6107,7 @@ attributes #1 = { nocallback nofree nosync nounwind willreturn }
 
   TEST_CASE("Compile Switch Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "switch_expressions.hltxt";
+    char const* const input_file = "switch_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5328,9 +6164,6 @@ switch_case_i4_:                                  ; preds = %switch_after
 switch_case_default:                              ; preds = %switch_case_i4_, %switch_after
   ret i32 3
 
-switch_after3:                                    ; No predecessors!
-  ret i32 5
-
 switch_case_default4:                             ; preds = %switch_after1
   br label %switch_case_i1_5
 
@@ -5346,7 +6179,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Ternary Condition Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "ternary_condition_expressions.hltxt";
+    char const* const input_file = "ternary_condition_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5504,7 +6337,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Test Framework Non Test Mode", "[LLVM_IR]")
   {
-    char const* const input_file = "test_framework.hltxt";
+    char const* const input_file = "test_framework.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5532,14 +6365,46 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Test Framework Test Mode", "[LLVM_IR]")
   {
-    char const* const input_file = "test_framework.hltxt";
+    char const* const input_file = "test_framework.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
     };
 
+    std::string const test_source_file_path = (g_test_source_files_path / input_file).generic_string();
+
     std::string const expected_llvm_ir = std::format(R"(
-@hlang_test_source_file_path = internal constant [66 x i8] c"{}\00"
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
+%struct.iris_json_Write_stream = type {{ ptr }}
+
+@iris_test_source_file_path = internal constant [68 x i8] c"{}/test_framework.iris\00"
+@global_1 = internal constant [4 x i8] c"hhi\00"
+@global_2 = internal constant [3 x i8] c"hi\00"
+@global_3 = internal constant [2 x i8] c"i\00"
+@global_4 = internal constant [4 x i8] c"lli\00"
+@global_5 = internal constant [4 x i8] c"hhu\00"
+@global_6 = internal constant [3 x i8] c"hu\00"
+@global_7 = internal constant [2 x i8] c"u\00"
+@global_8 = internal constant [4 x i8] c"llu\00"
+@global_9 = internal constant [2 x i8] c"f\00"
+@global_10 = internal constant [4 x i8] c"lld\00"
+@global_11 = internal constant [5 x i8] c"null\00"
+@global_12 = internal constant [3 x i8] c"%s\00"
+@global_13 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
+@global_14 = internal constant [7 x i8] c"' vs '\00"
+@global_15 = internal constant [3 x i8] c"'\0A\00"
+
+; Function Attrs: convergent
+declare i32 @fflush(ptr noundef) #0
+
+; Function Attrs: convergent
+declare i32 @fprintf(ptr noundef, ptr noundef, ...) #0
+
+; Function Attrs: convergent
+declare i32 @snprintf(ptr noundef, i64 noundef, ptr noundef, ...) #0
+
+; Function Attrs: convergent
+declare i64 @strlen(ptr noundef) #0
 
 ; Function Attrs: convergent
 define private i32 @Test_framework_add(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b") #0 {{
@@ -5557,27 +6422,354 @@ entry:
 ; Function Attrs: convergent
 define void @Test_framework_test_addition() #0 {{
 entry:
+  %__lhs = alloca i32, align 4
+  %__rhs = alloca i32, align 4
+  %__condition = alloca i1, align 1
+  %__lhs1 = alloca i32, align 4
+  %__rhs2 = alloca i32, align 4
+  %__condition3 = alloca i1, align 1
   %0 = call i32 @Test_framework_add(i32 noundef 1, i32 noundef 2)
-  %1 = icmp eq i32 %0, 3
-  call void @hlang_test_check(i1 noundef zeroext %1, ptr noundef @hlang_test_source_file_path, i64 noundef 11)
-  %2 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
-  %3 = icmp eq i32 %2, 5
-  call void @hlang_test_check(i1 noundef zeroext %3, ptr noundef @hlang_test_source_file_path, i64 noundef 12)
+  store i32 %0, ptr %__lhs, align 4
+  store i32 3, ptr %__rhs, align 4
+  %1 = load i32, ptr %__lhs, align 4
+  %2 = load i32, ptr %__rhs, align 4
+  %3 = icmp eq i32 %1, %2
+  store i1 %3, ptr %__condition, align 1
+  %4 = load i8, ptr %__condition, align 1
+  %5 = trunc i8 %4 to i1
+  call void @iris_test_check(i1 noundef zeroext %5, ptr noundef @iris_test_source_file_path, i64 noundef 11)
+  %6 = load i8, ptr %__condition, align 1
+  %7 = xor i8 %6, -1
+  %8 = trunc i8 %7 to i1
+  br i1 %8, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  call void @iris.json__at__print_json_difference__at__16983553210230134252(ptr noundef %__lhs, ptr noundef %__rhs)
+  br label %if_s1_after
+
+if_s1_after:                                      ; preds = %if_s0_then, %entry
+  %9 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
+  store i32 %9, ptr %__lhs1, align 4
+  store i32 5, ptr %__rhs2, align 4
+  %10 = load i32, ptr %__lhs1, align 4
+  %11 = load i32, ptr %__rhs2, align 4
+  %12 = icmp eq i32 %10, %11
+  store i1 %12, ptr %__condition3, align 1
+  %13 = load i8, ptr %__condition3, align 1
+  %14 = trunc i8 %13 to i1
+  call void @iris_test_check(i1 noundef zeroext %14, ptr noundef @iris_test_source_file_path, i64 noundef 12)
+  %15 = load i8, ptr %__condition3, align 1
+  %16 = xor i8 %15, -1
+  %17 = trunc i8 %16 to i1
+  br i1 %17, label %if_s0_then4, label %if_s1_after5
+
+if_s0_then4:                                      ; preds = %if_s1_after
+  call void @iris.json__at__print_json_difference__at__16983553210230134252(ptr noundef %__lhs1, ptr noundef %__rhs2)
+  br label %if_s1_after5
+
+if_s1_after5:                                     ; preds = %if_s0_then4, %if_s1_after
   ret void
 }}
 
 ; Function Attrs: convergent
-declare void @hlang_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
+define private ptr @iris.json.create_format_specifier(ptr %"arguments[0].buffer_0", i64 %"arguments[0].buffer_1", i32 noundef %"arguments[1].kind", i64 noundef %"arguments[2].size_in_bytes") #0 {{
+entry:
+  %buffer = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %kind = alloca i32, align 4
+  %size_in_bytes = alloca i64, align 8
+  %specifier = alloca ptr, align 8
+  %0 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 0
+  store ptr %"arguments[0].buffer_0", ptr %0, align 8
+  %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 1
+  store i64 %"arguments[0].buffer_1", ptr %1, align 8
+  store i32 %"arguments[1].kind", ptr %kind, align 4
+  store i64 %"arguments[2].size_in_bytes", ptr %size_in_bytes, align 8
+  %2 = load i32, ptr %kind, align 4
+  %3 = load i64, ptr %size_in_bytes, align 8
+  %4 = call ptr @iris.json.get_format_specifier(i32 noundef %2, i64 noundef %3)
+  store ptr %4, ptr %specifier, align 8
+  %5 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 0
+  %6 = load ptr, ptr %5, align 8
+  %7 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 1
+  %8 = load i64, ptr %7, align 8
+  %9 = load ptr, ptr %specifier, align 8
+  call void @iris.json.write_format_specifier(ptr %6, i64 %8, ptr noundef %9)
+  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  ret ptr %11
+}}
+
+; Function Attrs: convergent
+define private ptr @iris.json.get_format_specifier(i32 noundef %"arguments[0].kind", i64 noundef %"arguments[1].size_in_bytes") #0 {{
+entry:
+  %kind = alloca i32, align 4
+  %size_in_bytes = alloca i64, align 8
+  store i32 %"arguments[0].kind", ptr %kind, align 4
+  store i64 %"arguments[1].size_in_bytes", ptr %size_in_bytes, align 8
+  %0 = load i32, ptr %kind, align 4
+  %1 = icmp eq i32 %0, 0
+  br i1 %1, label %if_s0_then, label %if_s1_else
+
+if_s0_then:                                       ; preds = %entry
+  %2 = load i64, ptr %size_in_bytes, align 8
+  switch i64 %2, label %switch_case_default [
+    i64 1, label %switch_case_i0_
+    i64 2, label %switch_case_i1_
+    i64 4, label %switch_case_i2_
+  ]
+
+if_s1_else:                                       ; preds = %entry
+  %3 = load i32, ptr %kind, align 4
+  %4 = icmp eq i32 %3, 1
+  br i1 %4, label %if_s2_then, label %if_s3_else
+
+if_s2_then:                                       ; preds = %if_s1_else
+  %5 = load i64, ptr %size_in_bytes, align 8
+  switch i64 %5, label %switch_case_default5 [
+    i64 1, label %switch_case_i0_2
+    i64 2, label %switch_case_i1_3
+    i64 4, label %switch_case_i2_4
+  ]
+
+if_s3_else:                                       ; preds = %if_s1_else
+  %6 = load i32, ptr %kind, align 4
+  %7 = icmp eq i32 %6, 2
+  br i1 %7, label %if_s4_then, label %if_s5_after
+
+if_s4_then:                                       ; preds = %if_s3_else
+  ret ptr @global_9
+
+if_s5_after:                                      ; preds = %if_s3_else
+  ret ptr @global_10
+
+switch_case_i0_:                                  ; preds = %if_s0_then
+  ret ptr @global_1
+
+switch_case_i1_:                                  ; preds = %if_s0_then
+  ret ptr @global_2
+
+switch_case_i2_:                                  ; preds = %if_s0_then
+  ret ptr @global_3
+
+switch_case_default:                              ; preds = %if_s0_then
+  ret ptr @global_4
+
+switch_case_i0_2:                                 ; preds = %if_s2_then
+  ret ptr @global_5
+
+switch_case_i1_3:                                 ; preds = %if_s2_then
+  ret ptr @global_6
+
+switch_case_i2_4:                                 ; preds = %if_s2_then
+  ret ptr @global_7
+
+switch_case_default5:                             ; preds = %if_s2_then
+  ret ptr @global_8
+}}
+
+; Function Attrs: convergent
+define private void @iris.json.write_format_specifier(ptr %"arguments[0].buffer_0", i64 %"arguments[0].buffer_1", ptr noundef %"arguments[1].specifier") #0 {{
+entry:
+  %buffer = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %specifier = alloca ptr, align 8
+  %length = alloca i64, align 8
+  %index = alloca i64, align 8
+  %0 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 0
+  store ptr %"arguments[0].buffer_0", ptr %0, align 8
+  %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 1
+  store i64 %"arguments[0].buffer_1", ptr %1, align 8
+  store ptr %"arguments[1].specifier", ptr %specifier, align 8
+  %2 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %array_slice_element_pointer = getelementptr i8, ptr %3, i32 0
+  store i8 37, ptr %array_slice_element_pointer, align 1
+  %4 = load ptr, ptr %specifier, align 8
+  %5 = call i64 @strlen(ptr noundef %4)
+  store i64 %5, ptr %length, align 8
+  store i64 0, ptr %index, align 8
+  br label %for_loop_condition
+
+for_loop_condition:                               ; preds = %for_loop_update_index, %entry
+  %6 = load i64, ptr %length, align 8
+  %7 = load i64, ptr %index, align 8
+  %8 = icmp ult i64 %7, %6
+  br i1 %8, label %for_loop_then, label %for_loop_after
+
+for_loop_then:                                    ; preds = %for_loop_condition
+  %9 = load i64, ptr %index, align 8
+  %10 = add i64 1, %9
+  %11 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %12 = load ptr, ptr %11, align 8
+  %array_slice_element_pointer1 = getelementptr i8, ptr %12, i64 %10
+  %13 = load i64, ptr %index, align 8
+  %14 = load ptr, ptr %specifier, align 8
+  %array_element_pointer = getelementptr i8, ptr %14, i64 %13
+  %15 = load i8, ptr %array_element_pointer, align 1
+  store i8 %15, ptr %array_slice_element_pointer1, align 1
+  br label %for_loop_update_index
+
+for_loop_update_index:                            ; preds = %for_loop_then
+  %16 = load i64, ptr %index, align 8
+  %17 = add i64 %16, 1
+  store i64 %17, ptr %index, align 8
+  br label %for_loop_condition
+
+for_loop_after:                                   ; preds = %for_loop_condition
+  %18 = load i64, ptr %length, align 8
+  %19 = add i64 1, %18
+  %20 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %21 = load ptr, ptr %20, align 8
+  %array_slice_element_pointer2 = getelementptr i8, ptr %21, i64 %19
+  store i8 0, ptr %array_slice_element_pointer2, align 1
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @iris.json__at__to_json__at__3489948734076117284(ptr noundef %"arguments[0].stream", ptr noundef %"arguments[1].value") #0 {{
+entry:
+  %0 = alloca %struct.iris_json_Write_stream, align 8
+  %value = alloca ptr, align 8
+  %array = alloca [16 x i8], i64 16, align 1
+  %format_specifier_buffer = alloca [16 x i8], align 1
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %format_specifier = alloca ptr, align 8
+  %array1 = alloca [64 x i8], i64 64, align 1
+  %format_buffer = alloca [64 x i8], align 1
+  %2 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  store ptr %"arguments[0].stream", ptr %2, align 8
+  store ptr %"arguments[1].value", ptr %value, align 8
+  %3 = load ptr, ptr %value, align 8
+  %4 = icmp eq ptr %3, null
+  br i1 %4, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  %5 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %6 = load ptr, ptr %5, align 8
+  call void %6(ptr noundef @global_11)
+  ret void
+
+if_s1_after:                                      ; preds = %entry
+  call void @llvm.memset.p0.i64(ptr align 1 %array, i8 0, i64 16, i1 false)
+  %7 = load [16 x i8], ptr %array, align 1
+  store [16 x i8] %7, ptr %format_specifier_buffer, align 1
+  %data_pointer = getelementptr [16 x i8], ptr %format_specifier_buffer, i32 0, i32 0
+  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  store ptr %data_pointer, ptr %8, align 8
+  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  store i64 16, ptr %9, align 8
+  %10 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  %12 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 1
+  %13 = load i64, ptr %12, align 8
+  %14 = call ptr @iris.json.create_format_specifier(ptr %11, i64 %13, i32 noundef 0, i64 noundef 4)
+  store ptr %14, ptr %format_specifier, align 8
+  call void @llvm.memset.p0.i64(ptr align 1 %array1, i8 0, i64 64, i1 false)
+  %15 = load [64 x i8], ptr %array1, align 1
+  store [64 x i8] %15, ptr %format_buffer, align 1
+  %array_element_pointer = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
+  %16 = load ptr, ptr %value, align 8
+  %17 = load ptr, ptr %format_specifier, align 8
+  %18 = load i32, ptr %16, align 4
+  %19 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 64, ptr noundef %17, i32 noundef %18)
+  %20 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %21 = load ptr, ptr %20, align 8
+  %array_element_pointer2 = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
+  call void %21(ptr noundef %array_element_pointer2)
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @iris.json.print_to_stderr(ptr noundef %"arguments[0].value") #0 {{
+entry:
+  %value = alloca ptr, align 8
+  store ptr %"arguments[0].value", ptr %value, align 8
+  %0 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %1 = load ptr, ptr %value, align 8
+  %2 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_12, ptr noundef %1)
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @iris.json__at__print_json__at__9753731967319569499(ptr noundef %"arguments[0].value") #0 {{
+entry:
+  %value = alloca ptr, align 8
+  %stream = alloca %struct.iris_json_Write_stream, align 8
+  store ptr %"arguments[0].value", ptr %value, align 8
+  %0 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
+  store ptr @iris.json.print_to_stderr, ptr %0, align 8
+  %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
+  %2 = load ptr, ptr %1, align 8
+  %3 = load ptr, ptr %value, align 8
+  call void @iris.json__at__to_json__at__3489948734076117284(ptr noundef %2, ptr noundef %3)
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @iris.json__at__print_json_difference__at__16983553210230134252(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
+entry:
+  %lhs = alloca ptr, align 8
+  %rhs = alloca ptr, align 8
+  store ptr %"arguments[0].lhs", ptr %lhs, align 8
+  store ptr %"arguments[1].rhs", ptr %rhs, align 8
+  %0 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_13)
+  %2 = load ptr, ptr %rhs, align 8
+  call void @iris.json__at__print_json__at__9753731967319569499(ptr noundef %2)
+  %3 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_14)
+  %5 = load ptr, ptr %lhs, align 8
+  call void @iris.json__at__print_json__at__9753731967319569499(ptr noundef %5)
+  %6 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_15)
+  %8 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %9 = call i32 @fflush(ptr noundef %8)
+  ret void
+}}
+
+; Function Attrs: convergent
+declare void @iris_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+
+; Function Attrs: convergent
+declare ptr @__acrt_iob_func(i32 noundef) #0
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-)", (g_test_source_files_path / input_file).generic_string());
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
+)", g_test_source_files_path.generic_string(), test_source_file_path.size() + 1, test_source_file_path);
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.is_test_mode = true});
   }
 
+  TEST_CASE("Compile Type Kind", "[LLVM_IR]")
+  {
+    char const* const input_file = "type_kind.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private void @test_type_kind_run(i32 noundef %"arguments[0].parameter") #0 {
+entry:
+  %parameter = alloca i32, align 4
+  %a = alloca i32, align 4
+  store i32 %"arguments[0].parameter", ptr %parameter, align 4
+  store i32 4, ptr %a, align 4
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Unary Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "unary_expressions.hltxt";
+    char const* const input_file = "unary_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5643,7 +6835,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Use Printf", "[LLVM_IR]")
   {
-    char const* const input_file = "use_printf.hltxt";
+    char const* const input_file = "use_printf.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5672,9 +6864,88 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Use Printf Variadic Promotions", "[LLVM_IR]")
+  {
+    char const* const input_file = "use_printf_variadic_promotions.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "c.stdio", import_c_header_and_get_file_path("c.stdio", "stdio.h") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+@global_0 = internal constant [13 x i8] c"%f %d %u %d\0A\00"
+
+; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
+define void @Use_printf_variadic_promotions_run() #0 {
+entry:
+  %f = alloca float, align 4
+  %s = alloca i8, align 1
+  %u = alloca i8, align 1
+  %sh = alloca i16, align 2
+  store float 1.500000e+00, ptr %f, align 4
+  store i8 -2, ptr %s, align 1
+  store i8 3, ptr %u, align 1
+  store i16 4, ptr %sh, align 2
+  %0 = load float, ptr %f, align 4
+  %1 = fpext float %0 to double
+  %2 = load i8, ptr %s, align 1
+  %3 = sext i8 %2 to i32
+  %4 = load i8, ptr %u, align 1
+  %5 = zext i8 %4 to i32
+  %6 = load i16, ptr %sh, align 2
+  %7 = sext i16 %6 to i32
+  %8 = call i32 (ptr, ...) @printf(ptr noundef @global_0, double noundef %1, i32 noundef %3, i32 noundef %5, i32 noundef %7)
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Use Printf Variadic Promotions Indirection", "[LLVM_IR]")
+  {
+    char const* const input_file = "use_printf_variadic_promotions_indirection.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "c.stdio", import_c_header_and_get_file_path("c.stdio", "stdio.h") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+@global_0 = internal constant [4 x i8] c"%f\0A\00"
+
+; Function Attrs: convergent
+declare i32 @printf(ptr noundef, ...) #0
+
+; Function Attrs: convergent
+define void @Use_printf_variadic_promotions_indirection_run() #0 {
+entry:
+  %x = alloca float, align 4
+  %y = alloca ptr, align 8
+  store float 3.000000e+00, ptr %x, align 4
+  store ptr %x, ptr %y, align 8
+  %0 = load ptr, ptr %y, align 8
+  %1 = load float, ptr %0, align 4
+  %2 = fpext float %1 to double
+  %3 = call i32 (ptr, ...) @printf(ptr noundef @global_0, double noundef %2)
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Unique Name", "[LLVM_IR]")
   {
-    char const* const input_file = "unique_name.hltxt";
+    char const* const input_file = "unique_name.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5697,11 +6968,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Alias From Modules", "[LLVM_IR]")
   {
-    char const* const input_file = "using_alias_from_modules.hltxt";
+    char const* const input_file = "using_alias_from_modules.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-        { "Alias", parse_and_get_file_path(g_test_source_files_path / "using_alias.hltxt") },
+        { "Alias", parse_and_get_file_path(g_test_source_files_path / "using_alias.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -5723,7 +6994,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Alias", "[LLVM_IR]")
   {
-    char const* const input_file = "using_alias.hltxt";
+    char const* const input_file = "using_alias.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5750,7 +7021,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Enum Flags", "[LLVM_IR]")
   {
-    char const* const input_file = "using_enum_flags.hltxt";
+    char const* const input_file = "using_enum_flags.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5828,7 +7099,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Enum Default Values", "[LLVM_IR]")
   {
-    char const* const input_file = "using_enums_default_values.hltxt";
+    char const* const input_file = "using_enums_default_values.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5855,11 +7126,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Enums Duplicate", "[LLVM_IR]")
   {
-    char const* const input_file = "using_enums_duplicate.hltxt";
+    char const* const input_file = "using_enums_duplicate.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-        { "Enums", parse_and_get_file_path(g_test_source_files_path / "using_enums.hltxt") },
+        { "Enums", parse_and_get_file_path(g_test_source_files_path / "using_enums.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -5881,11 +7152,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Enums From Modules", "[LLVM_IR]")
   {
-    char const* const input_file = "using_enums_from_modules.hltxt";
+    char const* const input_file = "using_enums_from_modules.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
-        { "Enums", parse_and_get_file_path(g_test_source_files_path / "using_enums.hltxt") },
+        { "Enums", parse_and_get_file_path(g_test_source_files_path / "using_enums.iris") },
     };
 
     char const* const expected_llvm_ir = R"(
@@ -5905,7 +7176,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Enums", "[LLVM_IR]")
   {
-    char const* const input_file = "using_enums.hltxt";
+    char const* const input_file = "using_enums.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5959,7 +7230,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Function Constructors", "[LLVM_IR]")
   {
-    char const* const input_file = "using_function_constructors.hltxt";
+    char const* const input_file = "using_function_constructors.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -5972,17 +7243,17 @@ entry:
   %a = alloca i32, align 4
   %b = alloca float, align 4
   %c = alloca i32, align 4
-  %0 = call i32 @"Function_constructor@add@10481941949038830817"(i32 noundef 1, i32 noundef 2)
+  %0 = call i32 @Function_constructor__at__add__at__10481941949038830817(i32 noundef 1, i32 noundef 2)
   store i32 %0, ptr %a, align 4
-  %1 = call float @"Function_constructor@add@4195550094456234142"(float noundef 3.000000e+00, float noundef 4.000000e+00)
+  %1 = call float @Function_constructor__at__add__at__4195550094456234142(float noundef 3.000000e+00, float noundef 4.000000e+00)
   store float %1, ptr %b, align 4
-  %2 = call i32 @"Function_constructor@add@10481941949038830817"(i32 noundef 1, i32 noundef 2)
+  %2 = call i32 @Function_constructor__at__add__at__10481941949038830817(i32 noundef 1, i32 noundef 2)
   store i32 %2, ptr %c, align 4
   ret void
 }
 
 ; Function Attrs: convergent
-define private i32 @"Function_constructor@add@10481941949038830817"(i32 noundef %"arguments[0].first", i32 noundef %"arguments[1].second") #0 {
+define private i32 @Function_constructor__at__add__at__10481941949038830817(i32 noundef %"arguments[0].first", i32 noundef %"arguments[1].second") #0 {
 entry:
   %first = alloca i32, align 4
   %second = alloca i32, align 4
@@ -5995,7 +7266,7 @@ entry:
 }
 
 ; Function Attrs: convergent
-define private float @"Function_constructor@add@4195550094456234142"(float noundef %"arguments[0].first", float noundef %"arguments[1].second") #0 {
+define private float @Function_constructor__at__add__at__4195550094456234142(float noundef %"arguments[0].first", float noundef %"arguments[1].second") #0 {
 entry:
   %first = alloca float, align 4
   %second = alloca float, align 4
@@ -6015,7 +7286,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Global Variables", "[LLVM_IR]")
   {
-    char const* const input_file = "using_global_variables.hltxt";
+    char const* const input_file = "using_global_variables.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "using_global_variables";
     std::filesystem::create_directories(root_directory_path);
@@ -6025,7 +7296,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 float my_global = 0.0f;
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.iris", "my_module", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6063,7 +7334,7 @@ entry:
   %7 = load float, ptr @my_global, align 4
   store float %7, ptr %d, align 4
   store float 1.000000e+00, ptr %e, align 4
-  %8 = load i32, ptr getelementptr inbounds ([3 x i32], ptr @Global_variables_my_global_array, i32 0, i32 1), align 4
+  %8 = load i32, ptr getelementptr ([3 x i32], ptr @Global_variables_my_global_array, i32 0, i32 1), align 4
   store i32 %8, ptr %f, align 4
   ret void
 }
@@ -6076,7 +7347,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Global Variables 2", "[LLVM_IR]")
   {
-    char const* const input_file = "using_global_variables_2.hltxt";
+    char const* const input_file = "using_global_variables_2.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "using_global_variables";
     std::filesystem::create_directories(root_directory_path);
@@ -6085,7 +7356,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 void foo();
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.iris", "my_module", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6107,7 +7378,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Structs", "[LLVM_IR]")
   {
-    char const* const input_file = "using_structs.hltxt";
+    char const* const input_file = "using_structs.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6273,46 +7544,127 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Type Constructors", "[LLVM_IR]")
   {
-    char const* const input_file = "using_type_constructors.hltxt";
+    char const* const input_file = "using_type_constructors.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
     };
 
     char const* const expected_llvm_ir = R"(
-%"struct.Type_constructor@Dynamic_array@9266664480299747837" = type { ptr, i64 }
-%"struct.Type_constructor@Dynamic_array@12246575587352456780" = type { ptr, i64 }
-%struct.Type_constructor_My_struct = type { %"struct.Type_constructor@Dynamic_array@13825035046261308487" }
-%"struct.Type_constructor@Dynamic_array@13825035046261308487" = type { ptr, i64 }
-%"struct.Type_constructor@Dynamic_array@11091932333614297595" = type { ptr, i64 }
+%struct.Type_constructor__at__Dynamic_array__at__9266664480299747837 = type { ptr, i64 }
+%struct.Type_constructor__at__Dynamic_array__at__12246575587352456780 = type { ptr, i64 }
+%struct.Type_constructor_My_struct = type { %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487 }
+%struct.Type_constructor__at__Dynamic_array__at__13825035046261308487 = type { ptr, i64 }
+%struct.Type_constructor__at__Dynamic_array__at__11091932333614297595 = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define private void @Type_constructor_run(ptr %"arguments[0].instance_0_0", i64 %"arguments[0].instance_0_1") #0 {
 entry:
-  %instance_0 = alloca %"struct.Type_constructor@Dynamic_array@9266664480299747837", align 8
-  %instance_1 = alloca %"struct.Type_constructor@Dynamic_array@12246575587352456780", align 8
+  %instance_0 = alloca %struct.Type_constructor__at__Dynamic_array__at__9266664480299747837, align 8
+  %instance_1 = alloca %struct.Type_constructor__at__Dynamic_array__at__12246575587352456780, align 8
   %instance_2 = alloca %struct.Type_constructor_My_struct, align 8
-  %0 = alloca %"struct.Type_constructor@Dynamic_array@13825035046261308487", align 8
-  %instance_3 = alloca %"struct.Type_constructor@Dynamic_array@11091932333614297595", align 8
+  %0 = alloca %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487, align 8
+  %instance_3 = alloca %struct.Type_constructor__at__Dynamic_array__at__11091932333614297595, align 8
   %1 = getelementptr inbounds { ptr, i64 }, ptr %instance_0, i32 0, i32 0
   store ptr %"arguments[0].instance_0_0", ptr %1, align 8
   %2 = getelementptr inbounds { ptr, i64 }, ptr %instance_0, i32 0, i32 1
   store i64 %"arguments[0].instance_0_1", ptr %2, align 8
-  %3 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@12246575587352456780", ptr %instance_1, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__12246575587352456780, ptr %instance_1, i32 0, i32 0
   store ptr null, ptr %3, align 8
-  %4 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@12246575587352456780", ptr %instance_1, i32 0, i32 1
+  %4 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__12246575587352456780, ptr %instance_1, i32 0, i32 1
   store i64 0, ptr %4, align 8
-  %5 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@13825035046261308487", ptr %0, i32 0, i32 0
+  %5 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487, ptr %0, i32 0, i32 0
   store ptr null, ptr %5, align 8
-  %6 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@13825035046261308487", ptr %0, i32 0, i32 1
+  %6 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487, ptr %0, i32 0, i32 1
   store i64 0, ptr %6, align 8
-  %7 = load %"struct.Type_constructor@Dynamic_array@13825035046261308487", ptr %0, align 8
+  %7 = load %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487, ptr %0, align 8
   %8 = getelementptr inbounds %struct.Type_constructor_My_struct, ptr %instance_2, i32 0, i32 0
-  store %"struct.Type_constructor@Dynamic_array@13825035046261308487" %7, ptr %8, align 8
-  %9 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@11091932333614297595", ptr %instance_3, i32 0, i32 0
+  store %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487 %7, ptr %8, align 8
+  %9 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__11091932333614297595, ptr %instance_3, i32 0, i32 0
   store ptr null, ptr %9, align 8
-  %10 = getelementptr inbounds %"struct.Type_constructor@Dynamic_array@11091932333614297595", ptr %instance_3, i32 0, i32 1
+  %10 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__11091932333614297595, ptr %instance_3, i32 0, i32 1
   store i64 0, ptr %10, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Using Type Constructors 2", "[LLVM_IR]")
+  {
+    char const* const input_file = "using_type_constructors_2.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159 = type { float, float, float }
+
+; Function Attrs: convergent
+define { <2 x float>, float } @Using_type_constructors_2_get_one() #0 {
+entry:
+  %0 = alloca %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, align 4
+  %1 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %0, i32 0, i32 0
+  store float 1.000000e+00, ptr %1, align 4
+  %2 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %0, i32 0, i32 1
+  store float 1.000000e+00, ptr %2, align 4
+  %3 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %0, i32 0, i32 2
+  store float 1.000000e+00, ptr %3, align 4
+  %4 = load { <2 x float>, float }, ptr %0, align 4
+  ret { <2 x float>, float } %4
+}
+
+; Function Attrs: convergent
+define void @Using_type_constructors_2_use(<2 x float> %"arguments[0].value_0", float %"arguments[0].value_1") #0 {
+entry:
+  %value = alloca %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, align 4
+  %x = alloca float, align 4
+  %0 = getelementptr inbounds { <2 x float>, float }, ptr %value, i32 0, i32 0
+  store <2 x float> %"arguments[0].value_0", ptr %0, align 4
+  %1 = getelementptr inbounds { <2 x float>, float }, ptr %value, i32 0, i32 1
+  store float %"arguments[0].value_1", ptr %1, align 4
+  %2 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %value, i32 0, i32 0
+  %3 = load float, ptr %2, align 4
+  store float %3, ptr %x, align 4
+  ret void
+}
+
+; Function Attrs: convergent
+define void @Using_type_constructors_2_use_pointer(ptr noundef %"arguments[0].value") #0 {
+entry:
+  %value = alloca ptr, align 8
+  %x = alloca float, align 4
+  store ptr %"arguments[0].value", ptr %value, align 8
+  %0 = load ptr, ptr %value, align 8
+  %1 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %0, i32 0, i32 0
+  %2 = load float, ptr %1, align 4
+  store float %2, ptr %x, align 4
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Using Type Constructors 3", "[LLVM_IR]")
+  {
+    char const* const input_file = "using_type_constructors_3.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "Using_type_constructors_2", parse_and_get_file_path(g_test_source_files_path / "using_type_constructors_2.iris") },
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define void @Using_type_constructors_3_run() #0 {
+entry:
   ret void
 }
 
@@ -6324,7 +7676,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Using Unions", "[LLVM_IR]")
   {
-    char const* const input_file = "using_unions.hltxt";
+    char const* const input_file = "using_unions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6449,7 +7801,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
@@ -6460,7 +7812,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 
   TEST_CASE("Compile Variables", "[LLVM_IR]")
   {
-    char const* const input_file = "variables.hltxt";
+    char const* const input_file = "variables.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6486,7 +7838,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile While Loop Expressions", "[LLVM_IR]")
   {
-    char const* const input_file = "while_loop_expressions.hltxt";
+    char const* const input_file = "while_loop_expressions.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6594,7 +7946,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
   TEST_CASE("Compile Function Contracts", "[LLVM_IR]")
   {
-    char const* const input_file = "function_contracts.hltxt";
+    char const* const input_file = "function_contracts.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6693,7 +8045,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
     TEST_CASE("Compile Function Contracts with disable contracts", "[LLVM_IR]")
   {
-    char const* const input_file = "function_contracts.hltxt";
+    char const* const input_file = "function_contracts.iris";
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6722,7 +8074,7 @@ if_s1_after:                                      ; preds = %entry
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.contract_options = h::compiler::Contract_options::Disabled});
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.contract_options = iris::compiler::Contract_options::Disabled});
   }
 
   TEST_CASE("Struct layout of imported C header matches 0", "[LLVM_IR]")
@@ -6731,7 +8083,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     std::filesystem::create_directories(root_directory_path);
 
     std::string const header_content = R"(
-#include "stdint.h"
+#include <stdint.h>
 
 struct My_struct
 {
@@ -6744,33 +8096,38 @@ struct My_struct
 };
 )";
 
-std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_struct.h", "my_struct.hltxt", "my_module", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_struct.h", "my_struct.iris", "my_module", root_directory_path);
+
+    std::pmr::vector<std::filesystem::path> header_search_directories = iris::common::get_default_header_search_directories();
+    iris::c::Options const options = {
+      .include_directories = header_search_directories,
+    };
 
     std::filesystem::path const header_file_path = root_directory_path / "my_struct.h";
-    std::optional<h::Struct_layout> const expected_struct_layout = h::c::calculate_struct_layout(header_file_path, "My_struct", {});
+    std::optional<iris::Struct_layout> const expected_struct_layout = iris::c::calculate_struct_layout(header_file_path, "My_struct", options);
     REQUIRE(expected_struct_layout.has_value());
 
-    std::optional<h::Module> core_module = h::compiler::read_core_module(header_module_file_path);
+    std::optional<iris::Module> core_module = iris::compiler::read_core_module(header_module_file_path);
     REQUIRE(core_module.has_value());
 
-    h::compiler::LLVM_data llvm_data = h::compiler::initialize_llvm({});
+    iris::compiler::LLVM_data llvm_data = iris::compiler::initialize_llvm({});
 
-    h::Declaration_database declaration_database = h::create_declaration_database();
-    h::add_declarations(declaration_database, *core_module);
+    iris::Declaration_database declaration_database = iris::create_declaration_database();
+    iris::add_declarations(declaration_database, *core_module);
 
-    std::pmr::vector<h::Module const*> core_modules{ &core_module.value() };
-    h::compiler::Clang_module_data clang_module_data = h::compiler::create_clang_module_data(
+    std::pmr::vector<iris::Module const*> core_modules{ &core_module.value() };
+    iris::compiler::Clang_module_data_pointer clang_module_data = iris::compiler::create_clang_module_data(
         *llvm_data.context,
-        llvm_data.clang_data,
-        "Hl_clang_module",
+        *llvm_data.clang_data,
+        "Iris_clang_module",
         core_modules,
         declaration_database
     );
 
-    h::compiler::Type_database type_database = h::compiler::create_type_database(*llvm_data.context);
-    h::compiler::add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, clang_module_data, *core_module);
+    iris::compiler::Type_database type_database = iris::compiler::create_type_database(*llvm_data.context);
+    iris::compiler::add_module_types(type_database, *llvm_data.context, llvm_data.data_layout, *clang_module_data, *core_module);
 
-    h::Struct_layout const actual_struct_layout = h::compiler::calculate_struct_layout(llvm_data.data_layout, type_database, "my_module", "My_struct");
+    iris::Struct_layout const actual_struct_layout = iris::compiler::calculate_struct_layout(llvm_data.data_layout, type_database, "my_module", "My_struct");
 
     CHECK(actual_struct_layout == expected_struct_layout.value());
   }
@@ -6780,7 +8137,7 @@ std::filesystem::path const header_module_file_path = create_and_import_c_header
     std::string_view const expected_llvm_ir
   )
   {
-    char const* const input_file = "c_interoperability_call_function_with_struct.hltxt";
+    char const* const input_file = "c_interoperability_call_function_with_struct.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_interoperability_call_function_with_struct";
     std::filesystem::create_directories(root_directory_path);
@@ -6797,7 +8154,7 @@ typedef struct My_struct
 void foo(My_struct argument);
 )";
 
-    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.hltxt", "my_module", root_directory_path);
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.iris", "my_module", root_directory_path);
 
     std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
     {
@@ -6873,7 +8230,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -6887,7 +8244,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
     std::string_view const expected_llvm_ir
   )
   {
-    char const* const input_file = "c_interoperability_define_function_with_struct.hltxt";
+    char const* const input_file = "c_interoperability_define_function_with_struct.iris";
 
     std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_interoperability_define_function_with_struct";
     std::filesystem::create_directories(root_directory_path);
@@ -6996,7 +8353,7 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -7062,7 +8419,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_call_function_that_returns_bool.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_call_function_that_returns_bool.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - Call function that returns c bool x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7102,7 +8459,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_call_function_that_returns_bool.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_call_function_that_returns_bool.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_big_struct_and_return x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7133,17 +8490,17 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #2
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #2
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_big_struct_and_return.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_big_struct_and_return.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_big_struct_and_return x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7176,17 +8533,17 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #2
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #2
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_big_struct_and_return.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_big_struct_and_return.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_return_big_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7224,13 +8581,13 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_big_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_big_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_return_big_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7268,13 +8625,13 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_big_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_big_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_bool x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7325,7 +8682,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_bool.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_bool.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_bool x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7376,7 +8733,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_bool.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_bool.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_return_empty_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7401,7 +8758,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_empty_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_empty_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_return_empty_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7434,7 +8791,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_empty_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_empty_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_return_int x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7458,7 +8815,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_int.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_int.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_return_int x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7482,7 +8839,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_int.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_int.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_return_pointer x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7506,7 +8863,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_pointer.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_pointer.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_return_pointer x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7530,7 +8887,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_pointer.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_pointer.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_return_small_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7574,7 +8931,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_small_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_small_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_return_small_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7610,24 +8967,24 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_return_small_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_return_small_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_array_slice x86_64-pc-linux-gnu", "[LLVM_IR]")
   {
     char const* const expected_llvm_ir = R"(
-%struct.H_Builtin_Generic_array_slice = type { ptr, i64 }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define private void @c_interoperability_take(ptr %"arguments[0].a0_0", i64 %"arguments[0].a0_1") #0 {
 entry:
-  %a0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %a0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   %0 = getelementptr inbounds { ptr, i64 }, ptr %a0, i32 0, i32 0
   store ptr %"arguments[0].a0_0", ptr %0, align 8
   %1 = getelementptr inbounds { ptr, i64 }, ptr %a0, i32 0, i32 1
@@ -7641,16 +8998,16 @@ entry:
   %v0 = alloca i32, align 4
   %array = alloca [1 x ptr], i64 1, align 8
   %array1 = alloca [1 x ptr], align 8
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   store i32 0, ptr %v0, align 4
   %array_element_pointer = getelementptr [1 x ptr], ptr %array, i32 0, i32 0
   store ptr %v0, ptr %array_element_pointer, align 8
   %1 = load [1 x ptr], ptr %array, align 8
   store [1 x ptr] %1, ptr %array1, align 8
   %data_pointer = getelementptr [1 x ptr], ptr %array1, i32 0, i32 0
-  %2 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
   store ptr %data_pointer, ptr %2, align 8
-  %3 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 1, ptr %3, align 8
   %4 = getelementptr inbounds { ptr, i64 }, ptr %0, i32 0, i32 0
   %5 = load ptr, ptr %4, align 8
@@ -7663,13 +9020,13 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_array_slice.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_array_slice.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_array_slice x86_64-pc-windows-msvc", "[LLVM_IR]")
   {
     char const* const expected_llvm_ir = R"(
-%struct.H_Builtin_Generic_array_slice = type { ptr, i64 }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define private void @c_interoperability_take(ptr noundef %"arguments[0].a0") #0 {
@@ -7683,17 +9040,17 @@ entry:
   %v0 = alloca i32, align 4
   %array = alloca [1 x ptr], i64 1, align 8
   %array1 = alloca [1 x ptr], align 8
-  %0 = alloca %struct.H_Builtin_Generic_array_slice, align 8
-  %1 = alloca %struct.H_Builtin_Generic_array_slice, align 8
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   store i32 0, ptr %v0, align 4
   %array_element_pointer = getelementptr [1 x ptr], ptr %array, i32 0, i32 0
   store ptr %v0, ptr %array_element_pointer, align 8
   %2 = load [1 x ptr], ptr %array, align 8
   store [1 x ptr] %2, ptr %array1, align 8
   %data_pointer = getelementptr [1 x ptr], ptr %array1, i32 0, i32 0
-  %3 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
   store ptr %data_pointer, ptr %3, align 8
-  %4 = getelementptr inbounds %struct.H_Builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 1, ptr %4, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %1, ptr align 8 %0, i64 16, i1 false)
   call void @c_interoperability_take(ptr noundef %1)
@@ -7701,13 +9058,13 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_array_slice.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_array_slice.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_with_big_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7742,7 +9099,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_big_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_big_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_big_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7777,13 +9134,13 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_big_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_big_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_with_empty_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7808,7 +9165,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_empty_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_empty_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_empty_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7838,7 +9195,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_empty_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_empty_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_with_int_arguments x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7864,7 +9221,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_int_arguments.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_int_arguments.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_int_arguments x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7890,7 +9247,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_int_arguments.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_int_arguments.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_with_pointer x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7914,7 +9271,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_pointer.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_pointer.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_pointer x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -7938,7 +9295,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_pointer.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_pointer.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
   }
   
   TEST_CASE("C Interoperability - function_with_small_struct x86_64-pc-linux-gnu", "[LLVM_IR]")
@@ -7980,7 +9337,7 @@ entry:
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_small_struct.hltxt", "x86_64-pc-linux-gnu", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_small_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
   }
 
   TEST_CASE("C Interoperability - function_with_small_struct x86_64-pc-windows-msvc", "[LLVM_IR]")
@@ -8013,13 +9370,136 @@ entry:
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
-    test_c_interoperability_common("c_interoperability_function_with_small_struct.hltxt", "x86_64-pc-windows-msvc", expected_llvm_ir);
+    test_c_interoperability_common("c_interoperability_function_with_small_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Function Constructor Assigned to Global Variable Across Module Boundary", "[LLVM_IR]")
+  {
+    char const* const input_file = "function_constructor_global_consumer.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "Function_constructor_global_provider", parse_and_get_file_path(g_test_source_files_path / "function_constructor_global_provider.iris") },
+    };
+
+    char const* const expected_llvm_ir = R"(
+@Function_constructor_global_consumer_bar = constant ptr @Function_constructor_global_provider__at__to_json__at__7179855141281402803
+
+; Function Attrs: convergent
+define private void @Function_constructor_global_provider__at__to_json__at__7179855141281402803(ptr noundef %"arguments[0].value") #0 {
+entry:
+  %value = alloca ptr, align 8
+  store ptr %"arguments[0].value", ptr %value, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile using imported global variable assigned to function constructor instance", "[LLVM_IR]")
+  {
+    char const* const input_file = "function_constructor_global_consumer_2.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "Function_constructor_global_provider_2", parse_and_get_file_path(g_test_source_files_path / "function_constructor_global_provider_2.iris") },
+    };
+
+    char const* const expected_llvm_ir = R"(
+@Function_constructor_global_provider_2_to_json_int32 = external constant ptr
+
+; Function Attrs: convergent
+define private void @Function_constructor_global_consumer_2_run() #0 {
+entry:
+  %a = alloca i32, align 4
+  store i32 0, ptr %a, align 4
+  %0 = load ptr, ptr @Function_constructor_global_provider_2_to_json_int32, align 8
+  call void %0(ptr noundef %a)
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile create_soa_array_view_from_pointer", "[LLVM_IR]")
+  {
+    char const* const input_file = "soa_array_view_from_pointer.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map{};
+
+    char const* const expected_llvm_ir = R"(
+%__hl_soa_array_view = type { i64, i64, i64, ptr }
+
+; Function Attrs: convergent
+define private void @soa_array_view_from_pointer_create_mutable_view(ptr dead_on_unwind noalias writable sret(%__hl_soa_array_view) align 8 %return.result, ptr noundef %"arguments[0].data", i64 noundef %"arguments[1].length") #0 {
+entry:
+  %data = alloca ptr, align 8
+  %length = alloca i64, align 8
+  %soa_array_view = alloca %__hl_soa_array_view, align 8
+  store ptr %"arguments[0].data", ptr %data, align 8
+  store i64 %"arguments[1].length", ptr %length, align 8
+  %0 = load ptr, ptr %data, align 8
+  %1 = load i64, ptr %length, align 8
+  %2 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
+  store i64 0, ptr %2, align 8
+  %3 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
+  store i64 %1, ptr %3, align 8
+  %4 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
+  store i64 %1, ptr %4, align 8
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
+  store ptr %0, ptr %5, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return.result, ptr align 8 %soa_array_view, i64 32, i1 false)
+  ret void
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile calculate_soa_array_size_bytes", "[LLVM_IR]")
+  {
+    char const* const input_file = "calculate_soa_array_size_bytes.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map{};
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private i64 @calculate_soa_array_size_bytes_get_size(i64 noundef %"arguments[0].capacity") #0 {
+entry:
+  %capacity = alloca i64, align 8
+  store i64 %"arguments[0].capacity", ptr %capacity, align 8
+  %0 = load i64, ptr %capacity, align 8
+  %soa_member_block_size = mul i64 %0, 4
+  %soa_member_block_offset = add i64 0, %soa_member_block_size
+  %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
+  %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
+  %soa_member_block_size1 = mul i64 %0, 4
+  %soa_member_block_offset2 = add i64 %soa_offset_aligned, %soa_member_block_size1
+  ret i64 %soa_member_block_offset2
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 }
 

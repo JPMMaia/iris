@@ -1,28 +1,16 @@
-module;
+export module iris.compiler.expressions;
 
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
+import std;
+import llvm;
 
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <vector>
+import iris.core;
+import iris.core.declarations;
+import iris.compiler.clang_data;
+import iris.compiler.debug_info;
+import iris.compiler.instructions;
+import iris.compiler.types;
 
-export module h.compiler.expressions;
-
-import h.core;
-import h.core.declarations;
-import h.compiler.clang_data;
-import h.compiler.debug_info;
-import h.compiler.instructions;
-import h.compiler.types;
-
-namespace h::compiler
+namespace iris::compiler
 {
     export enum class Block_type
     {
@@ -63,7 +51,7 @@ namespace h::compiler
         llvm::Module& llvm_module;
         Clang_module_data const& clang_module_data;
         Module const& core_module;
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies;
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies;
         Declaration_database& declaration_database;
         Type_database& type_database;
         Enum_value_constants const& enum_value_constants;
@@ -74,7 +62,8 @@ namespace h::compiler
         std::span<Value_and_type const> local_variables;
         std::optional<Type_reference> expression_type;
         Debug_info* debug_info;
-        Contract_options contract_options; 
+        Contract_options contract_options;
+        bool enable_bounds_checks = false;
         std::optional<Source_position> source_position;
         std::pmr::polymorphic_allocator<> const& temporaries_allocator;
     };
@@ -150,8 +139,8 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         Expression_parameters const& expression_parameters
     );
 
@@ -160,8 +149,8 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         Expression_parameters const& expression_parameters
     );
 
@@ -170,9 +159,9 @@ namespace h::compiler
         llvm::Module& llvm_module,
         llvm::Function& llvm_function,
         llvm::IRBuilder<>& llvm_builder,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
-        h::Function_condition const& function_condition,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Function_condition const& function_condition,
         Condition_type const condition_type,
         Expression_parameters const& expression_parameters
     );

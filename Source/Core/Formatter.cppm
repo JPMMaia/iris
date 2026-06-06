@@ -1,33 +1,26 @@
-module;
+export module iris.core.formatter;
 
-#include <cstdint>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <sstream>
-#include <string>
+import std;
 
-export module h.core.formatter;
+import iris.core;
 
-import h.core;
-
-namespace h
+namespace iris
 {
     export struct Format_options
     {
-        std::span<h::Import_module_with_alias const> const alias_imports;
+        std::span<iris::Import_module_with_alias const> const alias_imports;
         std::pmr::polymorphic_allocator<> const& output_allocator;
         std::pmr::polymorphic_allocator<> const& temporaries_allocator;
     };
 
     export std::pmr::string format_module(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Format_options const& options
     );
 
     export std::pmr::string format_type_reference(
-        h::Module const& core_module,
-        std::optional<h::Type_reference> const& type_reference,
+        iris::Module_dependencies const& dependencies,
+        std::optional<iris::Type_reference> const& type_reference,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
@@ -37,11 +30,11 @@ namespace h
     );
 
     export std::pmr::string format_integer_type(
-        h::Integer_type const value
+        iris::Integer_type const value
     );
 
     export std::pmr::string format_statement(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Statement const& statement,
         std::uint32_t indentation,
         bool const add_semicolon = true,
@@ -50,7 +43,7 @@ namespace h
     );
 
     export std::pmr::string format_expression(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Statement const& statement,
         Expression const& expression,
         std::uint32_t indentation,
@@ -114,7 +107,7 @@ namespace h
     void add_format_function_parameters(
         String_buffer& buffer,
         std::span<std::pmr::string const> const parameter_names,
-        std::span<h::Type_reference const> const parameter_types,
+        std::span<iris::Type_reference const> const parameter_types,
         std::optional<std::pmr::vector<Source_position>> const parameter_source_positions,
         bool const is_variadic,
         bool const same_line,
@@ -292,7 +285,7 @@ namespace h
         String_buffer& buffer,
         Statement const& statement,
         Instance_call_expression const& expression,
-        std::optional<h::Source_range> const source_range,
+        std::optional<iris::Source_range> const source_range,
         std::uint32_t outside_indentation,
         Format_options const& options
     );
@@ -301,7 +294,7 @@ namespace h
         String_buffer& buffer,
         Statement const& statement,
         Instantiate_expression const& expression,
-        std::optional<h::Source_range> const source_range,
+        std::optional<iris::Source_range> const source_range,
         std::uint32_t outside_indentation,
         Format_options const& options
     );

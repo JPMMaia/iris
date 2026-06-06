@@ -1,0 +1,111 @@
+{
+  "name": "iris",
+  "displayName": "Iris Extension",
+  "description": "Provides support for the Iris programming language",
+  "version": "0.0.1",
+  "publisher": "JPMMaia",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JPMMaia/iris"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [],
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "breakpoints": [
+      {
+        "language": "iris"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Configuration",
+      "properties": {
+        "iris.iris_executable": {
+          "scope": "resource",
+          "type": "string",
+          "default": "iris",
+          "description": "Specify the file path to the iris executable."
+        },
+        "iris.iris_language_server_executable": {
+          "scope": "resource",
+          "type": "string",
+          "default": "iris_language_server",
+          "description": "Specify the file path to the iris language server executable."
+        },
+        "iris.trace.server": {
+          "scope": "window",
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server."
+        }
+      }
+    },
+    "grammars": [
+      {
+        "language": "iris",
+        "scopeName": "source.iris",
+        "path": "./syntaxes/iris.tmGrammar.json"
+      }
+    ],
+    "languages": [
+      {
+        "id": "iris",
+        "extensions": [
+          ".iris"
+        ],
+        "configuration": "./language_configuration.json"
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "**/iris_artifact.json",
+        "url": "./schemas/iris_artifact.schema.json"
+      },
+      {
+        "fileMatch": "**/iris_repository.json",
+        "url": "./schemas/iris_repository.schema.json"
+      },
+      {
+        "fileMatch": "**/iris_presets.json",
+        "url": "./schemas/iris_presets.schema.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "lint": "eslint",
+    "package": "vsce package",
+    "test": "vscode-test",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.9",
+    "@types/node": "^22.13.9",
+    "@types/vscode": "^1.95.0",
+    "@typescript-eslint/eslint-plugin": "^8.12.2",
+    "@typescript-eslint/parser": "^8.12.2",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.14.0",
+    "glob": "^13.0.6",
+    "mocha": "^10.8.2",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.0"
+  },
+  "dependencies": {
+    "@vscode/vsce": "^3.6.0",
+    "vscode-languageclient": "^9.0.1"
+  },
+  "private": true
+}

@@ -1,0 +1,7 @@
+module Using_type_constructors_3;
+
+import Using_type_constructors_2 as tc;
+
+export function run() -> ()
+{
+}

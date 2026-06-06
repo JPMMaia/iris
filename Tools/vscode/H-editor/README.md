@@ -1,1 +1,0 @@
-# H Editor vscode extension

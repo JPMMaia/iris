@@ -1,10 +1,10 @@
-module h.module_examples;
+module iris.module_examples;
 
-import h.core;
+import iris.core;
 
-namespace h::module_examples
+namespace iris::module_examples
 {
-    h::Module create_hello_world()
+    iris::Module create_hello_world()
     {
         return {};
     }

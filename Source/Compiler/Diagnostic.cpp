@@ -1,19 +1,15 @@
 module;
 
-#include <filesystem>
-#include <format>
-#include <memory_resource>
-#include <sstream>
-#include <string>
-
 #include <nlohmann/json.hpp>
 
-module h.compiler.diagnostic;
+module iris.compiler.diagnostic;
 
-import h.core;
-import h.json_serializer;
+import std;
 
-namespace h::compiler
+import iris.core;
+import iris.json_serializer;
+
+namespace iris::compiler
 {
     std::pmr::string diagnostic_to_string(
         Diagnostic const& diagnostic,
@@ -75,20 +71,20 @@ namespace h::compiler
     }
 
     Diagnostic_data create_diagnostic_mismatch_type_data(
-        std::optional<h::Type_reference> const& provided_type,
-        std::optional<h::Type_reference> const& expected_type
+        std::optional<iris::Type_reference> const& provided_type,
+        std::optional<iris::Type_reference> const& expected_type
     )
     {
-        std::pmr::string provided_type_json = provided_type.has_value() ? h::json::write(provided_type.value()) : std::pmr::string{"null"};
-        std::pmr::string expected_type_json = expected_type.has_value() ? h::json::write(expected_type.value()) : std::pmr::string{"null"};
+        std::pmr::string provided_type_json = provided_type.has_value() ? iris::json::write(provided_type.value()) : std::pmr::string{"null"};
+        std::pmr::string expected_type_json = expected_type.has_value() ? iris::json::write(expected_type.value()) : std::pmr::string{"null"};
 
         nlohmann::ordered_json output;
         
         if (provided_type.has_value())
-            output["provided_type"] = nlohmann::ordered_json::parse(h::json::write(provided_type.value()));
+            output["provided_type"] = nlohmann::ordered_json::parse(iris::json::write(provided_type.value()));
         
         if (expected_type.has_value())
-            output["expected_type"] = nlohmann::ordered_json::parse(h::json::write(expected_type.value()));
+            output["expected_type"] = nlohmann::ordered_json::parse(iris::json::write(expected_type.value()));
         
         return std::pmr::string{output.dump()};
     }
@@ -104,13 +100,13 @@ namespace h::compiler
         if (input.contains("provided_type"))
         {
             std::string const& provided_type_string = input["provided_type"].dump();
-            output.provided_type = h::json::read<h::Type_reference>(provided_type_string.c_str());
+            output.provided_type = iris::json::read<iris::Type_reference>(provided_type_string.c_str());
         }
 
         if (input.contains("expected_type"))
         {
             std::string const& expected_type_string = input["expected_type"].dump();
-            output.expected_type = h::json::read<h::Type_reference>(expected_type_string.c_str());
+            output.expected_type = iris::json::read<iris::Type_reference>(expected_type_string.c_str());
         }
 
         return output;

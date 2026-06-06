@@ -1,0 +1,43 @@
+{
+  "name": "tree-sitter-iris",
+  "version": "0.1.0",
+  "description": "Iris grammar for tree-sitter",
+  "repository": "https://github.com/jpmmaia/h",
+  "license": "MIT",
+  "author": {
+    "name": "João Maia",
+    "email": "jpmmaia@gmail.com"
+  },
+  "keywords": [
+    "incremental",
+    "parsing",
+    "tree-sitter",
+    "iris"
+  ],
+  "files": [
+    "grammar.js",
+    "tree-sitter.json",
+    "queries/*",
+    "src/**",
+    "*.wasm"
+  ],
+  "dependencies": {
+    "tree-sitter": "^0.22.4"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.24.4"
+  },
+  "peerDependenciesMeta": {
+    "tree-sitter": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test_tree_sitter": "tree-sitter test",
+    "test_tree_sitter_update": "tree-sitter test --update",
+    "prestart": "tree-sitter build --wasm",
+    "start": "tree-sitter playground",
+    "test": "npm run test_tree_sitter"
+  }
+}

@@ -1,0 +1,13 @@
+module Function_pointer_through_alias;
+
+using System = function<() -> ()>;
+
+function foo() -> ()
+{
+}
+
+export function run() -> ()
+{
+    var system: System = foo;
+    system();   
+}

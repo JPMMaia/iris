@@ -1,42 +1,29 @@
 module;
 
-#include <algorithm>
-#include <cassert>
-#include <cstdio>
-#include <filesystem>
-#include <format>
-#include <iostream>
-#include <memory_resource>
-#include <numeric>
-#include <optional>
-#include <ranges>
-#include <span>
-#include <string_view>
-#include <variant>
-#include <vector>
-
+#include <assert.h>
 #include <stdio.h>
 
 #include <clang-c/Index.h>
 
-module h.c_header_converter;
+module iris.c_header_converter;
 
-import h.c_header_hash;
+import std;
 
-import h.binary_serializer;
-import h.core;
-import h.core.declarations;
-import h.core.expressions;
-import h.core.types;
+import iris.binary_serializer;
+import iris.c_macro_parser;
+import iris.core;
+import iris.core.declarations;
+import iris.core.expressions;
+import iris.core.types;
 
-namespace h::c
+namespace iris::c
 {
     static constexpr bool g_debug = false;
 
-    h::Statement create_default_value(
+    iris::Statement create_default_value(
         Type_reference const& value_type,
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database
     );
 
     struct String
@@ -79,7 +66,16 @@ namespace h::c
     struct Header_source_location
     {
         CXFile file;
-        h::Source_range_location source_location;
+        iris::Source_range_location source_location;
+    };
+
+    using Macro_replacement_text_entries = std::pmr::vector<Macro_replacement_text_entry>;
+    using Macro_replacement_text_entries_cache = std::unordered_map<std::filesystem::path, std::optional<Macro_replacement_text_entries>>;
+
+    struct Import_visitor_context
+    {
+        C_declarations* declarations;
+        Macro_replacement_text_entries_cache* macro_replacement_text_entries_cache;
     };
 
     Header_source_location get_cursor_source_location(
@@ -92,7 +88,7 @@ namespace h::c
         unsigned line = 0;
         unsigned column = 0;
         unsigned offset = 0;
-        clang_getSpellingLocation(
+        clang_getExpansionLocation(
             cursor_location,
             &file,
             &line,
@@ -100,13 +96,20 @@ namespace h::c
             &offset
         );
 
-        std::optional<String> const file_name = file != nullptr ? clang_getFileName(file) : std::optional<String>{};
+        std::optional<String> file_name;
+        if (file != nullptr)
+        {
+            file_name = clang_File_tryGetRealPathName(file);
+            if (!file_name.has_value())
+                file_name = clang_getFileName(file);
+        }
+
         std::optional<std::filesystem::path> file_path = file_name.has_value() ? file_name->string_view() : std::optional<std::filesystem::path>{};
 
         return Header_source_location
         {
             .file = file,
-            .source_location = h::create_source_range_location(
+            .source_location = iris::create_source_range_location(
                 std::move(file_path),
                 line,
                 column,
@@ -116,49 +119,103 @@ namespace h::c
         };
     }
 
-    h::Source_position get_source_position(Header_source_location const& header_source_location)
+    iris::Source_position get_source_position(Header_source_location const& header_source_location)
     {
         return {.line = header_source_location.source_location.range.start.line, .column = header_source_location.source_location.range.start.column };
     }
 
-    std::optional<h::Fundamental_type> to_fundamental_type(CXTypeKind const type_kind) noexcept
+    struct Iris_meta_comment
+    {
+        std::pmr::string module_name;
+        std::pmr::string declaration_name;
+        std::pmr::string kind;
+    };
+
+    std::optional<std::string_view> find_iris_meta_field(
+        std::string_view const raw_comment,
+        std::string_view const key
+    )
+    {
+        std::size_t const start = raw_comment.find(key);
+        if (start == std::string_view::npos)
+            return std::nullopt;
+
+        std::size_t value_begin = start + key.size();
+        std::size_t value_end = value_begin;
+        while (value_end < raw_comment.size())
+        {
+            char const character = raw_comment[value_end];
+            if (std::isspace(character) || character == '*' || character == '/')
+                break;
+
+            value_end += 1;
+        }
+
+        if (value_begin == value_end)
+            return std::nullopt;
+
+        return raw_comment.substr(value_begin, value_end - value_begin);
+    }
+
+    std::optional<Iris_meta_comment> parse_iris_meta_comment(CXCursor const cursor)
+    {
+        String const raw_comment_string = clang_Cursor_getRawCommentText(cursor);
+        std::string_view const raw_comment = raw_comment_string.string_view();
+        if (raw_comment.find("IRIS_META") == std::string_view::npos)
+            return std::nullopt;
+
+        std::optional<std::string_view> const module_name = find_iris_meta_field(raw_comment, "module=");
+        std::optional<std::string_view> const declaration_name = find_iris_meta_field(raw_comment, "name=");
+        std::optional<std::string_view> const kind = find_iris_meta_field(raw_comment, "kind=");
+        if (!module_name.has_value() || !declaration_name.has_value() || !kind.has_value())
+            return std::nullopt;
+
+        return Iris_meta_comment
+        {
+            .module_name = std::pmr::string{*module_name},
+            .declaration_name = std::pmr::string{*declaration_name},
+            .kind = std::pmr::string{*kind}
+        };
+    }
+
+    std::optional<iris::Fundamental_type> to_fundamental_type(CXTypeKind const type_kind) noexcept
     {
         switch (type_kind)
         {
         case CXType_Bool:
-            return h::Fundamental_type::C_bool;
+            return iris::Fundamental_type::C_bool;
         case CXType_Char_U:
         case CXType_Char_S:
-            return h::Fundamental_type::C_char;
+            return iris::Fundamental_type::C_char;
         case CXType_UChar:
-            return h::Fundamental_type::C_uchar;
+            return iris::Fundamental_type::C_uchar;
         case CXType_UShort:
-            return h::Fundamental_type::C_ushort;
+            return iris::Fundamental_type::C_ushort;
         case CXType_UInt:
-            return h::Fundamental_type::C_uint;
+            return iris::Fundamental_type::C_uint;
         case CXType_ULong:
-            return h::Fundamental_type::C_ulong;
+            return iris::Fundamental_type::C_ulong;
         case CXType_ULongLong:
-            return h::Fundamental_type::C_ulonglong;
+            return iris::Fundamental_type::C_ulonglong;
         case CXType_SChar:
-            return h::Fundamental_type::C_schar;
+            return iris::Fundamental_type::C_schar;
         case CXType_Short:
-            return h::Fundamental_type::C_short;
+            return iris::Fundamental_type::C_short;
         case CXType_Int:
-            return h::Fundamental_type::C_int;
+            return iris::Fundamental_type::C_int;
         case CXType_Long:
-            return h::Fundamental_type::C_long;
+            return iris::Fundamental_type::C_long;
         case CXType_LongLong:
-            return h::Fundamental_type::C_longlong;
+            return iris::Fundamental_type::C_longlong;
         case CXType_Float:
-            return h::Fundamental_type::Float32;
+            return iris::Fundamental_type::Float32;
         case CXType_Double:
-            return h::Fundamental_type::Float64;
+            return iris::Fundamental_type::Float64;
         case CXType_Half:
         case CXType_Float16:
-            return h::Fundamental_type::Float16;
+            return iris::Fundamental_type::Float16;
             case CXType_LongDouble:
-            return h::Fundamental_type::C_longdouble;
+            return iris::Fundamental_type::C_longdouble;
         default:
             return std::nullopt;
         }
@@ -176,18 +233,18 @@ namespace h::c
         }
     }
 
-    h::Integer_type create_integer_type(CXTypeKind const type_kind)
+    iris::Integer_type create_integer_type(CXTypeKind const type_kind)
     {
         switch (type_kind)
         {
         case CXType_Char16:
-            return h::Integer_type
+            return iris::Integer_type
             {
                 .number_of_bits = 16,
                 .is_signed = true
             };
         case CXType_Char32:
-            return h::Integer_type
+            return iris::Integer_type
             {
                 .number_of_bits = 32,
                 .is_signed = true
@@ -195,6 +252,34 @@ namespace h::c
         default:
             throw std::runtime_error{ "Type is not integer!" };
         }
+    }
+
+    iris::Integer_type create_integer_type_from_clang_type(CXType const type)
+    {
+        bool const is_signed = [kind = type.kind]() -> bool
+        {
+            switch (kind)
+            {
+            case CXType_Char_S:
+            case CXType_SChar:
+            case CXType_Short:
+            case CXType_Int:
+            case CXType_Long:
+            case CXType_LongLong:
+                return true;
+            default:
+                return false;
+            }
+        }();
+
+        long long const size_in_bytes = clang_Type_getSizeOf(type);
+        std::uint32_t const number_of_bits = static_cast<std::uint32_t>(size_in_bytes * 8);
+
+        return iris::Integer_type
+        {
+            .number_of_bits = number_of_bits,
+            .is_signed = is_signed
+        };
     }
 
     std::string_view find_enum_name(std::string_view const spelling)
@@ -221,27 +306,27 @@ namespace h::c
         throw std::runtime_error("Could not find enum name!");
     }
 
-    std::optional<h::Type_reference> create_type_reference(C_declarations const& declarations, CXCursor cursor, CXType type);
+    std::optional<iris::Type_reference> create_type_reference(C_declarations const& declarations, CXCursor cursor, CXType type);
 
-    h::Function_type create_function_type(C_declarations const& declarations, CXCursor const cursor, CXType const function_type)
+    iris::Function_type create_function_type(C_declarations const& declarations, CXCursor const cursor, CXType const function_type)
     {
         CXType const result_type = clang_getResultType(function_type);
-        std::optional<h::Type_reference> result_type_reference = create_type_reference(declarations, cursor, result_type);
-        std::pmr::vector<h::Type_reference> output_parameter_types =
+        std::optional<iris::Type_reference> result_type_reference = create_type_reference(declarations, cursor, result_type);
+        std::pmr::vector<iris::Type_reference> output_parameter_types =
             result_type_reference.has_value() ?
-            std::pmr::vector<h::Type_reference>{*result_type_reference} :
-            std::pmr::vector<h::Type_reference>{};
+            std::pmr::vector<iris::Type_reference>{*result_type_reference} :
+            std::pmr::vector<iris::Type_reference>{};
 
         int const number_of_arguments = clang_getNumArgTypes(function_type);
 
-        std::pmr::vector<h::Type_reference> input_parameter_types;
+        std::pmr::vector<iris::Type_reference> input_parameter_types;
         input_parameter_types.reserve(number_of_arguments);
 
         for (int argument_index = 0; argument_index < number_of_arguments; ++argument_index)
         {
             CXType const argument_type = clang_getArgType(function_type, argument_index);
 
-            std::optional<h::Type_reference> parameter_type = create_type_reference(declarations, cursor, argument_type);
+            std::optional<iris::Type_reference> parameter_type = create_type_reference(declarations, cursor, argument_type);
             if (!parameter_type.has_value())
             {
                 throw std::runtime_error{ "Parameter type is void which is invalid!" };
@@ -252,7 +337,7 @@ namespace h::c
 
         bool const is_variadic = clang_isFunctionTypeVariadic(function_type) == 1;
 
-        h::Function_type h_function_type
+        iris::Function_type h_function_type
         {
             .input_parameter_types = std::move(input_parameter_types),
             .output_parameter_types = std::move(output_parameter_types),
@@ -262,9 +347,9 @@ namespace h::c
         return h_function_type;
     }
 
-    h::Function_pointer_type create_function_pointer_type(C_declarations const& declarations, CXCursor const cursor, CXType const function_type)
+    iris::Function_pointer_type create_function_pointer_type(C_declarations const& declarations, CXCursor const cursor, CXType const function_type)
     {
-        h::Function_type h_function_type = create_function_type(declarations, cursor, function_type);
+        iris::Function_type h_function_type = create_function_type(declarations, cursor, function_type);
 
         int const number_of_arguments = clang_getNumArgTypes(function_type);
 
@@ -296,12 +381,12 @@ namespace h::c
         );
 
         CXType const result_type = clang_getResultType(function_type);
-        std::optional<h::Type_reference> result_type_reference = create_type_reference(declarations, cursor, result_type);
+        std::optional<iris::Type_reference> result_type_reference = create_type_reference(declarations, cursor, result_type);
         std::pmr::vector<std::pmr::string> output_parameter_names;
         if (result_type_reference.has_value())
             output_parameter_names.emplace_back("result");
 
-        h::Function_pointer_type h_function_pointer_type
+        iris::Function_pointer_type h_function_pointer_type
         {
             .type = std::move(h_function_type),
             .input_parameter_names = std::move(input_parameter_names),
@@ -313,6 +398,11 @@ namespace h::c
 
     std::string_view remove_type(std::string_view const string)
     {
+        if (string.starts_with("const "))
+        {
+            return remove_type(string.substr(6));
+        }
+
         if (string.starts_with("enum "))
         {
             return string.substr(5);
@@ -331,15 +421,15 @@ namespace h::c
         }
     }
 
-    std::optional<h::Type_reference> create_type_reference(C_declarations const& declarations, CXCursor const cursor, CXType const type)
+    std::optional<iris::Type_reference> create_type_reference(C_declarations const& declarations, CXCursor const cursor, CXType const type)
     {
         {
-            std::optional<h::Fundamental_type> const fundamental_type =
+            std::optional<iris::Fundamental_type> const fundamental_type =
                 to_fundamental_type(type.kind);
 
             if (fundamental_type)
             {
-                return h::Type_reference
+                return iris::Type_reference
                 {
                     .data = *fundamental_type
                 };
@@ -347,9 +437,9 @@ namespace h::c
 
             if (is_integer(type.kind))
             {
-                h::Integer_type const integer_type = create_integer_type(type.kind);
+                iris::Integer_type const integer_type = create_integer_type(type.kind);
 
-                return h::Type_reference
+                return iris::Type_reference
                 {
                     .data = integer_type
                 };
@@ -394,13 +484,13 @@ namespace h::c
 
             bool const is_const = clang_isConstQualifiedType(pointee_type);
 
-            h::Pointer_type pointer_type
+            iris::Pointer_type pointer_type
             {
                 .element_type = element_type.has_value() ? std::pmr::vector<Type_reference>{std::move(*element_type)} : std::pmr::vector<Type_reference>{},
                 .is_mutable = !is_const
             };
 
-            return h::Type_reference
+            return iris::Type_reference
             {
                 .data = std::move(pointer_type)
             };
@@ -413,19 +503,25 @@ namespace h::c
             auto const location = std::find_if(
                 declarations.enum_declarations.begin(),
                 declarations.enum_declarations.end(),
-                [enum_type_name](h::Enum_declaration const& declaration) -> bool { return declaration.name == enum_type_name; }
+                [enum_type_name](iris::Enum_declaration const& declaration) -> bool { return declaration.name == enum_type_name; }
             );
 
             if (location == declarations.enum_declarations.end())
             {
+                auto const metadata_location = declarations.metadata_by_c_name.find(std::pmr::string{enum_type_name});
+                if (metadata_location != declarations.metadata_by_c_name.end())
+                {
+                    return iris::create_custom_type_reference(metadata_location->second.module_name, metadata_location->second.declaration_name);
+                }
+
                 std::string const message = std::format("Could not find enum with name '{}'\n", enum_type_name);
                 std::cerr << message;
                 throw std::runtime_error{ message };
             }
 
-            h::Enum_declaration const& declaration = *location;
+            iris::Enum_declaration const& declaration = *location;
 
-            h::Custom_type_reference reference
+            iris::Custom_type_reference reference
             {
                 .module_reference = {
                     .name = declarations.module_name
@@ -433,24 +529,25 @@ namespace h::c
                 .name = declaration.name
             };
 
-            return h::Type_reference
+            return iris::Type_reference
             {
                 .data = std::move(reference)
             };
         }
         case CXType_Typedef:
+        case CXType_Unexposed:
         {
             String const type_spelling = { clang_getTypedefName(type) };
             std::string_view const typedef_name = type_spelling.string_view();
 
             if (typedef_name.starts_with("__builtin_"))
             {
-                h::Builtin_type_reference reference
+                iris::Builtin_type_reference reference
                 {
                     .value = std::pmr::string{typedef_name}
                 };
 
-                return h::Type_reference
+                return iris::Type_reference
                 {
                     .data = std::move(reference)
                 };
@@ -459,23 +556,24 @@ namespace h::c
             auto const location = std::find_if(
                 declarations.alias_type_declarations.begin(),
                 declarations.alias_type_declarations.end(),
-                [typedef_name](h::Alias_type_declaration const& declaration) -> bool { return declaration.name == typedef_name; }
+                [typedef_name](iris::Alias_type_declaration const& declaration) -> bool { return declaration.name == typedef_name; }
             );
 
             if (location == declarations.alias_type_declarations.end())
             {
-                CXType const canonical_type = clang_getCanonicalType(type);
-                if (canonical_type.kind == CXType_Enum || canonical_type.kind == CXType_Record)
-                    return create_type_reference(declarations, cursor, canonical_type);
+                auto const metadata_location = declarations.metadata_by_c_name.find(std::pmr::string{typedef_name});
+                if (metadata_location != declarations.metadata_by_c_name.end())
+                {
+                    return iris::create_custom_type_reference(metadata_location->second.module_name, metadata_location->second.declaration_name);
+                }
 
-                std::string const message = std::format("Could not find typedef with name '{}'\n", typedef_name);
-                std::cerr << message;
-                throw std::runtime_error{ message };
+                CXType const canonical_type = clang_getCanonicalType(type);
+                return create_type_reference(declarations, cursor, canonical_type);
             }
 
-            h::Alias_type_declaration const& declaration = *location;
+            iris::Alias_type_declaration const& declaration = *location;
 
-            h::Custom_type_reference reference
+            iris::Custom_type_reference reference
             {
                 .module_reference = {
                     .name = declarations.module_name
@@ -483,15 +581,15 @@ namespace h::c
                 .name = declaration.name
             };
 
-            return h::Type_reference
+            return iris::Type_reference
             {
                 .data = std::move(reference)
             };
         }
         case CXType_FunctionProto:
         {
-            h::Function_pointer_type function_pointer_type = create_function_pointer_type(declarations, cursor, type);
-            return h::Type_reference
+            iris::Function_pointer_type function_pointer_type = create_function_pointer_type(declarations, cursor, type);
+            return iris::Type_reference
             {
                 .data = std::move(function_pointer_type)
             };
@@ -502,7 +600,13 @@ namespace h::c
             std::string_view const type_spelling_string = type_spelling.string_view();
             std::string_view type_name = remove_type(type_spelling_string);
 
-            return h::create_custom_type_reference(declarations.module_name, type_name);
+            auto const location = declarations.metadata_by_c_name.find(std::pmr::string{type_name});
+            if (location != declarations.metadata_by_c_name.end())
+            {
+                return iris::create_custom_type_reference(location->second.module_name, location->second.declaration_name);
+            }
+
+            return iris::create_custom_type_reference(declarations.module_name, type_name);
         }
         case CXType_Void:
         {
@@ -518,7 +622,7 @@ namespace h::c
             CXType const element_type = clang_getArrayElementType(type);
             long long const size = clang_getArraySize(type);
 
-            std::optional<h::Type_reference> element_type_reference = create_type_reference(declarations, cursor, element_type);
+            std::optional<iris::Type_reference> element_type_reference = create_type_reference(declarations, cursor, element_type);
 
             if (!element_type_reference.has_value())
             {
@@ -527,13 +631,13 @@ namespace h::c
                 throw std::runtime_error{ message };
             }
 
-            h::Constant_array_type reference
+            iris::Constant_array_type reference
             {
                 .value_type = {std::move(*element_type_reference)},
                 .size = static_cast<std::uint64_t>(size)
             };
 
-            return h::Type_reference
+            return iris::Type_reference
             {
                 .data = std::move(reference)
             };
@@ -557,7 +661,7 @@ namespace h::c
         }
     }
 
-    std::optional<h::Alias_type_declaration> create_alias_type_declaration(C_declarations const& declarations, CXCursor const cursor)
+    std::optional<iris::Alias_type_declaration> create_alias_type_declaration(C_declarations& declarations, CXCursor const cursor)
     {
         CXType const type = clang_getCursorType(cursor);
         String const type_spelling = { clang_getTypeSpelling(type) };
@@ -570,9 +674,23 @@ namespace h::c
         if (type_name == underlying_type_name)
             return std::nullopt;
 
-        std::optional<h::Type_reference> underlying_type_reference = create_type_reference(declarations, cursor, underlying_type);
+        std::pmr::string declaration_name = std::pmr::string{type_name};
+        std::optional<Iris_meta_comment> const metadata = parse_iris_meta_comment(cursor);
+        if (metadata.has_value())
+        {
+            declaration_name = metadata->declaration_name;
 
-        std::pmr::vector<h::Type_reference> alias_type;
+            declarations.metadata_by_c_name[std::pmr::string{type_name}] = Imported_declaration_metadata
+            {
+                .module_name = std::pmr::string{metadata->module_name},
+                .declaration_name = std::pmr::string{metadata->declaration_name},
+                .kind = std::pmr::string{metadata->kind}
+            };
+        }
+
+        std::optional<iris::Type_reference> underlying_type_reference = create_type_reference(declarations, cursor, underlying_type);
+
+        std::pmr::vector<iris::Type_reference> alias_type;
         if (underlying_type_reference.has_value())
         {
             alias_type.push_back(*underlying_type_reference);
@@ -582,23 +700,37 @@ namespace h::c
             cursor
         );
 
-        return h::Alias_type_declaration
+        return iris::Alias_type_declaration
         {
-            .name = std::pmr::string{type_name},
-            .unique_name = std::pmr::string{type_name},
+            .name = declaration_name,
+            .unique_name = declaration_name,
             .type = std::move(alias_type),
             .source_location = cursor_location.source_location,
         };
     }
 
-    h::Enum_declaration create_enum_declaration(C_declarations const& declarations, CXCursor const cursor)
+    iris::Enum_declaration create_enum_declaration(C_declarations& declarations, CXCursor const cursor)
     {
-        using Enum_values = std::pmr::vector<h::Enum_value>;
+        using Enum_values = std::pmr::vector<iris::Enum_value>;
 
         CXType const enum_type = clang_getCursorType(cursor);
 
         String const enum_type_spelling = clang_getTypeSpelling(enum_type);
         std::string_view const enum_type_name = find_enum_name(enum_type_spelling.string_view());
+
+        std::pmr::string declaration_name = std::pmr::string{enum_type_name};
+        std::optional<Iris_meta_comment> const metadata = parse_iris_meta_comment(cursor);
+        if (metadata.has_value())
+        {
+            declaration_name = metadata->declaration_name;
+
+            declarations.metadata_by_c_name[std::pmr::string{enum_type_name}] = Imported_declaration_metadata
+            {
+                .module_name = std::pmr::string{metadata->module_name},
+                .declaration_name = std::pmr::string{metadata->declaration_name},
+                .kind = std::pmr::string{metadata->kind}
+            };
+        }
 
         auto const visitor = [](CXCursor current_cursor, CXCursor parent, CXClientData client_data) -> CXChildVisitResult
         {
@@ -611,30 +743,31 @@ namespace h::c
                 String const enum_constant_spelling = clang_getCursorSpelling(current_cursor);
                 std::string_view const enum_constant_name = enum_constant_spelling.string_view();
 
-                std::uint64_t const enum_constant_value = static_cast<std::uint64_t>(clang_getEnumConstantDeclUnsignedValue(current_cursor));
+                CXType const underlying_type = clang_getEnumDeclIntegerType(parent);
+                iris::Integer_type const integer_type = create_integer_type_from_clang_type(underlying_type);
 
-                h::Statement statement_value
+                std::pmr::string const enum_constant_value_str = integer_type.is_signed
+                    ? std::pmr::string{std::to_string(clang_getEnumConstantDeclValue(current_cursor))}
+                    : std::pmr::string{std::to_string(clang_getEnumConstantDeclUnsignedValue(current_cursor))};
+
+                iris::Statement statement_value
                 {
                     .expressions = {
-                        h::Expression
+                        iris::Expression
                         {
-                            .data = h::Constant_expression
+                            .data = iris::Constant_expression
                             {
                                 .type = {
-                                    .data = h::Integer_type
-                                    {
-                                        .number_of_bits = 32,
-                                        .is_signed = true
-                                    }
+                                    .data = integer_type
                                 },
-                                .data = std::pmr::string{std::to_string(enum_constant_value)}
+                                .data = enum_constant_value_str
                             }
                         }
                     }
                 };
 
                 values->push_back(
-                    h::Enum_value
+                    iris::Enum_value
                     {
                         .name = std::pmr::string{enum_constant_name},
                         .value = std::move(statement_value)
@@ -657,16 +790,16 @@ namespace h::c
             cursor
         );
 
-        return h::Enum_declaration
+        return iris::Enum_declaration
         {
-            .name = std::pmr::string{enum_type_name},
-            .unique_name = std::pmr::string{enum_type_name},
+            .name = declaration_name,
+            .unique_name = declaration_name,
             .values = std::move(values),
             .source_location = cursor_location.source_location,
         };
     }
 
-    h::Forward_declaration create_forward_declaration(C_declarations const& declarations, CXCursor const cursor)
+    iris::Forward_declaration create_forward_declaration(C_declarations const& declarations, CXCursor const cursor)
     {
         CXType const type = clang_getCursorType(cursor);
         String const type_spelling = { clang_getTypeSpelling(type) };
@@ -676,7 +809,7 @@ namespace h::c
             cursor
         );
 
-        return h::Forward_declaration
+        return iris::Forward_declaration
         {
             .name = std::pmr::string{type_name},
             .unique_name = std::pmr::string{type_name},
@@ -712,13 +845,13 @@ namespace h::c
         return std::pmr::vector<std::pmr::string>{"result"};
     }
 
-    std::pmr::vector<h::Source_position> create_input_parameter_source_positions(
+    std::pmr::vector<iris::Source_position> create_input_parameter_source_positions(
         CXCursor const cursor
     )
     {
         int const number_of_arguments = clang_Cursor_getNumArguments(cursor);
 
-        std::pmr::vector<h::Source_position> parameter_source_positions;
+        std::pmr::vector<iris::Source_position> parameter_source_positions;
         parameter_source_positions.reserve(number_of_arguments);
 
         for (int argument_index = 0; argument_index < number_of_arguments; ++argument_index)
@@ -735,7 +868,7 @@ namespace h::c
         return parameter_source_positions;
     }
 
-    std::pmr::vector<h::Source_position> create_output_parameter_source_positions(
+    std::pmr::vector<iris::Source_position> create_output_parameter_source_positions(
         CXCursor const cursor,
         std::size_t const number_of_outputs
     )
@@ -887,6 +1020,12 @@ namespace h::c
             std::pmr::string const& line = lines[current_line_index];
             std::string_view const line_without_comments = get_line_without_comments(line, is_multi_line_comment);
 
+            if (line_without_comments.find("IRIS_META") != std::string_view::npos)
+            {
+                current_line_index += 1;
+                continue;
+            }
+
             if (is_empty_line(line_without_comments))
             {
                 current_line_index += 1;    
@@ -1001,12 +1140,15 @@ namespace h::c
         return std::pmr::string{stream.str()};
     }
 
-    h::Function_declaration create_function_declaration(C_declarations const& declarations, CXCursor const cursor)
+    iris::Function_declaration create_function_declaration(C_declarations const& declarations, CXCursor const cursor)
     {
         String const cursor_spelling = { clang_getCursorSpelling(cursor) };
-        std::string_view const function_name = cursor_spelling.string_view();
-        if (function_name == "puts") {
-            int i = 0;
+        std::pmr::string function_name = std::pmr::string{cursor_spelling.string_view()};
+
+        std::optional<Iris_meta_comment> const metadata = parse_iris_meta_comment(cursor);
+        if (metadata.has_value())
+        {
+            function_name = metadata->declaration_name;
         }
 
         Header_source_location const cursor_location = get_cursor_source_location(
@@ -1015,24 +1157,24 @@ namespace h::c
 
         CXType const function_type = clang_getCursorType(cursor);
 
-        h::Function_type h_function_type = create_function_type(declarations, cursor, function_type);
+        iris::Function_type h_function_type = create_function_type(declarations, cursor, function_type);
 
         std::pmr::vector<std::pmr::string> input_parameter_names = create_input_parameter_names(cursor);
         std::pmr::vector<std::pmr::string> output_parameter_names = create_output_parameter_names(h_function_type.output_parameter_types.size());
 
-        std::pmr::vector<h::Source_position> input_parameter_source_positions = create_input_parameter_source_positions(cursor);
-        std::pmr::vector<h::Source_position> output_parameter_source_positions = create_output_parameter_source_positions(cursor, h_function_type.output_parameter_types.size());
+        std::pmr::vector<iris::Source_position> input_parameter_source_positions = create_input_parameter_source_positions(cursor);
+        std::pmr::vector<iris::Source_position> output_parameter_source_positions = create_output_parameter_source_positions(cursor, h_function_type.output_parameter_types.size());
 
         std::optional<std::pmr::string> comment = create_function_comment(cursor);
 
-        return h::Function_declaration
+        return iris::Function_declaration
         {
-            .name = std::pmr::string{function_name},
-            .unique_name = std::pmr::string{function_name},
+            .name = function_name,
+            .unique_name = function_name,
             .type = std::move(h_function_type),
             .input_parameter_names = std::move(input_parameter_names),
             .output_parameter_names = std::move(output_parameter_names),
-            .linkage = h::Linkage::External,
+            .linkage = iris::Linkage::External,
             .comment = std::move(comment),
             .source_location = cursor_location.source_location,
             .input_parameter_source_positions = std::move(input_parameter_source_positions),
@@ -1040,7 +1182,45 @@ namespace h::c
         };
     }
 
-    C_macro_declaration create_macro_declaration(CXCursor const cursor)
+    std::optional<std::pmr::string> get_cached_macro_replacement_text(
+        std::string_view const macro_name,
+        iris::Source_range_location const& source_location,
+        Macro_replacement_text_entries_cache& replacement_text_entries_cache
+    )
+    {
+        if (!source_location.file_path.has_value())
+            return std::nullopt;
+
+        std::filesystem::path const& file_path = source_location.file_path.value();
+
+        auto location = replacement_text_entries_cache.find(file_path);
+        if (location == replacement_text_entries_cache.end())
+        {
+            auto const loaded_entries = get_macro_replacement_text_entries(file_path);
+            location = replacement_text_entries_cache.insert_or_assign(file_path, loaded_entries).first;
+        }
+
+        if (!location->second.has_value())
+            return get_macro_replacement_text(macro_name, source_location);
+
+        for (Macro_replacement_text_entry const& entry : *location->second)
+        {
+            if (entry.line != source_location.range.start.line || entry.name != macro_name)
+                continue;
+
+            if (!entry.replacement_text.has_value())
+                return std::nullopt;
+
+            return entry.replacement_text;
+        }
+
+        return std::nullopt;
+    }
+
+    C_macro_declaration create_macro_declaration(
+        CXCursor const cursor,
+        Macro_replacement_text_entries_cache& replacement_text_entries_cache
+    )
     {
         String const macro_spelling = { clang_getCursorSpelling(cursor) };
         std::string_view const macro_name = macro_spelling.string_view();
@@ -1054,14 +1234,15 @@ namespace h::c
         C_macro_declaration macro
         {
             .name = std::pmr::string{ macro_name },
-            .is_function_like = false,
+            .is_function_like = is_function_like,
+            .replacement_text = get_cached_macro_replacement_text(macro_name, cursor_location.source_location, replacement_text_entries_cache),
             .source_location = cursor_location.source_location,
         };
 
         return macro;
     }
 
-    std::optional<h::Statement> get_global_variable_initial_value(CXCursor const cursor, h::Type_reference const& type)
+    std::optional<iris::Statement> get_global_variable_initial_value(CXCursor const cursor, iris::Type_reference const& type)
     {
         CXCursor const initializer_cursor = clang_Cursor_getVarDeclInitializer(cursor);
 
@@ -1077,9 +1258,9 @@ namespace h::c
                     if (clang_EvalResult_isUnsignedInt(evaluation_result.value) != 0)
                     {
                         unsigned long long const value = clang_EvalResult_getAsUnsigned(evaluation_result.value);
-                        return h::create_statement(
+                        return iris::create_statement(
                             {
-                                h::create_constant_expression(
+                                iris::create_constant_expression(
                                     type,
                                     std::to_string(value)
                                 )
@@ -1089,9 +1270,9 @@ namespace h::c
                     else
                     {
                         long long const value = clang_EvalResult_getAsLongLong(evaluation_result.value);
-                        return h::create_statement(
+                        return iris::create_statement(
                             {
-                                h::create_constant_expression(
+                                iris::create_constant_expression(
                                     type,
                                     std::to_string(value)
                                 )
@@ -1102,9 +1283,9 @@ namespace h::c
                 case CXEval_Float:
                 {
                     double const value = clang_EvalResult_getAsDouble(evaluation_result.value);
-                    return h::create_statement(
+                    return iris::create_statement(
                         {
-                            h::create_constant_expression(
+                            iris::create_constant_expression(
                                 type,
                                 std::to_string(value)
                             )
@@ -1115,9 +1296,9 @@ namespace h::c
                 case CXEval_StrLiteral:
                 {
                     char const* const value = clang_EvalResult_getAsStr(evaluation_result.value);
-                    return h::create_statement(
+                    return iris::create_statement(
                         {
-                            h::create_constant_expression(
+                            iris::create_constant_expression(
                                 type,
                                 value
                             )
@@ -1137,25 +1318,25 @@ namespace h::c
     }
 
     void set_global_variable_default_values(
-        h::Module const& core_module,
-        h::Module_declarations& declarations,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        iris::Module_declarations& declarations,
+        iris::Declaration_database const& declaration_database
     )
     {
-        for (h::Global_variable_declaration& global_variable_declaration : declarations.global_variable_declarations)
+        for (iris::Global_variable_declaration& global_variable_declaration : declarations.global_variable_declarations)
         {
-            if (global_variable_declaration.initial_value == h::Statement{})
+            if (global_variable_declaration.initial_value == iris::Statement{})
             {
                 if (!global_variable_declaration.type.has_value())
                     throw std::runtime_error{std::format("Cannot deduce type of global variable '{}'", global_variable_declaration.name)};
 
-                h::Statement default_value = create_default_value(*global_variable_declaration.type, core_module, declaration_database);
+                iris::Statement default_value = create_default_value(*global_variable_declaration.type, core_module, declaration_database);
                 global_variable_declaration.initial_value = std::move(default_value);
             }
         }
     }
 
-    std::optional<h::Global_variable_declaration> create_global_variable_declaration(C_declarations const& declarations, CXCursor const cursor, bool const is_macro)
+    std::optional<iris::Global_variable_declaration> create_global_variable_declaration(C_declarations const& declarations, CXCursor const cursor, bool const is_macro)
     {
         String const cursor_spelling = { clang_getCursorSpelling(cursor) };
         std::string_view const variable_name = cursor_spelling.string_view();
@@ -1163,7 +1344,7 @@ namespace h::c
         CXType const variable_type = clang_getCursorType(cursor);
         bool const is_const = clang_isConstQualifiedType(variable_type);
 
-        std::optional<h::Type_reference> const type_reference = create_type_reference(declarations, cursor, variable_type);
+        std::optional<iris::Type_reference> const type_reference = create_type_reference(declarations, cursor, variable_type);
         if (!type_reference.has_value())
             return std::nullopt;
 
@@ -1171,30 +1352,30 @@ namespace h::c
             cursor
         );
 
-        std::optional<h::Statement> initial_value = get_global_variable_initial_value(cursor, type_reference.value());
+        std::optional<iris::Statement> initial_value = get_global_variable_initial_value(cursor, type_reference.value());
 
-        auto const calculate_global_type = [&]() -> h::Global_variable_type 
+        auto const calculate_global_type = [&]() -> iris::Global_variable_type 
         {
             if (is_macro)
-                return h::Global_variable_type::Macro;
+                return iris::Global_variable_type::Macro;
 
             CX_StorageClass const storage_class = clang_Cursor_getStorageClass(cursor);
             if (storage_class == CX_SC_Static)
-                return h::Global_variable_type::Macro;
+                return iris::Global_variable_type::Macro;
             else if (is_const)
-                return h::Global_variable_type::Constant;
+                return iris::Global_variable_type::Constant;
             else
-                return h::Global_variable_type::Mutable;
+                return iris::Global_variable_type::Mutable;
         };
 
-        h::Global_variable_type const global_type = calculate_global_type();
+        iris::Global_variable_type const global_type = calculate_global_type();
 
-        return h::Global_variable_declaration
+        return iris::Global_variable_declaration
         {
             .name = std::pmr::string{variable_name},
             .unique_name = std::pmr::string{variable_name},
             .type = std::move(*type_reference),
-            .initial_value = initial_value.has_value() ? std::move(*initial_value) : h::Statement{},
+            .initial_value = initial_value.has_value() ? std::move(*initial_value) : iris::Statement{},
             .global_type = global_type,
             .comment = std::nullopt,
             .source_location = cursor_location.source_location,
@@ -1307,17 +1488,33 @@ namespace h::c
         return std::pmr::string{ std::format("anonymous_{}", anonymous_member_count) };
     }
 
-    h::Union_declaration create_union_declaration(C_declarations& declarations, CXCursor const cursor);
+    iris::Union_declaration create_union_declaration(C_declarations& declarations, CXCursor const cursor);
 
-    h::Struct_declaration create_struct_declaration(C_declarations& declarations, CXCursor const cursor)
+    iris::Struct_declaration create_struct_declaration(C_declarations& declarations, CXCursor const cursor)
     {
         struct Client_data
         {
             C_declarations* declarations;
-            h::Struct_declaration* struct_declaration;
+            iris::Struct_declaration* struct_declaration;
         };
 
-        std::pmr::string const struct_name = create_declaration_name(declarations, cursor);
+        std::pmr::string struct_name = create_declaration_name(declarations, cursor);
+
+        String const cursor_spelling = { clang_getCursorSpelling(cursor) };
+        std::string_view const original_c_name = cursor_spelling.string_view();
+
+        std::optional<Iris_meta_comment> const metadata = parse_iris_meta_comment(cursor);
+        if (metadata.has_value())
+        {
+            struct_name = metadata->declaration_name;
+
+            declarations.metadata_by_c_name[std::pmr::string{original_c_name}] = Imported_declaration_metadata
+            {
+                .module_name = std::pmr::string{metadata->module_name},
+                .declaration_name = std::pmr::string{metadata->declaration_name},
+                .kind = std::pmr::string{metadata->kind}
+            };
+        }
 
         auto const visitor = [](CXCursor current_cursor, CXCursor parent, CXClientData client_data) -> CXChildVisitResult
         {
@@ -1338,7 +1535,7 @@ namespace h::c
                 }
                 else if (clang_Cursor_isBitField(current_cursor))
                 {
-                    std::optional<h::Type_reference> member_type_reference = create_type_reference(*data->declarations, current_cursor, member_type);
+                    std::optional<iris::Type_reference> member_type_reference = create_type_reference(*data->declarations, current_cursor, member_type);
 
                     std::uint32_t const bit_field_width = static_cast<std::uint32_t>(clang_getFieldDeclBitWidth(current_cursor));
 
@@ -1348,7 +1545,7 @@ namespace h::c
                 }
                 else
                 {
-                    std::optional<h::Type_reference> const member_type_reference = create_type_reference(*data->declarations, current_cursor, member_type);
+                    std::optional<iris::Type_reference> const member_type_reference = create_type_reference(*data->declarations, current_cursor, member_type);
 
                     if (!member_type_reference.has_value())
                     {
@@ -1373,7 +1570,7 @@ namespace h::c
             else if (cursor_kind == CXCursor_StructDecl && is_unnamed_or_anonymous_type(current_cursor))
             {
                 data->declarations->unnamed_count += 1;
-                h::Struct_declaration nested_struct_declaration = create_struct_declaration(*data->declarations, current_cursor);
+                iris::Struct_declaration nested_struct_declaration = create_struct_declaration(*data->declarations, current_cursor);
 
                 if (clang_Cursor_isAnonymousRecordDecl(current_cursor))
                 {
@@ -1381,7 +1578,7 @@ namespace h::c
                     data->struct_declaration->member_names.push_back(std::move(member_name));
                 }
 
-                h::Custom_type_reference reference
+                iris::Custom_type_reference reference
                 {
                     .module_reference = {
                         .name = data->declarations->module_name
@@ -1396,7 +1593,7 @@ namespace h::c
             else if (cursor_kind == CXCursor_UnionDecl && is_unnamed_or_anonymous_type(current_cursor))
             {
                 data->declarations->unnamed_count += 1;
-                h::Union_declaration nested_union_declaration = create_union_declaration(*data->declarations, current_cursor);
+                iris::Union_declaration nested_union_declaration = create_union_declaration(*data->declarations, current_cursor);
 
                 if (clang_Cursor_isAnonymousRecordDecl(current_cursor))
                 {
@@ -1404,7 +1601,7 @@ namespace h::c
                     data->struct_declaration->member_names.push_back(std::move(member_name));
                 }
 
-                h::Custom_type_reference reference
+                iris::Custom_type_reference reference
                 {
                     .module_reference = {
                         .name = data->declarations->module_name
@@ -1424,7 +1621,7 @@ namespace h::c
             cursor
         );
 
-        h::Struct_declaration struct_declaration
+        iris::Struct_declaration struct_declaration
         {
             .name = struct_name,
             .unique_name = struct_name,
@@ -1435,7 +1632,7 @@ namespace h::c
             .is_packed = false,
             .is_literal = false,
             .source_location = cursor_location.source_location,
-            .member_source_positions = std::pmr::vector<h::Source_position>{}
+            .member_source_positions = std::pmr::vector<iris::Source_position>{}
         };
 
         Client_data client_data
@@ -1456,12 +1653,12 @@ namespace h::c
         return struct_declaration;
     }
 
-    h::Union_declaration create_union_declaration(C_declarations& declarations, CXCursor const cursor)
+    iris::Union_declaration create_union_declaration(C_declarations& declarations, CXCursor const cursor)
     {
         struct Client_data
         {
             C_declarations* declarations;
-            h::Union_declaration* union_declaration;
+            iris::Union_declaration* union_declaration;
         };
         
         std::pmr::string const union_name = create_declaration_name(declarations, cursor);
@@ -1485,7 +1682,7 @@ namespace h::c
                 }
                 else
                 {
-                    std::optional<h::Type_reference> const member_type_reference = create_type_reference(*data->declarations, current_cursor, member_type);
+                    std::optional<iris::Type_reference> const member_type_reference = create_type_reference(*data->declarations, current_cursor, member_type);
 
                     if (!member_type_reference.has_value())
                     {
@@ -1509,7 +1706,7 @@ namespace h::c
             else if (cursor_kind == CXCursor_StructDecl && is_unnamed_or_anonymous_type(current_cursor))
             {
                 data->declarations->unnamed_count += 1;
-                h::Struct_declaration nested_struct_declaration = create_struct_declaration(*data->declarations, current_cursor);
+                iris::Struct_declaration nested_struct_declaration = create_struct_declaration(*data->declarations, current_cursor);
 
                 if (clang_Cursor_isAnonymousRecordDecl(current_cursor))
                 {
@@ -1517,7 +1714,7 @@ namespace h::c
                     data->union_declaration->member_names.push_back(std::move(member_name));
                 }
 
-                h::Custom_type_reference reference
+                iris::Custom_type_reference reference
                 {
                     .module_reference = {
                         .name = data->declarations->module_name
@@ -1531,7 +1728,7 @@ namespace h::c
             else if (cursor_kind == CXCursor_UnionDecl && is_unnamed_or_anonymous_type(current_cursor))
             {
                 data->declarations->unnamed_count += 1;
-                h::Union_declaration nested_union_declaration = create_union_declaration(*data->declarations, current_cursor);
+                iris::Union_declaration nested_union_declaration = create_union_declaration(*data->declarations, current_cursor);
 
                 if (clang_Cursor_isAnonymousRecordDecl(current_cursor))
                 {
@@ -1539,7 +1736,7 @@ namespace h::c
                     data->union_declaration->member_names.push_back(std::move(member_name));
                 }
                 
-                h::Custom_type_reference reference
+                iris::Custom_type_reference reference
                 {
                     .module_reference = {
                         .name = data->declarations->module_name
@@ -1558,14 +1755,14 @@ namespace h::c
             cursor
         );
 
-        h::Union_declaration union_declaration
+        iris::Union_declaration union_declaration
         {
             .name = union_name,
             .unique_name = union_name,
             .member_types = {},
             .member_names = {},
             .source_location = cursor_location.source_location,
-            .member_source_positions = std::pmr::vector<h::Source_position>{}
+            .member_source_positions = std::pmr::vector<iris::Source_position>{}
         };
 
         Client_data client_data
@@ -1598,7 +1795,7 @@ namespace h::c
             name == "uint64_t";
     }
 
-    bool is_fixed_width_integer_typedef_reference(h::Custom_type_reference const& reference, std::span<std::string_view const> const integer_alias_names)
+    bool is_fixed_width_integer_typedef_reference(iris::Custom_type_reference const& reference, std::span<std::string_view const> const integer_alias_names)
     {
         auto const location = std::find(
             integer_alias_names.begin(),
@@ -1609,11 +1806,11 @@ namespace h::c
         return location != integer_alias_names.end();
     }
 
-    h::Integer_type create_integer_type_from_fixed_width_integer_typedef_name(std::string_view const name)
+    iris::Integer_type create_integer_type_from_fixed_width_integer_typedef_name(std::string_view const name)
     {
         if (name == "int8_t")
         {
-            return h::Integer_type
+            return iris::Integer_type
             {
                 .number_of_bits = 8,
                 .is_signed = true
@@ -1621,7 +1818,7 @@ namespace h::c
         }
         else if (name == "int16_t")
         {
-            return h::Integer_type
+            return iris::Integer_type
             {
                 .number_of_bits = 16,
                 .is_signed = true
@@ -1629,7 +1826,7 @@ namespace h::c
         }
         else if (name == "int32_t")
         {
-            return h::Integer_type
+            return iris::Integer_type
             {
                 .number_of_bits = 32,
                 .is_signed = true
@@ -1637,7 +1834,7 @@ namespace h::c
         }
         else if (name == "int64_t")
         {
-            return h::Integer_type
+            return iris::Integer_type
             {
                 .number_of_bits = 64,
                 .is_signed = true
@@ -1645,7 +1842,7 @@ namespace h::c
         }
         else if (name == "uint8_t")
         {
-            return h::Integer_type
+            return iris::Integer_type
             {
                 .number_of_bits = 8,
                 .is_signed = false
@@ -1653,7 +1850,7 @@ namespace h::c
         }
         else if (name == "uint16_t")
         {
-            return h::Integer_type
+            return iris::Integer_type
             {
                 .number_of_bits = 16,
                 .is_signed = false
@@ -1661,7 +1858,7 @@ namespace h::c
         }
         else if (name == "uint32_t")
         {
-            return h::Integer_type
+            return iris::Integer_type
             {
                 .number_of_bits = 32,
                 .is_signed = false
@@ -1669,7 +1866,7 @@ namespace h::c
         }
         else if (name == "uint64_t")
         {
-            return h::Integer_type
+            return iris::Integer_type
             {
                 .number_of_bits = 64,
                 .is_signed = false
@@ -1681,31 +1878,31 @@ namespace h::c
     }
 
     void convert_typedef_to_integer_type_if_necessary(
-        h::Type_reference& type,
-        std::span<h::Alias_type_declaration const> const alias_type_declarations,
+        iris::Type_reference& type,
+        std::span<iris::Alias_type_declaration const> const alias_type_declarations,
         std::span<std::string_view const> const integer_alias_names,
         std::span<std::size_t const> const integer_alias_indices
     )
     {
-        if (std::holds_alternative<h::Custom_type_reference>(type.data))
+        if (std::holds_alternative<iris::Custom_type_reference>(type.data))
         {
-            h::Custom_type_reference const& reference = std::get<h::Custom_type_reference>(type.data);
+            iris::Custom_type_reference const& reference = std::get<iris::Custom_type_reference>(type.data);
 
             if (is_fixed_width_integer_typedef_reference(reference, integer_alias_names))
             {
                 auto const name_location = std::find(integer_alias_names.begin(), integer_alias_names.end(), reference.name);
                 auto const name_index = std::distance(integer_alias_names.begin(), name_location);
                 std::size_t integer_alias_index = integer_alias_indices[name_index];
-                h::Alias_type_declaration const& integer_alias_declaration = alias_type_declarations[integer_alias_index];
+                iris::Alias_type_declaration const& integer_alias_declaration = alias_type_declarations[integer_alias_index];
 
                 type.data = create_integer_type_from_fixed_width_integer_typedef_name(integer_alias_declaration.name);
             }
         }
-        else if (std::holds_alternative<h::Constant_array_type>(type.data))
+        else if (std::holds_alternative<iris::Constant_array_type>(type.data))
         {
-            h::Constant_array_type& data = std::get<h::Constant_array_type>(type.data);
+            iris::Constant_array_type& data = std::get<iris::Constant_array_type>(type.data);
 
-            for (h::Type_reference& reference : data.value_type)
+            for (iris::Type_reference& reference : data.value_type)
             {
                 convert_typedef_to_integer_type_if_necessary(
                     reference,
@@ -1715,11 +1912,11 @@ namespace h::c
                 );
             }
         }
-        else if (std::holds_alternative<h::Function_pointer_type>(type.data))
+        else if (std::holds_alternative<iris::Function_pointer_type>(type.data))
         {
-            h::Function_pointer_type& data = std::get<h::Function_pointer_type>(type.data);
+            iris::Function_pointer_type& data = std::get<iris::Function_pointer_type>(type.data);
 
-            for (h::Type_reference& reference : data.type.input_parameter_types)
+            for (iris::Type_reference& reference : data.type.input_parameter_types)
             {
                 convert_typedef_to_integer_type_if_necessary(
                     reference,
@@ -1729,7 +1926,7 @@ namespace h::c
                 );
             }
 
-            for (h::Type_reference& reference : data.type.output_parameter_types)
+            for (iris::Type_reference& reference : data.type.output_parameter_types)
             {
                 convert_typedef_to_integer_type_if_necessary(
                     reference,
@@ -1739,11 +1936,11 @@ namespace h::c
                 );
             }
         }
-        else if (std::holds_alternative<h::Pointer_type>(type.data))
+        else if (std::holds_alternative<iris::Pointer_type>(type.data))
         {
-            h::Pointer_type& data = std::get<h::Pointer_type>(type.data);
+            iris::Pointer_type& data = std::get<iris::Pointer_type>(type.data);
 
-            for (h::Type_reference& reference : data.element_type)
+            for (iris::Type_reference& reference : data.element_type)
             {
                 convert_typedef_to_integer_type_if_necessary(
                     reference,
@@ -1762,7 +1959,7 @@ namespace h::c
 
         for (std::size_t index = 0; index < input.alias_type_declarations.size(); ++index)
         {
-            h::Alias_type_declaration const& alias_type_declaration = input.alias_type_declarations[index];
+            iris::Alias_type_declaration const& alias_type_declaration = input.alias_type_declarations[index];
 
             if (is_fixed_width_integer_typedef_name(alias_type_declaration.name))
             {
@@ -1791,9 +1988,9 @@ namespace h::c
             output.alias_type_declarations.erase(output.alias_type_declarations.begin() + index);
         }
 
-        auto const process_type = [&](h::Type_reference const& type) -> bool
+        auto const process_type = [&](iris::Type_reference const& type) -> bool
         {
-            h::Type_reference& mutable_type = const_cast<Type_reference&>(type);
+            iris::Type_reference& mutable_type = const_cast<Type_reference&>(type);
             convert_typedef_to_integer_type_if_necessary(
                 mutable_type,
                 input.alias_type_declarations,
@@ -1803,29 +2000,29 @@ namespace h::c
             return false;
         };
 
-        for (h::Alias_type_declaration& declaration : output.alias_type_declarations)
+        for (iris::Alias_type_declaration& declaration : output.alias_type_declarations)
         {
-            h::visit_type_references(declaration, process_type);
+            iris::visit_type_references(declaration, process_type);
         }
 
-        for (h::Global_variable_declaration& declaration : output.global_variable_declarations)
+        for (iris::Global_variable_declaration& declaration : output.global_variable_declarations)
         {
-            h::visit_type_references(declaration, process_type);
+            iris::visit_type_references(declaration, process_type);
         }
 
-        for (h::Struct_declaration& declaration : output.struct_declarations)
+        for (iris::Struct_declaration& declaration : output.struct_declarations)
         {
-            h::visit_type_references(declaration, process_type);
+            iris::visit_type_references(declaration, process_type);
         }
 
-        for (h::Union_declaration& declaration : output.union_declarations)
+        for (iris::Union_declaration& declaration : output.union_declarations)
         {
-            h::visit_type_references(declaration, process_type);
+            iris::visit_type_references(declaration, process_type);
         }
 
-        for (h::Function_declaration& declaration : output.function_declarations)
+        for (iris::Function_declaration& declaration : output.function_declarations)
         {
-            h::visit_type_references(declaration, process_type);
+            iris::visit_type_references(declaration, process_type);
         }
 
         return output;
@@ -1836,10 +2033,10 @@ namespace h::c
         for (std::size_t index = 0; index < declarations.forward_declarations.size(); ++index)
         {
             std::size_t const reverse_index = declarations.forward_declarations.size() - 1 - index;
-            h::Forward_declaration const& forward_declaration = declarations.forward_declarations[reverse_index];
+            iris::Forward_declaration const& forward_declaration = declarations.forward_declarations[reverse_index];
 
             {
-                auto const is_declaration = [&](h::Struct_declaration const& declaration) -> bool { return declaration.unique_name == forward_declaration.unique_name; };
+                auto const is_declaration = [&](iris::Struct_declaration const& declaration) -> bool { return declaration.unique_name == forward_declaration.unique_name; };
                 auto const iterator = std::find_if(declarations.struct_declarations.begin(), declarations.struct_declarations.end(), is_declaration);
                 if (iterator != declarations.struct_declarations.end())
                 {
@@ -1849,7 +2046,7 @@ namespace h::c
             }
 
             {
-                auto const is_declaration = [&](h::Union_declaration const& declaration) -> bool { return declaration.unique_name == forward_declaration.unique_name; };
+                auto const is_declaration = [&](iris::Union_declaration const& declaration) -> bool { return declaration.unique_name == forward_declaration.unique_name; };
                 auto const iterator = std::find_if(declarations.union_declarations.begin(), declarations.union_declarations.end(), is_declaration);
                 if (iterator != declarations.union_declarations.end())
                 {
@@ -1861,53 +2058,53 @@ namespace h::c
     }
 
     static void add_expression(
-        h::Statement& statement,
-        h::Expression expression
+        iris::Statement& statement,
+        iris::Expression expression
     )
     {
         statement.expressions.push_back(std::move(expression));
     }
 
     static void add_default_value_to_statement(
-        h::Statement& statement,
+        iris::Statement& statement,
         Type_reference const& value_type,
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database
     )
     {
-        if (std::holds_alternative<h::Builtin_type_reference>(value_type.data))
+        if (std::holds_alternative<iris::Builtin_type_reference>(value_type.data))
         {
-            h::Builtin_type_reference const& builtin_type_reference = std::get<h::Builtin_type_reference>(value_type.data);
+            iris::Builtin_type_reference const& builtin_type_reference = std::get<iris::Builtin_type_reference>(value_type.data);
             // TODO
         }
-        else if (std::holds_alternative<h::Constant_array_type>(value_type.data))
+        else if (std::holds_alternative<iris::Constant_array_type>(value_type.data))
         {
-            h::Constant_array_type const& constant_array_type = std::get<h::Constant_array_type>(value_type.data);
+            iris::Constant_array_type const& constant_array_type = std::get<iris::Constant_array_type>(value_type.data);
 
-            h::Statement const element_default_value = create_default_value(constant_array_type.value_type[0], core_module, declaration_database);
+            iris::Statement const element_default_value = create_default_value(constant_array_type.value_type[0], core_module, declaration_database);
 
-            std::pmr::vector<h::Statement> array_data;
+            std::pmr::vector<iris::Statement> array_data;
             array_data.resize(constant_array_type.size);
             std::fill(array_data.begin(), array_data.end(), element_default_value);
 
-            add_expression(statement, h::create_constant_array_expression(std::move(array_data)));
+            add_expression(statement, iris::create_constant_array_expression(std::move(array_data)));
             return;
         }
-        else if (std::holds_alternative<h::Custom_type_reference>(value_type.data))
+        else if (std::holds_alternative<iris::Custom_type_reference>(value_type.data))
         {
-            h::Custom_type_reference const& custom_type_reference = std::get<h::Custom_type_reference>(value_type.data);
+            iris::Custom_type_reference const& custom_type_reference = std::get<iris::Custom_type_reference>(value_type.data);
 
-            std::optional<Declaration> const declaration_optional = h::find_declaration(declaration_database, core_module.name, custom_type_reference.name);
+            std::optional<Declaration> const declaration_optional = iris::find_declaration(declaration_database, core_module.name, custom_type_reference.name);
             if (declaration_optional.has_value())
             {
-                h::Declaration const& declaration = declaration_optional.value();
-                if (std::holds_alternative<h::Alias_type_declaration const*>(declaration.data))
+                iris::Declaration const& declaration = declaration_optional.value();
+                if (std::holds_alternative<iris::Alias_type_declaration const*>(declaration.data))
                 {
-                    h::Alias_type_declaration const* alias_type_declaration = std::get<h::Alias_type_declaration const*>(declaration.data);
+                    iris::Alias_type_declaration const* alias_type_declaration = std::get<iris::Alias_type_declaration const*>(declaration.data);
                     if (alias_type_declaration->type.empty())
                         throw std::runtime_error{ std::format("Alias type '{}' is void!", alias_type_declaration->name) };
 
-                    std::optional<Type_reference> const underlying_type_optional = h::get_underlying_type(declaration_database, alias_type_declaration->type[0]);
+                    std::optional<Type_reference> const underlying_type_optional = iris::get_underlying_type(declaration_database, alias_type_declaration->type[0]);
                     if (!underlying_type_optional.has_value())
                         throw std::runtime_error{ std::format("Alias type '{}' is void!", alias_type_declaration->name) };
 
@@ -1915,13 +2112,13 @@ namespace h::c
 
                     add_expression(
                         statement, 
-                        h::Expression
+                        iris::Expression
                         {
-                            .data = h::Cast_expression
+                            .data = iris::Cast_expression
                             {
                                 .source = { .expression_index = statement.expressions.size() + 1 },
                                 .destination_type = value_type,
-                                .cast_type = h::Cast_type::Numeric,
+                                .cast_type = iris::Cast_type::Numeric,
                             }
                         }
                     );
@@ -1929,120 +2126,120 @@ namespace h::c
                     add_default_value_to_statement(statement, underlying_type, core_module, declaration_database);
                     return;
                 }
-                else if (std::holds_alternative<h::Enum_declaration const*>(declaration.data))
+                else if (std::holds_alternative<iris::Enum_declaration const*>(declaration.data))
                 {
-                    h::Enum_declaration const* enum_declaration = std::get<h::Enum_declaration const*>(declaration.data);
+                    iris::Enum_declaration const* enum_declaration = std::get<iris::Enum_declaration const*>(declaration.data);
 
                     if (enum_declaration->values.empty())
                         throw std::runtime_error{ std::format("Enum '{}' is empty!", enum_declaration->name) };
 
-                    h::add_enum_value_expressions(statement, enum_declaration->name, enum_declaration->values[0].name);
+                    iris::add_enum_value_expressions(statement, enum_declaration->name, enum_declaration->values[0].name);
                     return;
                 }
-                else if (std::holds_alternative<h::Struct_declaration const*>(declaration.data))
+                else if (std::holds_alternative<iris::Struct_declaration const*>(declaration.data))
                 {
-                    add_expression(statement, h::create_instantiate_expression(Instantiate_expression_type::Default, {}));
+                    add_expression(statement, iris::create_instantiate_expression(Instantiate_expression_type::Default, {}));
                     return;
                 }
-                else if (std::holds_alternative<h::Union_declaration const*>(declaration.data))
+                else if (std::holds_alternative<iris::Union_declaration const*>(declaration.data))
                 {
-                    h::Union_declaration const* union_declaration = std::get<h::Union_declaration const*>(declaration.data);
+                    iris::Union_declaration const* union_declaration = std::get<iris::Union_declaration const*>(declaration.data);
 
                     if (union_declaration->member_types.empty()) {
-                        add_expression(statement, h::create_instantiate_expression(Instantiate_expression_type::Default, {}));
+                        add_expression(statement, iris::create_instantiate_expression(Instantiate_expression_type::Default, {}));
                         return;
                     }
 
-                    h::Instantiate_member_value_pair member_value
+                    iris::Instantiate_member_value_pair member_value
                     {
                         .member_name = union_declaration->member_names[0],
                         .value = {.expression_index = statement.expressions.size() + 1},
                     };
-                    add_expression(statement, h::create_instantiate_expression(Instantiate_expression_type::Default, {std::move(member_value)}));
+                    add_expression(statement, iris::create_instantiate_expression(Instantiate_expression_type::Default, {std::move(member_value)}));
                     
                     add_default_value_to_statement(statement, union_declaration->member_types[0], core_module, declaration_database);
                     return;
                 }
             }
         }
-        else if (std::holds_alternative<h::Fundamental_type>(value_type.data))
+        else if (std::holds_alternative<iris::Fundamental_type>(value_type.data))
         {
-            h::Fundamental_type const& fundamental_type = std::get<h::Fundamental_type>(value_type.data);
+            iris::Fundamental_type const& fundamental_type = std::get<iris::Fundamental_type>(value_type.data);
 
             switch (fundamental_type)
             {
-            case h::Fundamental_type::Bool: {
-                add_expression(statement, h::create_constant_expression(value_type, "false"));
+            case iris::Fundamental_type::Bool: {
+                add_expression(statement, iris::create_constant_expression(value_type, "false"));
                 return;
             }
-            case h::Fundamental_type::Float16:
-            case h::Fundamental_type::Float32:
-            case h::Fundamental_type::Float64:
-            case h::Fundamental_type::C_longdouble: {
-                add_expression(statement, h::create_constant_expression(value_type, "0.0"));
+            case iris::Fundamental_type::Float16:
+            case iris::Fundamental_type::Float32:
+            case iris::Fundamental_type::Float64:
+            case iris::Fundamental_type::C_longdouble: {
+                add_expression(statement, iris::create_constant_expression(value_type, "0.0"));
                 return;
             }
-            case h::Fundamental_type::String: {
-                add_expression(statement, h::create_constant_expression(value_type, ""));
+            case iris::Fundamental_type::String: {
+                add_expression(statement, iris::create_constant_expression(value_type, ""));
                 return;
             }
-            case h::Fundamental_type::Byte:
-            case h::Fundamental_type::C_bool:
-            case h::Fundamental_type::C_char:
-            case h::Fundamental_type::C_schar:
-            case h::Fundamental_type::C_uchar:
-            case h::Fundamental_type::C_short:
-            case h::Fundamental_type::C_ushort:
-            case h::Fundamental_type::C_int:
-            case h::Fundamental_type::C_uint:
-            case h::Fundamental_type::C_long:
-            case h::Fundamental_type::C_ulong:
-            case h::Fundamental_type::C_longlong:
-            case h::Fundamental_type::C_ulonglong: {
-                add_expression(statement, h::create_constant_expression(value_type, "0"));
+            case iris::Fundamental_type::Byte:
+            case iris::Fundamental_type::C_bool:
+            case iris::Fundamental_type::C_char:
+            case iris::Fundamental_type::C_schar:
+            case iris::Fundamental_type::C_uchar:
+            case iris::Fundamental_type::C_short:
+            case iris::Fundamental_type::C_ushort:
+            case iris::Fundamental_type::C_int:
+            case iris::Fundamental_type::C_uint:
+            case iris::Fundamental_type::C_long:
+            case iris::Fundamental_type::C_ulong:
+            case iris::Fundamental_type::C_longlong:
+            case iris::Fundamental_type::C_ulonglong: {
+                add_expression(statement, iris::create_constant_expression(value_type, "0"));
                 return;
             }
             }
         }
-        else if (std::holds_alternative<h::Function_pointer_type>(value_type.data))
+        else if (std::holds_alternative<iris::Function_pointer_type>(value_type.data))
         {
-            h::Function_pointer_type const& function_type = std::get<h::Function_pointer_type>(value_type.data);
-            add_expression(statement, h::create_null_pointer_expression());
+            iris::Function_pointer_type const& function_type = std::get<iris::Function_pointer_type>(value_type.data);
+            add_expression(statement, iris::create_null_pointer_expression());
             return;
         }
-        else if (std::holds_alternative<h::Integer_type>(value_type.data))
+        else if (std::holds_alternative<iris::Integer_type>(value_type.data))
         {
-            add_expression(statement, h::create_constant_expression(value_type, "0"));
+            add_expression(statement, iris::create_constant_expression(value_type, "0"));
             return;
         }
-        else if (std::holds_alternative<h::Pointer_type>(value_type.data))
+        else if (std::holds_alternative<iris::Pointer_type>(value_type.data))
         {
-            h::Pointer_type const& pointer_type = std::get<h::Pointer_type>(value_type.data);
-            add_expression(statement, h::create_null_pointer_expression());
+            iris::Pointer_type const& pointer_type = std::get<iris::Pointer_type>(value_type.data);
+            add_expression(statement, iris::create_null_pointer_expression());
             return;
         }
 
         throw std::runtime_error{ "create_default_value() did not handle Type_reference type!" };
     }
 
-    h::Statement create_default_value(
+    iris::Statement create_default_value(
         Type_reference const& value_type,
-        h::Module const& core_module,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database
     )
     {
-        h::Statement statement = {};
+        iris::Statement statement = {};
         add_default_value_to_statement(statement, value_type, core_module, declaration_database);
         return statement;
     }
 
     void add_struct_member_default_values(
-        h::Module const& core_module,
-        h::Module_declarations& declarations,
-        h::Declaration_database const& declaration_database
+        iris::Module const& core_module,
+        iris::Module_declarations& declarations,
+        iris::Declaration_database const& declaration_database
     )
     {
-        for (h::Struct_declaration& struct_declaration : declarations.struct_declarations)
+        for (iris::Struct_declaration& struct_declaration : declarations.struct_declarations)
         {
             struct_declaration.member_default_values.reserve(struct_declaration.member_types.size());
 
@@ -2050,7 +2247,7 @@ namespace h::c
             {
                 Type_reference const& member_type = struct_declaration.member_types[index];
 
-                h::Statement default_value = create_default_value(member_type, core_module, declaration_database);
+                iris::Statement default_value = create_default_value(member_type, core_module, declaration_database);
                 struct_declaration.member_default_values.push_back(std::move(default_value));
             }
         }
@@ -2172,12 +2369,12 @@ namespace h::c
 
     void group_declarations_by_visibility(
         C_declarations const& declarations,
-        h::Module_declarations& export_declarations,
-        h::Module_declarations& internal_declarations,
+        iris::Module_declarations& export_declarations,
+        iris::Module_declarations& internal_declarations,
         std::span<std::pmr::string const> const public_prefixes
     )
     {
-        for (h::Alias_type_declaration const& declaration : declarations.alias_type_declarations)
+        for (iris::Alias_type_declaration const& declaration : declarations.alias_type_declarations)
         {
             if (is_public_declaration(*declaration.unique_name, public_prefixes))
                 export_declarations.alias_type_declarations.push_back(declaration);
@@ -2185,7 +2382,7 @@ namespace h::c
                 internal_declarations.alias_type_declarations.push_back(declaration);
         }
 
-        for (h::Enum_declaration const& declaration : declarations.enum_declarations)
+        for (iris::Enum_declaration const& declaration : declarations.enum_declarations)
         {
             if (is_public_declaration(*declaration.unique_name, public_prefixes))
                 export_declarations.enum_declarations.push_back(declaration);
@@ -2193,7 +2390,7 @@ namespace h::c
                 internal_declarations.enum_declarations.push_back(declaration);
         }
 
-        for (h::Forward_declaration const& declaration : declarations.forward_declarations)
+        for (iris::Forward_declaration const& declaration : declarations.forward_declarations)
         {
             if (is_public_declaration(*declaration.unique_name, public_prefixes))
                 export_declarations.forward_declarations.push_back(declaration);
@@ -2201,7 +2398,7 @@ namespace h::c
                 internal_declarations.forward_declarations.push_back(declaration);
         }
 
-        for (h::Global_variable_declaration const& declaration : declarations.global_variable_declarations)
+        for (iris::Global_variable_declaration const& declaration : declarations.global_variable_declarations)
         {
             if (is_public_declaration(*declaration.unique_name, public_prefixes))
                 export_declarations.global_variable_declarations.push_back(declaration);
@@ -2209,7 +2406,7 @@ namespace h::c
                 internal_declarations.global_variable_declarations.push_back(declaration);
         }
 
-        for (h::Struct_declaration const& declaration : declarations.struct_declarations)
+        for (iris::Struct_declaration const& declaration : declarations.struct_declarations)
         {
             if (is_public_declaration(*declaration.unique_name, public_prefixes))
                 export_declarations.struct_declarations.push_back(declaration);
@@ -2217,7 +2414,7 @@ namespace h::c
                 internal_declarations.struct_declarations.push_back(declaration);
         }
 
-        for (h::Union_declaration const& declaration : declarations.union_declarations)
+        for (iris::Union_declaration const& declaration : declarations.union_declarations)
         {
             if (is_public_declaration(*declaration.unique_name, public_prefixes))
                 export_declarations.union_declarations.push_back(declaration);
@@ -2225,7 +2422,7 @@ namespace h::c
                 internal_declarations.union_declarations.push_back(declaration);
         }
 
-        for (h::Function_declaration const& declaration : declarations.function_declarations)
+        for (iris::Function_declaration const& declaration : declarations.function_declarations)
         {
             if (is_public_declaration(*declaration.unique_name, public_prefixes))
                 export_declarations.function_declarations.push_back(declaration);
@@ -2242,56 +2439,56 @@ namespace h::c
     {
         for (Alias_type_declaration const& declaration : declarations.alias_type_declarations)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration.name, type_reference);
             };
 
-            if (h::visit_type_references_recursively(declaration, predicate_with_name))
+            if (iris::visit_type_references_recursively(declaration, predicate_with_name))
                 return true;
         }
 
         for (Global_variable_declaration const& declaration : declarations.global_variable_declarations)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration.name, type_reference);
             };
 
-            if (h::visit_type_references_recursively(declaration, predicate_with_name))
+            if (iris::visit_type_references_recursively(declaration, predicate_with_name))
                 return true;
         }
 
         for (Struct_declaration const& declaration : declarations.struct_declarations)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration.name, type_reference);
             };
 
-            if (h::visit_type_references_recursively(declaration, predicate_with_name))
+            if (iris::visit_type_references_recursively(declaration, predicate_with_name))
                 return true;
         }
 
         for (Union_declaration const& declaration : declarations.union_declarations)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration.name, type_reference);
             };
 
-            if (h::visit_type_references_recursively(declaration, predicate_with_name))
+            if (iris::visit_type_references_recursively(declaration, predicate_with_name))
                 return true;
         }
 
         for (Function_declaration const& declaration : declarations.function_declarations)
         {
-            auto const predicate_with_name = [&](h::Type_reference const& type_reference) -> bool
+            auto const predicate_with_name = [&](iris::Type_reference const& type_reference) -> bool
             {
                 return predicate(declaration.name, type_reference);
             };
 
-            if (h::visit_type_references_recursively(declaration, predicate_with_name))
+            if (iris::visit_type_references_recursively(declaration, predicate_with_name))
                 return true;
         }
 
@@ -2440,14 +2637,14 @@ namespace h::c
     }
 
     void transform_enum_values(
-        h::Enum_declaration& declaration,
+        iris::Enum_declaration& declaration,
         std::span<std::pmr::string const> const remove_prefixes
     )
     {
         std::pmr::vector<std::string_view> const enum_name_words = separate_words(declaration.name);
         std::pmr::vector<std::pmr::string> const enum_name_lower_case_words = transform_to_lower_case(enum_name_words);
 
-        for (h::Enum_value& value : declaration.values)
+        for (iris::Enum_value& value : declaration.values)
         {
             value.name = transform_enum_value_name(value.name, enum_name_lower_case_words, remove_prefixes);
         }
@@ -2458,7 +2655,7 @@ namespace h::c
         std::span<std::pmr::string const> const remove_prefixes
     )
     {
-        for (h::Enum_declaration& declaration : declarations.enum_declarations)
+        for (iris::Enum_declaration& declaration : declarations.enum_declarations)
         {
             transform_enum_values(declaration, remove_prefixes);
             transform_name(declaration, remove_prefixes);
@@ -2467,30 +2664,30 @@ namespace h::c
         if (remove_prefixes.empty())
             return;
 
-        for (h::Alias_type_declaration& declaration : declarations.alias_type_declarations)
+        for (iris::Alias_type_declaration& declaration : declarations.alias_type_declarations)
             transform_name(declaration, remove_prefixes);
 
-        for (h::Forward_declaration& declaration : declarations.forward_declarations)
+        for (iris::Forward_declaration& declaration : declarations.forward_declarations)
             transform_name(declaration, remove_prefixes);
 
-        for (h::Global_variable_declaration& declaration : declarations.global_variable_declarations)
+        for (iris::Global_variable_declaration& declaration : declarations.global_variable_declarations)
             transform_name(declaration, remove_prefixes);
 
-        for (h::Struct_declaration& declaration : declarations.struct_declarations)
+        for (iris::Struct_declaration& declaration : declarations.struct_declarations)
             transform_name(declaration, remove_prefixes);
 
-        for (h::Union_declaration& declaration : declarations.union_declarations)
+        for (iris::Union_declaration& declaration : declarations.union_declarations)
             transform_name(declaration, remove_prefixes);
 
-        for (h::Function_declaration& declaration : declarations.function_declarations)
+        for (iris::Function_declaration& declaration : declarations.function_declarations)
             transform_name(declaration, remove_prefixes);
 
-        auto const process_type_reference = [&](std::string_view const declaration_name, h::Type_reference const& type_reference) -> bool
+        auto const process_type_reference = [&](std::string_view const declaration_name, iris::Type_reference const& type_reference) -> bool
         {
-            h::Type_reference* const reference = const_cast<h::Type_reference*>(&type_reference);
-            if (std::holds_alternative<h::Custom_type_reference>(reference->data))
+            iris::Type_reference* const reference = const_cast<iris::Type_reference*>(&type_reference);
+            if (std::holds_alternative<iris::Custom_type_reference>(reference->data))
             {
-                h::Custom_type_reference& custom_type_reference = std::get<h::Custom_type_reference>(reference->data);
+                iris::Custom_type_reference& custom_type_reference = std::get<iris::Custom_type_reference>(reference->data);
                 transform_name(custom_type_reference, remove_prefixes);
             }
             return false;
@@ -2537,6 +2734,11 @@ namespace h::c
             {
                 if (!macro_declaration.name.starts_with("_") && !macro_declaration.is_function_like && !ignore_macro(macro_declaration.name))
                 {
+                    if (!macro_declaration.replacement_text.has_value())
+                        continue;
+                    if (macro_declaration.replacement_text->starts_with("__pragma"))
+                        continue;
+
                     std::fputs("auto const ", file);
                     std::fputs(special_prefix, file);
                     std::fputs(macro_declaration.name.c_str(), file);
@@ -2569,7 +2771,7 @@ namespace h::c
 
                 if (variable_name.starts_with(special_prefix))
                 {
-                    std::optional<h::Global_variable_declaration> declaration = create_global_variable_declaration(*declarations, current_cursor, true);
+                    std::optional<iris::Global_variable_declaration> declaration = create_global_variable_declaration(*declarations, current_cursor, true);
                     if (declaration.has_value())
                     {
                         declaration->name = variable_name.substr(special_prefix.size());
@@ -2577,7 +2779,16 @@ namespace h::c
 
                         auto const macro_location = std::find_if(declarations->macro_declarations.begin(), declarations->macro_declarations.end(), [&](C_macro_declaration const& macro_declaration) -> bool { return macro_declaration.name == declaration->name; });
                         if (macro_location != declarations->macro_declarations.end())
+                        {
                             declaration->source_location = macro_location->source_location;
+
+                            if (declaration->initial_value == iris::Statement{} && macro_location->replacement_text.has_value())
+                            {
+                                std::optional<iris::Statement> const parsed_statement = parse_macro_replacement_text_to_statement(*macro_location->replacement_text);
+                                if (parsed_statement.has_value())
+                                    declaration->initial_value = *parsed_statement;
+                            }
+                        }
 
                         declarations->global_variable_declarations.push_back(std::move(*declaration));
                     }
@@ -2600,7 +2811,7 @@ namespace h::c
         return true;
     }
 
-    h::Module import_header(
+    iris::Module import_header(
         std::string_view const header_name,
         std::filesystem::path const& header_path,
         Options const& options,
@@ -2610,7 +2821,8 @@ namespace h::c
     {
         auto const visitor = [](CXCursor current_cursor, CXCursor parent, CXClientData client_data) -> CXChildVisitResult
         {
-            C_declarations* const declarations = reinterpret_cast<C_declarations*>(client_data);
+            Import_visitor_context* const context = reinterpret_cast<Import_visitor_context*>(client_data);
+            C_declarations* const declarations = context->declarations;
 
             CXCursorKind const cursor_kind = clang_getCursorKind(current_cursor);
 
@@ -2630,12 +2842,12 @@ namespace h::c
             
             if (cursor_kind == CXCursor_EnumDecl)
             {
-                h::Enum_declaration declaration = create_enum_declaration(*declarations, current_cursor);
+                iris::Enum_declaration declaration = create_enum_declaration(*declarations, current_cursor);
                 declarations->enum_declarations.push_back(std::move(declaration));
             }
             else if (cursor_kind == CXCursor_TypedefDecl)
             {
-                std::optional<h::Alias_type_declaration> declaration = create_alias_type_declaration(*declarations, current_cursor);
+                std::optional<iris::Alias_type_declaration> declaration = create_alias_type_declaration(*declarations, current_cursor);
                 if (declaration.has_value())
                     declarations->alias_type_declarations.push_back(std::move(declaration.value()));
             }
@@ -2645,7 +2857,7 @@ namespace h::c
             }
             else if (cursor_kind == CXCursor_MacroDefinition)
             {
-                declarations->macro_declarations.push_back(create_macro_declaration(current_cursor));
+                declarations->macro_declarations.push_back(create_macro_declaration(current_cursor, *context->macro_replacement_text_entries_cache));
             }
             else if (cursor_kind == CXCursor_StructDecl)
             {
@@ -2671,7 +2883,7 @@ namespace h::c
             }
             else if (cursor_kind == CXCursor_VarDecl)
             {
-                std::optional<h::Global_variable_declaration> declaration = create_global_variable_declaration(*declarations, current_cursor, false);
+                std::optional<iris::Global_variable_declaration> declaration = create_global_variable_declaration(*declarations, current_cursor, false);
                 if (declaration.has_value())
                     declarations->global_variable_declarations.push_back(std::move(*declaration));
             }
@@ -2681,13 +2893,20 @@ namespace h::c
 
         C_declarations declarations;
         declarations.module_name = header_name;
+        Macro_replacement_text_entries_cache macro_replacement_text_entries_cache;
+
+        Import_visitor_context visitor_context
+        {
+            .declarations = &declarations,
+            .macro_replacement_text_entries_cache = &macro_replacement_text_entries_cache
+        };
 
         CXCursor cursor = clang_getTranslationUnitCursor(unit);
 
         clang_visitChildren(
             cursor,
             visitor,
-            &declarations
+            &visitor_context
         );
 
         convert_macro_constants_to_global_constant_variables(
@@ -2703,8 +2922,8 @@ namespace h::c
         C_declarations declarations_with_fixed_width_integers = convert_fixed_width_integers_typedefs_to_integer_types(declarations);
         transform_names(declarations_with_fixed_width_integers, options.remove_prefixes);
 
-        h::Declaration_database declaration_database = h::create_declaration_database();
-        h::add_declarations(
+        iris::Declaration_database declaration_database = iris::create_declaration_database();
+        iris::add_declarations(
             declaration_database,
             header_name,
             true,
@@ -2719,7 +2938,7 @@ namespace h::c
             {}
         );
         
-        h::Module header_module
+        iris::Module header_module
         {
             .language_version = {
                 .major = 0,
@@ -2734,6 +2953,26 @@ namespace h::c
             .source_file_path = header_path
         };
 
+        std::pmr::unordered_set<std::pmr::string> dependency_names;
+        for (const auto& [c_name, metadata] : declarations_with_fixed_width_integers.metadata_by_c_name)
+        {
+            if (!metadata.module_name.empty() && metadata.module_name != header_module.name)
+            {
+                dependency_names.insert(metadata.module_name);
+            }
+        }
+
+        for (const auto& dependency_name : dependency_names)
+        {
+            iris::Import_module_with_alias dependency_import{
+                .module_name = dependency_name,
+                .alias = {},
+                .usages = {},
+                .source_range = std::nullopt
+            };
+            header_module.dependencies.alias_imports.push_back(std::move(dependency_import));
+        }
+
         group_declarations_by_visibility(declarations_with_fixed_width_integers, header_module.export_declarations, header_module.internal_declarations, options.public_prefixes);
 
         add_struct_member_default_values(header_module, header_module.export_declarations, declaration_database);
@@ -2745,7 +2984,7 @@ namespace h::c
         return header_module;
     }
 
-    std::optional<h::Module> import_header(
+    std::optional<iris::Module> import_header(
         std::string_view const header_name,
         std::filesystem::path const& header_path,
         Options const& options
@@ -2756,7 +2995,7 @@ namespace h::c
         if (!unit.has_value())
             return std::nullopt;
 
-        h::Module header_module = import_header(header_name, header_path, options, index, *unit);
+        iris::Module header_module = import_header(header_name, header_path, options, index, *unit);
 
         clang_disposeTranslationUnit(*unit);
         clang_disposeIndex(index);
@@ -2764,42 +3003,26 @@ namespace h::c
         return header_module;
     }
 
-    std::optional<h::Module> import_header_and_write_to_file(std::string_view const header_name, std::filesystem::path const& header_path, std::filesystem::path const& output_path, Options const& options)
+    std::optional<iris::Module> import_header_and_write_to_file(std::string_view const header_name, std::filesystem::path const& header_path, std::filesystem::path const& output_path, Options const& options)
     {
-        /*std::optional<std::uint64_t> current_header_hash = calculate_header_file_hash(header_path, options.target_triple, options.include_directories);
-
-        if (current_header_hash.has_value() && std::filesystem::exists(output_path))
-        {
-            std::optional<h::json::Header> const core_header = h::json::read_header(output_path);
-            if (core_header.has_value())
-            {
-                std::optional<std::uint64_t> const cached_header_hash = core_header->content_hash;
-                if (cached_header_hash.has_value())
-                {
-                    if (current_header_hash.value() == cached_header_hash.value())
-                        return;
-                }
-            }
-        }*/
-
-        std::optional<h::Module> header_module = import_header(header_name, header_path, options);
+        std::optional<iris::Module> header_module = import_header(header_name, header_path, options);
         if (!header_module.has_value())
             return std::nullopt;
 
         //header_module.content_hash = current_header_hash;
-        h::binary_serializer::write_module_to_file(output_path, *header_module, {});
+        iris::binary_serializer::write_module_to_file(output_path, *header_module, {});
 
         return *header_module;
     }
 
-    h::Struct_layout calculate_struct_layout(
+    iris::Struct_layout calculate_struct_layout(
         CXCursor const current_cursor
     )
     {
         struct Client_Data
         {
             CXType struct_type = {};
-            h::Struct_layout struct_layout = {};
+            iris::Struct_layout struct_layout = {};
         };
 
         auto const visitor = [](CXCursor current_cursor, CXCursor parent, CXClientData client_data) -> CXChildVisitResult
@@ -2853,7 +3076,7 @@ namespace h::c
         return client_data.struct_layout;
     }
 
-    std::optional<h::Struct_layout> calculate_struct_layout(
+    std::optional<iris::Struct_layout> calculate_struct_layout(
         std::filesystem::path const& header_path,
         std::string_view const struct_name,
         Options const& options
@@ -2867,7 +3090,7 @@ namespace h::c
         struct Client_data
         {
             std::string_view struct_name;
-            h::Struct_layout struct_layout = {};
+            iris::Struct_layout struct_layout = {};
         };
 
         auto const visitor = [](CXCursor current_cursor, CXCursor parent, CXClientData client_data) -> CXChildVisitResult

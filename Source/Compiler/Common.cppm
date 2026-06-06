@@ -1,21 +1,12 @@
-module;
+export module iris.compiler.common;
 
-#include <llvm/ADT/StringRef.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/Module.h>
+import std;
+import llvm;
 
-#include <filesystem>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <unordered_map>
+import iris.core;
+import iris.core.declarations;
 
-export module h.compiler.common;
-
-import h.core;
-import h.core.declarations;
-
-namespace h::compiler
+namespace iris::compiler
 {
     export std::string_view to_string_view(llvm::StringRef const string);
 
@@ -26,7 +17,7 @@ namespace h::compiler
     );
 
     export std::string mangle_name(
-        h::Declaration_database const& declaration_database,
+        iris::Declaration_database const& declaration_database,
         std::string_view const module_name,
         std::string_view const declaration_name
     );
@@ -65,9 +56,14 @@ namespace h::compiler
         std::string_view name
     );
 
-    export h::Module const* get_module(
+    export iris::Module const* get_module(
         std::string_view const module_name,
-        h::Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, h::Module> const& core_module_dependencies
+        iris::Module const& core_module,
+        std::pmr::unordered_map<std::pmr::string, iris::Module> const& core_module_dependencies
+    );
+
+    export llvm::GlobalValue::LinkageTypes to_linkage(
+        Linkage const linkage,
+        bool const is_test
     );
 }

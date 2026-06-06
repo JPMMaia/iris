@@ -1,13 +1,10 @@
-module;
+export module iris.common.filesystem;
 
-#include <filesystem>
-#include <vector>
+import std;
 
-export module h.common.filesystem;
+export import iris.common.filesystem_common;
 
-export import h.common.filesystem_common;
-
-namespace h::common
+namespace iris::common
 {
     export std::filesystem::path get_executable_directory();
     

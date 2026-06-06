@@ -1,12 +1,12 @@
-add_library(H_core)
-add_library(H::Core ALIAS H_core)
+add_library(Iris_core SHARED)
+add_library(Iris::Core ALIAS Iris_core)
 
-target_compile_features(H_core PUBLIC cxx_std_23)
-target_compile_definitions(H_core PUBLIC "_SCL_SECURE_NO_WARNINGS")
+target_link_libraries(Iris_core PUBLIC std_module)
+target_compile_features(Iris_core PUBLIC cxx_std_23)
 
-target_link_libraries(H_core PRIVATE H::Common)
+target_link_libraries(Iris_core PRIVATE Iris::Common)
 
-target_sources(H_core
+target_sources(Iris_core
    PUBLIC FILE_SET modules TYPE CXX_MODULES
       FILES
          "Core.cppm"
@@ -31,14 +31,17 @@ target_sources(H_core
 
 if(WIN32)
    find_package(xxHash CONFIG REQUIRED)
-   target_link_libraries(H_core PRIVATE xxHash::xxhash)
+   target_link_libraries(Iris_core PRIVATE xxHash::xxhash)
    install(IMPORTED_RUNTIME_ARTIFACTS xxHash::xxhash)
 else()
    find_package(PkgConfig REQUIRED)
    pkg_check_modules(XXHASH REQUIRED IMPORTED_TARGET libxxhash)
 
-   target_include_directories(H_core PRIVATE ${XXHASH_INCLUDE_DIRS})
-   target_link_libraries(H_core PRIVATE PkgConfig::XXHASH)
+   target_include_directories(Iris_core PRIVATE ${XXHASIris_INCLUDE_DIRS})
+   target_link_libraries(Iris_core PRIVATE PkgConfig::XXHASH)
 endif()
 
-add_dependencies(H_core Generate_h_core_expressions_visitor)
+add_dependencies(Iris_core Generate_h_core_expressions_visitor)
+
+target_generate_module_exports(Iris_core)
+install(TARGETS Iris_core)

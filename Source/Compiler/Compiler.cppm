@@ -1,34 +1,26 @@
-module;
+export module iris.compiler;
 
-#include <llvm/Analysis/CGSCCPassManager.h>
-#include <llvm/Analysis/LoopAnalysisManager.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/PassInstrumentation.h>
-#include <llvm/IR/PassManager.h>
-#include <llvm/Passes/StandardInstrumentations.h>
-#include <llvm/Target/TargetMachine.h>
+import std;
+import llvm;
 
-#include <filesystem>
-#include <memory>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <unordered_map>
+import iris.core;
+import iris.core.declarations;
+import iris.compiler.clang_data;
+import iris.compiler.diagnostic;
+import iris.compiler.expressions;
+import iris.compiler.types;
 
-export module h.compiler;
-
-import h.core;
-import h.core.declarations;
-import h.compiler.clang_data;
-import h.compiler.diagnostic;
-import h.compiler.expressions;
-import h.compiler.types;
-
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Optimization_managers
     {
+        Optimization_managers() = default;
+        Optimization_managers(Optimization_managers&&) = default;
+        Optimization_managers& operator=(Optimization_managers&&) = default;
+        Optimization_managers(Optimization_managers const&) = delete;
+        Optimization_managers& operator=(Optimization_managers const&) = delete;
+        ~Optimization_managers();
+
         std::unique_ptr<llvm::LoopAnalysisManager> loop_analysis_manager;
         std::unique_ptr<llvm::FunctionAnalysisManager> function_analysis_manager;
         std::unique_ptr<llvm::CGSCCAnalysisManager> cgscc_analysis_manager;
@@ -38,18 +30,33 @@ namespace h::compiler
 
     export struct LLVM_data
     {
-        std::string target_triple;
+        LLVM_data(
+            llvm::Triple target_triple,
+            llvm::Target const* target,
+            llvm::TargetMachine* target_machine,
+            llvm::DataLayout data_layout,
+            std::unique_ptr<llvm::LLVMContext> context,
+            Optimization_managers optimization_managers,
+            std::unique_ptr<Clang_data, void(*)(Clang_data*)> clang_data
+        );
+        LLVM_data(LLVM_data&&) = default;
+        LLVM_data& operator=(LLVM_data&&) = default;
+        LLVM_data(LLVM_data const&) = delete;
+        LLVM_data& operator=(LLVM_data const&) = delete;
+        ~LLVM_data();
+
+        llvm::Triple target_triple;
         llvm::Target const* target;
         llvm::TargetMachine* target_machine;
         llvm::DataLayout data_layout;
         std::unique_ptr<llvm::LLVMContext> context;
         Optimization_managers optimization_managers;
-        Clang_data clang_data;
+        std::unique_ptr<Clang_data, void(*)(Clang_data*)> clang_data;
     };
 
     export struct LLVM_module_data
     {
-        std::pmr::unordered_map<std::pmr::string, h::Module> dependencies;
+        std::pmr::unordered_map<std::pmr::string, iris::Module> dependencies;
         std::unique_ptr<llvm::Module> module;
     };
 
@@ -60,14 +67,15 @@ namespace h::compiler
         bool debug = true;
         bool output_debug_code_view = false;
         Contract_options contract_options = Contract_options::Log_error_and_abort;
+        bool enable_bounds_checks = true;
         bool is_test_mode = false;
     };
 
-    export std::optional<h::Module> read_core_module(
+    export std::optional<iris::Module> read_core_module(
         std::filesystem::path const& path
     );
 
-    export std::optional<h::Module> read_core_module_declarations(
+    export std::optional<iris::Module> read_core_module_declarations(
         std::filesystem::path const& path
     );
 
@@ -75,79 +83,56 @@ namespace h::compiler
         Compilation_options const& compilation_options
     );
 
-    export std::unique_ptr<llvm::Module> create_llvm_module(
-        LLVM_data& llvm_data,
-        Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
-        std::optional<std::span<std::string_view const>> const functions_to_compile,
-        Compilation_options const& compilation_options
-    );
-
-    export std::unique_ptr<llvm::Module> create_llvm_module(
-        LLVM_data& llvm_data,
-        Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
-        Compilation_options const& compilation_options
-    );
-
-    export LLVM_module_data create_llvm_module(
-        LLVM_data& llvm_data,
-        Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        Compilation_options const& compilation_options
-    );
-
-    export std::pmr::vector<h::Module const*> sort_core_modules(
-        std::span<h::Module const> const core_modules,
+    export std::pmr::vector<iris::Module const*> sort_core_modules(
+        std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
-    std::pmr::vector<h::Module const*> sort_core_modules(
-        std::pmr::unordered_map<std::pmr::string, h::Module> const& core_module_dependencies,
-        h::Module const* const core_module,
+    std::pmr::vector<iris::Module const*> sort_core_modules(
+        std::pmr::unordered_map<std::pmr::string, iris::Module const*> const& core_module_dependencies,
+        iris::Module const* const core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     export Declaration_database create_declaration_database_and_add_modules(
-        std::span<h::Module const> const header_modules,
-        std::span<h::Module const* const> const sorted_core_modules
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module const* const> const sorted_core_modules
     );
 
     export struct Declaration_database_and_sorted_modules
     {
-        std::pmr::vector<h::Module const*> sorted_core_modules;
+        std::pmr::vector<iris::Module const*> sorted_core_modules;
         Declaration_database declaration_database;
-        std::pmr::vector<h::compiler::Diagnostic> diagnostics;
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics;
     };
 
+    export Declaration_database_and_sorted_modules create_declaration_database_and_sorted_modules(
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module> const core_modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     export void print_diagnostics_and_exit_if_needed(
-        std::span<h::compiler::Diagnostic const> const diagnostics,
+        std::span<iris::compiler::Diagnostic const> const diagnostics,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     export struct Compilation_database
     {
-        Clang_module_data clang_module_data;
+        Clang_module_data_pointer clang_module_data;
         Type_database type_database;
     };
 
     export Compilation_database process_modules_and_create_compilation_database(
         LLVM_data& llvm_data,
-        Clang_context&& clang_context,
-        std::span<h::Module const* const> const sorted_modules,
-        Declaration_database& declaration_database,
+        Clang_context_pointer&& clang_context,
+        std::span<iris::Module const* const> const sorted_modules,
+        Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
-    );
-
-    export std::unique_ptr<llvm::Module> create_llvm_module(
-        LLVM_data& llvm_data,
-        h::Module core_module,
-        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        Declaration_database declaration_database,
-        Compilation_options const& compilation_options
     );
 
     export void optimize_llvm_module(
@@ -176,15 +161,37 @@ namespace h::compiler
         std::filesystem::path const& output_file_path
     );
 
-    export void generate_object_file(
-        std::filesystem::path const& output_file_path,
-        Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        Compilation_options const& compilation_options
+    export void add_import_usages(
+        iris::Module& core_module,
+        std::pmr::polymorphic_allocator<> const& output_allocator
     );
 
-    export void add_import_usages(
-        h::Module& core_module,
-        std::pmr::polymorphic_allocator<> const& output_allocator
+    export void add_builtin_module(
+        std::pmr::vector<iris::Module>& core_modules
+    );
+
+    export struct Preprocessed_modules
+    {
+        std::pmr::vector<iris::Module> transformed_core_modules;
+        std::pmr::vector<iris::Module const*> sorted_modules;
+        Declaration_database declaration_database;
+    };
+
+    export Preprocessed_modules preprocess_modules(
+        LLVM_data& llvm_data,
+        std::span<iris::Module const* const> const header_modules,
+        std::span<iris::Module const> const core_modules,
+        Compilation_options const& compilation_options,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    export std::unique_ptr<llvm::Module> create_llvm_module(
+        LLVM_data& llvm_data,
+        iris::Module const& core_module,
+        std::span<iris::Module const* const> const all_sorted_modules,
+        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
+        Declaration_database const& declaration_database,
+        Compilation_options const& compilation_options
     );
 }

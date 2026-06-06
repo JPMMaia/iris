@@ -1,6 +1,7 @@
 #pragma warning(push, 0)
 
 #include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/FunctionExtras.h>
 #include <llvm/ADT/IntrusiveRefCntPtr.h>
 #include <llvm/ADT/PointerUnion.h>
 
@@ -15,6 +16,7 @@
 #include <llvm/ExecutionEngine/Orc/Debugging/DebuggerSupport.h>
 #include <llvm/ExecutionEngine/Orc/EPCIndirectionUtils.h>
 #include <llvm/ExecutionEngine/Orc/Mangling.h>
+#include <llvm/ExecutionEngine/Orc/Layer.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/ExecutionEngine/Orc/Shared/ExecutorSymbolDef.h>
 #include <llvm/ExecutionEngine/Orc/SymbolStringPool.h>
@@ -27,6 +29,7 @@
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Operator.h>
 #include <llvm/IR/PassInstrumentation.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Verifier.h>
@@ -42,6 +45,7 @@
 #include <llvm/Support/PointerLikeTypeTraits.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/TrailingObjects.h>
 #include <llvm/Support/VirtualFileSystem.h>
 
 #include <llvm/Target/TargetMachine.h>

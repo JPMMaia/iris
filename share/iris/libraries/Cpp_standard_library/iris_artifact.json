@@ -1,0 +1,20 @@
+{
+    "name": "Cpp_standard_library",
+    "version": "0.1.0",
+    "type": "library",
+    "dependencies": [
+        {
+            "name": "C_standard_library"
+        }
+    ],
+    "library": {
+        "external_libraries": {
+            "windows-dynamic-debug": [
+                "msvcprtd.lib"
+            ],
+            "windows-dynamic-release": [
+                "msvcprt.lib"
+            ]
+        }
+    }
+}

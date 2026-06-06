@@ -4,31 +4,29 @@ module;
 
 #include <cassert>
 
-export module h.json_serializer;
+export module iris.json_serializer;
 
 import std;
 
-import h.json_serializer.generated;
-//import h.json_serializer.generics;
-import h.common;
-import h.core;
+import iris.json_serializer.generated;
+//import iris.json_serializer.generics;
+import iris.common;
+import iris.core;
 
-namespace h::json
+namespace iris::json
 {
     export std::optional<JSON> serialize_module(
-        h::Module const& core_module
+        iris::Module const& core_module
     )
     {
         return to_json(core_module);
     }
 
-    export std::optional<h::Module> deserialize_module(
-        std::string_view const data
+    export std::optional<iris::Module> deserialize_module(
+        JSON const& json
     )
     {
-        JSON const json = JSON::parse(data);
-
-        h::Module output{};
+        iris::Module output{};
         from_json(json, output);
         return output;
     }
@@ -68,7 +66,7 @@ namespace h::json
 
     export bool write_module_to_file(
         std::filesystem::path const& file_path,
-        h::Module const& core_module
+        iris::Module const& core_module
     )
     {
         std::optional<JSON> const data = serialize_module(
@@ -78,19 +76,19 @@ namespace h::json
             return false;
 
         std::string const dump = data->dump(4);
-        h::common::write_to_file(file_path, dump);
+        iris::common::write_to_file(file_path, dump);
         return true;
     }
 
-    export std::optional<h::Module> read_module_from_file(
+    export std::optional<iris::Module> read_module_from_file(
         std::filesystem::path const& file_path
     )
     {
-        std::optional<JSON> const data = h::common::get_file_contents(file_path);
+        std::optional<JSON> const data = iris::common::get_file_contents(file_path);
         if (!data.has_value())
             return std::nullopt;
 
-        std::optional<h::Module> core_module = deserialize_module(
+        std::optional<iris::Module> core_module = deserialize_module(
             data.value()
         );
 

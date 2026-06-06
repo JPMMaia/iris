@@ -1,21 +1,12 @@
-module;
+module iris.compiler.test_framework;
 
-#include <algorithm>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <vector>
+import std;
 
-module h.compiler.test_framework;
+import iris.core;
+import iris.core.types;
+import iris.parser.convertor;
 
-import h.core;
-import h.core.types;
-import h.parser.convertor;
-
-namespace h::compiler
+namespace iris::compiler
 {
     std::pmr::string get_test_module_name(
         std::string_view const artifact_name
@@ -41,7 +32,7 @@ namespace h::compiler
     }
 
     static std::pmr::vector<Test_info> get_test_infos(
-        std::span<h::Module const* const> const core_modules,
+        std::span<iris::Module const* const> const core_modules,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -52,10 +43,10 @@ namespace h::compiler
             std::uint64_t const module_index,
             std::string_view const module_name,
             std::pmr::string const& module_alias_name,
-            std::span<h::Function_declaration const> const declarations
+            std::span<iris::Function_declaration const> const declarations
         ) -> void
         {
-            for (h::Function_declaration const& declaration : declarations)
+            for (iris::Function_declaration const& declaration : declarations)
             {
                 if (declaration.is_test)
                 {
@@ -75,7 +66,7 @@ namespace h::compiler
 
         for (std::uint64_t module_index = 0; module_index < core_modules.size(); ++module_index)
         {
-            h::Module const& core_module = *core_modules[module_index];
+            iris::Module const& core_module = *core_modules[module_index];
             std::pmr::string const module_alias_name = create_module_alias_name(core_module.name);
             add_test_infos(module_index, core_module.name, module_alias_name, core_module.export_declarations.function_declarations);
             add_test_infos(module_index, core_module.name, module_alias_name, core_module.internal_declarations.function_declarations);
@@ -85,13 +76,13 @@ namespace h::compiler
     }
 
     static std::pmr::string create_imports(
-        std::span<h::Module const* const> const core_modules,
+        std::span<iris::Module const* const> const core_modules,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         std::stringstream stream;
 
-        for (h::Module const* const core_module : core_modules)
+        for (iris::Module const* const core_module : core_modules)
         {
             stream << "import " << core_module->name << " as " << create_module_alias_name(core_module->name) << ";\n";
         }
@@ -100,7 +91,7 @@ namespace h::compiler
     }
 
     static std::pmr::string create_module_source_files(
-        std::span<h::Module const* const> const core_modules,
+        std::span<iris::Module const* const> const core_modules,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -108,7 +99,7 @@ namespace h::compiler
 
         for (std::size_t index = 0; index < core_modules.size(); ++index)
         {
-            h::Module const& core_module = *core_modules[index];
+            iris::Module const& core_module = *core_modules[index];
             std::string const source_file_path = core_module.source_file_path.has_value() ? core_module.source_file_path->generic_string() : std::string{};
             stream << "    \"" << source_file_path << "\"c";
             if (index + 1 < core_modules.size())
@@ -195,9 +186,9 @@ namespace h::compiler
         return std::pmr::string{stream.str()};
     }
 
-    std::optional<h::Module> create_test_module(
+    std::optional<iris::Module> create_test_module(
         std::string_view const artifact_name,
-        std::span<h::Module const* const> const core_modules,
+        std::span<iris::Module const* const> const core_modules,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
@@ -212,32 +203,32 @@ var g_test_module_indices: Constant_array::<Uint64> = [{}];
 var g_test_source_file_lines: Constant_array::<Uint64> = [{}];
 var g_tests: Constant_array::<Test_function> = [{}];
 
-@unique_name("hlang_get_test_count")
+@unique_name("iris_get_test_count")
 export function get_test_count() -> (result: Uint64)
 {{
     return {}u64;
 }}
 
-@unique_name("hlang_get_test_names")
+@unique_name("iris_get_test_names")
 export function get_test_names() -> (result: **C_char)
 {{
     return &g_test_names[0];
 }}
 
-@unique_name("hlang_get_test_source_file")
+@unique_name("iris_get_test_source_file")
 export function get_test_source_file(test_index: Uint64) -> (source_file_path: *C_char)
 {{
     var module_index = g_test_module_indices[test_index];
     return g_module_source_files[module_index];
 }}
 
-@unique_name("hlang_get_test_source_file_lines")
+@unique_name("iris_get_test_source_file_lines")
 export function get_test_source_file_lines() -> (result: *Uint64)
 {{
     return &g_test_source_file_lines[0];
 }}
 
-@unique_name("hlang_get_tests")
+@unique_name("iris_get_tests")
 export function get_tests() -> (result: *Test_function)
 {{
     return &g_tests[0];
@@ -258,7 +249,7 @@ export function get_tests() -> (result: *Test_function)
 
         std::string const test_module_code = std::format(test_template, test_module_name, imports, module_source_files, test_names, test_module_indices, test_source_file_lines, test_pointers, test_infos.size());
 
-        std::optional<h::Module> const test_module = h::parser::parse_and_convert_to_module(
+        std::optional<iris::Module> const test_module = iris::parser::parse_and_convert_to_module(
             test_module_code,
             std::nullopt,
             temporaries_allocator,
@@ -268,14 +259,14 @@ export function get_tests() -> (result: *Test_function)
         return test_module;
     }
 
-    h::Function_pointer_type create_test_check_function_pointer_type()
+    iris::Function_pointer_type create_test_check_function_pointer_type()
     {
-        return h::Function_pointer_type {
+        return iris::Function_pointer_type {
             .type = {
                 .input_parameter_types = {
-                    h::create_bool_type_reference(),
-                    h::create_c_string_type_reference(false),
-                    h::create_integer_type_type_reference(64, false),
+                    iris::create_bool_type_reference(),
+                    iris::create_c_string_type_reference(false),
+                    iris::create_integer_type_type_reference(64, false),
                 },
                 .output_parameter_types = {},
                 .is_variadic = false,
@@ -285,17 +276,17 @@ export function get_tests() -> (result: *Test_function)
         };
     }
 
-    h::Function_declaration create_test_check_function_declaration()
+    iris::Function_declaration create_test_check_function_declaration()
     {
-        h::Function_pointer_type function_pointer_type = create_test_check_function_pointer_type();
+        iris::Function_pointer_type function_pointer_type = create_test_check_function_pointer_type();
 
-        return h::Function_declaration{
-            .name = "hlang_test_check",
-            .unique_name = "hlang_test_check",
+        return iris::Function_declaration{
+            .name = "iris_test_check",
+            .unique_name = "iris_test_check",
             .type = std::move(function_pointer_type.type),
             .input_parameter_names = std::move(function_pointer_type.input_parameter_names),
             .output_parameter_names = std::move(function_pointer_type.output_parameter_names),
-            .linkage = h::Linkage::External,
+            .linkage = iris::Linkage::External,
             .is_test = false
         };
     }

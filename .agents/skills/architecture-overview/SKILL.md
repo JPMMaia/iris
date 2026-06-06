@@ -1,0 +1,226 @@
+---
+name: 'architecture-overview'
+description: 'Architecture overview of the Iris language compiler: directory structure, key components, build system, common tasks, best practices'
+license: MIT
+---
+
+# Iris Language Repository - GitHub Copilot Instructions
+
+## Repository Overview
+
+This is the **Iris language compiler** repository. Iris is a systems programming language that uses LLVM for code generation and tree-sitter for parsing.
+
+The compiler accepts `.iris` source files, parses them using tree-sitter, and then compiles to bitcode using LLVM.
+
+For interoperability with C, it can generate C headers from Iris source files, and it can also import C headers as Iris modules that can then be used directly in Iris code.
+
+It also contains a Builder component that orchestrates the entire build pipeline, reading configuration files to determine which source files to compile, which C headers to import, and which Iris modules to export as C headers. It can also compile C++ source files as part of the build process.
+
+## Directory Structure & Responsibilities
+
+### Source Directory (`Source/`)
+
+- **`Core/`** - Core Module data structures and semantics
+  - `Core.cppm` - Defines the internal representation of modules, types, expressions, and statements. This is the central data structure used throughout the compiler.
+  - `Types.cppm` - Mostly utility functions for working with `iris::Type_reference`
+  - `Declarations.cppm` - Contains `iris::Declaration_database` which is used to store all declarations (types, functions, global variables) accross all modules (including imported C header modules). This is used during validation and code generation to resolve type references and function calls.
+  - `Expressions.cppm` - Helper functions for working with `iris::Expression` values.
+
+- **`Compiler/`** - Core compilation logic
+  - `Builder.cpp`
+    - Build orchestration and pipeline management.
+    - Organizes source files into import/export/compile groups.
+    - Coordinates the entire compilation process.
+  - `Compiler.cpp` - LLVM code generation and lowering.
+  - `Expressions.cpp` - Expression lowering to LLVM IR.
+  - `Clang_code_generation.cpp` - Clang-based code generation for C and platform ABI compatibility. It's possible that this might be changed to use the new LLVM's ABI Lowering Library.
+  - `Test_framework.cpp` - Can be used to create `.iris` source files that implement specific functions that return information about the tests. For example it will return an array of function pointers to all the functions marked with the `@test` attribute. These functions are then called by the test runner which is implemented in `share/iris/source/tests_main.cpp`.
+  - `Validation.cppm` - Type checking and semantic validation.
+  - `Linker.cppm` - Linking logic
+  - `JIT/` - Just-In-Time execution support. Not fully implemented yet and it's not being used at the moment.
+  - `Passes/` - Core Module transformation passes. For example, processing compile-time expressions. In the future, we want to move template instantiation, reflection processing into here as well.
+  - `Project/` - Defines Artifact and Repository data structures which are used to configure the Builder's behavior. The Builder reads `iris_artifact.json` and `iris_repository.json` files to determine how to organize the build pipeline.
+
+- **`Builder/`** - Build pipeline orchestration
+  - For now this is only contains a `main.cpp` file which is used to create the `iris` executable. This might be moved into `Compiler/` in the future, as most of the work is done in the `Compiler/Builder.cpp` file.
+
+- **`Parser/`** - tree-sitter parsing and CST conversion
+  - `Parser.cppm` - Uses tree-sitter to parse `.iris` source files into the tree-sitter Concrete Syntax Tree (CST).
+  - `Convertor.cpp` - tree-sitter CST to Core Module conversion
+  - `tree-sitter-iris/` - Grammar definition
+
+- **`Interoperability/`** - C header import/export
+  - `C_header_importer.cppm` - Convert C headers to Core Module
+  - `C_header_exporter.cppm` - Convert Core Module to C headers
+  - Uses libclang for C header parsing
+
+- **`Binary_serializer/`** - Binary serialization utilities. Reads/writes the Core Module representation to a binary format. This is mostly used for caching the parsing results (either by the Builder or the Language Server).
+
+- **`JSON_serializer/`** - JSON serialization utilities. Same as Binary_serializer but for JSON format. This can be useful for debugging purposes (e.g. outputting the Core Module into a JSON file and then inspect).
+
+- **`Language_server/`** - Language Server Protocol implementation
+  - Provides IntelliSense for Iris language
+  - `Completion.cppm` - Code completion
+  - `Diagnostics.cppm` - Error diagnostics
+  - `Go_to_location.cppm` - Jump to definition
+  - `Inlay_hints.cppm` - Type/value hints
+
+### Build System Tools
+
+- **`Tools/code_generator/`** - Code generation utilities
+- **`Tools/tests_result_replacer/`** - Runs the compiler tests that contain the `[LLVM]` tag and then edits `Source/Compiler/Compiler.tests.cpp` and replaces the expected results with the actual results.
+
+### Examples Directory (`Examples/`)
+- Contains example `.iris` source files and projects. This is used by the tests.
+
+- **`Hello_world/`** - Basic Iris program example
+- **`Export_and_import_c_header/`** - Project that exports a C header and imports another C header.
+- **`Export_c_header/`** - Project that exports a C header.
+- **`Mix_with_cpp/`** - Project that compiles C++.
+- **`Test_framework/`** - Project that uses the test framework.
+- **`txt/`** - Language feature test cases (expressions, types, C interop, etc.)
+
+### Scripts Directory
+
+- **`Scripts/build_utilities.py`** - Build and installation utilities
+
+## Key Language Features
+
+- Code is organized in modules. Modules can import other modules and export their own declarations.
+- C interoperability. Modules can be exported as C headers. C headers can be imported as modules.
+- Similar to C (e.g. pointers, structs, no classes).
+- Variables are immutable by default.
+- Function preconditions and postconditions.
+- Defer expressions that execute before the enclosing scope exits.
+- Tests can be easily created by marking functions with the `@test` attribute. The test framework will automatically find these functions and execute them.
+- A language server that provides code completion, diagnostics, go to definition, inlay hints.
+- Not implemented yet (or partially implemented):
+  - Compile-time expressions.
+  - Reflections.
+  - Higher-level functional programming features (lambdas, map/filter, etc).
+  - Structure of Arrays (SoA) type.
+  - SIMD vector types and operations.
+  - (Possibly) Memory safety features.
+  - (Possibly) A node editor for visual programming.
+  - (Possibly) A tool to visualize a graph of dependencies between functions, modules, and artifacts.
+
+## Builder Project Files
+
+### `iris_repository.json`
+Defines the structure of an Iris language repository:
+- Lists artifacts (libraries, executables)
+- Specifies source file groups
+- Indicates import/export/compile targets
+
+### `iris_artifact.json`
+Defines an artifact (library or executable):
+- Artifact type (library/executable)
+- Source groups (imports, exports, compilations)
+- Output file names
+
+## Common Tasks
+
+### Building
+
+- **CMake 4.3+** with C++23 modules enabled
+- **vcpkg** for dependency management
+- **Build types**: Debug and Release configurations
+
+#### Configure CMake
+```bash
+# Windows Debug
+cmake --preset windows-debug
+
+# Linux Debug
+cmake --preset linux-debug
+```
+
+#### Build Debug
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+```
+
+#### Build Release
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+### Installing Iris
+
+#### Install Debug version
+```bash
+python Scripts/build_utilities.py install_iris <install_path> --configuration debug
+```
+
+#### Install Release version
+```bash
+python Scripts/build_utilities.py install_iris <install_path> --configuration release
+```
+
+### Testing
+
+Test cases are located in `Examples/txt/` with various language features:
+- Expressions (binary, block, assignment, ternary)
+- Types (booleans, arrays, bit fields, enums, structs, unions)
+- Control flow (break, defer, assert, loops)
+
+Run tests using CTest:
+```bash
+cd build
+ctest -j 8
+```
+
+### VS Code Extension Development
+
+The VS Code extension is located in `Tools/vscode/iris-extension/`:
+
+#### Build Language Client
+```bash
+cd Tools/vscode/iris-extension
+npm run compile
+```
+
+#### Package Extension
+```bash
+cd Tools/vscode/iris-extension
+npm run package
+```
+
+## Configuration Files
+
+### `CMakePresets.json`
+CMake build presets:
+- `windows-debug`: Windows Debug configuration
+- `linux-debug`: Linux Debug configuration
+
+### `vcpkg.json`
+Lists external dependencies managed by vcpkg.
+
+## Key Files to Reference
+
+- `CMakeLists.txt` - Root build configuration
+- `CMakePresets.json` - CMake presets
+- `vcpkg.json` - Dependencies
+- `Scripts/build_utilities.py` - Build utilities
+- `Source/Compiler/Builder.cpp` - Build orchestration
+- `Source/Parser/Convertor.cpp` - CST to Core Module conversion
+- `Source/Core/Core.cppm` - Core Module representation
+- `Examples/` - Usage patterns and test cases
+
+## File Type Conventions
+
+| Extension | Purpose | Description |
+|-----------|---------|-------------|
+| `.iris` | Iris Language Source | Iris language code that contains user code that is input to this compiler |
+| `.h` | C Header | C header files |
+| `.cppm` | C++ Modules | C++ module interface files |
+| `.cpp` | C++ Implementation | C++ implementation files |
+
+## Best Practices
+
+1. **Understand the Core Module**: All processing flows through the Core Module representation
+2. **Use Builder Configuration**: Configure imports/exports/compilations via repository and artifact files
+3. **Leverage C Interoperability**: Use C headers to integrate with existing C libraries
+4. **Test with Examples**: Refer to `Examples/txt/` for language feature test cases

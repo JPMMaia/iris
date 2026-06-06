@@ -1,60 +1,63 @@
 module;
 
-#include <clang/AST/ASTContext.h>
-#include <clang/AST/Decl.h>
-#include <clang/AST/DeclBase.h>
-#include <clang/AST/DeclCXX.h>
-#include <clang/AST/Type.h>
-#include <clang/Basic/Builtins.h>
-#include <clang/Basic/CodeGenOptions.h>
-#include <clang/Basic/Diagnostic.h>
-#include <clang/Basic/FileManager.h>
-#include <clang/Basic/IdentifierTable.h>
-#include <clang/Basic/SourceLocation.h>
-#include <clang/Basic/SourceManager.h>
-#include <clang/Basic/TargetInfo.h>
-#include <clang/CodeGen/CodeGenABITypes.h>
-#include <clang/CodeGen/CGFunctionInfo.h>
-#include <clang/CodeGen/ModuleBuilder.h>
-#include <clang/Frontend/CompilerInstance.h>
-#include <clang/lib/CodeGen/CodeGenModule.h>
-#include <clang/lib/CodeGen/CodeGenTypes.h>
-#include <clang/lib/CodeGen/CGRecordLayout.h>
-#include <llvm/ADT/APSInt.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <clang/Lex/HeaderSearchOptions.h>
-#include <clang/Lex/PreprocessorOptions.h>
-#include <llvm/Support/VirtualFileSystem.h>
+#include <assert.h>
 
-#include <array>
-#include <cassert>
-#include <compare>
-#include <exception>
-#include <iterator>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <span>
-#include <variant>
+#include <llvm/ADT/FunctionExtras.h>
 
-module h.compiler.clang_code_generation;
+module iris.compiler.clang_code_generation;
 
-import h.common;
-import h.compiler.analysis;
-import h.compiler.common;
-import h.compiler.debug_info;
-import h.compiler.instructions;
-import h.compiler.types;
-import h.core;
-import h.core.declarations;
-import h.core.execution_engine;
-import h.core.string_hash;
-import h.core.types;
+import std;
+import llvm;
+import clang;
 
-namespace h::compiler
+import iris.common;
+import iris.compiler.analysis;
+import iris.compiler.common;
+import iris.compiler.debug_info;
+import iris.compiler.instructions;
+import iris.compiler.types;
+import iris.core;
+import iris.core.declarations;
+import iris.core.execution_engine;
+import iris.core.string_hash;
+import iris.core.types;
+
+namespace iris::compiler
 {
-    static constexpr std::string_view c_builtin_module_name = "H.Builtin";
+    static constexpr std::string_view c_builtin_module_name = "iris.builtin";
+
+    struct Clang_data
+    {
+        std::unique_ptr<clang::CompilerInstance> compiler_instance;
+        std::unique_ptr<clang::TargetOptions> target_options;
+    };
+
+    struct Clang_module_declarations
+    {
+        std::pmr::unordered_map<std::pmr::string, clang::FunctionDecl*, iris::String_hash, iris::String_equal> function_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::TypedefDecl*, iris::String_hash, iris::String_equal> alias_type_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::EnumDecl*, iris::String_hash, iris::String_equal> enum_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, iris::String_hash, iris::String_equal> struct_declarations;
+        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, iris::String_hash, iris::String_equal> union_declarations;
+    };
+
+    struct Clang_declaration_database
+    {
+        std::pmr::unordered_map<std::pmr::string, Clang_module_declarations, iris::String_hash, iris::String_equal> map;
+    };
+
+    struct Clang_context
+    {
+        clang::ASTContext& ast_context;
+        std::unique_ptr<clang::CodeGenerator> code_generator;
+    };
+
+    struct Clang_module_data
+    {
+        clang::ASTContext& ast_context;
+        std::unique_ptr<clang::CodeGenerator> code_generator;
+        Clang_declaration_database declaration_database;
+    };
 
     clang::QualType get_opaque_forward_declaration(
         clang::ASTContext& clang_ast_context
@@ -98,7 +101,7 @@ namespace h::compiler
         record_declaration->addDecl(field);
         record_declaration->completeDefinition();
 
-        return clang_ast_context.getRecordType(record_declaration);
+        return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
     }
 
     static clang::QualType create_clang_soa_array_view_type(
@@ -145,13 +148,13 @@ namespace h::compiler
 
         record_declaration->completeDefinition();
 
-        return clang_ast_context.getRecordType(record_declaration);
+        return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
     }
 
     void add_clang_alias_type_declaration(
-        std::pmr::unordered_map<std::pmr::string, clang::TypedefDecl*, h::String_hash, h::String_equal>& clang_alias_type_declarations,
+        std::pmr::unordered_map<std::pmr::string, clang::TypedefDecl*, iris::String_hash, iris::String_equal>& clang_alias_type_declarations,
         clang::ASTContext& clang_ast_context,
-        h::Alias_type_declaration const& alias_type_declaration,
+        iris::Alias_type_declaration const& alias_type_declaration,
         Declaration_database const& declaration_database,
         Clang_declaration_database const& clang_declaration_database
     )
@@ -164,12 +167,12 @@ namespace h::compiler
 
         if (!alias_type_declaration.type.empty())
         {
-            auto const add_underlying_alias = [&](h::Type_reference const& type_reference) -> bool {
+            auto const add_underlying_alias = [&](iris::Type_reference const& type_reference) -> bool {
 
-                if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
+                if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
                 {
-                    h::Custom_type_reference const custom_type_reference = std::get<h::Custom_type_reference>(type_reference.data);
-                    std::optional<h::Declaration> const declaration = h::find_declaration(
+                    iris::Custom_type_reference const custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.data);
+                    std::optional<iris::Declaration> const declaration = iris::find_declaration(
                         declaration_database,
                         custom_type_reference.module_reference.name,
                         custom_type_reference.name
@@ -177,9 +180,9 @@ namespace h::compiler
 
                     if (declaration.has_value())
                     {
-                        if (std::holds_alternative<h::Alias_type_declaration const*>(declaration->data))
+                        if (std::holds_alternative<iris::Alias_type_declaration const*>(declaration->data))
                         {
-                            h::Alias_type_declaration const* underlying_alias_type_declaration = std::get<Alias_type_declaration const*>(declaration->data);
+                            iris::Alias_type_declaration const* underlying_alias_type_declaration = std::get<Alias_type_declaration const*>(declaration->data);
 
                             if (underlying_alias_type_declaration != nullptr)
                             {
@@ -198,7 +201,7 @@ namespace h::compiler
                 return false;
             };
 
-            h::visit_type_references_recursively(
+            iris::visit_type_references_recursively(
                 alias_type_declaration.type[0],
                 add_underlying_alias
             );
@@ -230,9 +233,9 @@ namespace h::compiler
     }
 
     void add_clang_enum_declaration(
-        std::pmr::unordered_map<std::pmr::string, clang::EnumDecl*, h::String_hash, h::String_equal>& clang_enum_declarations,
+        std::pmr::unordered_map<std::pmr::string, clang::EnumDecl*, iris::String_hash, iris::String_equal>& clang_enum_declarations,
         clang::ASTContext& clang_ast_context,
-        h::Enum_declaration const& enum_declaration
+        iris::Enum_declaration const& enum_declaration
     )
     {
         // TODO should we use unique_name?
@@ -252,7 +255,7 @@ namespace h::compiler
 
         for (std::size_t value_index = 0; value_index < enum_declaration.values.size(); ++value_index)
         {
-            h::Enum_value const& enum_value = enum_declaration.values[value_index];
+            iris::Enum_value const& enum_value = enum_declaration.values[value_index];
 
             clang::IdentifierInfo* value_identifier = &clang_ast_context.Idents.get(enum_value.name.data());
             clang::EnumConstantDecl* clang_enum_value = clang::EnumConstantDecl::Create(
@@ -281,7 +284,7 @@ namespace h::compiler
     clang::RecordDecl* create_clang_struct_declaration(
         clang::ASTContext& clang_ast_context,
         std::string_view const module_name,
-        h::Struct_declaration const& struct_declaration
+        iris::Struct_declaration const& struct_declaration
     )
     {
         std::string const mangled_name = mangle_name(module_name, struct_declaration.name, struct_declaration.unique_name);
@@ -302,15 +305,18 @@ namespace h::compiler
     void set_clang_struct_definition(
         clang::ASTContext& clang_ast_context,
         clang::RecordDecl& record_declaration,
-        h::Struct_declaration const& struct_declaration,
+        iris::Struct_declaration const& struct_declaration,
         Declaration_database const& declaration_database,
         Clang_declaration_database const& clang_declaration_database
     )
     {
+        if (record_declaration.isCompleteDefinition())
+            return;
+
         for (std::size_t member_index = 0; member_index < struct_declaration.member_types.size(); ++member_index)
         {
             std::string_view const member_name = struct_declaration.member_names[member_index];
-            h::Type_reference const& member_type = struct_declaration.member_types[member_index];
+            iris::Type_reference const& member_type = struct_declaration.member_types[member_index];
             std::optional<std::uint32_t> const member_bit_field = struct_declaration.member_bit_fields[member_index];
 
             std::optional<clang::QualType> const member_clang_type_optional = create_type(
@@ -321,7 +327,7 @@ namespace h::compiler
                 clang_declaration_database
             );
             if (!member_clang_type_optional.has_value())
-                h::common::print_message_and_exit(std::format("Could not create clang type for '{}.{}'.", struct_declaration.name, member_name));
+                iris::common::print_message_and_exit(std::format("Could not create clang type for '{}.{}'.", struct_declaration.name, member_name));
 
             clang::QualType const& member_clang_type = member_clang_type_optional.value();
 
@@ -343,8 +349,8 @@ namespace h::compiler
             {
                 std::uint32_t const bits = member_bit_field.value();
 
-                llvm::APInt const width{32, bits};
-                clang::QualType const bit_width_type = clang_ast_context.getIntTypeForBitwidth(32, 0);
+                llvm::APInt const width{64, bits};
+                clang::QualType const bit_width_type = clang_ast_context.getIntTypeForBitwidth(64, 0);
 
                 clang::IntegerLiteral* const bit_width_expression = clang::IntegerLiteral::Create(
                     clang_ast_context,
@@ -353,7 +359,14 @@ namespace h::compiler
                     {}
                 );
 
-                field->setBitWidth(bit_width_expression);    
+                clang::ConstantExpr* const constant_expression = clang::ConstantExpr::Create(
+                    clang_ast_context,
+                    bit_width_expression,
+                    clang::APValue{llvm::APSInt{bit_width_expression->getValue(), true}}
+                );
+
+                field->setBitWidth(constant_expression);
+                assert(field->hasConstantIntegerBitWidth());
             }
 
             record_declaration.addDecl(field);
@@ -363,10 +376,10 @@ namespace h::compiler
     }
 
     void add_clang_union_declaration(
-        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, h::String_hash, h::String_equal>& clang_union_declarations,
+        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, iris::String_hash, iris::String_equal>& clang_union_declarations,
         clang::ASTContext& clang_ast_context,
-        h::Module const& core_module,
-        h::Union_declaration const& union_declaration
+        iris::Module const& core_module,
+        iris::Union_declaration const& union_declaration
     )
     {
         std::string const mangled_name = mangle_union_name(core_module, union_declaration.name);
@@ -385,19 +398,21 @@ namespace h::compiler
     }
 
     void add_clang_union_definition(
-        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, h::String_hash, h::String_equal>& clang_union_declarations,
+        std::pmr::unordered_map<std::pmr::string, clang::RecordDecl*, iris::String_hash, iris::String_equal>& clang_union_declarations,
         clang::ASTContext& clang_ast_context,
-        h::Union_declaration const& union_declaration,
+        iris::Union_declaration const& union_declaration,
         Declaration_database const& declaration_database,
         Clang_declaration_database const& clang_declaration_database
     )
     {
         clang::RecordDecl* record_declaration = clang_union_declarations.at(union_declaration.name);
+        if (record_declaration->isCompleteDefinition())
+            return;
 
         for (std::size_t member_index = 0; member_index < union_declaration.member_types.size(); ++member_index)
         {
             std::string_view const member_name = union_declaration.member_names[member_index];
-            h::Type_reference const& member_type = union_declaration.member_types[member_index];
+            iris::Type_reference const& member_type = union_declaration.member_types[member_index];
 
             clang::QualType const member_clang_type = *create_type(
                 clang_ast_context,
@@ -429,7 +444,7 @@ namespace h::compiler
 
     clang::QualType create_clang_function_proto_type(
         clang::ASTContext& clang_ast_context,
-        h::Function_type const& function_type,
+        iris::Function_type const& function_type,
         Declaration_database const& declaration_database,
         Clang_declaration_database const& clang_declaration_database
     )
@@ -446,7 +461,7 @@ namespace h::compiler
 
         for (std::size_t index = 0; index < function_type.input_parameter_types.size(); ++index)
         {
-            h::Type_reference const& input_parameter_type_reference = function_type.input_parameter_types[index];
+            iris::Type_reference const& input_parameter_type_reference = function_type.input_parameter_types[index];
 
             clang::QualType const input_parameter_type = *create_type(
                 clang_ast_context,
@@ -473,7 +488,7 @@ namespace h::compiler
 
     clang::FunctionDecl* create_clang_function_declaration(
         clang::ASTContext& clang_ast_context,
-        h::Function_declaration const& function_declaration,
+        iris::Function_declaration const& function_declaration,
         Declaration_database const& declaration_database,
         Clang_declaration_database const& clang_declaration_database
     )
@@ -512,7 +527,7 @@ namespace h::compiler
             for (std::size_t index = 0; index < function_declaration.type.input_parameter_types.size(); ++index)
             {
                 std::string_view const input_parameter_name = function_declaration.input_parameter_names[index];
-                h::Type_reference const& input_parameter_type_reference = function_declaration.type.input_parameter_types[index];
+                iris::Type_reference const& input_parameter_type_reference = function_declaration.type.input_parameter_types[index];
 
                 clang::IdentifierInfo* parameter_name = &clang_ast_context.Idents.get(input_parameter_name.data());
                 clang::QualType parameter_type = *create_type(clang_ast_context, input_parameter_type_reference, false, declaration_database, clang_declaration_database);
@@ -548,12 +563,14 @@ namespace h::compiler
     void add_clang_struct_declaration(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
-        h::Module const& core_module,
-        h::Struct_declaration const& struct_declaration,
+        iris::Module const& core_module,
+        iris::Struct_declaration const& struct_declaration,
         Declaration_database const& declaration_database
     )
     {
         auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
+        if (iterator->second.struct_declarations.contains(struct_declaration.name))
+            return;
 
         clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
         iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
@@ -563,12 +580,14 @@ namespace h::compiler
     void add_clang_union_declaration(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
-        h::Module const& core_module,
-        h::Union_declaration const& union_declaration,
+        iris::Module const& core_module,
+        iris::Union_declaration const& union_declaration,
         Declaration_database const& declaration_database
     )
     {
         auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
+        if (iterator->second.union_declarations.contains(union_declaration.name))
+            return;
 
         add_clang_union_declaration(iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
         add_clang_union_definition(iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
@@ -578,11 +597,13 @@ namespace h::compiler
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
         std::string_view const module_name,
-        h::Function_declaration const& function_declaration,
+        iris::Function_declaration const& function_declaration,
         Declaration_database const& declaration_database
     )
     {
         auto iterator = clang_declaration_database.map.emplace(module_name.data(), Clang_module_declarations{}).first;
+        if (iterator->second.function_declarations.contains(function_declaration.name))
+            return;
 
         clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
         iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
@@ -591,20 +612,26 @@ namespace h::compiler
     void add_clang_function_declarations(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Declaration_database const& declaration_database
     )
     {
         auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
 
-        for (h::Function_declaration const& function_declaration : core_module.export_declarations.function_declarations)
+        for (iris::Function_declaration const& function_declaration : core_module.export_declarations.function_declarations)
         {
+            if (iterator->second.function_declarations.contains(function_declaration.name))
+                continue;
+
             clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
             iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
         }
 
-        for (h::Function_declaration const& function_declaration : core_module.internal_declarations.function_declarations)
+        for (iris::Function_declaration const& function_declaration : core_module.internal_declarations.function_declarations)
         {
+            if (iterator->second.function_declarations.contains(function_declaration.name))
+                continue;
+
             clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
             iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
         }
@@ -613,33 +640,49 @@ namespace h::compiler
     void add_clang_declarations(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Declaration_database const& declaration_database
     )
     {
         auto iterator = clang_declaration_database.map.emplace(core_module.name, Clang_module_declarations{}).first;
 
-        for (h::Enum_declaration const& enum_declaration : core_module.export_declarations.enum_declarations)
-            add_clang_enum_declaration(iterator->second.enum_declarations, clang_ast_context, enum_declaration);
-
-        for (h::Enum_declaration const& enum_declaration : core_module.internal_declarations.enum_declarations)
-            add_clang_enum_declaration(iterator->second.enum_declarations, clang_ast_context, enum_declaration);
-
-        for (h::Struct_declaration const& struct_declaration : core_module.export_declarations.struct_declarations)
+        for (iris::Enum_declaration const& enum_declaration : core_module.export_declarations.enum_declarations)
         {
+            if (iterator->second.enum_declarations.contains(enum_declaration.name))
+                continue;
+            
+            add_clang_enum_declaration(iterator->second.enum_declarations, clang_ast_context, enum_declaration);
+        }
+
+        for (iris::Enum_declaration const& enum_declaration : core_module.internal_declarations.enum_declarations)
+        {
+            if (iterator->second.enum_declarations.contains(enum_declaration.name))
+                continue;
+
+            add_clang_enum_declaration(iterator->second.enum_declarations, clang_ast_context, enum_declaration);
+        }
+
+        for (iris::Struct_declaration const& struct_declaration : core_module.export_declarations.struct_declarations)
+        {
+            if (iterator->second.struct_declarations.contains(struct_declaration.name))
+                continue;
+
             clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
             iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
         }
 
-        for (h::Struct_declaration const& struct_declaration : core_module.internal_declarations.struct_declarations)
+        for (iris::Struct_declaration const& struct_declaration : core_module.internal_declarations.struct_declarations)
         {
+            if (iterator->second.struct_declarations.contains(struct_declaration.name))
+                continue;
+
             clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
             iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
         }
 
-        for (h::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
+        for (iris::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
         {
-            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
+            std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
             assert(instance_custom_type_reference.has_value());
             
             clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, instance_custom_type_reference->module_reference.name, struct_declaration);
@@ -648,42 +691,42 @@ namespace h::compiler
             instance_iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
         }
 
-        for (h::Union_declaration const& union_declaration : core_module.export_declarations.union_declarations)
+        for (iris::Union_declaration const& union_declaration : core_module.export_declarations.union_declarations)
             add_clang_union_declaration(iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
 
-        for (h::Union_declaration const& union_declaration : core_module.internal_declarations.union_declarations)
+        for (iris::Union_declaration const& union_declaration : core_module.internal_declarations.union_declarations)
             add_clang_union_declaration(iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
 
-        for (h::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
+        for (iris::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
         {
-            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
+            std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
             assert(instance_custom_type_reference.has_value());
             
             auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
             add_clang_union_declaration(instance_iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
         }
 
-        for (h::Alias_type_declaration const& alias_type_declaration : core_module.export_declarations.alias_type_declarations)
+        for (iris::Alias_type_declaration const& alias_type_declaration : core_module.export_declarations.alias_type_declarations)
             add_clang_alias_type_declaration(iterator->second.alias_type_declarations, clang_ast_context, alias_type_declaration, declaration_database, clang_declaration_database);
 
-        for (h::Alias_type_declaration const& alias_type_declaration : core_module.internal_declarations.alias_type_declarations)
+        for (iris::Alias_type_declaration const& alias_type_declaration : core_module.internal_declarations.alias_type_declarations)
             add_clang_alias_type_declaration(iterator->second.alias_type_declarations, clang_ast_context, alias_type_declaration, declaration_database, clang_declaration_database);
 
-        for (h::Struct_declaration const& struct_declaration : core_module.export_declarations.struct_declarations)
+        for (iris::Struct_declaration const& struct_declaration : core_module.export_declarations.struct_declarations)
         {
             clang::RecordDecl* const record_declaration = iterator->second.struct_declarations.at(struct_declaration.name);
             set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
         }
 
-        for (h::Struct_declaration const& struct_declaration : core_module.internal_declarations.struct_declarations)
+        for (iris::Struct_declaration const& struct_declaration : core_module.internal_declarations.struct_declarations)
         {
             clang::RecordDecl* const record_declaration = iterator->second.struct_declarations.at(struct_declaration.name);
             set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
         }
 
-        for (h::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
+        for (iris::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
         {
-            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
+            std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
             assert(instance_custom_type_reference.has_value());
 
             auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
@@ -691,46 +734,62 @@ namespace h::compiler
             set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
         }
 
-        for (h::Union_declaration const& union_declaration : core_module.export_declarations.union_declarations)
+        for (iris::Union_declaration const& union_declaration : core_module.export_declarations.union_declarations)
             add_clang_union_definition(iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
 
-        for (h::Union_declaration const& union_declaration : core_module.internal_declarations.union_declarations)
+        for (iris::Union_declaration const& union_declaration : core_module.internal_declarations.union_declarations)
             add_clang_union_definition(iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
 
-        for (h::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
+        for (iris::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
         {
-            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
+            std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
             assert(instance_custom_type_reference.has_value());
 
             auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
             add_clang_union_definition(instance_iterator->second.union_declarations, clang_ast_context, union_declaration, declaration_database, clang_declaration_database);
         }
 
-        for (h::Function_declaration const& function_declaration : core_module.export_declarations.function_declarations)
+        for (iris::Function_declaration const& function_declaration : core_module.export_declarations.function_declarations)
         {
+            if (iterator->second.function_declarations.contains(function_declaration.name))
+                continue;
+
             clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
             iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
         }
 
-        for (h::Function_declaration const& function_declaration : core_module.internal_declarations.function_declarations)
+        for (iris::Function_declaration const& function_declaration : core_module.internal_declarations.function_declarations)
         {
+            if (iterator->second.function_declarations.contains(function_declaration.name))
+                continue;
+
             clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
             iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
         }
 
-        for (h::Function_declaration const& function_declaration : core_module.instanced_declarations.function_declarations)
+        for (iris::Function_declaration const& function_declaration : core_module.instanced_declarations.function_declarations)
         {
             clang::FunctionDecl* const clang_declaration = create_clang_function_declaration(clang_ast_context, function_declaration, declaration_database, clang_declaration_database);
 
-            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(function_declaration.name);
-            assert(instance_custom_type_reference.has_value());
-            
-            auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
-            instance_iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
+            std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(function_declaration.name);
+            if (instance_custom_type_reference.has_value())
+            {
+                auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
+                instance_iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
+            }
+            else
+            {
+                iterator->second.function_declarations.emplace(function_declaration.name, clang_declaration);
+            }
         }
     }
 
-    Clang_context create_clang_context(
+    void destroy_clang_context(Clang_context* data)
+    {
+        delete data;
+    }
+
+    std::unique_ptr<Clang_context, void(*)(Clang_context*)> create_clang_context(
         llvm::LLVMContext& llvm_context,
         Clang_data const& clang_data,
         std::string_view const module_name
@@ -753,49 +812,59 @@ namespace h::compiler
         };
         code_generator->Initialize(clang_ast_context);
 
-        return Clang_context
+        std::unique_ptr<Clang_context, void(*)(Clang_context*)> output
         {
-            .ast_context = clang_ast_context,
-            .code_generator = std::move(code_generator),
+            new Clang_context
+            {
+                .ast_context = clang_ast_context,
+                .code_generator = std::move(code_generator),
+            },
+            destroy_clang_context
         };
+
+        return output;
     }
 
-    Clang_module_data create_clang_module_data(
-        Clang_context&& clang_context,
-        std::span<h::Module const* const> const sorted_modules,
+    Clang_module_data_pointer create_clang_module_data(
+        Clang_context_pointer&& clang_context,
+        std::span<iris::Module const* const> const sorted_modules,
         Declaration_database const& declaration_database
     )
     {
-        clang::ASTContext& clang_ast_context = clang_context.ast_context;
+        clang::ASTContext& clang_ast_context = clang_context->ast_context;
 
         Clang_declaration_database clang_declaration_database;
 
         for (Module const* sorted_module : sorted_modules)
             add_clang_declarations(clang_declaration_database, clang_ast_context, *sorted_module, declaration_database);
 
-        return Clang_module_data
-        {
-            .ast_context = clang_ast_context,
-            .code_generator = std::move(clang_context.code_generator),
-            .declaration_database = std::move(clang_declaration_database),
-        };
+        Clang_module_data_pointer output(
+            new Clang_module_data
+            {
+                .ast_context = clang_ast_context,
+                .code_generator = std::move(clang_context->code_generator),
+                .declaration_database = std::move(clang_declaration_database),
+            },
+            destroy_clang_module_data
+        );
+        return output;
     }
 
-    Clang_module_data create_clang_module_data(
+    Clang_module_data_pointer create_clang_module_data(
         llvm::LLVMContext& llvm_context,
         Clang_data const& clang_data,
         std::string_view const module_name,
-        std::span<h::Module const* const> const sorted_modules,
+        std::span<iris::Module const* const> const sorted_modules,
         Declaration_database const& declaration_database
     )
     {
-        Clang_context clang_context = create_clang_context(llvm_context, clang_data, module_name);
+        Clang_context_pointer clang_context = create_clang_context(llvm_context, clang_data, module_name);
         return create_clang_module_data(std::move(clang_context), sorted_modules, declaration_database);
     }
 
     clang::CodeGen::CGFunctionInfo const& create_clang_function_info(
         Clang_module_data const& clang_module_data,
-        h::Function_type const& function_type,
+        iris::Function_type const& function_type,
         Declaration_database const& declaration_database
     )
     {
@@ -827,7 +896,7 @@ namespace h::compiler
         std::string_view const function_name
     )
     {
-        std::optional<h::Custom_type_reference> const instance_type_reference = unmangle_instance_call_name(function_name);
+        std::optional<iris::Custom_type_reference> const instance_type_reference = unmangle_instance_call_name(function_name);
         std::string_view const actual_module_name = instance_type_reference.has_value() ? std::string_view{instance_type_reference->module_reference.name} : module_name;
 
         auto const module_declarations_location = clang_module_data.declaration_database.map.find(actual_module_name);
@@ -842,7 +911,7 @@ namespace h::compiler
     llvm::FunctionType* convert_to_llvm_function_type(
         Clang_module_data const& clang_module_data,
         Declaration_database const& declaration_database,
-        h::Function_type const& function_type
+        iris::Function_type const& function_type
     )
     {
         clang::QualType const clang_function_type = create_clang_function_proto_type(
@@ -894,7 +963,7 @@ namespace h::compiler
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         Clang_module_data const& clang_module_data,
-        h::Function_declaration const& function_declaration,
+        iris::Function_declaration const& function_declaration,
         llvm::Function& llvm_function,
         Declaration_database const& declaration_database,
         Type_database const& type_database
@@ -994,7 +1063,7 @@ namespace h::compiler
 
                     if (argument_info.info.getIndirectByVal())
                     {
-                        h::Type_reference const& input_parameter_type = function_declaration.type.input_parameter_types[argument_info_index];
+                        iris::Type_reference const& input_parameter_type = function_declaration.type.input_parameter_types[argument_info_index];
                         llvm::Type* const original_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, input_parameter_type, type_database);
                         argument->addAttr(llvm::Attribute::getWithByValType(llvm_context, original_llvm_type));
                         argument->addAttr(llvm::Attribute::getWithAlignment(llvm_context, llvm::Align(argument_info.info.getIndirectAlign().getQuantity())));
@@ -1024,13 +1093,14 @@ namespace h::compiler
 
     Transformed_arguments transform_arguments(
         std::pmr::vector<bool> const& is_expression_address_of,
+        std::span<std::optional<Type_reference> const> const original_argument_types,
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
         llvm::Function& llvm_parent_function,
-        h::Module const& core_module,
-        h::Function_type const& function_type,
+        iris::Module const& core_module,
+        iris::Function_type const& function_type,
         clang::CodeGen::CGFunctionInfo const& function_info,
         std::span<llvm::Value* const> const original_arguments,
         Type_database const& type_database
@@ -1046,7 +1116,7 @@ namespace h::compiler
             {
                 // Pass return type as argument pointer
 
-                h::Type_reference const& original_return_type = function_type.output_parameter_types[0];
+                iris::Type_reference const& original_return_type = function_type.output_parameter_types[0];
                 llvm::Type* const original_return_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, original_return_type, type_database);
                 
                 llvm::AllocaInst* const alloca_instruction = create_alloca_instruction(llvm_builder, llvm_data_layout, llvm_parent_function, original_return_llvm_type);
@@ -1080,7 +1150,7 @@ namespace h::compiler
 
                         llvm::Value* const original_argument = original_arguments[argument_index];
 
-                        h::Type_reference const& original_argument_type = function_type.input_parameter_types[argument_index];
+                        iris::Type_reference const& original_argument_type = function_type.input_parameter_types[argument_index];
                         llvm::Type* const original_argument_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, original_argument_type, type_database);
                         llvm::Align const original_argument_alignment = llvm_data_layout.getABITypeAlign(original_argument_llvm_type);
 
@@ -1104,7 +1174,7 @@ namespace h::compiler
                     else
                     {
                         llvm::Value* const original_argument = original_arguments[argument_index];
-                        h::Type_reference const& original_argument_type = function_type.input_parameter_types[argument_index];
+                        iris::Type_reference const& original_argument_type = function_type.input_parameter_types[argument_index];
                         llvm::Type* const original_argument_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, original_argument_type, type_database);
 
                         bool const is_taking_adress_of_value = is_expression_address_of[argument_index];
@@ -1147,7 +1217,7 @@ namespace h::compiler
                     {
                         llvm::Value* const original_argument = original_arguments[argument_index];
                         
-                        h::Type_reference const& original_argument_type = function_type.input_parameter_types[argument_index];
+                        iris::Type_reference const& original_argument_type = function_type.input_parameter_types[argument_index];
                         llvm::Type* const original_argument_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, original_argument_type, type_database);
 
                         std::pmr::vector<llvm::Attribute> attributes
@@ -1162,7 +1232,7 @@ namespace h::compiler
                     }
                     else
                     {
-                        h::Type_reference const& original_argument_type = function_type.input_parameter_types[argument_index];
+                        iris::Type_reference const& original_argument_type = function_type.input_parameter_types[argument_index];
                         llvm::Type* const original_argument_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, original_argument_type, type_database);
                         std::uint64_t const original_argument_size_in_bits = llvm_data_layout.getTypeAllocSize(original_argument_llvm_type);
                         llvm::Align const original_argument_alignment = llvm_data_layout.getABITypeAlign(original_argument_llvm_type);
@@ -1205,6 +1275,8 @@ namespace h::compiler
 
         if (function_info.isVariadic())
         {
+            static constexpr unsigned c_varargs_int_promotion_bits = 32;
+
             std::size_t const start_index = argument_infos.size();
 
             for (std::size_t argument_index = start_index; argument_index < original_arguments.size(); ++argument_index)
@@ -1212,12 +1284,52 @@ namespace h::compiler
                 llvm::Value* const original_argument = original_arguments[argument_index];
                 bool const is_taking_adress_of_value = is_expression_address_of[argument_index];
 
-                llvm::Value* const loaded_value = create_load_instruction_if_needed(
+                llvm::Value* loaded_value = create_load_instruction_if_needed(
                     llvm_builder,
                     llvm_data_layout,
                     original_argument,
                     is_taking_adress_of_value
                 );
+
+                if (argument_index < original_argument_types.size())
+                {
+                    std::optional<Type_reference> const& original_argument_type = original_argument_types[argument_index];
+
+                    if (original_argument_type.has_value())
+                    {
+                        // When the argument is an indirection expression (e.g. *y where y: *Float32),
+                        // the value has already been loaded once (from y's alloca to get the pointer),
+                        // but the actual pointee value still needs to be loaded before promotion.
+                        if (loaded_value->getType()->isPointerTy() && !is_non_void_pointer(*original_argument_type))
+                        {
+                            llvm::Type* const original_argument_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, *original_argument_type, type_database);
+                            loaded_value = create_load_instruction(llvm_builder, llvm_data_layout, original_argument_llvm_type, loaded_value);
+                        }
+
+                        if (is_floating_point(*original_argument_type) && loaded_value->getType()->isFloatTy())
+                        {
+                            loaded_value = llvm_builder.CreateFPExt(loaded_value, llvm::Type::getDoubleTy(llvm_context));
+                        }
+                        else if ((is_integer(*original_argument_type) || is_bool(*original_argument_type) || is_c_bool(*original_argument_type)) && loaded_value->getType()->isIntegerTy())
+                        {
+                            unsigned const source_bits = loaded_value->getType()->getIntegerBitWidth();
+
+                            if (source_bits < c_varargs_int_promotion_bits)
+                            {
+                                llvm::Type* const promoted_type = llvm::Type::getIntNTy(llvm_context, c_varargs_int_promotion_bits);
+
+                                if (is_signed_integer(*original_argument_type))
+                                {
+                                    loaded_value = llvm_builder.CreateSExt(loaded_value, promoted_type);
+                                }
+                                else
+                                {
+                                    loaded_value = llvm_builder.CreateZExt(loaded_value, promoted_type);
+                                }
+                            }
+                        }
+                    }
+                }
 
                 std::pmr::vector<llvm::Attribute> attributes;
                 attributes.reserve(1);
@@ -1296,14 +1408,15 @@ namespace h::compiler
 
     llvm::Value* generate_function_call(
         std::pmr::vector<bool> const& is_expression_address_of,
+        std::span<std::optional<Type_reference> const> const original_argument_types,
         llvm::LLVMContext& llvm_context,
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
         llvm::Function& llvm_parent_function,
         Clang_module_data const& clang_module_data,
-        h::Module const& core_module,
-        h::Function_type const& function_type,
+        iris::Module const& core_module,
+        iris::Function_type const& function_type,
         llvm::FunctionType& llvm_function_type,
         llvm::Value& llvm_function_callee,
         std::span<llvm::Value* const> const llvm_arguments,
@@ -1313,7 +1426,7 @@ namespace h::compiler
     {
         clang::CodeGen::CGFunctionInfo const& function_info = create_clang_function_info(clang_module_data, function_type, declaration_database);
 
-        Transformed_arguments const transformed_arguments = transform_arguments(is_expression_address_of, llvm_context, llvm_builder, llvm_data_layout, llvm_module, llvm_parent_function, core_module, function_type, function_info, llvm_arguments, type_database);
+        Transformed_arguments const transformed_arguments = transform_arguments(is_expression_address_of, original_argument_types, llvm_context, llvm_builder, llvm_data_layout, llvm_module, llvm_parent_function, core_module, function_type, function_info, llvm_arguments, type_database);
 
         llvm::CallInst* call_instruction = llvm_builder.CreateCall(&llvm_function_type, &llvm_function_callee, transformed_arguments.values);
 
@@ -1348,8 +1461,8 @@ namespace h::compiler
     void set_function_input_parameter_debug_information(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         std::size_t const input_parameter_index,
         llvm::BasicBlock& llvm_block,
         llvm::Value& alloca_instruction,
@@ -1407,8 +1520,8 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         Clang_module_data const& clang_module_data,
-        h::Module const& core_module,
-        h::Function_declaration const& function_declaration,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
         llvm::Function& llvm_function,
         llvm::BasicBlock& llvm_block,
         Declaration_database const& declaration_database,
@@ -1436,7 +1549,7 @@ namespace h::compiler
         {
             clang::CodeGen::CGFunctionInfoArgInfo const& argument_info = argument_infos[restored_argument_index];
             std::pmr::string const& restored_argument_name = function_declaration.input_parameter_names[restored_argument_index];
-            h::Type_reference const& restored_argument_type = function_declaration.type.input_parameter_types[restored_argument_index];
+            iris::Type_reference const& restored_argument_type = function_declaration.type.input_parameter_types[restored_argument_index];
 
             clang::CodeGen::ABIArgInfo::Kind const kind = argument_info.info.getKind();
 
@@ -1566,8 +1679,8 @@ namespace h::compiler
         llvm::DataLayout const& llvm_data_layout,
         llvm::Module& llvm_module,
         Clang_module_data const& clang_module_data,
-        h::Module const& core_module,
-        h::Function_type const& function_type,
+        iris::Module const& core_module,
+        iris::Function_type const& function_type,
         llvm::Function& llvm_function,
         Declaration_database const& declaration_database,
         Type_database const& type_database,
@@ -1591,7 +1704,7 @@ namespace h::compiler
             case clang::CodeGen::ABIArgInfo::Direct:
             case clang::CodeGen::ABIArgInfo::Extend: {
 
-                h::Type_reference const& original_return_type = function_type.output_parameter_types[0];
+                iris::Type_reference const& original_return_type = function_type.output_parameter_types[0];
                 llvm::Type* const original_return_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, original_return_type, type_database);
 
                 llvm::Type* const new_return_llvm_type = return_info.getCoerceToType();
@@ -1620,7 +1733,7 @@ namespace h::compiler
 
                 llvm::Argument* const return_argument = llvm_function.getArg(0);
 
-                h::Type_reference const& return_type = function_type.output_parameter_types[0];
+                iris::Type_reference const& return_type = function_type.output_parameter_types[0];
                 llvm::Type* const return_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, return_type, type_database);
                 std::uint64_t const return_size_in_bits = llvm_data_layout.getTypeAllocSize(return_llvm_type);
                 llvm::Align const return_alignment = llvm_data_layout.getABITypeAlign(return_llvm_type);
@@ -1792,6 +1905,15 @@ namespace h::compiler
         Convertion_type const convertion_type
     )
     {   
+        auto const is_pointer_valued_global_variable = [](llvm::Value* const value) -> bool
+        {
+            if (!llvm::GlobalVariable::classof(value))
+                return false;
+
+            llvm::GlobalVariable const* const global_variable = static_cast<llvm::GlobalVariable const*>(value);
+            return global_variable->getValueType()->isPointerTy();
+        };
+
         if (source_llvm_type == destination_llvm_type)
         {
             if (source_llvm_value->getType() != source_llvm_type && source_llvm_value->getType()->isPointerTy())
@@ -1809,7 +1931,7 @@ namespace h::compiler
                 }
                 else
                 {
-                    if (llvm::AllocaInst::classof(source_llvm_value) || llvm::GetElementPtrInst::classof(source_llvm_value))
+                    if (llvm::AllocaInst::classof(source_llvm_value) || llvm::GetElementPtrInst::classof(source_llvm_value) || is_pointer_valued_global_variable(source_llvm_value))
                     {
                         if (!is_taking_address_of_source_llvm_value)
                         {
@@ -1852,8 +1974,8 @@ namespace h::compiler
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Function& llvm_parent_function,
-        h::Module const& core_module,
-        h::Function_type const& function_type,
+        iris::Module const& core_module,
+        iris::Function_type const& function_type,
         clang::CodeGen::CGFunctionInfo const& function_info,
         Type_database const& type_database,
         llvm::Value* const call_instruction
@@ -1872,7 +1994,7 @@ namespace h::compiler
             case clang::CodeGen::ABIArgInfo::Direct:
             case clang::CodeGen::ABIArgInfo::Extend: {
 
-                h::Type_reference const& original_return_type = function_type.output_parameter_types[0];
+                iris::Type_reference const& original_return_type = function_type.output_parameter_types[0];
                 llvm::Type* const original_return_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, original_return_type, type_database);
 
                 llvm::Type* const new_return_llvm_type = return_info.getCoerceToType();
@@ -1906,7 +2028,7 @@ namespace h::compiler
         std::string_view const declaration_name
     )
     {
-        std::optional<h::Custom_type_reference> const instance_type_reference = unmangle_type_instance_name(declaration_name);
+        std::optional<iris::Custom_type_reference> const instance_type_reference = unmangle_type_instance_name(declaration_name);
         std::string_view const actual_module_name = instance_type_reference.has_value() ? std::string_view{instance_type_reference->module_reference.name} : module_name;
 
         Clang_module_declarations const& clang_declarations = clang_module_data.declaration_database.map.find(actual_module_name)->second;
@@ -1916,7 +2038,7 @@ namespace h::compiler
             if (location != clang_declarations.alias_type_declarations.end())
             {
                 clang::TypedefDecl* const typedef_declaration = location->second;
-                clang::QualType const qual_type = clang_module_data.ast_context.getTypedefType(typedef_declaration);
+                clang::QualType const qual_type = clang_module_data.ast_context.getCanonicalTypeDeclType(typedef_declaration);
                 llvm::Type* const clang_type = clang::CodeGen::convertTypeForMemory(clang_module_data.code_generator->CGM(), qual_type);
                 return clang_type;
             }
@@ -1927,7 +2049,7 @@ namespace h::compiler
             if (location != clang_declarations.enum_declarations.end())
             {
                 clang::EnumDecl* const enum_declaration = location->second;
-                clang::QualType const qual_type = clang_module_data.ast_context.getEnumType(enum_declaration);
+                clang::QualType const qual_type = clang_module_data.ast_context.getCanonicalTypeDeclType(enum_declaration);
                 llvm::Type* const clang_type = clang::CodeGen::convertTypeForMemory(clang_module_data.code_generator->CGM(), qual_type);
                 return clang_type;
             }
@@ -1957,7 +2079,7 @@ namespace h::compiler
     static clang::RecordDecl* create_on_demand_clang_union_declaration(
         clang::ASTContext& clang_ast_context,
         std::string_view const module_name,
-        h::Union_declaration const& union_declaration
+        iris::Union_declaration const& union_declaration
     )
     {
         std::string const mangled_name = mangle_name(module_name, union_declaration.name, union_declaration.unique_name);
@@ -2007,6 +2129,18 @@ namespace h::compiler
 
         auto const ensure_nested_custom_type_declarations = [&](Type_reference const& type_reference) -> bool
         {
+            if (std::holds_alternative<Array_slice_type>(type_reference.data))
+            {
+                ensure_clang_custom_type_declaration(
+                    clang_ast_context,
+                    declaration_database,
+                    clang_declaration_database,
+                    "iris.builtin",
+                    "Generic_array_slice"
+                );
+                return false;
+            }
+
             if (!std::holds_alternative<Custom_type_reference>(type_reference.data))
                 return false;
 
@@ -2024,35 +2158,66 @@ namespace h::compiler
 
         Clang_module_declarations& clang_declarations = clang_declaration_database.map.emplace(module_name, Clang_module_declarations{}).first->second;
 
-        if (std::holds_alternative<h::Alias_type_declaration const*>(declaration->data))
+        if (std::holds_alternative<iris::Alias_type_declaration const*>(declaration->data))
         {
-            Alias_type_declaration const* const alias_declaration = std::get<h::Alias_type_declaration const*>(declaration->data);
+            Alias_type_declaration const* const alias_declaration = std::get<iris::Alias_type_declaration const*>(declaration->data);
 
             if (!alias_declaration->type.empty())
-                visit_type_references_recursively(alias_declaration->type[0], ensure_nested_custom_type_declarations);
+            {
+                Type_reference const& alias_underlying_type = alias_declaration->type[0];
+                if (std::holds_alternative<iris::Type_instance>(alias_underlying_type.data))
+                {
+                    Type_instance const& type_instance = std::get<iris::Type_instance>(alias_underlying_type.data);
+                    Declaration_instance_storage storage = instantiate_type_instance(declaration_database, type_instance);
+                    if (std::holds_alternative<iris::Struct_declaration>(storage.data))
+                    {
+                        Struct_declaration const& struct_decl = std::get<iris::Struct_declaration>(storage.data);
+                        std::string_view const tc_module = type_instance.type_constructor.module_reference.name;
 
-            add_clang_alias_type_declaration(clang_declarations.alias_type_declarations, clang_ast_context, *alias_declaration, declaration_database, clang_declaration_database);
+                        for (Type_reference const& member_type : struct_decl.member_types)
+                            visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
+
+                        Clang_module_declarations& tc_clang_decls = clang_declaration_database.map.emplace(
+                            tc_module, Clang_module_declarations{}).first->second;
+
+                        if (!tc_clang_decls.struct_declarations.contains(struct_decl.name))
+                        {
+                            clang::RecordDecl* const record_decl = create_clang_struct_declaration(
+                                clang_ast_context, tc_module, struct_decl);
+                            tc_clang_decls.struct_declarations.emplace(struct_decl.name, record_decl);
+                            set_clang_struct_definition(clang_ast_context, *record_decl, struct_decl,
+                                declaration_database, clang_declaration_database);
+                        }
+                    }
+                }
+                else
+                {
+                    visit_type_references_recursively(alias_underlying_type, ensure_nested_custom_type_declarations);
+                }
+            }
+
+            // Re-acquire the alias module's declarations in case the map was rehashed above.
+            Clang_module_declarations& alias_clang_decls = clang_declaration_database.map.emplace(
+                module_name, Clang_module_declarations{}).first->second;
+            add_clang_alias_type_declaration(alias_clang_decls.alias_type_declarations, clang_ast_context, *alias_declaration, declaration_database, clang_declaration_database);
             return;
         }
 
-        if (std::holds_alternative<h::Enum_declaration const*>(declaration->data))
+        if (std::holds_alternative<iris::Enum_declaration const*>(declaration->data))
         {
-            Enum_declaration const* const enum_declaration = std::get<h::Enum_declaration const*>(declaration->data);
+            Enum_declaration const* const enum_declaration = std::get<iris::Enum_declaration const*>(declaration->data);
             add_clang_enum_declaration(clang_declarations.enum_declarations, clang_ast_context, *enum_declaration);
             return;
         }
 
-        if (std::holds_alternative<h::Forward_declaration const*>(declaration->data))
+        if (std::holds_alternative<iris::Forward_declaration const*>(declaration->data))
         {
             return;
         }
 
-        if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+        if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data))
         {
-            Struct_declaration const* const struct_declaration = std::get<h::Struct_declaration const*>(declaration->data);
-
-            for (Type_reference const& member_type : struct_declaration->member_types)
-                visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
+            Struct_declaration const* const struct_declaration = std::get<iris::Struct_declaration const*>(declaration->data);
 
             clang::RecordDecl* record_declaration = nullptr;
             auto const struct_location = clang_declarations.struct_declarations.find(declaration_name);
@@ -2066,18 +2231,18 @@ namespace h::compiler
                 record_declaration = struct_location->second;
             }
 
+            for (Type_reference const& member_type : struct_declaration->member_types)
+                visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
+
             if (!record_declaration->isCompleteDefinition())
                 set_clang_struct_definition(clang_ast_context, *record_declaration, *struct_declaration, declaration_database, clang_declaration_database);
 
             return;
         }
 
-        if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+        if (std::holds_alternative<iris::Union_declaration const*>(declaration->data))
         {
-            Union_declaration const* const union_declaration = std::get<h::Union_declaration const*>(declaration->data);
-
-            for (Type_reference const& member_type : union_declaration->member_types)
-                visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
+            Union_declaration const* const union_declaration = std::get<iris::Union_declaration const*>(declaration->data);
 
             clang::RecordDecl* record_declaration = nullptr;
             auto const union_location = clang_declarations.union_declarations.find(declaration_name);
@@ -2091,9 +2256,18 @@ namespace h::compiler
                 record_declaration = union_location->second;
             }
 
+            for (Type_reference const& member_type : union_declaration->member_types)
+                visit_type_references_recursively(member_type, ensure_nested_custom_type_declarations);
+
             if (!record_declaration->isCompleteDefinition())
                 add_clang_union_definition(clang_declarations.union_declarations, clang_ast_context, *union_declaration, declaration_database, clang_declaration_database);
 
+            return;
+        }
+
+        if (std::holds_alternative<iris::Type_constructor const*>(declaration->data))
+        {
+            // Type constructors are templates, not concrete types — no Clang representation needed.
             return;
         }
 
@@ -2132,12 +2306,64 @@ namespace h::compiler
         return clang::CodeGen::convertTypeForMemory(clang_context.code_generator->CGM(), *clang_type);
     }
 
+    llvm::Type* convert_type_instance_on_demand(
+        Clang_context const& clang_context,
+        Declaration_database const& declaration_database,
+        iris::Type_instance const& type_instance
+    )
+    {
+        Clang_declaration_database transient_clang_declaration_database;
+
+        iris::Declaration_instance_storage storage = iris::instantiate_type_instance(declaration_database, type_instance);
+        if (!std::holds_alternative<iris::Struct_declaration>(storage.data))
+            throw std::runtime_error{"convert_type_instance_on_demand: expected Struct_declaration"};
+
+        iris::Struct_declaration const& struct_declaration = std::get<iris::Struct_declaration>(storage.data);
+        std::string_view const transient_module_name = type_instance.type_constructor.module_reference.name;
+
+        auto const ensure_member_type = [&](iris::Type_reference const& type_ref) -> bool
+        {
+            if (!std::holds_alternative<iris::Custom_type_reference>(type_ref.data))
+                return false;
+            iris::Custom_type_reference const& ctr = std::get<iris::Custom_type_reference>(type_ref.data);
+            ensure_clang_custom_type_declaration(
+                clang_context.ast_context,
+                declaration_database,
+                transient_clang_declaration_database,
+                ctr.module_reference.name,
+                ctr.name
+            );
+            return false;
+        };
+        for (iris::Type_reference const& member_type : struct_declaration.member_types)
+            iris::visit_type_references_recursively(member_type, ensure_member_type);
+
+        Clang_module_declarations& transient_clang_declarations = transient_clang_declaration_database.map
+            .emplace(transient_module_name, Clang_module_declarations{}).first->second;
+
+        clang::RecordDecl* record_declaration = nullptr;
+        if (!transient_clang_declarations.struct_declarations.contains(struct_declaration.name))
+        {
+            record_declaration = create_clang_struct_declaration(clang_context.ast_context, transient_module_name, struct_declaration);
+            transient_clang_declarations.struct_declarations.emplace(struct_declaration.name, record_declaration);
+            set_clang_struct_definition(clang_context.ast_context, *record_declaration, struct_declaration,
+                declaration_database, transient_clang_declaration_database);
+        }
+        else
+        {
+            record_declaration = transient_clang_declarations.struct_declarations.at(struct_declaration.name);
+        }
+
+        clang::QualType const qual_type = clang_context.ast_context.getCanonicalTypeDeclType(record_declaration);
+        return clang::CodeGen::convertTypeForMemory(clang_context.code_generator->CGM(), qual_type);
+    }
+
     llvm::Type* convert_type(
         Clang_module_data const& clang_module_data,
         clang::RecordDecl* const record_declaration
     )
     {
-        clang::QualType const qual_type = clang_module_data.ast_context.getRecordType(record_declaration);
+        clang::QualType const qual_type = clang_module_data.ast_context.getCanonicalTypeDeclType(record_declaration);
         llvm::Type* const clang_type = clang::CodeGen::convertTypeForMemory(clang_module_data.code_generator->CGM(), qual_type);
         return clang_type;
     }
@@ -2479,15 +2705,15 @@ namespace h::compiler
 
     std::optional<clang::QualType> create_type(
         clang::ASTContext& clang_ast_context,
-        h::Type_reference const& type_reference,
+        iris::Type_reference const& type_reference,
         bool const alloca_type,
         Declaration_database const& declaration_database,
         Clang_declaration_database const& clang_declaration_database
     )
     {
-        if (std::holds_alternative<h::Array_slice_type>(type_reference.data))
+        if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
         {
-            auto const module_declarations_location = clang_declaration_database.map.find("H.Builtin");
+            auto const module_declarations_location = clang_declaration_database.map.find("iris.builtin");
             if (module_declarations_location == clang_declaration_database.map.end())
                 throw std::runtime_error{"Cannot find Builtin module!"};
             Clang_module_declarations const& module_declarations = module_declarations_location->second;
@@ -2497,17 +2723,17 @@ namespace h::compiler
                 throw std::runtime_error{"Cannot find Builtin.Generic_array_slice!"};
 
             clang::RecordDecl* const record_declaration = array_slice_type_location->second;
-            return clang_ast_context.getRecordType(record_declaration);
+            return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
         }
-        else if (std::holds_alternative<h::Builtin_type_reference>(type_reference.data))
+        else if (std::holds_alternative<iris::Builtin_type_reference>(type_reference.data))
         {
-            h::Builtin_type_reference const& builtin_type = std::get<h::Builtin_type_reference>(type_reference.data);
+            iris::Builtin_type_reference const& builtin_type = std::get<iris::Builtin_type_reference>(type_reference.data);
             if (builtin_type.value == "__builtin_va_list")
                 return clang_ast_context.getBuiltinVaListType();
         }
-        else if (std::holds_alternative<h::Constant_array_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Constant_array_type>(type_reference.data))
         {
-            h::Constant_array_type const& constant_array_type = std::get<h::Constant_array_type>(type_reference.data);
+            iris::Constant_array_type const& constant_array_type = std::get<iris::Constant_array_type>(type_reference.data);
 
             if (constant_array_type.value_type.empty())
                 throw std::runtime_error{"Cannot create constant array type if value_type is not specified."};
@@ -2526,91 +2752,91 @@ namespace h::compiler
 
             return clang_ast_context.getConstantArrayType(*element_type, array_size_value, nullptr, clang::ArraySizeModifier::Normal, 0);
         }
-        else if (std::holds_alternative<h::Soa_array_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Soa_array_type>(type_reference.data))
         {
             return create_clang_soa_array_type(clang_ast_context);
         }
-        else if (std::holds_alternative<h::Soa_array_view_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Soa_array_view_type>(type_reference.data))
         {
             return create_clang_soa_array_view_type(clang_ast_context);
         }
-        else if (std::holds_alternative<h::Decimal_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Decimal_type>(type_reference.data))
         {
-            h::Decimal_type const decimal_type = std::get<h::Decimal_type>(type_reference.data);
+            iris::Decimal_type const decimal_type = std::get<iris::Decimal_type>(type_reference.data);
             std::uint32_t const number_of_bits = get_decimal_size_in_bits(decimal_type.scale);
             return clang_ast_context.getIntTypeForBitwidth(number_of_bits, 1);
         }
-        else if (std::holds_alternative<h::Fundamental_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Fundamental_type>(type_reference.data))
         {
-            h::Fundamental_type const fundamental_type = std::get<h::Fundamental_type>(type_reference.data);
+            iris::Fundamental_type const fundamental_type = std::get<iris::Fundamental_type>(type_reference.data);
             switch (fundamental_type)
             {
-                case h::Fundamental_type::Bool:
-                case h::Fundamental_type::C_bool: {
+                case iris::Fundamental_type::Bool:
+                case iris::Fundamental_type::C_bool: {
                     return alloca_type ? clang_ast_context.getIntTypeForBitwidth(8, 0) : clang_ast_context.BoolTy;
                 }
-                case h::Fundamental_type::Byte: {
+                case iris::Fundamental_type::Byte: {
                     return clang_ast_context.getIntTypeForBitwidth(8, 0);
                 }
-                case h::Fundamental_type::Float16: {
+                case iris::Fundamental_type::Float16: {
                     return clang_ast_context.getRealTypeForBitwidth(16, clang::FloatModeKind::Half);
                 }
-                case h::Fundamental_type::Float32: {
+                case iris::Fundamental_type::Float32: {
                     return clang_ast_context.getRealTypeForBitwidth(32, clang::FloatModeKind::Float);
                 }
-                case h::Fundamental_type::Float64: {
+                case iris::Fundamental_type::Float64: {
                     return clang_ast_context.getRealTypeForBitwidth(64, clang::FloatModeKind::Double);
                 }
-                case h::Fundamental_type::String: {
+                case iris::Fundamental_type::String: {
                     Clang_module_declarations const& clang_declarations = clang_declaration_database.map.find(c_builtin_module_name)->second;
                     clang::RecordDecl* const record_declaration = clang_declarations.struct_declarations.at("String");
 
-                    return clang_ast_context.getRecordType(record_declaration);
+                    return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
                 }
-                case h::Fundamental_type::Any_type: {
+                case iris::Fundamental_type::Any_type: {
                     return clang_ast_context.VoidPtrTy;
                 }
-                case h::Fundamental_type::C_char: {
+                case iris::Fundamental_type::C_char: {
                     return clang_ast_context.CharTy;
                 }
-                case h::Fundamental_type::C_schar: {
+                case iris::Fundamental_type::C_schar: {
                     return clang_ast_context.SignedCharTy;
                 }
-                case h::Fundamental_type::C_uchar: {
+                case iris::Fundamental_type::C_uchar: {
                     return clang_ast_context.UnsignedCharTy;
                 }
-                case h::Fundamental_type::C_short: {
+                case iris::Fundamental_type::C_short: {
                     return clang_ast_context.ShortTy;
                 }
-                case h::Fundamental_type::C_ushort: {
+                case iris::Fundamental_type::C_ushort: {
                     return clang_ast_context.UnsignedShortTy;
                 }
-                case h::Fundamental_type::C_int: {
+                case iris::Fundamental_type::C_int: {
                     return clang_ast_context.IntTy;
                 }
-                case h::Fundamental_type::C_uint: {
+                case iris::Fundamental_type::C_uint: {
                     return clang_ast_context.UnsignedIntTy;
                 }
-                case h::Fundamental_type::C_long: {
+                case iris::Fundamental_type::C_long: {
                     return clang_ast_context.LongTy;
                 }
-                case h::Fundamental_type::C_ulong: {
+                case iris::Fundamental_type::C_ulong: {
                     return clang_ast_context.UnsignedLongTy;
                 }
-                case h::Fundamental_type::C_longlong: {
+                case iris::Fundamental_type::C_longlong: {
                     return clang_ast_context.LongLongTy;
                 }
-                case h::Fundamental_type::C_ulonglong: {
+                case iris::Fundamental_type::C_ulonglong: {
                     return clang_ast_context.UnsignedLongLongTy;
                 }
-                case h::Fundamental_type::C_longdouble: {
+                case iris::Fundamental_type::C_longdouble: {
                     return clang_ast_context.LongDoubleTy;
                 }
             }
         }
-        else if (std::holds_alternative<h::Function_pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Function_pointer_type>(type_reference.data))
         {
-            h::Function_pointer_type const& function_pointer_type = std::get<h::Function_pointer_type>(type_reference.data);
+            iris::Function_pointer_type const& function_pointer_type = std::get<iris::Function_pointer_type>(type_reference.data);
 
             clang::QualType const function_proto_type = create_clang_function_proto_type(
                 clang_ast_context,
@@ -2621,11 +2847,11 @@ namespace h::compiler
 
             return clang_ast_context.getPointerType(function_proto_type);
         }
-        else if (std::holds_alternative<h::Integer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Integer_type>(type_reference.data))
         {
-            h::Integer_type const integer_type = std::get<h::Integer_type>(type_reference.data);
+            iris::Integer_type const integer_type = std::get<iris::Integer_type>(type_reference.data);
 
-            /*auto const get_number_of_bits = [](h::Integer_type const& integer_type) -> unsigned int
+            /*auto const get_number_of_bits = [](iris::Integer_type const& integer_type) -> unsigned int
             {
                 if (integer_type.number_of_bits == 8 || integer_type.number_of_bits == 16 || integer_type.number_of_bits == 32 || integer_type.number_of_bits == 64)
                     return integer_type.number_of_bits;
@@ -2639,10 +2865,26 @@ namespace h::compiler
 
             return clang_ast_context.getIntTypeForBitwidth(integer_type.number_of_bits, integer_type.is_signed ? 1 : 0);
         }
-        else if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
+        else if (std::holds_alternative<iris::Type_instance>(type_reference.data))
         {
-            h::Custom_type_reference const custom_type_reference = std::get<h::Custom_type_reference>(type_reference.data);
-            std::optional<h::Declaration> const declaration = h::find_declaration(
+            iris::Type_instance const& type_instance = std::get<iris::Type_instance>(type_reference.data);
+            std::pmr::string const mangled_name = mangle_type_instance_name(type_instance);
+            std::string_view const tc_module = type_instance.type_constructor.module_reference.name;
+
+            auto const module_location = clang_declaration_database.map.find(tc_module);
+            if (module_location == clang_declaration_database.map.end())
+                return std::nullopt;
+
+            auto const struct_location = module_location->second.struct_declarations.find(mangled_name);
+            if (struct_location == module_location->second.struct_declarations.end())
+                return std::nullopt;
+
+            return clang_ast_context.getCanonicalTypeDeclType(struct_location->second);
+        }
+        else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
+        {
+            iris::Custom_type_reference const custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.data);
+            std::optional<iris::Declaration> const declaration = iris::find_declaration(
                 declaration_database,
                 custom_type_reference.module_reference.name,
                 custom_type_reference.name
@@ -2650,21 +2892,21 @@ namespace h::compiler
 
             if (declaration.has_value())
             {
-                if (std::holds_alternative<h::Alias_type_declaration const*>(declaration->data))
+                if (std::holds_alternative<iris::Alias_type_declaration const*>(declaration->data))
                 {
                     Clang_module_declarations const& clang_declarations = clang_declaration_database.map.at(custom_type_reference.module_reference.name);
                     clang::TypedefDecl* const typedef_declaration = clang_declarations.alias_type_declarations.at(custom_type_reference.name);
 
-                    return clang_ast_context.getTypedefType(typedef_declaration);
+                    return clang_ast_context.getCanonicalTypeDeclType(typedef_declaration);
                 }
-                else if (std::holds_alternative<h::Enum_declaration const*>(declaration->data))
+                else if (std::holds_alternative<iris::Enum_declaration const*>(declaration->data))
                 {
                     Clang_module_declarations const& clang_declarations = clang_declaration_database.map.at(custom_type_reference.module_reference.name);
                     clang::EnumDecl* const enum_declaration = clang_declarations.enum_declarations.at(custom_type_reference.name);
 
-                    return clang_ast_context.getEnumType(enum_declaration);
+                    return clang_ast_context.getCanonicalTypeDeclType(enum_declaration);
                 }
-                else if (std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+                else if (std::holds_alternative<iris::Struct_declaration const*>(declaration->data))
                 {
                     Clang_module_declarations const& clang_declarations = clang_declaration_database.map.at(custom_type_reference.module_reference.name);
                     auto const location = clang_declarations.struct_declarations.find(custom_type_reference.name);
@@ -2672,20 +2914,20 @@ namespace h::compiler
                         return std::nullopt;
                     
                     clang::RecordDecl* const record_declaration = location->second;
-                    return clang_ast_context.getRecordType(record_declaration);
+                    return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
                 }
-                else if (std::holds_alternative<h::Union_declaration const*>(declaration->data))
+                else if (std::holds_alternative<iris::Union_declaration const*>(declaration->data))
                 {
                     Clang_module_declarations const& clang_declarations = clang_declaration_database.map.at(custom_type_reference.module_reference.name);
                     clang::RecordDecl* const record_declaration = clang_declarations.union_declarations.at(custom_type_reference.name);
 
-                    return clang_ast_context.getRecordType(record_declaration);
+                    return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
                 }
             }
         }
-        else if (std::holds_alternative<h::Pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Pointer_type>(type_reference.data))
         {
-            h::Pointer_type const pointer_type = std::get<h::Pointer_type>(type_reference.data);
+            iris::Pointer_type const pointer_type = std::get<iris::Pointer_type>(type_reference.data);
             if (pointer_type.element_type.empty())
                 return clang_ast_context.getPointerType(clang_ast_context.VoidTy);
 
@@ -2707,7 +2949,7 @@ namespace h::compiler
 
     std::optional<clang::QualType> create_type(
         clang::ASTContext& clang_ast_context,
-        std::span<h::Type_reference const> const type_reference,
+        std::span<iris::Type_reference const> const type_reference,
         bool const alloca_type,
         Declaration_database const& declaration_database,
         Clang_declaration_database const& clang_declaration_database
@@ -2720,7 +2962,12 @@ namespace h::compiler
         return create_type(clang_ast_context, type_reference[0], alloca_type, declaration_database, clang_declaration_database);
     }
 
-    Clang_data create_clang_data(
+    void destroy_clang_data(Clang_data* data)
+    {
+        delete data;
+    }
+
+    Clang_data_pointer create_clang_data(
         llvm::LLVMContext& llvm_context,
         llvm::Triple const& llvm_triple,
         unsigned int const optimization_level
@@ -2730,16 +2977,14 @@ namespace h::compiler
 
         compiler_instance->createDiagnostics();
 
-        compiler_instance->createFileManager();
-        compiler_instance->createSourceManager(compiler_instance->getFileManager());
-
-        std::shared_ptr<clang::TargetOptions> target_options = std::make_shared<clang::TargetOptions>();
+        std::unique_ptr<clang::TargetOptions> target_options = std::make_unique<clang::TargetOptions>();
         target_options->Triple = llvm_triple.str();
-        clang::TargetInfo* target_info = clang::TargetInfo::CreateTargetInfo(compiler_instance->getDiagnostics(), target_options);
+        clang::TargetInfo* target_info = clang::TargetInfo::CreateTargetInfo(compiler_instance->getDiagnostics(), *target_options.get());
         compiler_instance->setTarget(target_info);
 
+        compiler_instance->createVirtualFileSystem();
         compiler_instance->createFileManager();
-        compiler_instance->createSourceManager(compiler_instance->getFileManager());
+        compiler_instance->createSourceManager();
 
         clang::LangOptions language_options;
         std::vector<std::string> language_option_includes;
@@ -2750,9 +2995,90 @@ namespace h::compiler
 
         compiler_instance->createASTContext();
 
-        return Clang_data
+        Clang_data_pointer output
+        (
+            new Clang_data
+            {
+                .compiler_instance = std::move(compiler_instance),
+                .target_options = std::move(target_options),
+            },
+            destroy_clang_data
+        );
+
+        return output;
+    }
+
+    void destroy_clang_module_data(Clang_module_data* data)
+    {
+        delete data;
+    }
+
+    clang::CompilerInstance& get_compiler_instance(Clang_data const& clang_data)
+    {
+        return *clang_data.compiler_instance.get();
+    }
+
+    Clang_declaration_database& get_clang_declaration_database(Clang_module_data& clang_module_data)
+    {
+        return clang_module_data.declaration_database;
+    }
+
+    Clang_declaration_database const& get_clang_declaration_database(Clang_module_data const& clang_module_data)
+    {
+        return clang_module_data.declaration_database;
+    }
+
+    clang::ASTContext& get_clang_ast_context(Clang_module_data& clang_module_data)
+    {
+        return clang_module_data.ast_context;
+    }
+
+    clang::ASTContext const& get_clang_ast_context(Clang_module_data const& clang_module_data)
+    {
+        return clang_module_data.ast_context;
+    }
+
+    llvm::Function& to_function(
+        llvm::LLVMContext& llvm_context,
+        llvm::DataLayout const& llvm_data_layout,
+        Clang_module_data const& clang_module_data,
+        std::string_view const module_name,
+        llvm::FunctionType& llvm_function_type,
+        Function_declaration const& function_declaration,
+        Type_database const& type_database,
+        Declaration_database const& declaration_database
+    )
+    {
+        llvm::GlobalValue::LinkageTypes const linkage = to_linkage(function_declaration.linkage, function_declaration.is_test);
+
+        std::string const mangled_name = mangle_name(module_name, function_declaration.name, function_declaration.unique_name);
+
+        llvm::Function* const llvm_function = llvm::Function::Create(
+            &llvm_function_type,
+            linkage,
+            mangled_name.c_str(),
+            nullptr
+        );
+
+        if (!llvm_function)
         {
-            .compiler_instance = std::move(compiler_instance),
-        };
+            throw std::runtime_error{ "Could not create function." };
+        }
+
+        set_llvm_function_argument_names(
+            llvm_context,
+            llvm_data_layout,
+            clang_module_data,
+            function_declaration,
+            *llvm_function,
+            declaration_database,
+            type_database
+        );
+
+        llvm_function->setCallingConv(llvm::CallingConv::C);
+
+        set_function_definition_attributes(llvm_context, clang_module_data, *llvm_function);
+
+        return *llvm_function;
     }
 }

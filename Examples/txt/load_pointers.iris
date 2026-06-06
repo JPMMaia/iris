@@ -1,0 +1,21 @@
+module Load_pointers;
+
+struct My_struct
+{
+    v0: *Int32 = null;
+}
+
+function run(instance: *My_struct) -> ()
+{
+    if instance->v0 != null
+    {
+    }
+
+    var p0 = &instance[0];
+    var v0 = instance[0];
+
+    var n = null;
+    if p0 == n
+    {
+    }
+}

@@ -1,0 +1,81 @@
+=========================
+Char literals
+=========================
+
+module Char_literals;
+
+export function foo() -> ()
+{
+    var plain = 'a';
+    var escaped_quote = '\'';
+    var escaped_backslash = '\\';
+    var escaped_newline = '\n';
+    var escaped_tab = '\t';
+    var escaped_carriage_return = '\r';
+}
+
+---
+
+(Module
+  (Module_head
+    (Module_declaration
+      (Module_name
+        (Identifier_with_dots
+          (Identifier)))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters)
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_constant
+                  (Char)))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_constant
+                  (Char)))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_constant
+                  (Char)))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_constant
+                  (Char)))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_constant
+                  (Char)))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_constant
+                  (Char))))))))))

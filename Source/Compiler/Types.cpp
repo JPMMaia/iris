@@ -1,38 +1,23 @@
 module;
 
-#include <clang/AST/Decl.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DebugInfoMetadata.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/DIBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
+#include <assert.h>
 
-#include <array>
-#include <filesystem>
-#include <functional>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <variant>
-#include <vector>
+module iris.compiler.types;
 
-module h.compiler.types;
+import std;
+import llvm;
 
-import h.common;
-import h.compiler.clang_code_generation;
-import h.compiler.clang_data;
-import h.compiler.common;
-import h.compiler.debug_info_formatter;
-import h.core.hash;
-import h.core;
-import h.core.declarations;
-import h.core.types;
+import iris.common;
+import iris.compiler.clang_code_generation;
+import iris.compiler.clang_data;
+import iris.compiler.common;
+import iris.compiler.debug_info_formatter;
+import iris.core.hash;
+import iris.core;
+import iris.core.declarations;
+import iris.core.types;
 
-namespace h::compiler
+namespace iris::compiler
 {
     static std::uint64_t align_to(
         std::uint64_t const value,
@@ -108,7 +93,7 @@ namespace h::compiler
 
         llvm::DIType* string_type = llvm_debug_builder.createStructType(
             &llvm_scope,
-            "h::String",
+            "iris::String",
             nullptr,
             0,
             size_in_bits,
@@ -247,6 +232,22 @@ namespace h::compiler
         }
     }
 
+    static bool is_requested_type(
+        std::string_view const name,
+        std::optional<std::span<std::pmr::string const>> const& requested_debug_types
+    )
+    {
+        if (!requested_debug_types.has_value())
+            return true;
+
+        auto const location = std::find_if(
+            requested_debug_types->begin(),
+            requested_debug_types->end(),
+            [&](std::pmr::string const& requested_name) -> bool { return requested_name == name; }
+        );
+        return location != requested_debug_types->end();
+    }
+
     void add_alias_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
@@ -298,6 +299,7 @@ namespace h::compiler
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
         llvm::DataLayout const& llvm_data_layout,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         std::span<Alias_type_declaration const> const alias_type_declarations,
         Module const& core_module,
         Type_database const& type_database,
@@ -307,6 +309,9 @@ namespace h::compiler
     {
         for (Alias_type_declaration const& alias_type_declaration : alias_type_declarations)
         {
+            if (!is_requested_type(alias_type_declaration.name, requested_debug_types))
+                continue;
+
             add_alias_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, alias_type_declaration, core_module, type_database, debug_type_database, llvm_debug_type_map);
         }
     }
@@ -331,6 +336,7 @@ namespace h::compiler
         llvm::DIScope& llvm_debug_scope,
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         std::string_view const module_name,
         std::span<Enum_declaration const> const enum_declarations,
         std::pmr::unordered_map<std::pmr::string, std::pmr::vector<llvm::Constant*>> const& enum_value_constants,
@@ -339,6 +345,9 @@ namespace h::compiler
     {
         for (Enum_declaration const& enum_declaration : enum_declarations)
         {
+            if (!is_requested_type(enum_declaration.name, requested_debug_types))
+                continue;
+
             // TODO figure out required number of bits
             unsigned const number_of_bits = 32;
             llvm::DIType* const underlying_type = llvm_debug_builder.createBasicType("Int32", 32, llvm::dwarf::DW_ATE_signed);
@@ -355,7 +364,7 @@ namespace h::compiler
                 llvm::Constant* const enum_constant = constants[index];
                 llvm::ConstantInt* const constant_int = llvm::dyn_cast<llvm::ConstantInt>(enum_constant);
                 if (constant_int == nullptr)
-                    h::common::print_message_and_exit(std::format("In enum '{}', value '{}' is not a constant integer!", key, enum_value.name));
+                    iris::common::print_message_and_exit(std::format("In enum '{}', value '{}' is not a constant integer!", key, enum_value.name));
 
                 std::uint64_t const integer_value = constant_int->getZExtValue();
 
@@ -407,6 +416,7 @@ namespace h::compiler
         llvm::DIScope& llvm_debug_scope,
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Module const& core_module,
         std::span<Struct_declaration const> const struct_declarations,
         LLVM_debug_type_map& llvm_debug_type_map
@@ -414,6 +424,12 @@ namespace h::compiler
     {
         for (Struct_declaration const& struct_declaration : struct_declarations)
         {
+            if (!is_requested_type(struct_declaration.name, requested_debug_types))
+                continue;
+
+            if (llvm_debug_type_map.contains(struct_declaration.name))
+                continue;
+
             std::string const mangled_name = mangle_struct_name(core_module, struct_declaration.name);
 
             llvm::DIFile* const declaration_llvm_debug_file = get_or_create_llvm_debug_file(llvm_debug_builder, llvm_debug_file, llvm_debug_files, struct_declaration.source_location);
@@ -436,6 +452,7 @@ namespace h::compiler
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
         llvm::DataLayout const& llvm_data_layout,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Clang_module_data const& clang_module_data,
         Module const& core_module,
         std::span<Struct_declaration const> const struct_declarations,
@@ -446,6 +463,13 @@ namespace h::compiler
     {
         for (Struct_declaration const& struct_declaration : struct_declarations)
         {
+            if (!is_requested_type(struct_declaration.name, requested_debug_types))
+                continue;
+
+            llvm::DIType* const llvm_forward_declaration_debug_type = llvm_debug_type_map.at(struct_declaration.name);
+            if (!llvm_forward_declaration_debug_type->isReplaceable())
+                continue;
+
             std::pmr::vector<llvm::DIType*> const llvm_member_debug_types = type_references_to_llvm_debug_types(
                 llvm_debug_builder,
                 llvm_debug_scope,
@@ -522,8 +546,6 @@ namespace h::compiler
                 }
             }
 
-            llvm::DIType* const llvm_forward_declaration_debug_type = llvm_debug_type_map.at(struct_declaration.name);
-
             llvm::TypeSize const size_in_bits = llvm_data_layout.getTypeSizeInBits(llvm_struct_type);
 
             llvm::DIFile* const declaration_llvm_debug_file = get_or_create_llvm_debug_file(llvm_debug_builder, llvm_debug_file, llvm_debug_files, struct_declaration.source_location);
@@ -569,6 +591,7 @@ namespace h::compiler
         llvm::DIScope& llvm_debug_scope,
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Module const& core_module,
         std::span<Union_declaration const> const union_declarations,
         LLVM_debug_type_map& llvm_debug_type_map
@@ -576,6 +599,12 @@ namespace h::compiler
     {
         for (Union_declaration const& union_declaration : union_declarations)
         {
+            if (!is_requested_type(union_declaration.name, requested_debug_types))
+                continue;
+
+            if (llvm_debug_type_map.contains(union_declaration.name))
+                continue;
+
             std::string const mangled_name = mangle_struct_name(core_module, union_declaration.name);
 
             llvm::DIFile* const declaration_llvm_debug_file = get_or_create_llvm_debug_file(llvm_debug_builder, llvm_debug_file, llvm_debug_files, union_declaration.source_location);
@@ -598,6 +627,7 @@ namespace h::compiler
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
         llvm::DataLayout const& llvm_data_layout,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Module const& core_module,
         std::span<Union_declaration const> const union_declarations,
         Debug_type_database const& debug_type_database,
@@ -607,6 +637,13 @@ namespace h::compiler
     {
         for (Union_declaration const& union_declaration : union_declarations)
         {
+            if (!is_requested_type(union_declaration.name, requested_debug_types))
+                continue;
+
+            llvm::DIType* const llvm_forward_declaration_debug_type = llvm_debug_type_map.at(union_declaration.name);
+            if (!llvm_forward_declaration_debug_type->isReplaceable())
+                continue;
+
             std::pmr::vector<llvm::DIType*> const llvm_member_debug_types = type_references_to_llvm_debug_types(
                 llvm_debug_builder,
                 llvm_debug_scope,
@@ -647,8 +684,6 @@ namespace h::compiler
 
                 elements.push_back(llvm_member_debug_type);
             }
-
-            llvm::DIType* const llvm_forward_declaration_debug_type = llvm_debug_type_map.at(union_declaration.name);
 
             llvm::TypeSize const size_in_bits = llvm_data_layout.getTypeSizeInBits(llvm_union_type);
 
@@ -712,9 +747,9 @@ namespace h::compiler
 
         add_struct_declarations(clang_module_data, core_module.name, core_module.export_declarations.struct_declarations, llvm_type_map);
         add_struct_declarations(clang_module_data, core_module.name, core_module.internal_declarations.struct_declarations, llvm_type_map);
-        for (h::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
+        for (iris::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
         {
-            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
+            std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
             assert(instance_custom_type_reference.has_value());
 
             std::pmr::string const& instance_module_name = instance_custom_type_reference->module_reference.name;
@@ -730,9 +765,9 @@ namespace h::compiler
 
         add_union_declarations(clang_module_data, core_module.name, core_module.export_declarations.union_declarations, llvm_type_map);
         add_union_declarations(clang_module_data, core_module.name, core_module.internal_declarations.union_declarations, llvm_type_map);
-        for (h::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
+        for (iris::Union_declaration const& union_declaration : core_module.instanced_declarations.union_declarations)
         {
-            std::optional<h::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
+            std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(union_declaration.name);
             assert(instance_custom_type_reference.has_value());
 
             std::pmr::string const& instance_module_name = instance_custom_type_reference->module_reference.name;
@@ -794,6 +829,7 @@ namespace h::compiler
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
         llvm::DataLayout const& llvm_data_layout,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Clang_module_data const& clang_module_data,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::pmr::vector<llvm::Constant*>> const& enum_value_constants,
@@ -803,23 +839,23 @@ namespace h::compiler
         LLVM_debug_type_map& llvm_debug_type_map = debug_type_database.name_to_llvm_debug_type[core_module.name];
         LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at(core_module.name);
 
-        add_enum_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module.name, core_module.export_declarations.enum_declarations, enum_value_constants, llvm_debug_type_map);
-        add_enum_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module.name, core_module.internal_declarations.enum_declarations, enum_value_constants, llvm_debug_type_map);
+        add_enum_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module.name, core_module.export_declarations.enum_declarations, enum_value_constants, llvm_debug_type_map);
+        add_enum_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module.name, core_module.internal_declarations.enum_declarations, enum_value_constants, llvm_debug_type_map);
 
-        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module, core_module.export_declarations.struct_declarations, llvm_debug_type_map);
-        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module, core_module.internal_declarations.struct_declarations, llvm_debug_type_map);
+        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, core_module.export_declarations.struct_declarations, llvm_debug_type_map);
+        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, core_module.internal_declarations.struct_declarations, llvm_debug_type_map);
 
-        add_union_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module, core_module.export_declarations.union_declarations, llvm_debug_type_map);
-        add_union_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, core_module, core_module.internal_declarations.union_declarations, llvm_debug_type_map);
+        add_union_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, core_module.export_declarations.union_declarations, llvm_debug_type_map);
+        add_union_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, core_module.internal_declarations.union_declarations, llvm_debug_type_map);
 
-        add_alias_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module.export_declarations.alias_type_declarations, core_module, type_database, debug_type_database, llvm_debug_type_map);
-        add_alias_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module.internal_declarations.alias_type_declarations, core_module, type_database, debug_type_database, llvm_debug_type_map);
+        add_alias_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module.export_declarations.alias_type_declarations, core_module, type_database, debug_type_database, llvm_debug_type_map);
+        add_alias_debug_types(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module.internal_declarations.alias_type_declarations, core_module, type_database, debug_type_database, llvm_debug_type_map);
 
-        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, clang_module_data, core_module, core_module.export_declarations.struct_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
-        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, clang_module_data, core_module, core_module.internal_declarations.struct_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
+        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, clang_module_data, core_module, core_module.export_declarations.struct_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
+        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, clang_module_data, core_module, core_module.internal_declarations.struct_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
 
-        set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module, core_module.export_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
-        set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, core_module, core_module.internal_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
+        set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module, core_module.export_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
+        set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module, core_module.internal_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
     }
 
     llvm::DIType* create_void_type(
@@ -834,7 +870,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Array_slice_type const& type,
         Debug_type_database const& debug_type_database
     )
@@ -882,7 +918,7 @@ namespace h::compiler
 
         std::pmr::string const array_slice_name = format_debug_type_name(
             core_module,
-            h::Type_reference{ .data = type },
+            iris::Type_reference{ .data = type },
             debug_type_database,
             {},
             {}
@@ -907,7 +943,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Constant_array_type const& type,
         Debug_type_database const& debug_type_database
     )
@@ -954,7 +990,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Soa_array_type const& type,
         Debug_type_database const& debug_type_database
     )
@@ -1004,7 +1040,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Soa_array_view_type const& type,
         Debug_type_database const& debug_type_database
     )
@@ -1098,11 +1134,19 @@ namespace h::compiler
         );
     }
 
+    static std::string format_source_location(std::optional<Source_range> const& source_range)
+    {
+        if (!source_range.has_value())
+            return "";
+        return std::format(" (line {}, column {})", source_range->start.line, source_range->start.column);
+    }
+
     llvm::Type* fundamental_type_to_llvm_type(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
         Fundamental_type const type,
-        Builtin_types const& builtin_types
+        Builtin_types const& builtin_types,
+        std::optional<Source_range> const source_range = {}
     )
     {
         switch (type)
@@ -1136,14 +1180,15 @@ namespace h::compiler
         case Fundamental_type::C_ulonglong:
             return llvm_data_layout.getSmallestLegalIntType(llvm_context, 64);
         default:
-            throw std::runtime_error{ "Not implemented." };
+            throw std::runtime_error{ std::format("fundamental_type_to_llvm_type: Not implemented.{}", format_source_location(source_range)) };
         }
     }
 
     llvm::DIType* fundamental_type_to_llvm_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
         Fundamental_type const type,
-        Debug_builtin_types const& debug_builtin_types
+        Debug_builtin_types const& debug_builtin_types,
+        std::optional<Source_range> const source_range = {}
     )
     {
         std::pmr::string const type_name = format_debug_primitive_type_name(type, {});
@@ -1189,7 +1234,7 @@ namespace h::compiler
         case Fundamental_type::C_longdouble:
             return llvm_debug_builder.createBasicType(type_name.data(), 128, llvm::dwarf::DW_ATE_float);
         default:
-            throw std::runtime_error{ "Not implemented." };
+            throw std::runtime_error{ std::format("fundamental_type_to_llvm_debug_type: Not implemented.{}", format_source_location(source_range)) };
         }
     }
 
@@ -1197,7 +1242,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Function_pointer_type const& type,
         Debug_type_database const& debug_type_database
     )
@@ -1262,7 +1307,7 @@ namespace h::compiler
         static llvm::DINamespace* scope = llvm_debug_builder.createNameSpace(nullptr, "h", false);
 
         std::uint32_t const bits = type.scale <= 6 ? 32 : 64;
-        std::string const name = std::format("h::Decimal{}", type.scale);
+        std::string const name = std::format("iris::Decimal{}", type.scale);
         llvm::DIType* const storage_type = llvm_debug_builder.createBasicType(std::format("{}_storage", name), bits, llvm::dwarf::DW_ATE_signed);
 
         std::array<llvm::Metadata*, 1> const elements
@@ -1310,7 +1355,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Pointer_type const type,
         Debug_type_database const& debug_type_database
     )
@@ -1328,10 +1373,10 @@ namespace h::compiler
     {
         if (std::holds_alternative<Array_slice_type>(type_reference.data))
         {
-            LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at("H.Builtin");
+            LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at("iris.builtin");
             auto const location = llvm_type_map.find("Generic_array_slice");
             if (location == llvm_type_map.end())
-                throw std::runtime_error{ "Could not find Generic_array_slice LLVM type!" };
+                throw std::runtime_error{ std::format("Could not find Generic_array_slice LLVM type!{}", format_source_location(type_reference.source_range)) };
 
             llvm::Type* const llvm_type = location->second;
             return llvm_type;
@@ -1339,7 +1384,7 @@ namespace h::compiler
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             // Builtin_type_reference const& data = std::get<Builtin_type_reference>(type_reference.data);
-            throw std::runtime_error{ "Not implemented." };
+            throw std::runtime_error{ std::format("type_reference_to_llvm_type builtin type not implemented.{}", format_source_location(type_reference.source_range)) };
         }
         else if (std::holds_alternative<Constant_array_type>(type_reference.data))
         {
@@ -1372,7 +1417,7 @@ namespace h::compiler
         else if (std::holds_alternative<Fundamental_type>(type_reference.data))
         {
             Fundamental_type const data = std::get<Fundamental_type>(type_reference.data);
-            return fundamental_type_to_llvm_type(llvm_context, llvm_data_layout, data, type_database.builtin);
+            return fundamental_type_to_llvm_type(llvm_context, llvm_data_layout, data, type_database.builtin, type_reference.source_range);
         }
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
@@ -1394,14 +1439,17 @@ namespace h::compiler
             Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
             return pointer_type_to_llvm_type(llvm_context, llvm_data_layout, data, type_database);
         }
+        else if (std::holds_alternative<Null_pointer_type>(type_reference.data))
+        {
+            return llvm::PointerType::get(llvm_context, 0);
+        }
 
-        throw std::runtime_error{ "Not implemented." };
+        throw std::runtime_error{ std::format("type_reference_to_llvm_type: Not implemented.{}", format_source_location(type_reference.source_range)) };
     }
 
     static llvm::Type* pointer_type_to_llvm_type_on_demand(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Module const& core_module,
         Pointer_type const type,
         Declaration_database const& declaration_database,
         Clang_context const& clang_context
@@ -1409,7 +1457,7 @@ namespace h::compiler
     {
         llvm::Type* pointed_type =
             !type.element_type.empty() ?
-            type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, type.element_type[0], declaration_database, clang_context) :
+            type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, type.element_type[0], declaration_database, clang_context) :
             llvm::PointerType::get(llvm::Type::getInt8Ty(llvm_context), 0);
         return pointed_type->getPointerTo();
     }
@@ -1417,7 +1465,6 @@ namespace h::compiler
     llvm::Type* type_reference_to_llvm_type_on_demand(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Module const& core_module,
         Type_reference const& type_reference,
         Declaration_database const& declaration_database,
         Clang_context const& clang_context
@@ -1431,12 +1478,12 @@ namespace h::compiler
         }
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
-            throw std::runtime_error{ "Builtin_type_reference on-demand conversion is not implemented." };
+            throw std::runtime_error{ std::format("Builtin_type_reference on-demand conversion is not implemented.{}", format_source_location(type_reference.source_range)) };
         }
         else if (std::holds_alternative<Constant_array_type>(type_reference.data))
         {
             Constant_array_type const& data = std::get<Constant_array_type>(type_reference.data);
-            llvm::Type* const llvm_element_type = type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, data.value_type, declaration_database, clang_context);
+            llvm::Type* const llvm_element_type = type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, data.value_type, declaration_database, clang_context);
             return llvm::ArrayType::get(llvm_element_type, data.size);
         }
         else if (std::holds_alternative<Soa_array_type>(type_reference.data))
@@ -1450,14 +1497,14 @@ namespace h::compiler
         else if (std::holds_alternative<Custom_type_reference>(type_reference.data))
         {
             Custom_type_reference const& data = std::get<Custom_type_reference>(type_reference.data);
-            std::string_view const module_name = find_module_name(core_module, data.module_reference);
+            std::string_view const module_name = data.module_reference.name;
             return convert_type_on_demand(clang_context, declaration_database, module_name, data.name);
         }
         else if (std::holds_alternative<Fundamental_type>(type_reference.data))
         {
             Fundamental_type const data = std::get<Fundamental_type>(type_reference.data);
             Builtin_types const builtin_types = create_builtin_types(llvm_context);
-            return fundamental_type_to_llvm_type(llvm_context, llvm_data_layout, data, builtin_types);
+            return fundamental_type_to_llvm_type(llvm_context, llvm_data_layout, data, builtin_types, type_reference.source_range);
         }
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
@@ -1477,16 +1524,19 @@ namespace h::compiler
         else if (std::holds_alternative<Pointer_type>(type_reference.data))
         {
             Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
-            return pointer_type_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, data, declaration_database, clang_context);
+            return pointer_type_to_llvm_type_on_demand(llvm_context, llvm_data_layout, data, declaration_database, clang_context);
+        }
+        else if (std::holds_alternative<Null_pointer_type>(type_reference.data))
+        {
+            return llvm::PointerType::get(llvm_context, 0);
         }
         else if (std::holds_alternative<Type_instance>(type_reference.data))
         {
             Type_instance const& data = std::get<Type_instance>(type_reference.data);
-            std::pmr::string const mangled_name = mangle_type_instance_name(data);
-            throw std::runtime_error{ std::format("Cannot evaluate reflection for unresolved type instance '{}'.", mangled_name) };
+            return convert_type_instance_on_demand(clang_context, declaration_database, data);
         }
 
-        throw std::runtime_error{ "Not implemented." };
+        throw std::runtime_error{ std::format("type_reference_to_llvm_type_on_demand: Not implemented.{}", format_source_location(type_reference.source_range)) };
     }
 
     llvm::Type* type_reference_to_llvm_type(
@@ -1505,7 +1555,6 @@ namespace h::compiler
     llvm::Type* type_reference_to_llvm_type_on_demand(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Module const& core_module,
         std::span<Type_reference const> const type_reference,
         Declaration_database const& declaration_database,
         Clang_context const& clang_context
@@ -1514,7 +1563,7 @@ namespace h::compiler
         if (type_reference.empty())
             return llvm::Type::getVoidTy(llvm_context);
 
-        return type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, core_module, type_reference[0], declaration_database, clang_context);
+        return type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, type_reference[0], declaration_database, clang_context);
     }
 
     std::pmr::vector<llvm::Type*> type_references_to_llvm_types(
@@ -1542,7 +1591,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Type_reference const& type_reference,
         Debug_type_database const& debug_type_database
     )
@@ -1555,7 +1604,7 @@ namespace h::compiler
         if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             // Builtin_type_reference const& data = std::get<Builtin_type_reference>(type_reference.data);
-            throw std::runtime_error{ "Not implemented." };
+            throw std::runtime_error{ std::format("type_reference_to_llvm_debug_type builtin type not implemented.{}", format_source_location(type_reference.source_range)) };
         }
         else if (std::holds_alternative<Constant_array_type>(type_reference.data))
         {
@@ -1588,7 +1637,7 @@ namespace h::compiler
         else if (std::holds_alternative<Fundamental_type>(type_reference.data))
         {
             Fundamental_type const data = std::get<Fundamental_type>(type_reference.data);
-            return fundamental_type_to_llvm_debug_type(llvm_debug_builder, data, debug_type_database.builtin);
+            return fundamental_type_to_llvm_debug_type(llvm_debug_builder, data, debug_type_database.builtin, type_reference.source_range);
         }
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
@@ -1610,15 +1659,19 @@ namespace h::compiler
             Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
             return pointer_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
         }
+        else if (std::holds_alternative<Null_pointer_type>(type_reference.data))
+        {
+            return llvm_debug_builder.createPointerType(create_void_type(llvm_debug_builder), llvm_data_layout.getPointerSizeInBits());
+        }
 
-        throw std::runtime_error{ "Not implemented." };
+        throw std::runtime_error{ std::format("type_reference_to_llvm_debug_type: Not implemented.{}", format_source_location(type_reference.source_range)) };
     }
 
     llvm::DIType* type_reference_to_llvm_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::span<Type_reference const> const type_reference,
         Debug_type_database const& debug_type_database
     )
@@ -1633,7 +1686,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::span<Type_reference const> const type_references,
         Debug_type_database const& debug_type_database,
         std::pmr::polymorphic_allocator<> const& output_allocator
@@ -1662,14 +1715,14 @@ namespace h::compiler
         LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at(module_name.data());
         auto const llvm_type_location = llvm_type_map.find(struct_name.data());
         if (llvm_type_location == llvm_type_map.end())
-            h::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. Could not find it!", module_name, struct_name));
+            iris::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. Could not find it!", module_name, struct_name));
 
         llvm::Type* const llvm_type = llvm_type_location->second;
         if (llvm_type == nullptr)
-            h::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. llvm::Type is null!", module_name, struct_name));
+            iris::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. llvm::Type is null!", module_name, struct_name));
 
         if (!llvm::StructType::classof(llvm_type))
-            h::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. llvm::Type is not llvm::StructType!", module_name, struct_name));
+            iris::common::print_message_and_exit(std::format("Could not calculate struct layout of '{}.{}'. llvm::Type is not llvm::StructType!", module_name, struct_name));
 
 
         llvm::StructType* const llvm_struct_type = static_cast<llvm::StructType*>(llvm_type);

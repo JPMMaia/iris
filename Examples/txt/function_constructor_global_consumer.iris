@@ -1,0 +1,5 @@
+module Function_constructor_global_consumer;
+
+import Function_constructor_global_provider as fns;
+
+var bar = fns.to_json::<Int32>;

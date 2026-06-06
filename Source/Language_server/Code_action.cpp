@@ -8,20 +8,20 @@ module;
 
 #include <lsp/types.h>
 
-module h.language_server.code_action;
+module iris.language_server.code_action;
 
-import h.compiler.analysis;
-import h.compiler.diagnostic;
-import h.core;
-import h.core.declarations;
-import h.core.expressions;
-import h.core.formatter;
-import h.core.types;
-import h.language_server.core;
-import h.language_server.location;
-import h.parser.parse_tree;
+import iris.compiler.analysis;
+import iris.compiler.diagnostic;
+import iris.core;
+import iris.core.declarations;
+import iris.core.expressions;
+import iris.core.formatter;
+import iris.core.types;
+import iris.language_server.core;
+import iris.language_server.location;
+import iris.parser.parse_tree;
 
-namespace h::language_server
+namespace iris::language_server
 {
     static std::uint32_t count_consecutive_spaces(
         std::u8string_view const text,
@@ -47,13 +47,13 @@ namespace h::language_server
     }
 
     static std::uint32_t calculate_indendation(
-        h::parser::Parse_tree const& parse_tree,
-        h::Source_position const& source_position
+        iris::parser::Parse_tree const& parse_tree,
+        iris::Source_position const& source_position
     )
     {
-        h::parser::Parse_node const root_node = get_root_node(parse_tree);
+        iris::parser::Parse_node const root_node = get_root_node(parse_tree);
 
-        h::parser::Parse_node const hint_node = h::parser::get_smallest_node_that_contains_position(
+        iris::parser::Parse_node const hint_node = iris::parser::get_smallest_node_that_contains_position(
             root_node,
             source_position
         );
@@ -87,7 +87,7 @@ namespace h::language_server
 
     static lsp::WorkspaceEdit create_workspace_edit_from_text_edit(
         std::filesystem::path const& source_file_path,
-        h::Source_range const& range,
+        iris::Source_range const& range,
         std::string_view const new_text
     )
     {
@@ -116,22 +116,22 @@ namespace h::language_server
     }
 
     std::optional<std::size_t> find_enum_value_index_from_default_value(
-        h::Enum_declaration const& enum_declaration,
-        h::Statement const& member_default_value
+        iris::Enum_declaration const& enum_declaration,
+        iris::Statement const& member_default_value
     )
     {
         if (member_default_value.expressions.empty())
             return std::nullopt;
 
-        h::Expression const& first_expression = member_default_value.expressions[0];
-        if (std::holds_alternative<h::Access_expression>(first_expression.data))
+        iris::Expression const& first_expression = member_default_value.expressions[0];
+        if (std::holds_alternative<iris::Access_expression>(first_expression.data))
         {
-            h::Access_expression const& access_expression = std::get<h::Access_expression>(first_expression.data);
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(first_expression.data);
 
             auto const location = std::find_if(
                 enum_declaration.values.begin(),
                 enum_declaration.values.end(),
-                [&](h::Enum_value const& enum_value) -> bool { return enum_value.name == access_expression.member_name; }
+                [&](iris::Enum_value const& enum_value) -> bool { return enum_value.name == access_expression.member_name; }
             );
             if (location == enum_declaration.values.end())
                 return std::nullopt;
@@ -142,16 +142,16 @@ namespace h::language_server
         return std::nullopt;
     }
 
-    static h::Statement create_instantiate_member_statement_value(
+    static iris::Statement create_instantiate_member_statement_value(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
-        h::Struct_declaration const& declaration,
+        iris::Module const& core_module,
+        iris::Struct_declaration const& declaration,
         std::size_t const member_index
     )
     {
-        h::Statement const& member_default_value = declaration.member_default_values[member_index];
+        iris::Statement const& member_default_value = declaration.member_default_values[member_index];
         
-        h::Type_reference const& member_type = declaration.member_types[member_index];
+        iris::Type_reference const& member_type = declaration.member_types[member_index];
         std::optional<Declaration> const member_declaration = find_underlying_declaration(
             declaration_database,
             member_type
@@ -159,13 +159,13 @@ namespace h::language_server
         if (!member_declaration.has_value())
             return member_default_value;
 
-        if (std::holds_alternative<h::Enum_declaration const*>(member_declaration->data))
+        if (std::holds_alternative<iris::Enum_declaration const*>(member_declaration->data))
         {
             std::optional<std::string_view> enum_module_name = get_type_module_name(member_type);
             if (!enum_module_name.has_value() || enum_module_name.value() == core_module.name)
                 return member_default_value;
 
-            h::Enum_declaration const& enum_declaration = *std::get<h::Enum_declaration const*>(member_declaration->data);
+            iris::Enum_declaration const& enum_declaration = *std::get<iris::Enum_declaration const*>(member_declaration->data);
             std::optional<std::size_t> const enum_value_index = find_enum_value_index_from_default_value(
                 enum_declaration,
                 member_default_value
@@ -183,12 +183,12 @@ namespace h::language_server
 
             std::string_view const import_alias = import_location->alias;
 
-            h::Statement statement
+            iris::Statement statement
             {
                 .expressions = {
-                    h::Expression
+                    iris::Expression
                     {
-                        .data = h::Access_expression
+                        .data = iris::Access_expression
                         {
                             .expression = {
                                 .expression_index = 1,
@@ -196,9 +196,9 @@ namespace h::language_server
                             .member_name = enum_declaration.values[enum_value_index.value()].name
                         }
                     },
-                    h::Expression
+                    iris::Expression
                     {
-                        .data = h::Access_expression
+                        .data = iris::Access_expression
                         {
                             .expression = {
                                 .expression_index = 2,
@@ -206,9 +206,9 @@ namespace h::language_server
                             .member_name = enum_declaration.name
                         }
                     },
-                    h::Expression
+                    iris::Expression
                     {
-                        .data = h::Variable_expression
+                        .data = iris::Variable_expression
                         {
                             .name = std::pmr::string{import_alias}
                         }
@@ -226,15 +226,15 @@ namespace h::language_server
 
     static lsp::CodeAction create_add_missing_instantiate_members_code_action(
         Declaration_database const& declaration_database,
-        h::parser::Parse_tree const& parse_tree,
-        h::Module const& core_module,
-        h::Struct_declaration const& declaration,
-        h::Statement const& original_statement,
-        h::Expression const& original_expression,
-        h::Instantiate_expression const& original_instantiate_expression
+        iris::parser::Parse_tree const& parse_tree,
+        iris::Module const& core_module,
+        iris::Struct_declaration const& declaration,
+        iris::Statement const& original_statement,
+        iris::Expression const& original_expression,
+        iris::Instantiate_expression const& original_instantiate_expression
     )
     {
-        h::Instantiate_expression new_instantiate_expression = original_instantiate_expression;
+        iris::Instantiate_expression new_instantiate_expression = original_instantiate_expression;
         std::size_t const original_expression_index = find_expression_index(original_statement, original_expression);
         
         Statement statement = original_statement;
@@ -253,7 +253,7 @@ namespace h::language_server
             {
                 std::size_t const value_expression_index = statement.expressions.size();
                 
-                h::Statement const member_statement = create_instantiate_member_statement_value(
+                iris::Statement const member_statement = create_instantiate_member_statement_value(
                     declaration_database,
                     core_module,
                     declaration,
@@ -263,7 +263,7 @@ namespace h::language_server
                 add_expressions_to_expressions(statement.expressions, member_statement.expressions);
 
                 new_instantiate_expression.members.push_back(
-                    h::Instantiate_member_value_pair
+                    iris::Instantiate_member_value_pair
                     {
                         .member_name = std::pmr::string{member_name},
                         .value = {.expression_index = value_expression_index },
@@ -292,14 +292,14 @@ namespace h::language_server
             }
         );
 
-        statement.expressions[original_expression_index] = h::Expression{new_instantiate_expression};
+        statement.expressions[original_expression_index] = iris::Expression{new_instantiate_expression};
 
         std::uint32_t const indentation = calculate_indendation(
             parse_tree,
             original_expression.source_range->start
         );
 
-        std::pmr::string const new_text = h::format_expression(
+        std::pmr::string const new_text = iris::format_expression(
             core_module,
             statement,
             statement.expressions[original_expression_index],
@@ -316,7 +316,7 @@ namespace h::language_server
         );
 
         lsp::CodeActionKind const kind =
-            original_instantiate_expression.type == h::Instantiate_expression_type::Explicit ?
+            original_instantiate_expression.type == iris::Instantiate_expression_type::Explicit ?
             lsp::CodeActionKind::QuickFix :
             lsp::CodeActionKind::RefactorRewrite;
 
@@ -331,8 +331,8 @@ namespace h::language_server
     }
 
     static bool is_position_before(
-        h::Source_position const& first,
-        h::Source_position const& second
+        iris::Source_position const& first,
+        iris::Source_position const& second
     )
     {
         if (first.line < second.line)
@@ -344,22 +344,22 @@ namespace h::language_server
         return first.column < second.column;
     }
 
-    static h::Expression const* find_innermost_instantiate_expression(
-        h::Statement const& statement,
-        h::Source_position const& source_position
+    static iris::Expression const* find_innermost_instantiate_expression(
+        iris::Statement const& statement,
+        iris::Source_position const& source_position
     )
     {
-        h::Expression const* innermost = nullptr;
+        iris::Expression const* innermost = nullptr;
 
-        for (h::Expression const& expression : statement.expressions)
+        for (iris::Expression const& expression : statement.expressions)
         {
-            if (std::holds_alternative<h::Instantiate_expression>(expression.data))
+            if (std::holds_alternative<iris::Instantiate_expression>(expression.data))
             {
-                if (h::range_contains_position_inclusive(expression.source_range.value(), source_position))
+                if (iris::range_contains_position_inclusive(expression.source_range.value(), source_position))
                 {
                     if (innermost != nullptr)
                     {
-                        if (h::range_contains_position_inclusive(innermost->source_range.value(), expression.source_range->start))
+                        if (iris::range_contains_position_inclusive(innermost->source_range.value(), expression.source_range->start))
                         {
                             innermost = &expression;
                         }
@@ -377,22 +377,22 @@ namespace h::language_server
 
     lsp::CodeAction create_add_cast_code_action(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
-        h::compiler::Diagnostic const& diagnostic,
-        h::compiler::Diagnostic_mismatch_type_data const& mismatch_data,
+        iris::Module const& core_module,
+        iris::compiler::Diagnostic const& diagnostic,
+        iris::compiler::Diagnostic_mismatch_type_data const& mismatch_data,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::optional<h::Type_reference> const provided_underlying_type = get_underlying_type(declaration_database, mismatch_data.provided_type);
-        std::optional<h::Type_reference> const expected_underlying_type = get_underlying_type(declaration_database, mismatch_data.expected_type);
+        std::optional<iris::Type_reference> const provided_underlying_type = get_underlying_type(declaration_database, mismatch_data.provided_type);
+        std::optional<iris::Type_reference> const expected_underlying_type = get_underlying_type(declaration_database, mismatch_data.expected_type);
 
-        std::pmr::string const provided_type_name = h::format_type_reference(core_module, mismatch_data.provided_type, temporaries_allocator, temporaries_allocator);
-        std::pmr::string const provided_underlying_type_name = h::format_type_reference(core_module, provided_underlying_type, temporaries_allocator, temporaries_allocator);
+        std::pmr::string const provided_type_name = iris::format_type_reference(core_module.dependencies, mismatch_data.provided_type, temporaries_allocator, temporaries_allocator);
+        std::pmr::string const provided_underlying_type_name = iris::format_type_reference(core_module.dependencies, provided_underlying_type, temporaries_allocator, temporaries_allocator);
 
-        std::pmr::string const expected_type_name = h::format_type_reference(core_module, mismatch_data.expected_type, temporaries_allocator, temporaries_allocator);
-        std::pmr::string const expected_underlying_type_name = h::format_type_reference(core_module, expected_underlying_type, temporaries_allocator, temporaries_allocator);
+        std::pmr::string const expected_type_name = iris::format_type_reference(core_module.dependencies, mismatch_data.expected_type, temporaries_allocator, temporaries_allocator);
+        std::pmr::string const expected_underlying_type_name = iris::format_type_reference(core_module.dependencies, expected_underlying_type, temporaries_allocator, temporaries_allocator);
 
-        h::Source_range const source_range = h::create_source_range(
+        iris::Source_range const source_range = iris::create_source_range(
             diagnostic.range.end.line,
             diagnostic.range.end.column,
             diagnostic.range.end.line,
@@ -420,26 +420,26 @@ namespace h::language_server
     void add_fix_code_action(
         std::vector<std::variant<lsp::Command, lsp::CodeAction>>& code_actions,
         Declaration_database const& declaration_database,
-        h::parser::Parse_tree const& parse_tree,
-        h::Module const& core_module,
-        std::span<h::compiler::Diagnostic const> const diagnostics,
+        iris::parser::Parse_tree const& parse_tree,
+        iris::Module const& core_module,
+        std::span<iris::compiler::Diagnostic const> const diagnostics,
         lsp::Range const range,
         lsp::CodeActionContext const& context
     )
     {
-        h::Source_range const source_range = to_source_range(range);
+        iris::Source_range const source_range = to_source_range(range);
 
-        for (h::compiler::Diagnostic const& diagnostic : diagnostics)
+        for (iris::compiler::Diagnostic const& diagnostic : diagnostics)
         {
             if (!range_contains_position_inclusive(diagnostic.range, source_range.start))
                 continue;
 
             if (diagnostic.code.has_value())
             {
-                h::compiler::Diagnostic_code const code = diagnostic.code.value();
-                if (code == h::compiler::Diagnostic_code::Type_mismatch)
+                iris::compiler::Diagnostic_code const code = diagnostic.code.value();
+                if (code == iris::compiler::Diagnostic_code::Type_mismatch)
                 {
-                    h::compiler::Diagnostic_mismatch_type_data const mismatch_data = h::compiler::read_diagnostic_mismatch_type_data(
+                    iris::compiler::Diagnostic_mismatch_type_data const mismatch_data = iris::compiler::read_diagnostic_mismatch_type_data(
                         diagnostic.data
                     );
 
@@ -459,9 +459,9 @@ namespace h::language_server
 
     lsp::TextDocument_CodeActionResult compute_code_actions(
         Declaration_database const& declaration_database,
-        h::parser::Parse_tree const& parse_tree,
-        h::Module const& core_module,
-        std::span<h::compiler::Diagnostic const> const diagnostics,
+        iris::parser::Parse_tree const& parse_tree,
+        iris::Module const& core_module,
+        std::span<iris::compiler::Diagnostic const> const diagnostics,
         lsp::Range const range,
         lsp::CodeActionContext const& context
     )
@@ -470,9 +470,9 @@ namespace h::language_server
 
         add_fix_code_action(code_actions, declaration_database, parse_tree, core_module, diagnostics, range, context);
 
-        h::Source_range const source_range = to_source_range(range);
+        iris::Source_range const source_range = to_source_range(range);
 
-        std::optional<h::Function> const function = find_function_that_contains_source_position(
+        std::optional<iris::Function> const function = find_function_that_contains_source_position(
             core_module,
             source_range.start
         );
@@ -480,16 +480,16 @@ namespace h::language_server
         {
             std::optional<lsp::TextDocument_CodeActionResult> result_optional = std::nullopt;
 
-            auto const process_statement = [&](h::Statement const& statement, h::compiler::Scope const& scope) -> bool
+            auto const process_statement = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> bool
             {
-                h::Expression const* expression = find_innermost_instantiate_expression(
+                iris::Expression const* expression = find_innermost_instantiate_expression(
                     statement,
                     source_range.start
                 );
                 if (expression != nullptr)
                 {
-                    std::optional<h::Type_reference> const type_to_instantiate = get_expression_type(
-                        core_module,
+                    std::optional<iris::Type_reference> const type_to_instantiate = get_expression_type(
+                        core_module.name,
                         function->declaration,
                         scope,
                         statement,
@@ -500,21 +500,21 @@ namespace h::language_server
                     if (type_to_instantiate.has_value())
                     {
                         std::optional<Declaration> const& declaration = find_underlying_declaration(declaration_database, type_to_instantiate.value());
-                        if (declaration.has_value() && std::holds_alternative<h::Struct_declaration const*>(declaration->data))
+                        if (declaration.has_value() && std::holds_alternative<iris::Struct_declaration const*>(declaration->data))
                         {
-                            std::pmr::vector<h::compiler::Declaration_member_info> const member_infos = h::compiler::get_declaration_member_infos(
+                            std::pmr::vector<iris::compiler::Declaration_member_info> const member_infos = iris::compiler::get_declaration_member_infos(
                                 declaration.value(),
                                 {}
                             );
 
-                            h::Instantiate_expression const& instantiate_expression = std::get<h::Instantiate_expression>(expression->data);
+                            iris::Instantiate_expression const& instantiate_expression = std::get<iris::Instantiate_expression>(expression->data);
                             if (member_infos.size() != instantiate_expression.members.size())
                             {
                                 lsp::CodeAction code_action = create_add_missing_instantiate_members_code_action(
                                     declaration_database,
                                     parse_tree,
                                     core_module,
-                                    *std::get<h::Struct_declaration const*>(declaration->data),
+                                    *std::get<iris::Struct_declaration const*>(declaration->data),
                                     statement,
                                     *expression,
                                     instantiate_expression
@@ -530,17 +530,17 @@ namespace h::language_server
                 return false;
             };
 
-            h::compiler::Scope scope = {};
+            iris::compiler::Scope scope = {};
 
-            h::compiler::add_parameters_to_scope(
+            iris::compiler::add_parameters_to_scope(
                 scope,
                 function->declaration->input_parameter_names,
                 function->declaration->type.input_parameter_types,
                 function->declaration->input_parameter_source_positions
             );
 
-            h::compiler::visit_statements_using_scope(
-                core_module,
+            iris::compiler::visit_statements_using_scope(
+                core_module.name,
                 function->declaration,
                 scope,
                 function->definition->statements,

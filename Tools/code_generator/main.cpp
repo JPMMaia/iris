@@ -1,7 +1,7 @@
 #include <fstream>
 #include <string_view>
 
-import h.tools.code_generator;
+import iris.tools.code_generator;
 
 int main(int const argc, char const* const* const argv)
 {
@@ -20,7 +20,7 @@ int main(int const argc, char const* const* const argv)
         std::ifstream input_stream{ input_filename };
         std::ofstream output_stream{ output_filename };
 
-        h::tools::code_generator::generate_json_data(
+        iris::tools::code_generator::generate_json_data(
             input_stream,
             output_stream
         );
@@ -33,7 +33,7 @@ int main(int const argc, char const* const* const argv)
         std::ifstream input_stream{ input_filename };
         std::ofstream output_stream{ output_filename };
 
-        h::tools::code_generator::generate_typescript_interface(
+        iris::tools::code_generator::generate_typescript_interface(
             input_stream,
             output_stream
         );
@@ -46,7 +46,7 @@ int main(int const argc, char const* const* const argv)
         std::ifstream input_stream{ input_filename };
         std::ofstream output_stream{ output_filename };
 
-        h::tools::code_generator::generate_typescript_intermediate_representation(
+        iris::tools::code_generator::generate_typescript_intermediate_representation(
             input_stream,
             output_stream
         );
@@ -59,7 +59,7 @@ int main(int const argc, char const* const* const argv)
         std::ifstream input_stream{ input_filename };
         std::ofstream output_stream{ output_filename };
 
-        h::tools::code_generator::generate_serialize_binary_code(
+        iris::tools::code_generator::generate_serialize_binary_code(
             input_stream,
             output_stream
         );
@@ -72,7 +72,7 @@ int main(int const argc, char const* const* const argv)
         std::ifstream input_stream{ input_filename };
         std::ofstream output_stream{ output_filename };
 
-        h::tools::code_generator::generate_serialize_json_code(
+        iris::tools::code_generator::generate_serialize_json_code(
             input_stream,
             output_stream
         );
@@ -85,7 +85,7 @@ int main(int const argc, char const* const* const argv)
         std::ifstream input_stream{ input_filename };
         std::ofstream output_stream{ output_filename };
 
-        h::tools::code_generator::generate_json_operators_code(
+        iris::tools::code_generator::generate_json_operators_code(
             input_stream,
             output_stream
         );
@@ -98,7 +98,7 @@ int main(int const argc, char const* const* const argv)
         std::ifstream input_stream{ input_filename };
         std::ofstream output_stream{ output_filename };
 
-        h::tools::code_generator::generate_expressions_visitor(
+        iris::tools::code_generator::generate_expressions_visitor(
             input_stream,
             output_stream
         );
@@ -111,7 +111,7 @@ int main(int const argc, char const* const* const argv)
         std::ifstream input_stream{ input_filename };
         std::ofstream output_stream{ output_filename };
 
-        h::tools::code_generator::generate_soa_array_natvis(
+        iris::tools::code_generator::generate_soa_array_natvis(
             input_stream,
             output_stream
         );
@@ -124,7 +124,7 @@ int main(int const argc, char const* const* const argv)
         std::ifstream input_stream{ input_filename };
         std::ofstream output_stream{ output_filename };
 
-        h::tools::code_generator::generate_soa_array_view_natvis(
+        iris::tools::code_generator::generate_soa_array_view_natvis(
             input_stream,
             output_stream
         );

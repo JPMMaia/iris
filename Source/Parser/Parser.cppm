@@ -1,15 +1,15 @@
 module;
 
-#include <filesystem>
-
 #include <tree_sitter/api.h>
 
-export module h.parser.parser;
+export module iris.parser.parser;
 
-import h.core;
-import h.parser.parse_tree;
+import std;
 
-namespace h::parser
+import iris.core;
+import iris.parser.parse_tree;
+
+namespace iris::parser
 {
     struct Parser_data
     {
@@ -30,7 +30,7 @@ namespace h::parser
     export Parse_tree edit_tree(
         Parser const& parser,
         Parse_tree&& previous_parse_tree,
-        h::Source_range const range,
+        iris::Source_range const range,
         std::u8string_view const new_text
     );
 

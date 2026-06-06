@@ -1,29 +1,15 @@
-module;
+export module iris.compiler.types;
 
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DebugInfoMetadata.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/DIBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Type.h>
+import std;
+import llvm;
 
-#include <filesystem>
-#include <memory_resource>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <vector>
-#include <variant>
+import iris.compiler.clang_data;
+import iris.core.hash;
+import iris.core;
+import iris.core.declarations;
+import iris.core.struct_layout;
 
-export module h.compiler.types;
-
-import h.compiler.clang_data;
-import h.core.hash;
-import h.core;
-import h.core.declarations;
-import h.core.struct_layout;
-
-namespace h::compiler
+namespace iris::compiler
 {
     export bool is_enum_type(Type_reference const& type, llvm::Value* value);
 
@@ -110,6 +96,7 @@ namespace h::compiler
         llvm::DIFile& llvm_debug_file,
         std::unordered_map<std::filesystem::path, llvm::DIFile*>& llvm_debug_files,
         llvm::DataLayout const& llvm_data_layout,
+        std::optional<std::span<std::pmr::string const>> const requested_debug_types,
         Clang_module_data const& clang_module_data,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::pmr::vector<llvm::Constant*>> const& enum_value_constants,
@@ -133,7 +120,6 @@ namespace h::compiler
     export llvm::Type* type_reference_to_llvm_type_on_demand(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Module const& core_module,
         Type_reference const& type_reference,
         Declaration_database const& declaration_database,
         Clang_context const& clang_context
@@ -142,7 +128,6 @@ namespace h::compiler
     export llvm::Type* type_reference_to_llvm_type_on_demand(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,
-        Module const& core_module,
         std::span<Type_reference const> type_reference,
         Declaration_database const& declaration_database,
         Clang_context const& clang_context
@@ -160,7 +145,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         Type_reference const& type_reference,
         Debug_type_database const& debug_type_database
     );
@@ -169,7 +154,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::span<Type_reference const> const type_reference,
         Debug_type_database const& debug_type_database
     );
@@ -178,7 +163,7 @@ namespace h::compiler
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
         llvm::DataLayout const& llvm_data_layout,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::span<Type_reference const> const type_references,
         Debug_type_database const& debug_type_database,
         std::pmr::polymorphic_allocator<> const& output_allocator

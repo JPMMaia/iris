@@ -1,24 +1,13 @@
-module;
+module iris.compiler.common;
 
-#include <llvm/ADT/StringRef.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/Module.h>
+import std;
+import llvm;
 
-#include <filesystem>
-#include <format>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <span>
-#include <unordered_map>
+import iris.core;
+import iris.core.declarations;
+import iris.core.hash;
 
-module h.compiler.common;
-
-import h.core;
-import h.core.declarations;
-import h.core.hash;
-
-namespace h::compiler
+namespace iris::compiler
 {
     std::string_view to_string_view(llvm::StringRef const string)
     {
@@ -41,12 +30,12 @@ namespace h::compiler
     }
 
     std::string mangle_name(
-        h::Declaration_database const& declaration_database,
+        iris::Declaration_database const& declaration_database,
         std::string_view const module_name,
         std::string_view const declaration_name
     )
     {
-        std::optional<h::Declaration> const declaration = find_declaration(declaration_database, module_name, declaration_name);
+        std::optional<iris::Declaration> const declaration = find_declaration(declaration_database, module_name, declaration_name);
 
         if (declaration.has_value())
         {
@@ -132,10 +121,10 @@ namespace h::compiler
         return get_llvm_function(core_module.name, llvm_module, name, unique_name);
     }
 
-    h::Module const* get_module(
+    iris::Module const* get_module(
         std::string_view const module_name,
-        h::Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, h::Module> const& core_module_dependencies
+        iris::Module const& core_module,
+        std::pmr::unordered_map<std::pmr::string, iris::Module> const& core_module_dependencies
     )
     {
         if (core_module.name == module_name)
@@ -147,5 +136,23 @@ namespace h::compiler
             return &location->second;
 
         return nullptr;
+    }
+
+    llvm::GlobalValue::LinkageTypes to_linkage(
+        Linkage const linkage,
+        bool const is_test
+    )
+    {
+        if (is_test)
+            return llvm::GlobalValue::LinkageTypes::ExternalLinkage;
+
+        switch (linkage)
+        {
+        case Linkage::External:
+            return llvm::GlobalValue::LinkageTypes::ExternalLinkage;
+        case Linkage::Private:
+        default:
+            return llvm::GlobalValue::LinkageTypes::PrivateLinkage;
+        }
     }
 }

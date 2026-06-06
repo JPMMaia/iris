@@ -1,16 +1,12 @@
-module;
-
-#include <llvm/IR/DIBuilder.h>
-#include <llvm/IR/IRBuilder.h>
-
-export module h.compiler.debug_info;
+export module iris.compiler.debug_info;
 
 import std;
+import llvm;
 
-import h.compiler.types;
-import h.core;
+import iris.compiler.types;
+import iris.core;
 
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Debug_info
     {
@@ -18,6 +14,7 @@ namespace h::compiler
         Debug_type_database type_database;
         llvm::DICompileUnit* main_llvm_compile_unit;
         std::pmr::vector<llvm::DIScope*> llvm_scopes;
+        std::unordered_map<std::filesystem::path, llvm::DIFile*> llvm_debug_files;
     };
 
     export llvm::DIScope* get_debug_scope(
@@ -45,6 +42,12 @@ namespace h::compiler
         unsigned const column
     );
 
+    export void set_debug_location(
+        llvm::IRBuilder<>& llvm_builder,
+        Debug_info& debug_info,
+        std::optional<Source_position> const& position
+    );
+
     export void unset_debug_location(
         llvm::IRBuilder<>& llvm_builder
     );
@@ -52,13 +55,13 @@ namespace h::compiler
     export void set_debug_location_at_statement(
         llvm::IRBuilder<>& llvm_builder,
         Debug_info& debug_info,
-        h::Statement const& statement
+        iris::Statement const& statement
     );
 
     export void set_debug_location_at_range(
         llvm::IRBuilder<>& llvm_builder,
         Debug_info& debug_info,
-        std::optional<h::Source_range> const& source_range
+        std::optional<iris::Source_range> const& source_range
     );
 
     export using Debug_type_names = std::pmr::vector<std::pmr::string>;
@@ -66,7 +69,7 @@ namespace h::compiler
 
     export Debug_type_names_per_module create_requested_dependency_debug_types(
         Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, Module> const& core_module_dependencies,
+        std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         std::pmr::polymorphic_allocator<> const& allocator
     );
 }

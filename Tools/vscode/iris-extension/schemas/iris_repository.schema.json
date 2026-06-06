@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Iris Repository",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "artifacts"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the repository (e.g. the project or library collection name)."
+    },
+    "artifacts": {
+      "type": "array",
+      "description": "Ordered list of artifact entries. Dependencies must be listed before the artifacts that depend on them.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "location"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Must exactly match the \"name\" field in the referenced iris_artifact.json."
+          },
+          "location": {
+            "type": "string",
+            "description": "Relative path from this repository file to the iris_artifact.json file."
+          }
+        }
+      }
+    }
+  }
+}

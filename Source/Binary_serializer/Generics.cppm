@@ -1,23 +1,14 @@
 module;
 
-#include <cassert>
-#include <compare>
-#include <cstddef>
-#include <cstring>
-#include <deque>
-#include <filesystem>
-#include <optional>
-#include <span>
-#include <string>
-#include <type_traits>
-#include <variant>
-#include <vector>
+#include <assert.h>
 
-export module h.binary_serializer.generics;
+export module iris.binary_serializer.generics;
 
-import h.core;
+import std;
 
-namespace h::binary_serializer
+import iris.core;
+
+namespace iris::binary_serializer
 {
     export struct Serializer
     {
@@ -31,22 +22,46 @@ namespace h::binary_serializer
     };
 
     export template <typename T>
-    void serialize(
-        Serializer& serializer,
-        T const& data
-    );
+    void serialize(Serializer& serializer, T const& data);
 
     export template <typename T>
-    void deserialize(
-        Deserializer& deserializer,
-        T& data
-    );
+    void deserialize(Deserializer& deserializer, T& data);
+
+    export template <typename T>
+    void serialize(Serializer& serializer, std::optional<T> const& value);
+
+    export template <typename T>
+    void deserialize(Deserializer& deserializer, std::optional<T>& value);
 
     export template <>
     void serialize(Serializer& serializer, std::pmr::string const& value);
 
     export template <>
     void deserialize(Deserializer& deserializer, std::pmr::string& value);
+
+    export template <>
+    void serialize(Serializer& serializer, std::filesystem::path const& value);
+
+    export template <>
+    void deserialize(Deserializer& deserializer, std::filesystem::path& value);
+
+    export template <typename... T>
+    void serialize(Serializer& serializer, std::variant<T...> const& value);
+
+    export template <typename... Ts>
+    void deserialize(Deserializer& deserializer, std::variant<Ts...>& value);
+
+    export template <typename T>
+    void serialize(Serializer& serializer, std::pmr::deque<T> const& value);
+
+    export template <typename T>
+    void deserialize(Deserializer& deserializer, std::pmr::deque<T>& value);
+
+    export template <typename T>
+    void serialize(Serializer& serializer, std::pmr::vector<T> const& value);
+
+    export template <typename T>
+    void deserialize(Deserializer& deserializer, std::pmr::vector<T>& value);
 
     export void write_data(
         Serializer& serializer,
@@ -111,13 +126,13 @@ namespace h::binary_serializer
         return data;
     }
 
-    export template <>
+    template <>
     void serialize(Serializer& serializer, std::filesystem::path const& value)
     {
         serialize(serializer, std::pmr::string{value.generic_string()});
     }
 
-    export template <>
+    template <>
     void deserialize(Deserializer& deserializer, std::filesystem::path& value)
     {
         std::pmr::string string_value;
@@ -125,7 +140,7 @@ namespace h::binary_serializer
         value = string_value;
     }
 
-    export template <typename T>
+    template <typename T>
     void serialize(Serializer& serializer, std::optional<T> const& value)
     {
         if (value.has_value())
@@ -139,7 +154,7 @@ namespace h::binary_serializer
         }
     }
 
-    export template <typename T>
+    template <typename T>
     void deserialize(Deserializer& deserializer, std::optional<T>& value)
     {
         bool const has_value = read_bool(deserializer);
@@ -152,14 +167,14 @@ namespace h::binary_serializer
         }
     }
 
-    export template <>
+    template <>
     void serialize(Serializer& serializer, std::pmr::string const& value)
     {
         write_uint64(serializer, value.size());
         write_data(serializer, value.data(), value.size());
     }
 
-    export template <>
+    template <>
     void deserialize(Deserializer& deserializer, std::pmr::string& value)
     {
         std::uint64_t const size_in_bytes = read_uint64(deserializer);
@@ -168,7 +183,7 @@ namespace h::binary_serializer
         read_data(deserializer, value.data(), value.size());
     }
 
-    export template <typename... T>
+    template <typename... T>
     void serialize(Serializer& serializer, std::variant<T...> const& value)
     {
         write_uint64(serializer, value.index());
@@ -181,7 +196,7 @@ namespace h::binary_serializer
         std::visit(visitor, value);
     }
 
-    export template <typename... Ts>
+    template <typename... Ts>
     void deserialize(Deserializer& deserializer, std::variant<Ts...>& value)
     {
         std::uint64_t const index = read_uint64(deserializer);
@@ -210,7 +225,7 @@ namespace h::binary_serializer
         value = funcs[index](deserializer);
     }
 
-    export template <typename T>
+    template <typename T>
     void serialize(Serializer& serializer, std::pmr::deque<T> const& value)
     {
         write_uint64(serializer, value.size());
@@ -219,7 +234,7 @@ namespace h::binary_serializer
             serialize(serializer, value[index]);
     }
 
-    export template <typename T>
+    template <typename T>
     void deserialize(Deserializer& deserializer, std::pmr::deque<T>& value)
     {
         std::uint64_t const size_in_bytes = read_uint64(deserializer);
@@ -234,7 +249,7 @@ namespace h::binary_serializer
         }
     }
 
-    export template <typename T>
+    template <typename T>
     void serialize(Serializer& serializer, std::pmr::vector<T> const& value)
     {
         write_uint64(serializer, value.size());
@@ -243,7 +258,7 @@ namespace h::binary_serializer
             serialize(serializer, value[index]);
     }
 
-    export template <typename T>
+    template <typename T>
     void deserialize(Deserializer& deserializer, std::pmr::vector<T>& value)
     {
         std::uint64_t const size_in_bytes = read_uint64(deserializer);
@@ -258,19 +273,17 @@ namespace h::binary_serializer
         }
     }
 
-    export template <typename T>
+    template <typename T>
     void serialize(Serializer& serializer, T const& value)
     {
-        static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable!");
-
+        static_assert (std::is_trivially_copyable_v<T>);
         write_data(serializer, &value, sizeof(T));
     }
 
-    export template <typename T>
+    template <typename T>
     void deserialize(Deserializer& deserializer, T& value)
     {
-        static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable!");
-
+        static_assert (std::is_trivially_copyable_v<T>);
         read_data(deserializer, &value, sizeof(T));
     }
 }

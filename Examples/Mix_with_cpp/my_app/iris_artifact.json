@@ -1,0 +1,39 @@
+{
+    "name": "my_app",
+    "version": "0.1.0",
+    "type": "executable",
+    "dependencies": [
+        {
+            "name": "external_library"
+        }
+    ],
+    "sources": [
+        {
+            "type": "import_c_header",
+            "headers": [
+                {
+                    "name": "C_interface",
+                    "header": "c_interface.h"
+                }
+            ]
+        },
+        {
+            "type": "c++",
+            "include": [
+                "./**/*.cpp"
+            ],
+            "additional_flags": [
+                "-std=c++23"
+            ]
+        },
+        {
+            "type": "iris",
+            "include": [
+                "./**/*.iris"
+            ]
+        }
+    ],
+    "executable": {
+        "source": "my_app.iris"
+    }
+}

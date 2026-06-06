@@ -1,0 +1,31 @@
+{
+    "name": "Copy_files",
+    "version": "0.1.0",
+    "type": "executable",
+    "dependencies": [
+        {
+            "name": "C_standard_library"
+        }
+    ],
+    "sources": [
+        {
+            "type": "iris",
+            "include": [
+                "./**/*.iris"
+            ]
+        }
+    ],
+    "copy": [
+        {
+            "source": "assets/config.txt",
+            "destination": "bin/assets/config.txt"
+        },
+        {
+            "source": "assets/data",
+            "destination": "bin/assets/data"
+        }
+    ],
+    "executable": {
+        "source": "main.iris"
+    }
+}

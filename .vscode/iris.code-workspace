@@ -1,0 +1,514 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Generate JSON serializer",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/Iris_Tools_Generate_JSON.exe",
+				"args": [
+					"serialize_json_code",
+					"${workspaceFolder}/Source/Core/Core.cppm",
+					"${workspaceFolder}/Source/JSON_serializer/Generated.cppm"
+				],
+				"cwd": "${workspaceFolder}",
+			},
+			{
+				"name": "Generate JSON operators",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/Iris_Tools_Generate_JSON.exe",
+				"args": [
+					"operators",
+					"${workspaceFolder}/Source/Core/Core.cppm",
+					"${workspaceFolder}/Source/JSON_serializer/Operators.cppm"
+				],
+				"cwd": "${workspaceFolder}"
+			},
+			{
+				"name": "Replace Compiler Tests",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/Iris_Tools_Replace_tests_results.exe",
+				"args": [
+					"${workspaceFolder}/build/bin/Debug/Iris_compiler_tests.exe",
+					"${workspaceFolder}/Source/Compiler/Compiler.tests.cpp",
+				],
+				"cwd": "${workspaceFolder}"
+			},
+			{
+				"name": "C Header Importer tests",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/Iris_c_header_importer_tests.exe",
+				"args": [],
+				"cwd": "${workspaceFolder}",
+			},
+			{
+				"name": "iris build rts-game",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
+				"args": [
+					"build",
+					"game"
+				],
+				"cwd": "${workspaceFolder}/../rts-game",
+			},
+			{
+				"name": "iris build-tests rts-game",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
+				"args": [
+					"build-tests",
+					"game"
+				],
+				"cwd": "${workspaceFolder}/../rts-game",
+			},
+			{
+				"name": "Debug rts-game tests",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/../rts-game/build/bin/game.iris.Debug/test.exe",
+				"args": [
+					"--list-tests",
+					"--output-format=json:${workspaceFolder}/test.json"
+				],
+				"cwd": "${workspaceFolder}/build",
+			},
+			{
+				"name": "iris import-c-header",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
+				"args": [
+					"import-c-header",
+					"c.complex",
+					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/projects/complex/complex.h",
+					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/Complex/c.complex.h"
+				],
+				"cwd": "${workspaceFolder}/build",
+			},
+			{
+				"name": "iris print-struct-layout",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
+				"args": [
+					"print-struct-layout",
+					"${workspaceFolder}/Tools/vscode/iris-extension/packages/client/test_fixture/build/no_artifact/code_lens_0.generated.irisb",
+					"My_struct"
+				],
+				"cwd": "${workspaceFolder}/build",
+			},
+			{
+				"name": "iris generate-compile-commands rts-game",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/iris.exe",
+				"args": [
+					"generate-compile-commands",
+					"--artifact-file=${workspaceFolder}/../rts-game/source/game/iris_artifact.json",
+					"--output-file=${workspaceFolder}/../rts-game/build/compile_commands.json",
+					"--build-directory=${workspaceFolder}/../rts-game/build",
+					"--header-search-path=C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/ucrt/",
+					"--repository=${workspaceFolder}/share/iris/libraries/iris_repository.json",
+					"--repository=${workspaceFolder}/../iris_local_repository/iris_repository.json",
+					"--repository=${workspaceFolder}/../rts-game/source/iris_repository.json"
+				],
+				"cwd": "${workspaceFolder}/../rts-game",
+			},
+			{
+				"name": "Run Language Server",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/iris_language_server.exe",
+				"args": [],
+				"cwd": "${workspaceFolder}/build"
+			},
+			{
+				"name": "Attach to Language Server",
+				"type": "cppvsdbg",
+				"request": "attach",
+				"program": "${workspaceFolder}/build/bin/Debug/iris_language_server.exe"
+			},
+			{
+				"name": "Run Language Client",
+				"type": "extensionHost",
+				"request": "launch",
+				"runtimeExecutable": "${execPath}",
+				"args": [
+					"--extensionDevelopmentPath=${workspaceRoot}/Tools/vscode/iris-extension",
+					"--trace-warnings",
+					"--disable-extensions"
+				],
+				"sourceMaps": true,
+				"autoAttachChildProcesses": true,
+				"outFiles": [
+					"${workspaceRoot}/Tools/vscode/iris-extension/out/**/*.js"
+				],
+				"env": {
+					"mode": "debug",
+					"iris_language_server": "${workspaceFolder}/build/bin/Debug/iris_language_server.exe"
+				}
+			},
+			{
+				"name": "Run Language Server Tests",
+				"type": "extensionHost",
+				"request": "launch",
+				"runtimeExecutable": "${execPath}",
+				"testConfiguration": "${workspaceFolder}/Tools/vscode/iris-extension/.vscode-test.mjs",
+				"args": [],
+				"autoAttachChildProcesses": true,
+				"preLaunchTask": "Build Language Client and Server",
+				"env": {
+					"mode": "debug",
+					"iris_language_server": "${workspaceFolder}/build/bin/Debug/iris_language_server.exe"
+				}
+			},
+			{
+				"name": "Compiler Tests",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/build/bin/Debug/Iris_compiler_tests.exe",
+				"args": [
+					"[JIT]"
+				],
+				"cwd": "${workspaceFolder}/build/tmp",
+			},
+			{
+				"name": "Python build_utilities",
+				"type": "debugpy",
+				"request": "launch",
+				"program": "${workspaceFolder}/Scripts/build_utilities.py",
+				"args": [
+					"generate_examples"
+				],
+			},
+			{
+				"name": "Test VSCode extension",
+				"type": "extensionHost",
+				"request": "launch",
+				"runtimeExecutable": "${execPath}",
+				"testConfiguration": "${workspaceFolder}/Tools/vscode/iris-extension/.vscode-test.mjs",
+				"args": [
+				],
+				"outFiles": [
+					"${workspaceRoot}/Tools/vscode/iris-extension/out/**/*.js"
+				],
+				"preLaunchTask": "Build Language Client",
+				"env": {
+					"iris_language_server": "${workspaceFolder}/build/bin/Debug/iris_language_server.exe"
+				}
+			},
+		],
+		"compounds": [
+			{
+				"name": "Start Language Client and Server",
+				"configurations": [
+					"Run Language Server",
+					"Run Language Client"
+				],
+				"preLaunchTask": "Build Language Client and Server",
+				"stopAll": true
+			},
+			{
+				"name": "Test Language Server",
+				"configurations": [
+					"Run Language Server",
+					"Run Language Server Tests"
+				],
+				"preLaunchTask": "Build Language Client and Server",
+				"stopAll": true
+			}
+		]
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "Package VSCode Extension",
+				"command": "npm",
+				"type": "shell",
+				"args": [
+					"run",
+					"package"
+				],
+				"presentation": {
+					"reveal": "always"
+				},
+				"group": "none",
+				"options": {
+					"cwd": "${workspaceFolder}/Tools/vscode/iris-extension"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Build Language Server",
+				"command": "cmake",
+				"type": "shell",
+				"args": [
+					"--build",
+					"${workspaceFolder}/build",
+					"--target",
+					"Iris_language_server_app"
+				],
+				"problemMatcher": [
+					"$msCompile"
+				]
+			},
+			{
+				"label": "Build Language Client",
+				"command": "npm",
+				"type": "process",
+				"args": [
+					"run",
+					"compile"
+				],
+				"presentation": {
+					"reveal": "always"
+				},
+				"group": "none",
+				"options": {
+					"cwd": "${workspaceFolder}/Tools/vscode/iris-extension"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Build Language Client and Server",
+				"dependsOn": [
+					"Build Language Client",
+					"Build Language Server"
+				]
+			},
+			{
+				"label": "CMake Configure",
+				"command": "cmake",
+				"type": "shell",
+				"args": [
+					"--preset",
+					"windows"
+				]
+			},
+			{
+				"label": "Build Debug",
+				"command": "cmake",
+				"type": "shell",
+				"args": [
+					"--build",
+					"${workspaceFolder}/build",
+					"--config",
+					"Debug"
+				],
+				"problemMatcher": [
+					"$msCompile"
+				]
+			},
+			{
+				"label": "Build Release",
+				"command": "cmake",
+				"type": "shell",
+				"args": [
+					"--build",
+					"${workspaceFolder}/build",
+					"--config",
+					"Release"
+				],
+				"problemMatcher": [
+					"$msCompile"
+				]
+			},
+			{
+				"label": "Install Debug Iris",
+				"type": "shell",
+				"command": "python",
+				"args": [
+					"${workspaceFolder}/Scripts/build_utilities.py",
+					"install_iris",
+					"${workspaceFolder}/../iris_install",
+					"--configuration",
+					"debug"
+				],
+				"presentation": {
+					"reveal": "always"
+				},
+				"problemMatcher": [],
+				"dependsOn": [
+					"Build Debug"
+				]
+			},
+			{
+				"label": "Install Release Iris",
+				"type": "shell",
+				"command": "python",
+				"args": [
+					"${workspaceFolder}/Scripts/build_utilities.py",
+					"install_iris",
+					"${workspaceFolder}/../iris_install"
+				],
+				"presentation": {
+					"reveal": "always"
+				},
+				"problemMatcher": [],
+				"dependsOn": [
+					"Build Release"
+				]
+			}
+		]
+	},
+	"settings": {
+		"files.associations": {
+			"vector": "cpp",
+			"algorithm": "cpp",
+			"array": "cpp",
+			"atomic": "cpp",
+			"bit": "cpp",
+			"cctype": "cpp",
+			"charconv": "cpp",
+			"chrono": "cpp",
+			"clocale": "cpp",
+			"cmath": "cpp",
+			"compare": "cpp",
+			"concepts": "cpp",
+			"cstddef": "cpp",
+			"cstdint": "cpp",
+			"cstdio": "cpp",
+			"cstdlib": "cpp",
+			"cstring": "cpp",
+			"ctime": "cpp",
+			"cwchar": "cpp",
+			"exception": "cpp",
+			"format": "cpp",
+			"forward_list": "cpp",
+			"functional": "cpp",
+			"initializer_list": "cpp",
+			"iomanip": "cpp",
+			"ios": "cpp",
+			"iosfwd": "cpp",
+			"istream": "cpp",
+			"iterator": "cpp",
+			"limits": "cpp",
+			"list": "cpp",
+			"locale": "cpp",
+			"map": "cpp",
+			"memory": "cpp",
+			"memory_resource": "cpp",
+			"mutex": "cpp",
+			"new": "cpp",
+			"numeric": "cpp",
+			"optional": "cpp",
+			"ostream": "cpp",
+			"ratio": "cpp",
+			"sstream": "cpp",
+			"stdexcept": "cpp",
+			"stop_token": "cpp",
+			"streambuf": "cpp",
+			"string": "cpp",
+			"system_error": "cpp",
+			"thread": "cpp",
+			"tuple": "cpp",
+			"type_traits": "cpp",
+			"typeinfo": "cpp",
+			"unordered_map": "cpp",
+			"utility": "cpp",
+			"valarray": "cpp",
+			"xfacet": "cpp",
+			"xhash": "cpp",
+			"xiosbase": "cpp",
+			"xlocale": "cpp",
+			"xlocbuf": "cpp",
+			"xlocinfo": "cpp",
+			"xlocmes": "cpp",
+			"xlocmon": "cpp",
+			"xlocnum": "cpp",
+			"xloctime": "cpp",
+			"xmemory": "cpp",
+			"xstddef": "cpp",
+			"xstring": "cpp",
+			"xtr1common": "cpp",
+			"xtree": "cpp",
+			"xutility": "cpp",
+			"*.inc": "cpp",
+			"variant": "cpp",
+			"filesystem": "cpp",
+			"bitset": "cpp",
+			"cinttypes": "cpp",
+			"condition_variable": "cpp",
+			"deque": "cpp",
+			"fstream": "cpp",
+			"future": "cpp",
+			"iostream": "cpp",
+			"queue": "cpp",
+			"random": "cpp",
+			"regex": "cpp",
+			"set": "cpp",
+			"shared_mutex": "cpp",
+			"span": "cpp",
+			"stack": "cpp",
+			"unordered_set": "cpp",
+			"*.def": "cpp",
+			"*.cppm": "cpp",
+			"ranges": "cpp",
+			"cassert": "cpp",
+			"complex": "cpp",
+			"string_view": "cpp",
+			"any": "cpp",
+			"codecvt": "cpp",
+			"coroutine": "cpp",
+			"resumable": "cpp"
+		},
+		"cmake.configureSettings": {
+			"CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/../vcpkg/scripts/buildsystems/vcpkg.cmake"
+		},
+		"cmake.configureArgs": [
+			//"--debug-find"
+		],
+		"cmake.buildArgs": [
+			//"--verbose"
+		],
+		"cmake.configureOnOpen": false,
+		"C_Cpp.formatting": "vcFormat",
+		"[json]": {
+			"editor.defaultFormatter": "vscode.json-language-features"
+		},
+		"[jsonc]": {
+			"editor.defaultFormatter": "vscode.json-language-features"
+		},
+		"C_Cpp.vcFormat.newLine.beforeOpenBrace.lambda": "newLine",
+		"C_Cpp.vcFormat.indent.lambdaBracesWhenParameter": false,
+		"testMate.cpp.test.advancedExecutables": [
+			{
+				"pattern": "build/bin/Debug/*{test,Test,TEST}*",
+				"cwd": "${workspaceFolder}/build",
+				"name": "Debug ${filename}"
+			},
+			{
+				"pattern": "build/bin/Release/*{test,Test,TEST}*",
+				"cwd": "${workspaceFolder}/build",
+				"name": "Release ${filename}"
+			}
+		],
+		"editor.formatOnSave": false,
+		"C_Cpp.default.cppStandard": "c++23",
+		"C_Cpp.default.cStandard": "c23",
+		"C_Cpp.default.compileCommands": [
+			"${workspaceFolder}/build/compile_commands.json"
+		],
+		"cmake.automaticReconfigure": false,
+		"cmake.buildBeforeRun": false,
+		"cmake.configureOnEdit": false,
+		"cmake.enableAutomaticKitScan": false,
+		"chat.tools.terminal.autoApprove": {
+			"Enter-VsDevEnv": true,
+			"cmake": true,
+			"./build/Source/Compiler/Debug/Iris_compiler_tests.exe": true
+		}
+	}
+}

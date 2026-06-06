@@ -1,16 +1,8 @@
-module;
+export module iris.compiler.repository;
 
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
+import std;
 
-export module h.compiler.repository;
-
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Repository
     {

@@ -1,22 +1,15 @@
-module;
+export module iris.compiler.clang_compiler;
 
-#include <clang/Frontend/CompilerInstance.h>
+import std;
 
-#include <filesystem>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string>
-#include <vector>
+import iris.compiler.clang_data;
 
-export module h.compiler.clang_compiler;
-
-namespace h::compiler
+namespace iris::compiler
 {
     export std::filesystem::path find_clang(bool const use_clang_cl);
 
     export bool compile_cpp(
-        clang::CompilerInstance& clang_compiler_instance,
+        Clang_data const& clang_data,
         std::string_view const target_triple,
         std::filesystem::path const& source_file_path,
         std::filesystem::path const& output_file_path,

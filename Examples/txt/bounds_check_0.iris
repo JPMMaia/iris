@@ -1,0 +1,18 @@
+module Bounds_check_0;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+export function access_slice(integers: Array_slice::<Int32>, index: Int32) -> (value: Int32)
+{
+    return integers[index];
+}
+
+export function access_fixed_array(index: Int32) -> (value: Int32)
+{
+    var a: Constant_array::<Int32, 4> = [0, 1, 2, 3];
+    return a[index];
+}

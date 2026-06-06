@@ -1,10 +1,10 @@
 #include <catch2/catch_session.hpp>
 
-import h.common;
+import iris.common;
 
 int main(int argc, char* argv[])
 {
-    h::common::install_abort_handlers();
+    iris::common::install_abort_handlers();
 
     int const result = Catch::Session().run(argc, argv);
     return result;

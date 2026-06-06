@@ -1,0 +1,6 @@
+module test.type_kind;
+
+function run(parameter: Type_kind) -> ()
+{
+    var a = Type_kind.Struct;
+}

@@ -1,0 +1,10 @@
+module Use_printf_variadic_promotions_indirection;
+
+import c.stdio as stdio;
+
+export function run() -> ()
+{
+    var x = 3.0f32;
+    var y = &x;
+    stdio.printf("%f\n"c, *y);
+}

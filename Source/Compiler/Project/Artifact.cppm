@@ -1,21 +1,12 @@
-module;
+export module iris.compiler.artifact;
 
-#include <filesystem>
-#include <functional>
-#include <memory_resource>
-#include <optional>
-#include <span>
-#include <string_view>
-#include <unordered_map>
-#include <variant>
-#include <vector>
+import std;
 
-export module h.compiler.artifact;
+import iris.compiler.target;
+import iris.compiler.presets;
+import iris.core;
 
-import h.compiler.target;
-import h.core;
-
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Version
     {
@@ -61,7 +52,7 @@ namespace h::compiler
     {
     };
 
-    export struct Hlang_source_group
+    export struct Iris_source_group
     {
     };
 
@@ -71,7 +62,7 @@ namespace h::compiler
             Export_c_header_source_group,
             Import_c_header_source_group,
             Cpp_source_group,
-            Hlang_source_group
+            Iris_source_group
         >;
         
         std::optional<Data_type> data;
@@ -90,6 +81,12 @@ namespace h::compiler
         std::pmr::unordered_multimap<std::pmr::string, std::pmr::string> external_libraries;
     };
 
+    export struct Copy_entry
+    {
+        std::filesystem::path source;
+        std::filesystem::path destination;
+    };
+
     export struct Artifact
     {
         std::filesystem::path file_path;
@@ -100,9 +97,15 @@ namespace h::compiler
         std::pmr::vector<Source_group> sources;
         std::pmr::vector<std::filesystem::path> public_include_directories;
         std::optional<std::variant<Executable_info, Library_info>> info;
+        std::pmr::vector<Copy_entry> copy_entries;
     };
 
     export Artifact get_artifact(std::filesystem::path const& artifact_file_path);
+
+    export Artifact get_artifact(
+        std::filesystem::path const& artifact_file_path,
+        Environment_variables const& environment_variables
+    );
 
     export void write_artifact_to_file(Artifact const& artifact, std::filesystem::path const& artifact_file_path);
 
@@ -134,7 +137,7 @@ namespace h::compiler
         std::function<bool(std::filesystem::path)> const& predicate
     );
 
-    export std::pmr::vector<std::filesystem::path> get_artifact_hlang_source_files(
+    export std::pmr::vector<std::filesystem::path> get_artifact_iris_source_files(
         Artifact const& artifact,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -179,11 +182,11 @@ namespace h::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
-    export std::pmr::vector<h::Module const*> get_artifact_modules_and_dependencies(
+    export std::pmr::vector<iris::Module const*> get_artifact_modules_and_dependencies(
         Artifact const& artifact,
         std::span<Artifact const> const all_artifacts,
-        std::span<h::Module const> const header_modules,
-        std::span<h::Module const> const core_modules,
+        std::span<iris::Module const> const header_modules,
+        std::span<iris::Module const> const core_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );

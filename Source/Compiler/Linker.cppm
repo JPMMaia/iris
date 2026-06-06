@@ -1,14 +1,8 @@
-module;
+export module iris.compiler.linker;
 
-#include <filesystem>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
+import std;
 
-export module h.compiler.linker;
-
-namespace h::compiler
+namespace iris::compiler
 {
     export enum class Link_type
     {

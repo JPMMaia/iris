@@ -1,15 +1,10 @@
-module;
+module iris.common.filesystem_common;
 
-#include <filesystem>
-#include <optional>
-#include <span>
-#include <string_view>
+import std;
 
-module h.common.filesystem_common;
+import iris.common.filesystem;
 
-import h.common.filesystem;
-
-namespace h::common
+namespace iris::common
 {
     std::optional<std::filesystem::path> search_file(
         std::string_view const filename,
@@ -64,30 +59,49 @@ namespace h::common
 
     std::filesystem::path get_share_path(std::filesystem::path const& relative_path)
     {
-        std::filesystem::path const current_directory_include_path = std::filesystem::current_path().parent_path() / "share" / "hlang" / relative_path;
+        std::filesystem::path const executable_directory_include_path = get_executable_directory().parent_path() / "share" / "iris" / relative_path;
+        if (std::filesystem::exists(executable_directory_include_path))
+            return executable_directory_include_path;
+
+        std::filesystem::path const executable_directory_parent_include_path = get_executable_directory().parent_path().parent_path().parent_path() / "share" / "iris" / relative_path;
+        if (std::filesystem::exists(executable_directory_parent_include_path))
+            return executable_directory_parent_include_path;
+
+        std::filesystem::path const current_directory_include_path = std::filesystem::current_path() / "share" / "iris" / relative_path;
         if (std::filesystem::exists(current_directory_include_path))
             return current_directory_include_path;
-        std::filesystem::path const executable_directory_include_path = get_executable_directory().parent_path() / "share" / "hlang" / relative_path;
-        return executable_directory_include_path;
+
+        std::filesystem::path const parent_directory_include_path = std::filesystem::current_path().parent_path() / "share" / "iris" / relative_path;
+        return parent_directory_include_path;
     }
 
     std::filesystem::path get_builtin_include_directory()
     {
-        return get_share_path("include");
+        return get_share_path("include").lexically_normal();
+    }
+
+    std::filesystem::path get_builtin_module_file_path()
+    {
+        return get_share_path("source/Builtin.iris").lexically_normal();
+    }
+
+    std::filesystem::path get_json_module_file_path()
+    {
+        return get_share_path("libraries/Iris_standard_library/json.iris").lexically_normal();
     }
 
     std::filesystem::path get_tests_main_file_path()
     {
-        return get_share_path("source/tests_main.cpp");
+        return get_share_path("source/tests_main.cpp").lexically_normal();
     }
 
     std::filesystem::path get_standard_repository_file_path()
     {
-        return get_share_path("libraries/hlang_repository.json");
+        return get_share_path("libraries/iris_repository.json").lexically_normal();
     }
 
     std::filesystem::path get_visualizers_file_path()
     {
-        return get_share_path("visualizers");
+        return get_share_path("visualizers").lexically_normal();
     }
 }

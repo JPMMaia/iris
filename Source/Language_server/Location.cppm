@@ -6,48 +6,48 @@ module;
 
 #include <lsp/types.h>
 
-export module h.language_server.location;
+export module iris.language_server.location;
 
-import h.compiler.analysis;
-import h.core;
-import h.core.declarations;
+import iris.compiler.analysis;
+import iris.core;
+import iris.core.declarations;
 
-namespace h::language_server
+namespace iris::language_server
 {
     export std::optional<Declaration> find_declaration_that_contains_source_position(
         Declaration_database const& declaration_database,
         std::string_view const& module_name,
-        h::Source_position const& source_position
+        iris::Source_position const& source_position
     );
 
-    export std::optional<h::Function> find_function_that_contains_source_position(
-        h::Module const& core_module,
-        h::Source_position const& source_position
+    export std::optional<iris::Function> find_function_that_contains_source_position(
+        iris::Module const& core_module,
+        iris::Source_position const& source_position
     );
 
-    export std::optional<h::Type_reference> find_type_that_contains_source_position(
-        h::Type_reference const& type,
-        h::Source_position const& source_position
+    export std::optional<iris::Type_reference> find_type_that_contains_source_position(
+        iris::Type_reference const& type,
+        iris::Source_position const& source_position
     );
 
     export std::optional<Declaration> find_value_declaration_using_expression(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
-        h::Statement const& statement,
-        h::Expression const& expression
+        iris::Module const& core_module,
+        iris::Statement const& statement,
+        iris::Expression const& expression
     );
 
-    export h::Enum_declaration const* find_enum_declaration_using_expression(
+    export iris::Enum_declaration const* find_enum_declaration_using_expression(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
-        h::Statement const& statement,
-        h::Expression const& expression
+        iris::Module const& core_module,
+        iris::Statement const& statement,
+        iris::Expression const& expression
     );
 
     export void visit_expressions_that_contain_position(
         Declaration_database const& declaration_database,
-        h::Module const& core_module,
-        h::Source_position const& source_position,
-        std::function<bool(h::Function_declaration const* function_declaration, h::compiler::Scope const& scope, h::Statement const& statement, h::Expression const& expression)> const& visitor
+        iris::Module const& core_module,
+        iris::Source_position const& source_position,
+        std::function<bool(iris::Function_declaration const* function_declaration, iris::compiler::Scope const& scope, iris::Statement const& statement, iris::Expression const& expression)> const& visitor
     );
 }

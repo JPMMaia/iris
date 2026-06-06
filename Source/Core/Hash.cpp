@@ -2,20 +2,14 @@ module;
 
 #include <xxhash.h>
 
-#include <cstddef>
-#include <memory_resource>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <variant>
+module iris.core.hash;
 
-module h.core.hash;
+import std;
 
-import h.common;
-import h.core;
+import iris.common;
+import iris.core;
 
-namespace h
+namespace iris
 {
     static inline void update_hash(
         XXH64_state_t* const state,
@@ -25,12 +19,12 @@ namespace h
 
     void update_hash_with_declaration(
         XXH64_state_t* const state,
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::string_view const declaration_name
     )
     {
         {
-            std::optional<h::Function_declaration const*> const declaration = find_function_declaration(core_module, declaration_name);
+            std::optional<iris::Function_declaration const*> const declaration = find_function_declaration(core_module, declaration_name);
             if (declaration)
             {
                 update_hash(state, *declaration.value());
@@ -39,7 +33,7 @@ namespace h
         }
 
         {
-            std::optional<h::Alias_type_declaration const*> const declaration = find_alias_type_declaration(core_module, declaration_name);
+            std::optional<iris::Alias_type_declaration const*> const declaration = find_alias_type_declaration(core_module, declaration_name);
             if (declaration)
             {
                 update_hash(state, *declaration.value());
@@ -48,7 +42,7 @@ namespace h
         }
 
         {
-            std::optional<h::Enum_declaration const*> const declaration = find_enum_declaration(core_module, declaration_name);
+            std::optional<iris::Enum_declaration const*> const declaration = find_enum_declaration(core_module, declaration_name);
             if (declaration)
             {
                 update_hash(state, *declaration.value());
@@ -57,7 +51,7 @@ namespace h
         }
 
         {
-            std::optional<h::Struct_declaration const*> const declaration = find_struct_declaration(core_module, declaration_name);
+            std::optional<iris::Struct_declaration const*> const declaration = find_struct_declaration(core_module, declaration_name);
             if (declaration)
             {
                 update_hash(state, *declaration.value());
@@ -66,7 +60,7 @@ namespace h
         }
 
         {
-            std::optional<h::Union_declaration const*> const declaration = find_union_declaration(core_module, declaration_name);
+            std::optional<iris::Union_declaration const*> const declaration = find_union_declaration(core_module, declaration_name);
             if (declaration)
             {
                 update_hash(state, *declaration.value());
@@ -82,7 +76,7 @@ namespace h
     )
     {
         if (XXH64_update(state, input, size) == XXH_ERROR)
-            h::common::print_message_and_exit("Could not update xxhash state!");
+            iris::common::print_message_and_exit("Could not update xxhash state!");
     }
 
     void update_hash(
@@ -95,15 +89,15 @@ namespace h
 
     void update_hash(
         XXH64_state_t* const state,
-        h::Function_type const& function_type
+        iris::Function_type const& function_type
     )
     {
-        for (h::Type_reference const& parameter_type : function_type.input_parameter_types)
+        for (iris::Type_reference const& parameter_type : function_type.input_parameter_types)
         {
             update_hash(state, parameter_type);
         }
 
-        for (h::Type_reference const& parameter_type : function_type.output_parameter_types)
+        for (iris::Type_reference const& parameter_type : function_type.output_parameter_types)
         {
             update_hash(state, parameter_type);
         }
@@ -113,7 +107,7 @@ namespace h
 
     void update_hash(
         XXH64_state_t* const state,
-        h::Function_pointer_type const& function_pointer_type
+        iris::Function_pointer_type const& function_pointer_type
     )
     {
         update_hash(state, function_pointer_type.type);
@@ -121,74 +115,79 @@ namespace h
 
     void update_hash(
         XXH64_state_t* const state,
-        h::Type_reference const& type_reference
+        iris::Type_reference const& type_reference
     )
     {
-        if (std::holds_alternative<h::Array_slice_type>(type_reference.data))
+        if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
         {
-            h::Array_slice_type const& data = std::get<h::Array_slice_type>(type_reference.data);
+            iris::Array_slice_type const& data = std::get<iris::Array_slice_type>(type_reference.data);
 
-            for (h::Type_reference const& element_type : data.element_type)
+            for (iris::Type_reference const& element_type : data.element_type)
             {
                 update_hash(state, element_type);
             }
 
             update_hash(state, &data.is_mutable, sizeof(data.is_mutable));
         }
-        else if (std::holds_alternative<h::Builtin_type_reference>(type_reference.data))
+        else if (std::holds_alternative<iris::Builtin_type_reference>(type_reference.data))
         {
-            h::Builtin_type_reference const& data = std::get<h::Builtin_type_reference>(type_reference.data);
+            iris::Builtin_type_reference const& data = std::get<iris::Builtin_type_reference>(type_reference.data);
             update_hash(state, data.value);
         }
-        else if (std::holds_alternative<h::Constant_array_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Constant_array_type>(type_reference.data))
         {
-            h::Constant_array_type const& data = std::get<h::Constant_array_type>(type_reference.data);
+            iris::Constant_array_type const& data = std::get<iris::Constant_array_type>(type_reference.data);
 
-            for (h::Type_reference const& value_type : data.value_type)
+            for (iris::Type_reference const& value_type : data.value_type)
             {
                 update_hash(state, value_type);
             }
 
             update_hash(state, &data.size, sizeof(data.size));
         }
-        else if (std::holds_alternative<h::Custom_type_reference>(type_reference.data))
+        else if (std::holds_alternative<iris::Decimal_type>(type_reference.data))
         {
-            h::Custom_type_reference const& data = std::get<h::Custom_type_reference>(type_reference.data);
+            iris::Decimal_type const& data = std::get<iris::Decimal_type>(type_reference.data);
+            update_hash(state, &data.scale, sizeof(data.scale));
+        }
+        else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
+        {
+            iris::Custom_type_reference const& data = std::get<iris::Custom_type_reference>(type_reference.data);
             update_hash(state, data.module_reference.name);
             update_hash(state, data.name);
         }
-        else if (std::holds_alternative<h::Fundamental_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Fundamental_type>(type_reference.data))
         {
-            h::Fundamental_type const data = std::get<h::Fundamental_type>(type_reference.data);
+            iris::Fundamental_type const data = std::get<iris::Fundamental_type>(type_reference.data);
             update_hash(state, &data, sizeof(data));
         }
-        else if (std::holds_alternative<h::Function_pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Function_pointer_type>(type_reference.data))
         {
-            h::Function_pointer_type const& data = std::get<h::Function_pointer_type>(type_reference.data);
+            iris::Function_pointer_type const& data = std::get<iris::Function_pointer_type>(type_reference.data);
             update_hash(state, data);
         }
-        else if (std::holds_alternative<h::Integer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Integer_type>(type_reference.data))
         {
-            h::Integer_type const& data = std::get<h::Integer_type>(type_reference.data);
+            iris::Integer_type const& data = std::get<iris::Integer_type>(type_reference.data);
             update_hash(state, &data.number_of_bits, sizeof(data.number_of_bits));
             update_hash(state, &data.is_signed, sizeof(data.is_signed));
         }
-        else if (std::holds_alternative<h::Pointer_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Pointer_type>(type_reference.data))
         {
-            h::Pointer_type const& data = std::get<h::Pointer_type>(type_reference.data);
+            iris::Pointer_type const& data = std::get<iris::Pointer_type>(type_reference.data);
 
-            for (h::Type_reference const& element_type : data.element_type)
+            for (iris::Type_reference const& element_type : data.element_type)
             {
                 update_hash(state, element_type);
             }
 
             update_hash(state, &data.is_mutable, sizeof(data.is_mutable));
         }
-        else if (std::holds_alternative<h::Soa_array_type>(type_reference.data))
+        else if (std::holds_alternative<iris::Soa_array_type>(type_reference.data))
         {
-            h::Soa_array_type const& data = std::get<h::Soa_array_type>(type_reference.data);
+            iris::Soa_array_type const& data = std::get<iris::Soa_array_type>(type_reference.data);
 
-            for (h::Type_reference const& value_type : data.value_type)
+            for (iris::Type_reference const& value_type : data.value_type)
             {
                 update_hash(state, value_type);
             }
@@ -197,14 +196,14 @@ namespace h
         }
         else
         {
-            h::common::print_message_and_exit("Hash of type reference data is not implemented!");
+            iris::common::print_message_and_exit("Hash of type reference data is not implemented!");
         }
     }
 
     void update_hash(
         XXH64_state_t* const state,
-        h::Statement const& statement,
-        h::Expression const& expression
+        iris::Statement const& statement,
+        iris::Expression const& expression
     )
     {
         {
@@ -212,87 +211,87 @@ namespace h
             update_hash(state, &index, sizeof(index));
         }
 
-        if (std::holds_alternative<h::Access_expression>(expression.data))
+        if (std::holds_alternative<iris::Access_expression>(expression.data))
         {
-            h::Access_expression const& data = std::get<h::Access_expression>(expression.data);
+            iris::Access_expression const& data = std::get<iris::Access_expression>(expression.data);
             update_hash(state, statement, data.expression);
             update_hash(state, data.member_name);
         }
-        else if (std::holds_alternative<h::Binary_expression>(expression.data))
+        else if (std::holds_alternative<iris::Binary_expression>(expression.data))
         {
-            h::Binary_expression const& data = std::get<h::Binary_expression>(expression.data);
+            iris::Binary_expression const& data = std::get<iris::Binary_expression>(expression.data);
             update_hash(state, statement, data.left_hand_side);
             update_hash(state, statement, data.right_hand_side);
             update_hash(state, &data.operation, sizeof(data.operation));
         }
-        else if (std::holds_alternative<h::Cast_expression>(expression.data))
+        else if (std::holds_alternative<iris::Cast_expression>(expression.data))
         {
-            h::Cast_expression const& data = std::get<h::Cast_expression>(expression.data);
+            iris::Cast_expression const& data = std::get<iris::Cast_expression>(expression.data);
             update_hash(state, statement, data.source);
             update_hash(state, data.destination_type);
             update_hash(state, &data.cast_type, sizeof(data.cast_type));
         }
-        else if (std::holds_alternative<h::Constant_expression>(expression.data))
+        else if (std::holds_alternative<iris::Constant_expression>(expression.data))
         {
-            h::Constant_expression const& data = std::get<h::Constant_expression>(expression.data);
+            iris::Constant_expression const& data = std::get<iris::Constant_expression>(expression.data);
             update_hash(state, data.type);
             update_hash(state, data.data);
         }
-        else if (std::holds_alternative<h::Constant_array_expression>(expression.data))
+        else if (std::holds_alternative<iris::Constant_array_expression>(expression.data))
         {
-            h::Constant_array_expression const& data = std::get<h::Constant_array_expression>(expression.data);
+            iris::Constant_array_expression const& data = std::get<iris::Constant_array_expression>(expression.data);
 
-            for (h::Statement const& element_statement : data.array_data)
+            for (iris::Statement const& element_statement : data.array_data)
             {
                 update_hash(state, element_statement);
             }
         }
-        else if (std::holds_alternative<h::Instantiate_expression>(expression.data))
+        else if (std::holds_alternative<iris::Instantiate_expression>(expression.data))
         {
-            h::Instantiate_expression const& data = std::get<h::Instantiate_expression>(expression.data);
+            iris::Instantiate_expression const& data = std::get<iris::Instantiate_expression>(expression.data);
             update_hash(state, &data.type, sizeof(data.type));
 
-            for (h::Instantiate_member_value_pair const& pair : data.members)
+            for (iris::Instantiate_member_value_pair const& pair : data.members)
             {
                 update_hash(state, pair.member_name);
                 update_hash(state, statement, pair.value);
             }
         }
-        else if (std::holds_alternative<h::Null_pointer_expression>(expression.data))
+        else if (std::holds_alternative<iris::Null_pointer_expression>(expression.data))
         {
             std::uint8_t const null_value = 0;
             update_hash(state, &null_value, sizeof(null_value));
         }
-        else if (std::holds_alternative<h::Parenthesis_expression>(expression.data))
+        else if (std::holds_alternative<iris::Parenthesis_expression>(expression.data))
         {
-            h::Parenthesis_expression const& data = std::get<h::Parenthesis_expression>(expression.data);
+            iris::Parenthesis_expression const& data = std::get<iris::Parenthesis_expression>(expression.data);
             update_hash(state, statement, data.expression);
         }
-        else if (std::holds_alternative<h::Type_expression>(expression.data))
+        else if (std::holds_alternative<iris::Type_expression>(expression.data))
         {
-            h::Type_expression const& data = std::get<h::Type_expression>(expression.data);
+            iris::Type_expression const& data = std::get<iris::Type_expression>(expression.data);
             update_hash(state, data.type);
         }
-        else if (std::holds_alternative<h::Unary_expression>(expression.data))
+        else if (std::holds_alternative<iris::Unary_expression>(expression.data))
         {
-            h::Unary_expression const& data = std::get<h::Unary_expression>(expression.data);
+            iris::Unary_expression const& data = std::get<iris::Unary_expression>(expression.data);
             update_hash(state, statement, data.expression);
             update_hash(state, &data.operation, sizeof(data.operation));
         }
-        else if (std::holds_alternative<h::Variable_expression>(expression.data))
+        else if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
-            h::Variable_expression const& data = std::get<h::Variable_expression>(expression.data);
+            iris::Variable_expression const& data = std::get<iris::Variable_expression>(expression.data);
             update_hash(state, data.name);
         }
         else
         {
-            h::common::print_message_and_exit("Hash of expression type is not implemented!");
+            iris::common::print_message_and_exit("Hash of expression type is not implemented!");
         }
     }
 
     inline void update_hash(
         XXH64_state_t* const state,
-        h::Statement const& statement,
+        iris::Statement const& statement,
         Expression_index const expression
     )
     {
@@ -301,10 +300,10 @@ namespace h
 
     void update_hash(
         XXH64_state_t* const state,
-        h::Statement const& statement
+        iris::Statement const& statement
     )
     {
-        for (h::Expression const& expression : statement.expressions)
+        for (iris::Expression const& expression : statement.expressions)
         {
             update_hash(state, statement, expression);
         }
@@ -312,7 +311,7 @@ namespace h
 
     void update_hash(
         XXH64_state_t* const state,
-        h::Alias_type_declaration const& declaration
+        iris::Alias_type_declaration const& declaration
     )
     {
         update_hash(state, declaration.name);
@@ -320,13 +319,13 @@ namespace h
         if (declaration.unique_name.has_value())
             update_hash(state, *declaration.unique_name);
 
-        for (h::Type_reference const& type_reference : declaration.type)
+        for (iris::Type_reference const& type_reference : declaration.type)
             update_hash(state, type_reference);
     }
 
     void update_hash(
         XXH64_state_t* const state,
-        h::Enum_declaration const& declaration
+        iris::Enum_declaration const& declaration
     )
     {
         update_hash(state, declaration.name);
@@ -334,7 +333,7 @@ namespace h
         if (declaration.unique_name.has_value())
             update_hash(state, *declaration.unique_name);
 
-        for (h::Enum_value const& enum_value : declaration.values)
+        for (iris::Enum_value const& enum_value : declaration.values)
         {
             update_hash(state, enum_value.name);
             if (enum_value.value)
@@ -344,7 +343,7 @@ namespace h
 
     void update_hash(
         XXH64_state_t* const state,
-        h::Struct_declaration const& declaration
+        iris::Struct_declaration const& declaration
     )
     {
         update_hash(state, declaration.name);
@@ -352,13 +351,13 @@ namespace h
         if (declaration.unique_name.has_value())
             update_hash(state, *declaration.unique_name);
 
-        for (h::Type_reference const& type_reference : declaration.member_types)
+        for (iris::Type_reference const& type_reference : declaration.member_types)
             update_hash(state, type_reference);
 
         for (std::pmr::string const& member_name : declaration.member_names)
             update_hash(state, member_name);
 
-        for (h::Statement const& member_default_value : declaration.member_default_values)
+        for (iris::Statement const& member_default_value : declaration.member_default_values)
             update_hash(state, member_default_value);
 
         update_hash(state, &declaration.is_packed, sizeof(declaration.is_packed));
@@ -367,7 +366,7 @@ namespace h
 
     void update_hash(
         XXH64_state_t* const state,
-        h::Union_declaration const& declaration
+        iris::Union_declaration const& declaration
     )
     {
         update_hash(state, declaration.name);
@@ -375,7 +374,7 @@ namespace h
         if (declaration.unique_name.has_value())
             update_hash(state, *declaration.unique_name);
 
-        for (h::Type_reference const& type_reference : declaration.member_types)
+        for (iris::Type_reference const& type_reference : declaration.member_types)
             update_hash(state, type_reference);
 
         for (std::pmr::string const& member_name : declaration.member_names)
@@ -384,7 +383,7 @@ namespace h
 
     void update_hash(
         XXH64_state_t* const state,
-        h::Function_declaration const& declaration
+        iris::Function_declaration const& declaration
     )
     {
         update_hash(state, declaration.name);
@@ -412,12 +411,12 @@ namespace h
 
     XXH64_hash_t hash_alias_type_declaration(
         XXH64_state_t* const state,
-        h::Alias_type_declaration const& declaration
+        iris::Alias_type_declaration const& declaration
     )
     {
         XXH64_hash_t const seed = 0;
         if (XXH64_reset(state, seed) == XXH_ERROR)
-            h::common::print_message_and_exit("Could not reset xxhash state!");
+            iris::common::print_message_and_exit("Could not reset xxhash state!");
 
         update_hash(state, declaration);
 
@@ -427,12 +426,12 @@ namespace h
 
     XXH64_hash_t hash_enum_declaration(
         XXH64_state_t* const state,
-        h::Enum_declaration const& declaration
+        iris::Enum_declaration const& declaration
     )
     {
         XXH64_hash_t const seed = 0;
         if (XXH64_reset(state, seed) == XXH_ERROR)
-            h::common::print_message_and_exit("Could not reset xxhash state!");
+            iris::common::print_message_and_exit("Could not reset xxhash state!");
 
         update_hash(state, declaration);
 
@@ -442,12 +441,12 @@ namespace h
 
     XXH64_hash_t hash_struct_declaration(
         XXH64_state_t* const state,
-        h::Struct_declaration const& declaration
+        iris::Struct_declaration const& declaration
     )
     {
         XXH64_hash_t const seed = 0;
         if (XXH64_reset(state, seed) == XXH_ERROR)
-            h::common::print_message_and_exit("Could not reset xxhash state!");
+            iris::common::print_message_and_exit("Could not reset xxhash state!");
 
         update_hash(state, declaration);
 
@@ -457,12 +456,12 @@ namespace h
 
     XXH64_hash_t hash_union_declaration(
         XXH64_state_t* const state,
-        h::Union_declaration const& declaration
+        iris::Union_declaration const& declaration
     )
     {
         XXH64_hash_t const seed = 0;
         if (XXH64_reset(state, seed) == XXH_ERROR)
-            h::common::print_message_and_exit("Could not reset xxhash state!");
+            iris::common::print_message_and_exit("Could not reset xxhash state!");
 
         update_hash(state, declaration);
 
@@ -472,12 +471,12 @@ namespace h
 
     XXH64_hash_t hash_function_declaration(
         XXH64_state_t* const state,
-        h::Function_declaration const& declaration
+        iris::Function_declaration const& declaration
     )
     {
         XXH64_hash_t const seed = 0;
         if (XXH64_reset(state, seed) == XXH_ERROR)
-            h::common::print_message_and_exit("Could not reset xxhash state!");
+            iris::common::print_message_and_exit("Could not reset xxhash state!");
 
         update_hash(state, declaration);
 
@@ -487,12 +486,12 @@ namespace h
 
     XXH64_hash_t hash_type_instance(
         XXH64_state_t* const state,
-        h::Type_instance const& type_instance
+        iris::Type_instance const& type_instance
     )
     {
         XXH64_hash_t const seed = 0;
         if (XXH64_reset(state, seed) == XXH_ERROR)
-            h::common::print_message_and_exit("Could not reset xxhash state!");
+            iris::common::print_message_and_exit("Could not reset xxhash state!");
 
         update_hash(state, type_instance);
 
@@ -502,12 +501,12 @@ namespace h
 
     XXH64_hash_t hash_instance_call_key(
         XXH64_state_t* const state,
-        h::Instance_call_key const& instance_call_key
+        iris::Instance_call_key const& instance_call_key
     )
     {
         XXH64_hash_t const seed = 0;
         if (XXH64_reset(state, seed) == XXH_ERROR)
-            h::common::print_message_and_exit("Could not reset xxhash state!");
+            iris::common::print_message_and_exit("Could not reset xxhash state!");
 
         update_hash(state, instance_call_key.module_name);
         update_hash(state, instance_call_key.function_constructor_name);
@@ -522,13 +521,13 @@ namespace h
     }
 
     Symbol_name_to_hash hash_module_declarations(
-        h::Module const& core_module,
+        iris::Module const& core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
         XXH64_state_t* const state = XXH64_createState();
         if (state == nullptr)
-            h::common::print_message_and_exit("Could not initialize xxhash state!");
+            iris::common::print_message_and_exit("Could not initialize xxhash state!");
 
         std::pmr::unordered_map<std::pmr::string, std::uint64_t> map{ output_allocator };
 

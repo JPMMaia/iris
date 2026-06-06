@@ -1,0 +1,21 @@
+{
+    "name": "empty_app",
+    "version": "0.1.0",
+    "type": "executable",
+    "dependencies": [
+        {
+            "name": "my_library"
+        }
+    ],
+    "sources": [
+        {
+            "type": "iris",
+            "include": [
+                "./**/*.iris"
+            ]
+        }
+    ],
+    "executable": {
+        "source": "empty_app.iris"
+    }
+}

@@ -1,0 +1,133 @@
+{
+    "scopeName": "source.iris",
+    "patterns": [
+        {
+            "include": "#comments"
+        },
+        {
+            "include": "#keywords"
+        },
+        {
+            "include": "#numbers"
+        },
+        {
+            "include": "#operators"
+        },
+        {
+            "include": "#strings"
+        },
+        {
+            "include": "#types"
+        }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-slash.iris",
+                    "begin": "//",
+                    "beginCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.comment.iris"
+                        }
+                    },
+                    "end": "$"
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.iris",
+                    "match": "\\b(break|case|continue|default|else|explicit|export|for|function|if|import|in|module|mutable|return|reverse|step_by|switch|to|using|var|while)\\b"
+                },
+                {
+                    "name": "keyword.operator.iris",
+                    "match": "\\b(has|as)\\b"
+                }
+            ]
+        },
+        "numbers": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.iris",
+                    "match": "\\b(0[xX][0-9a-fA-F]+|\\d+(\\.\\d+)?([eE][+-]?\\d+)?)\\b"
+                }
+            ]
+        },
+        "operators": {
+            "patterns": [
+                {
+                    "name": "keyword.operator.assignment.iris",
+                    "match": "(\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=|=)"
+                },
+                {
+                    "name": "keyword.operator.arithmetic.iris",
+                    "match": "(\\+|\\-|\\*|\\/|%)"
+                },
+                {
+                    "name": "keyword.operator.logical.iris",
+                    "match": "(\\&\\&|\\|\\||!|&|\\|)"
+                },
+                {
+                    "name": "keyword.operator.comparison.iris",
+                    "match": "(==|!=|<|>|<=|>=)"
+                }
+            ]
+        },
+        "strings": {
+            "patterns": [
+                {
+                    "name": "string.quoted.double.iris",
+                    "begin": "\"",
+                    "beginCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.begin.iris"
+                        }
+                    },
+                    "end": "\"",
+                    "endCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.end.iris"
+                        }
+                    },
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.iris",
+                            "match": "\\\\."
+                        }
+                    ]
+                },
+                {
+                    "name": "string.quoted.single.iris",
+                    "begin": "'",
+                    "beginCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.begin.iris"
+                        }
+                    },
+                    "end": "'",
+                    "endCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.end.iris"
+                        }
+                    },
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.iris",
+                            "match": "\\\\."
+                        }
+                    ]
+                }
+            ]
+        },
+        "types": {
+            "patterns": [
+                {
+                    "name": "storage.type.iris",
+                    "match": "\\b(Int8|Int16|Int32|Int64|Uint8|Uint16|Uint32|Uint64|Float16|Float32|Float64|enum|struct|union)\\b"
+                }
+            ]
+        }
+    }
+}

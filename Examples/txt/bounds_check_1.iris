@@ -1,0 +1,25 @@
+module Bounds_check_1;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+export function access_soa_array_element(index: Int32) -> (value: Particle)
+{
+    mutable particles: Soa_array::<Particle, 4> = {};
+    return particles[index];
+}
+
+export function access_soa_array_member_x(index: Int32) -> (value: Float32)
+{
+    mutable particles: Soa_array::<Particle, 4> = {};
+    return particles->x[index];
+}
+
+export function access_soa_array_member_y(index: Int32) -> (value: Float32)
+{
+    mutable particles: Soa_array::<Particle, 4> = {};
+    return particles->y[index];
+}

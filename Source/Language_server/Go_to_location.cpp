@@ -7,22 +7,22 @@ module;
 
 #include <lsp/types.h>
 
-module h.language_server.go_to_location;
+module iris.language_server.go_to_location;
 
-import h.compiler.analysis;
-import h.core;
-import h.core.declarations;
-import h.core.types;
-import h.language_server.core;
-import h.language_server.location;
-import h.parser.parse_tree;
+import iris.compiler.analysis;
+import iris.core;
+import iris.core.declarations;
+import iris.core.types;
+import iris.language_server.core;
+import iris.language_server.location;
+import iris.parser.parse_tree;
 
-namespace h::language_server
+namespace iris::language_server
 {
     static lsp::TextDocument_DefinitionResult create_result(
         std::filesystem::path const& target_file_path,
-        h::Source_range const& target_range,
-        h::Source_range const& target_selection_range,
+        iris::Source_range const& target_range,
+        iris::Source_range const& target_selection_range,
         bool const client_supports_definition_link
     )
     {
@@ -59,19 +59,19 @@ namespace h::language_server
     }
 
     static lsp::TextDocument_DefinitionResult create_result_from_declaration(
-        h::parser::Parse_tree const& parse_tree,
+        iris::parser::Parse_tree const& parse_tree,
         Declaration const& declaration,
         bool const client_supports_definition_link
     )
     {
         std::string_view const declaration_name = get_declaration_name(declaration);
-        std::optional<h::Source_range_location> const declaration_location = get_declaration_source_location(declaration);
+        std::optional<iris::Source_range_location> const declaration_location = get_declaration_source_location(declaration);
         if (!declaration_location.has_value() || !declaration_location->file_path.has_value())
             return nullptr;
         
         std::filesystem::path const& target_file_path = declaration_location->file_path.value();
-        h::Source_range const target_range = declaration_location->range;
-        h::Source_range const target_selection_range = create_sub_source_range(target_range, 0, declaration_name.size()).value();
+        iris::Source_range const target_range = declaration_location->range;
+        iris::Source_range const target_selection_range = create_sub_source_range(target_range, 0, declaration_name.size()).value();
 
         return create_result(
             target_file_path,
@@ -83,8 +83,8 @@ namespace h::language_server
 
     static lsp::TextDocument_DefinitionResult create_result_from_type(
         Declaration_database const& declaration_database,
-        h::parser::Parse_tree const& parse_tree,
-        h::Type_reference const& type,
+        iris::parser::Parse_tree const& parse_tree,
+        iris::Type_reference const& type,
         bool const client_supports_definition_link
     )
     {
@@ -100,8 +100,8 @@ namespace h::language_server
     }
 
     static lsp::TextDocument_DefinitionResult create_result_from_variable(
-        h::Module const& core_module,
-        h::compiler::Variable const& variable,
+        iris::Module const& core_module,
+        iris::compiler::Variable const& variable,
         bool const client_supports_definition_link
     )
     {
@@ -109,13 +109,13 @@ namespace h::language_server
             return nullptr;
         
         std::filesystem::path const& target_file_path = core_module.source_file_path.value();
-        h::Source_range const target_range = create_source_range(
+        iris::Source_range const target_range = create_source_range(
             variable.source_position->line,
             variable.source_position->column,
             variable.source_position->line,
             variable.source_position->column + variable.name.size()
         );
-        h::Source_range const target_selection_range = target_range;
+        iris::Source_range const target_selection_range = target_range;
 
         return create_result(
             target_file_path,
@@ -128,25 +128,25 @@ namespace h::language_server
     static lsp::TextDocument_DefinitionResult create_result_from_declaration_member(
         Declaration const& declaration,
         std::string_view const member_name,
-        std::optional<h::Source_position> const& member_source_position,
+        std::optional<iris::Source_position> const& member_source_position,
         bool const client_supports_definition_link
     )
     {
         if (!member_source_position.has_value())
             return nullptr;
 
-        std::optional<h::Source_range_location> const declaration_location = get_declaration_source_location(declaration);
+        std::optional<iris::Source_range_location> const declaration_location = get_declaration_source_location(declaration);
         if (!declaration_location.has_value() || !declaration_location->file_path.has_value())
             return nullptr;
 
         std::filesystem::path const& target_file_path = declaration_location->file_path.value();
-        h::Source_range const target_range = create_source_range(
+        iris::Source_range const target_range = create_source_range(
             member_source_position->line,
             member_source_position->column,
             member_source_position->line,
             member_source_position->column + member_name.size()
         );
-        h::Source_range const target_selection_range = target_range;    
+        iris::Source_range const target_selection_range = target_range;    
 
         return create_result(
             target_file_path,
@@ -158,15 +158,15 @@ namespace h::language_server
 
     lsp::TextDocument_DefinitionResult compute_go_to_definition(
         Declaration_database const& declaration_database,
-        h::parser::Parse_tree const& parse_tree,
-        h::Module const& core_module,
+        iris::parser::Parse_tree const& parse_tree,
+        iris::Module const& core_module,
         lsp::Position const position,
         bool const client_supports_definition_link
     )
     {
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
-        h::Source_position const& source_position = to_source_position(position);
+        iris::Source_position const& source_position = to_source_position(position);
 
         std::optional<Declaration> const declaration_optional = find_declaration_that_contains_source_position(
             declaration_database,
@@ -177,9 +177,9 @@ namespace h::language_server
         {
             std::optional<lsp::TextDocument_DefinitionResult> result_optional = std::nullopt;
 
-            auto const process_type = [&](h::Type_reference const& type) -> bool
+            auto const process_type = [&](iris::Type_reference const& type) -> bool
             {
-                std::optional<h::Type_reference> const inner_type = find_type_that_contains_source_position(
+                std::optional<iris::Type_reference> const inner_type = find_type_that_contains_source_position(
                     type,
                     source_position
                 );
@@ -210,7 +210,7 @@ namespace h::language_server
                 return result_optional.value();
         }
 
-        std::optional<h::Function> const function = find_function_that_contains_source_position(
+        std::optional<iris::Function> const function = find_function_that_contains_source_position(
             core_module,
             source_position
         );
@@ -218,9 +218,9 @@ namespace h::language_server
         {
             std::optional<lsp::TextDocument_DefinitionResult> result_optional = std::nullopt;
 
-            auto const process_type = [&](h::Type_reference const& type) -> bool
+            auto const process_type = [&](iris::Type_reference const& type) -> bool
             {
-                std::optional<h::Type_reference> const inner_type = find_type_that_contains_source_position(
+                std::optional<iris::Type_reference> const inner_type = find_type_that_contains_source_position(
                     type,
                     source_position
                 );
@@ -246,23 +246,23 @@ namespace h::language_server
             if (result_optional.has_value())
                 return result_optional.value();
 
-            auto const process_statement = [&](h::Statement const& statement, h::compiler::Scope const& scope) -> bool
+            auto const process_statement = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> bool
             {
-                auto const process_expression = [&](h::Expression const& expression, h::Statement const& statement) -> bool
+                auto const process_expression = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
                 {
                     if (!expression.source_range.has_value())
                         return false;
 
-                    if (h::range_contains_position_inclusive(expression.source_range.value(), source_position))
+                    if (iris::range_contains_position_inclusive(expression.source_range.value(), source_position))
                     {
-                        if (std::holds_alternative<h::Access_expression>(expression.data))
+                        if (std::holds_alternative<iris::Access_expression>(expression.data))
                         {
-                            h::Access_expression const& access_expression = std::get<h::Access_expression>(expression.data);
+                            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
 
-                            h::Expression const& expression_to_access = statement.expressions[access_expression.expression.expression_index];
+                            iris::Expression const& expression_to_access = statement.expressions[access_expression.expression.expression_index];
 
-                            std::optional<h::Type_reference> const expression_to_access_type = h::compiler::get_expression_type(
-                                core_module,
+                            std::optional<iris::Type_reference> const expression_to_access_type = iris::compiler::get_expression_type(
+                                core_module.name,
                                 function->declaration,
                                 scope,
                                 statement,
@@ -275,7 +275,7 @@ namespace h::language_server
                                 std::optional<Declaration> const& declaration = find_declaration(declaration_database, expression_to_access_type.value());
                                 if (declaration.has_value())
                                 {
-                                    std::pmr::vector<h::compiler::Declaration_member_info> const member_infos = h::compiler::get_declaration_member_infos(
+                                    std::pmr::vector<iris::compiler::Declaration_member_info> const member_infos = iris::compiler::get_declaration_member_infos(
                                         declaration.value(),
                                         temporaries_allocator
                                     );
@@ -283,11 +283,11 @@ namespace h::language_server
                                     auto const location = std::find_if(
                                         member_infos.begin(),
                                         member_infos.end(),
-                                        [&](h::compiler::Declaration_member_info const& member_info) -> bool { return member_info.member_name == access_expression.member_name; }
+                                        [&](iris::compiler::Declaration_member_info const& member_info) -> bool { return member_info.member_name == access_expression.member_name; }
                                     );
                                     if (location != member_infos.end())
                                     {
-                                        h::compiler::Declaration_member_info const& member_info = *location;
+                                        iris::compiler::Declaration_member_info const& member_info = *location;
 
                                         result_optional = create_result_from_declaration_member(
                                             declaration.value(),
@@ -300,7 +300,7 @@ namespace h::language_server
                                 }
                             }
 
-                            h::Enum_declaration const* enum_declaration = find_enum_declaration_using_expression(
+                            iris::Enum_declaration const* enum_declaration = find_enum_declaration_using_expression(
                                 declaration_database,
                                 core_module,
                                 statement,
@@ -317,18 +317,18 @@ namespace h::language_server
                                 auto const location = std::find_if(
                                     enum_declaration->values.begin(),
                                     enum_declaration->values.end(),
-                                    [&](h::Enum_value const& member) -> bool { return member.name == access_expression.member_name; }
+                                    [&](iris::Enum_value const& member) -> bool { return member.name == access_expression.member_name; }
                                 );
                                 if (location != enum_declaration->values.end())
                                 {
-                                    h::Enum_value const& member = *location;
+                                    iris::Enum_value const& member = *location;
 
                                     if (member.source_location.has_value())
                                     {
                                         result_optional = create_result_from_declaration_member(
                                             Declaration{ .data = enum_declaration },
                                             member.name,
-                                            h::Source_position{member.source_location->line, member.source_location->column},
+                                            iris::Source_position{member.source_location->line, member.source_location->column},
                                             client_supports_definition_link
                                         );
                                         return true;
@@ -350,15 +350,15 @@ namespace h::language_server
 
                             return true;
                         }
-                        else if (std::holds_alternative<h::Instantiate_expression>(expression.data))
+                        else if (std::holds_alternative<iris::Instantiate_expression>(expression.data))
                         {
-                            h::Instantiate_expression const& instantiate_expression = std::get<h::Instantiate_expression>(expression.data);
+                            iris::Instantiate_expression const& instantiate_expression = std::get<iris::Instantiate_expression>(expression.data);
 
                             auto const instantiate_member_location = std::find_if(
                                 instantiate_expression.members.begin(),
                                 instantiate_expression.members.end(),
                                 [&](Instantiate_member_value_pair const& member) -> bool {
-                                    std::optional<h::Source_range> const member_name_source_range = create_sub_source_range(
+                                    std::optional<iris::Source_range> const member_name_source_range = create_sub_source_range(
                                         member.source_range,
                                         0,
                                         member.member_name.size()
@@ -370,8 +370,8 @@ namespace h::language_server
                             {
                                 Instantiate_member_value_pair const& member = *instantiate_member_location;
 
-                                std::optional<h::Type_reference> const type_to_instantiate = get_expression_type(
-                                    core_module,
+                                std::optional<iris::Type_reference> const type_to_instantiate = get_expression_type(
+                                    core_module.name,
                                     function->declaration,
                                     scope,
                                     statement,
@@ -384,7 +384,7 @@ namespace h::language_server
                                     std::optional<Declaration> const& declaration = find_declaration(declaration_database, type_to_instantiate.value());
                                     if (declaration.has_value())
                                     {
-                                        std::pmr::vector<h::compiler::Declaration_member_info> const member_infos = h::compiler::get_declaration_member_infos(
+                                        std::pmr::vector<iris::compiler::Declaration_member_info> const member_infos = iris::compiler::get_declaration_member_infos(
                                             declaration.value(),
                                             temporaries_allocator
                                         );
@@ -392,7 +392,7 @@ namespace h::language_server
                                         auto const member_location = std::find_if(
                                             member_infos.begin(),
                                             member_infos.end(),
-                                            [&](h::compiler::Declaration_member_info const& member_info) -> bool { return member_info.member_name == member.member_name; }
+                                            [&](iris::compiler::Declaration_member_info const& member_info) -> bool { return member_info.member_name == member.member_name; }
                                         );
                                         if (member_location != member_infos.end() && member_location->member_source_position.has_value())
                                         {
@@ -408,11 +408,11 @@ namespace h::language_server
                                 }
                             }
                         }
-                        else if (std::holds_alternative<h::Variable_expression>(expression.data))
+                        else if (std::holds_alternative<iris::Variable_expression>(expression.data))
                         {
-                            h::Variable_expression const& variable_expression = std::get<h::Variable_expression>(expression.data);
+                            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
 
-                            h::compiler::Variable const* const variable = h::compiler::find_variable_from_scope(scope, variable_expression.name);
+                            iris::compiler::Variable const* const variable = iris::compiler::find_variable_from_scope(scope, variable_expression.name);
                             if (variable != nullptr)
                             {
                                 result_optional = create_result_from_variable(core_module, *variable, client_supports_definition_link);
@@ -437,17 +437,17 @@ namespace h::language_server
                 );
             };
 
-            h::compiler::Scope scope = {};
+            iris::compiler::Scope scope = {};
 
-            h::compiler::add_parameters_to_scope(
+            iris::compiler::add_parameters_to_scope(
                 scope,
                 function->declaration->input_parameter_names,
                 function->declaration->type.input_parameter_types,
                 function->declaration->input_parameter_source_positions
             );
 
-            h::compiler::visit_statements_using_scope(
-                core_module,
+            iris::compiler::visit_statements_using_scope(
+                core_module.name,
                 function->declaration,
                 scope,
                 function->definition->statements,

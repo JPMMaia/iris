@@ -1,11 +1,8 @@
-module;
+export module iris.compiler.target;
 
-#include <memory_resource>
-#include <string>
+import std;
 
-export module h.compiler.target;
-
-namespace h::compiler
+namespace iris::compiler
 {
     export struct Target
     {

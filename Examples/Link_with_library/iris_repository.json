@@ -1,0 +1,13 @@
+{
+    "name": "Link_with_library",
+    "artifacts": [
+        {
+            "name": "my_library",
+            "location": "my_library/iris_artifact.json"
+        },
+        {
+            "name": "my_app",
+            "location": "my_app/iris_artifact.json"
+        }
+    ]
+}

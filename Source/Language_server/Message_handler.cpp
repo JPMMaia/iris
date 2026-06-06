@@ -14,11 +14,11 @@ module;
 
 #include <nlohmann/json.hpp>
 
-module h.language_server.message_handler;
+module iris.language_server.message_handler;
 
-import h.language_server.server;
+import iris.language_server.server;
 
-namespace h::language_server
+namespace iris::language_server
 {
     Message_handler create_message_handler()
     {
@@ -119,7 +119,6 @@ namespace h::language_server
                     message_handler.add<lsp::notifications::Workspace_DidChangeWorkspaceFolders>(
                         [&](lsp::notifications::Workspace_DidChangeWorkspaceFolders::Params&& parameters) -> void
                         {
-                            connection.writeMessage("Workspace folder change event received.");
                         }
                     );
 
@@ -203,6 +202,13 @@ namespace h::language_server
             [&](lsp::requests::TextDocument_InlayHint::Params&& parameters) -> lsp::requests::TextDocument_InlayHint::Result
             {
                 return compute_document_inlay_hints(server, parameters);
+            }
+        );
+
+        message_handler.add<lsp::requests::TextDocument_SignatureHelp>(
+            [&](lsp::requests::TextDocument_SignatureHelp::Params&& parameters) -> lsp::requests::TextDocument_SignatureHelp::Result
+            {
+                return compute_text_document_signature_help(server, parameters);
             }
         );
 

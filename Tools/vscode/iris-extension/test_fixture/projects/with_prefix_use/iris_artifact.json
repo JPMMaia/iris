@@ -1,0 +1,22 @@
+{
+    "name": "With_prefix_use",
+    "version": "0.1.0",
+    "type": "executable",
+    "dependencies": [
+        {
+            "name": "With_prefix"
+        }
+    ],
+    "sources": [
+        {
+            "type": "iris",
+            "include": [
+                "./**/*.iris"
+            ]
+        }
+    ],
+    "executable": {
+        "source": "main.iris",
+        "entry_point": "with_prefix_use_main_main"
+    }
+}
