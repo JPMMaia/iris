@@ -7,6 +7,7 @@ import std.compat;
 
 import iris.c_header_converter;
 import iris.common;
+import iris.common.filesystem_common;
 import iris.compiler;
 import iris.compiler.artifact;
 import iris.compiler.builder;
@@ -155,6 +156,32 @@ iris::compiler::Environment_variables get_effective_environment_variables(
     return {};
 }
 
+std::pmr::vector<std::filesystem::path> deduplicate_paths(
+    std::span<std::filesystem::path const> const paths
+)
+{
+    std::pmr::vector<std::filesystem::path> merged_paths;
+    std::pmr::set<std::pmr::string> seen_paths;
+
+    auto append_unique = [&](std::span<std::filesystem::path const> const source)
+    {
+        for (std::filesystem::path const& path : source)
+        {
+            std::filesystem::path const normalized = path.lexically_normal();
+            std::pmr::string key = std::pmr::string{ normalized.generic_string() };
+            if (seen_paths.contains(key))
+                continue;
+
+            seen_paths.insert(std::move(key));
+            merged_paths.push_back(normalized);
+        }
+    };
+
+    append_unique(paths);
+
+    return merged_paths;
+}
+
 std::pmr::vector<std::filesystem::path> merge_paths_with_dedup(
     std::span<std::filesystem::path const> const presets_paths,
     std::span<std::filesystem::path const> const command_paths
@@ -218,11 +245,13 @@ std::pmr::vector<std::filesystem::path> get_effective_repository_paths_argument(
     std::optional<iris::compiler::Presets> const& presets
 )
 {
-    std::pmr::vector<std::filesystem::path> const command_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
-    if (!presets.has_value())
-        return command_paths;
+    std::pmr::vector<std::filesystem::path> repository_paths = convert_to_path(subprogram.get<std::vector<std::string>>("--repository"));
+    repository_paths.push_back(iris::common::get_standard_repository_file_path());
 
-    return merge_paths_with_dedup(presets->repository_paths, command_paths);
+    if (presets.has_value())
+        repository_paths.insert(repository_paths.end(), presets->repository_paths.begin(), presets->repository_paths.end());
+
+    return deduplicate_paths(repository_paths);
 }
 
 iris::compiler::Contract_options get_effective_function_contract_options_argument(
