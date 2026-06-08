@@ -310,6 +310,37 @@ namespace iris::parser
         return ts_node_is_error(node) || ts_node_is_missing(node);
     }
 
+    static bool is_ancestor_of(
+        Parse_node const& ancestor,
+        Parse_node const& descendant
+    )
+    {
+        if (ancestor.ts_node.id == descendant.ts_node.id)
+            return false;
+
+        TSNode current = descendant.ts_node;
+        while (!ts_node_is_null(current))
+        {
+            if (current.id == ancestor.ts_node.id)
+                return true;
+            current = ts_node_parent(current);
+        }
+        return false;
+    }
+
+    static bool has_descendant_in_list(
+        Parse_node const& node,
+        std::span<Parse_node const> const descendants
+    )
+    {
+        for (Parse_node const& descendant : descendants)
+        {
+            if (is_ancestor_of(node, descendant))
+                return true;
+        }
+        return false;
+    }
+
     template<class FunctionT>
     void depth_first_search(
         TSTreeCursor* cursor,
@@ -332,7 +363,6 @@ namespace iris::parser
     }
 
     std::pmr::vector<Parse_node> get_error_or_missing_nodes(
-        Parse_tree const& tree,
         Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -351,21 +381,27 @@ namespace iris::parser
                 return false;
 
             if (is_error_or_missing_node(current_node))
-            {
                 output.push_back({.ts_node = current_node});
-                return false;
-            }
 
             return true;
         };
+
 
         TSTreeCursor cursor = ts_tree_cursor_new(node.ts_node);
 
         depth_first_search(&cursor, visitor);
 
+        std::pmr::vector<Parse_node> leaf_errors{temporaries_allocator};
+        leaf_errors.reserve(output.size());
+        for (std::size_t i = 0; i < output.size(); ++i)
+        {
+            if (!has_descendant_in_list(output[i], output))
+                leaf_errors.push_back(output[i]);
+        }
+
         ts_tree_cursor_delete(&cursor);
 
-        return std::pmr::vector<Parse_node>{std::move(output), output_allocator};
+        return std::pmr::vector<Parse_node>{std::move(leaf_errors), output_allocator};
     }
 
     Parse_node get_smallest_node_that_contains_position(
@@ -504,6 +540,10 @@ namespace iris::parser
     {
         output.append(depth * 2, ' ');
         output += ts_node_grammar_type(node);
+        if (ts_node_is_error(node))
+            output += " [error]";
+        if (ts_node_is_missing(node))
+            output += " [missing]";
         output += " \"";
         output += get_node_value(tree, Parse_node{node});
         output += "\"\n";

@@ -121,7 +121,6 @@ namespace iris::parser
     );
 
     export std::pmr::vector<Parse_node> get_error_or_missing_nodes(
-        Parse_tree const& tree,
         Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
