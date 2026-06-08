@@ -200,7 +200,7 @@ namespace iris::parser
         CHECK(has_errors(root));
 
         std::pmr::polymorphic_allocator<> allocator;
-        std::pmr::vector<Parse_node> const errors = get_error_or_missing_nodes(tree, root, allocator, allocator);
+        std::pmr::vector<Parse_node> const errors = get_error_or_missing_nodes(root, allocator, allocator);
         CHECK_FALSE(errors.empty());
 
         destroy_tree(std::move(tree));
