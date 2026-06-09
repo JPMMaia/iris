@@ -139,11 +139,16 @@ namespace iris::c
         };
     }
 
-    iris::Module const& import_vulkan_header_module()
+    iris::Module const& import_vulkan_header_module(
+        bool const use_prefixes = false
+    )
     {
         static std::optional<iris::Module> header_module_optional = std::nullopt;
-        if (header_module_optional.has_value())
+        static std::optional<iris::Module> header_module_use_prefixes_optional = std::nullopt;
+        if (!use_prefixes && header_module_optional.has_value())
             return header_module_optional.value();
+        if (use_prefixes && header_module_use_prefixes_optional.has_value())
+            return header_module_use_prefixes_optional.value();
 
         std::filesystem::path const vulkan_headers_path = g_vulkan_headers_location;
         std::filesystem::path const vulkan_header_path = vulkan_headers_path / "vulkan" / "vulkan.h";
@@ -155,14 +160,22 @@ namespace iris::c
         include_directories.insert(include_directories.end(), default_header_search_directories.begin(), default_header_search_directories.end());
         include_directories.push_back(vulkan_headers_path);
 
+        std::array<std::pmr::string, 3> const prefixes_array = { "vk", "Vk", "VK_" };
         iris::c::Options const options = {
             .include_directories = include_directories,
+            .public_prefixes = use_prefixes ? std::span<std::pmr::string const>{prefixes_array} : std::span<std::pmr::string const>{},
+            .remove_prefixes = use_prefixes ? std::span<std::pmr::string const>{prefixes_array} : std::span<std::pmr::string const>{},
             .allow_errors = false,
         };
 
-        header_module_optional = iris::c::import_header("vulkan", vulkan_header_path, options);
-        REQUIRE(header_module_optional.has_value());
-        iris::Module const& header_module = header_module_optional.value();
+        if (!use_prefixes)
+            header_module_optional = iris::c::import_header("vulkan", vulkan_header_path, options);
+        else
+            header_module_use_prefixes_optional = iris::c::import_header("vulkan", vulkan_header_path, options);
+
+        std::optional<iris::Module> const& actual_header_module_optional = use_prefixes ? header_module_use_prefixes_optional : header_module_optional;
+        REQUIRE(actual_header_module_optional.has_value());
+        iris::Module const& header_module = actual_header_module_optional.value();
 
         CHECK(header_module.source_file_path == vulkan_header_path);
     
@@ -819,6 +832,28 @@ namespace iris::c
 
             CHECK(actual.member_types[2] == iris::Type_reference{ .data = expected_type });
         }
+    }
+
+    TEST_CASE("Import vulkan.h C header creates 'VkSampleCountFlagBits' with members that don't start with a number")
+    {
+        iris::Module const& header_module = import_vulkan_header_module(true);
+
+        iris::Enum_declaration const& actual = iris::c::find_enum_declaration(header_module, "SampleCountFlagBits");
+
+        CHECK(actual.name == "SampleCountFlagBits");
+
+        REQUIRE(actual.unique_name.has_value());
+        CHECK(actual.unique_name.value() == "VkSampleCountFlagBits");
+
+        REQUIRE(actual.values.size() >= 7);
+
+        CHECK(actual.values[0].name == "k1_bit");
+        CHECK(actual.values[1].name == "k2_bit");
+        CHECK(actual.values[2].name == "k4_bit");
+        CHECK(actual.values[3].name == "k8_bit");
+        CHECK(actual.values[4].name == "k16_bit");
+        CHECK(actual.values[5].name == "k32_bit");
+        CHECK(actual.values[6].name == "k64_bit");
     }
 
     TEST_CASE("Handles anonymous declarations inside structs")
