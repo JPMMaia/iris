@@ -1,12 +1,15 @@
 module;
 
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <memory_resource>
 #include <span>
 #include <sstream>
 #include <vector>
 
+#include <lsp/messagehandler.h>
+#include <lsp/messages.h>
 #include <lsp/types.h>
 
 module iris.language_server.server;
@@ -20,6 +23,7 @@ import iris.compiler.builder;
 import iris.compiler.diagnostic;
 import iris.compiler.presets;
 import iris.compiler.target;
+import iris.compiler.validation;
 import iris.core;
 import iris.core.declarations;
 import iris.language_server.code_action;
@@ -568,16 +572,10 @@ namespace iris::language_server
             );
 
             std::pmr::vector<std::optional<int>> core_module_versions{output_allocator};
-            core_module_versions.resize(core_module_source_file_paths.size(), std::nullopt);
+            core_module_versions.resize(core_module_source_file_paths.size(), std::optional<int>{1});
 
-            std::pmr::vector<std::pmr::vector<iris::compiler::Diagnostic>> core_module_diagnostics{output_allocator};
-            core_module_diagnostics.resize(core_module_source_file_paths.size());
-
-            std::pmr::vector<std::pmr::string> core_module_diagnostic_result_ids{output_allocator};
-            core_module_diagnostic_result_ids.resize(core_module_source_file_paths.size(), "0");
-
-            std::pmr::vector<bool> core_module_diagnostic_dirty_flags{output_allocator};
-            core_module_diagnostic_dirty_flags.resize(core_module_source_file_paths.size(), true);
+            std::pmr::vector<Diagnostics_state> diagnostics_states{output_allocator};
+            diagnostics_states.resize(core_module_source_file_paths.size());
 
             std::pmr::vector<iris::parser::Parse_tree> core_module_parse_trees = parse_source_files(
                 server.parser,
@@ -609,11 +607,9 @@ namespace iris::language_server
                 .header_modules = std::move(modules_and_declaration_database.header_modules),
                 .core_module_source_file_paths = std::move(core_module_source_file_paths),
                 .core_module_versions = std::move(core_module_versions),
-                .core_module_diagnostics = std::move(core_module_diagnostics),
-                .core_module_diagnostic_result_ids = std::move(core_module_diagnostic_result_ids),
-                .core_module_diagnostic_dirty_flags = std::move(core_module_diagnostic_dirty_flags),
                 .core_module_parse_trees = std::move(core_module_parse_trees),
                 .core_modules = std::move(core_modules),
+                .diagnostics_states = std::move(diagnostics_states),
                 .declaration_database = std::move(modules_and_declaration_database.declaration_database),
             };
 
@@ -672,8 +668,6 @@ namespace iris::language_server
         );
         if (!result.has_value())
             return;
-
-        result->first.core_module_versions[result->second] = std::nullopt;
     }
 
     void text_document_did_change(
@@ -725,28 +719,38 @@ namespace iris::language_server
                 workspace_data.core_module_parse_trees[core_module_index] = std::move(new_parse_tree);
             }
 
-            std::optional<iris::Module> core_module = convert_to_core_module(
-                workspace_data.core_module_source_file_paths[core_module_index],
-                workspace_data.core_module_parse_trees[core_module_index],
-                output_allocator,
+            std::filesystem::path const& source_file_path = workspace_data.core_module_source_file_paths[core_module_index];
+            iris::parser::Parse_tree const& parse_tree = workspace_data.core_module_parse_trees[core_module_index];
+
+            std::vector<lsp::Diagnostic> parser_diagnostics = create_document_parser_diagnostics(
+                source_file_path,
+                parse_tree,
                 temporaries_allocator
             );
-            if (core_module.has_value())
+
+            if (parser_diagnostics.empty())
             {
-                workspace_data.core_modules[core_module_index] = core_module.value();
+                std::optional<iris::Module> core_module = convert_to_core_module(
+                    source_file_path,
+                    parse_tree,
+                    output_allocator,
+                    temporaries_allocator
+                );
+                if (core_module.has_value())
+                {
+                    workspace_data.core_modules[core_module_index] = core_module.value();
 
-                iris::compiler::Declaration_database_and_sorted_modules result =
-                    iris::compiler::create_declaration_database_and_sorted_modules(
-                        workspace_data.header_modules,
-                        workspace_data.core_modules,
-                        temporaries_allocator,
-                        temporaries_allocator
-                    );
+                    iris::compiler::Declaration_database_and_sorted_modules result =
+                        iris::compiler::create_declaration_database_and_sorted_modules(
+                            workspace_data.header_modules,
+                            workspace_data.core_modules,
+                            temporaries_allocator,
+                            temporaries_allocator
+                        );
 
-                workspace_data.declaration_database = std::move(result.declaration_database);
+                    workspace_data.declaration_database = std::move(result.declaration_database);
+                }
             }
-
-            workspace_data.core_module_diagnostic_dirty_flags[core_module_index] = true;
         }
     }
 
@@ -769,7 +773,7 @@ namespace iris::language_server
             workspace_data.declaration_database,
             workspace_data.core_module_parse_trees[core_module_index],
             workspace_data.core_modules[core_module_index],
-            workspace_data.core_module_diagnostics[core_module_index],
+            workspace_data.diagnostics_states[core_module_index].diagnostics,
             parameters.range,
             parameters.context
         );
@@ -847,14 +851,13 @@ namespace iris::language_server
         {
             std::pmr::vector<lsp::WorkspaceDocumentDiagnosticReport> const items = create_all_diagnostics(
                 workspace_data.core_module_source_file_paths,
-                workspace_data.core_module_versions,
-                workspace_data.core_module_diagnostics,
-                parameters.previousResultIds,
-                workspace_data.core_module_diagnostic_result_ids,
-                workspace_data.core_module_diagnostic_dirty_flags,
-                workspace_data.core_module_parse_trees,
-                workspace_data.header_modules,
                 workspace_data.core_modules,
+                workspace_data.core_module_versions,
+                workspace_data.core_module_parse_trees,
+                workspace_data.diagnostics_states,
+                parameters.previousResultIds,
+                workspace_data.header_modules,
+                workspace_data.declaration_database,
                 temporaries_allocator,
                 temporaries_allocator
             );
@@ -862,12 +865,6 @@ namespace iris::language_server
             report.items.reserve(report.items.capacity() + items.size());
             for (lsp::WorkspaceDocumentDiagnosticReport const& item : items)
                 report.items.push_back(item);
-
-            std::fill(
-                workspace_data.core_module_diagnostic_dirty_flags.begin(),
-                workspace_data.core_module_diagnostic_dirty_flags.end(),
-                false
-            );
         }
 
         return report;
@@ -878,18 +875,46 @@ namespace iris::language_server
         lsp::DocumentDiagnosticParams const& parameters
     )
     {
-        if (parameters.previousResultId.has_value())
+        std::optional<std::pair<Workspace_data&, std::size_t>> const workspace_core_module_pair = find_workspace_core_module_index(
+            server,
+            parameters.textDocument.uri
+        );
+        if (!workspace_core_module_pair.has_value())
         {
             lsp::RelatedUnchangedDocumentDiagnosticReport output = {};
-            output.resultId = parameters.previousResultId.value();
+            output.resultId = parameters.previousResultId.has_value() ? parameters.previousResultId.value() : "1";
             return output;
         }
-        else
+
+        Workspace_data& workspace_data = workspace_core_module_pair->first;
+        std::size_t const core_module_index = workspace_core_module_pair->second;
+        std::optional<int> const version = workspace_data.core_module_versions[core_module_index];
+
+        Diagnostics_state& diagnostics_state = workspace_data.diagnostics_states[core_module_index];
+        bool const are_diagnostics_dirty = version.has_value() ? diagnostics_state.version != version : true;
+
+        if (!are_diagnostics_dirty)
         {
-            lsp::RelatedUnchangedDocumentDiagnosticReport output = {};
-            output.resultId = "1";
-            return output;
+            if (parameters.previousResultId.has_value() && parameters.previousResultId.value() == diagnostics_state.result_id)
+            {
+                lsp::RelatedUnchangedDocumentDiagnosticReport output = {};
+                output.resultId = parameters.previousResultId.value();
+                return output;
+            }
         }
+
+        lsp::DocumentDiagnosticReport report = create_document_diagnostics(
+            parameters.textDocument.uri,
+            workspace_data.core_modules[core_module_index],
+            version,
+            workspace_data.core_module_parse_trees[core_module_index],
+            workspace_data.diagnostics_states[core_module_index],
+            workspace_data.declaration_database,
+            {},
+            {}
+        );
+
+        return report;
     }
 
     lsp::TextDocument_InlayHintResult compute_document_inlay_hints(

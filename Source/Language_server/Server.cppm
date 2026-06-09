@@ -5,6 +5,7 @@ module;
 #include <span>
 #include <vector>
 
+#include <lsp/messagehandler.h>
 #include <lsp/types.h>
 
 export module iris.language_server.server;
@@ -15,6 +16,7 @@ import iris.compiler.diagnostic;
 import iris.compiler.target;
 import iris.core;
 import iris.core.declarations;
+import iris.language_server.diagnostics;
 import iris.parser.parse_tree;
 import iris.parser.parser;
 
@@ -27,11 +29,9 @@ namespace iris::language_server
         std::pmr::vector<iris::Module> header_modules;
         std::pmr::vector<std::filesystem::path> core_module_source_file_paths;
         std::pmr::vector<std::optional<int>> core_module_versions;
-        std::pmr::vector<std::pmr::vector<iris::compiler::Diagnostic>> core_module_diagnostics;
-        std::pmr::vector<std::pmr::string> core_module_diagnostic_result_ids;
-        std::pmr::vector<bool> core_module_diagnostic_dirty_flags;
         std::pmr::vector<iris::parser::Parse_tree> core_module_parse_trees;
         std::pmr::vector<iris::Module> core_modules;
+        std::pmr::vector<Diagnostics_state> diagnostics_states;
         iris::Declaration_database declaration_database;
     };
 
