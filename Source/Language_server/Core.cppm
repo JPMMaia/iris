@@ -34,6 +34,11 @@ namespace iris::language_server
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 
+    export bool compare_document_uris(
+        lsp::DocumentUri const& left,
+        lsp::DocumentUri const& right
+    );
+
     export std::optional<lsp::PreviousResultId> find_previous_result_id(
         std::span<lsp::PreviousResultId const> const result_ids,
         lsp::DocumentUri const& document_uri

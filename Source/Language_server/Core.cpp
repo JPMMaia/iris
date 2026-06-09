@@ -19,8 +19,8 @@ namespace iris::language_server
     {
         return lsp::Position
         {
-            .line = input.line - 1,
-            .character = input.column - 1,
+            .line = input.line > 0 ? input.line - 1 : 0,
+            .character = input.column > 0 ? input.column - 1 : 0,
         };
     }
 
@@ -71,6 +71,35 @@ namespace iris::language_server
         return output;
     }
 
+    bool compare_document_uris(
+        lsp::DocumentUri const& left,
+        lsp::DocumentUri const& right
+    )
+    {
+        std::string_view const left_path = left.path();
+        std::string_view const right_path = right.path();
+
+        if (left_path.size() != right_path.size())
+            return false;
+
+        for (std::size_t index = 0; index < left_path.size(); ++index)
+        {
+            char const left_char = left_path[index];
+            char const right_char = right_path[index];
+
+            if (left_char == right_char)
+                continue;
+
+            if ((left_char == '\\' || left_char == '/') && (right_char == '\\' || right_char == '/'))
+                continue;
+
+            if (std::tolower(left_char) != std::tolower(right_char))
+                return false;
+        }
+        
+        return true;
+    }
+
     std::optional<lsp::PreviousResultId> find_previous_result_id(
         std::span<lsp::PreviousResultId const> const result_ids,
         lsp::DocumentUri const& document_uri
@@ -79,7 +108,7 @@ namespace iris::language_server
         auto const location = std::find_if(
             result_ids.begin(),
             result_ids.end(),
-            [&](lsp::PreviousResultId const& result_id) -> bool { return result_id.uri == document_uri; }
+            [&](lsp::PreviousResultId const& result_id) -> bool { return compare_document_uris(result_id.uri, document_uri); }
         );
         if (location == result_ids.end())
             return std::nullopt;

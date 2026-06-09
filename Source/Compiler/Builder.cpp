@@ -424,6 +424,13 @@ namespace iris::compiler
         for (std::filesystem::path const& artifact_file_path : artifact_file_paths)
         {
             Artifact const artifact = get_artifact(artifact_file_path, environment_variables);
+            auto const location = std::find_if(
+                artifacts.begin(),
+                artifacts.end(),
+                [&](Artifact const& current_artifact) -> bool { return current_artifact.name == artifact.name; }
+            );
+            if (location != artifacts.end())
+                continue;
 
             add_artifact_dependencies(
                 artifacts,
