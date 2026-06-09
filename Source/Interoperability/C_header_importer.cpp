@@ -2495,6 +2495,12 @@ namespace iris::c
         return false;
     }
 
+    void prefix_if_name_starts_with_digit(std::pmr::string& name, char const prefix)
+    {
+        if (!name.empty() && std::isdigit(name.front()))
+            name.insert(name.begin(), prefix);
+    }
+
     template <typename Declaration_type>
     void transform_name(
         Declaration_type& declaration,
@@ -2504,7 +2510,11 @@ namespace iris::c
         for (std::string_view const remove_prefix : remove_prefixes)
         {
             if (declaration.name.starts_with(remove_prefix))
+            {
                 declaration.name.erase(0, remove_prefix.size());
+                assert(!declaration.name.empty());
+                prefix_if_name_starts_with_digit(declaration.name, 'K');
+            }
         }
     }
 
@@ -2631,7 +2641,10 @@ namespace iris::c
 
         std::pmr::string snake_case_value = join(value_words_without_prefix, '_');
         if (!snake_case_value.empty())
+        {
             snake_case_value[0] = std::toupper(snake_case_value[0]);
+            prefix_if_name_starts_with_digit(snake_case_value, 'k');
+        }
 
         return snake_case_value;
     }
