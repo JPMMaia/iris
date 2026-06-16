@@ -2057,7 +2057,7 @@ namespace iris::compiler
                     };
                 }
             }
-            else if (!is_integer(type) && !is_floating_point(type) && !is_byte(type) && !is_bool(type) && !is_c_bool(type) && !is_enum_type(parameters.declaration_database, type) && !is_function_pointer(type))
+            else if (!is_integer(type) && !is_floating_point(type) && !is_decimal(type) && !is_byte(type) && !is_bool(type) && !is_c_bool(type) && !is_enum_type(parameters.declaration_database, type) && !is_function_pointer(type))
             {
                 return
                 {

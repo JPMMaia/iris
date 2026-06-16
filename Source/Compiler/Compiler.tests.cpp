@@ -3780,6 +3780,422 @@ entry:
 }
 
 ; Function Attrs: convergent
+define void @Decimal_expressions_decimal_32_comparisons(i32 noundef %"arguments[0].x", i32 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i32, align 4
+  %y = alloca i32, align 4
+  %eq = alloca i8, align 1
+  %neq = alloca i8, align 1
+  %lt = alloca i8, align 1
+  %le = alloca i8, align 1
+  %gt = alloca i8, align 1
+  %ge = alloca i8, align 1
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store i32 %"arguments[1].y", ptr %y, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = load i32, ptr %y, align 4
+  %2 = icmp eq i32 %0, %1
+  store i1 %2, ptr %eq, align 1
+  %3 = load i32, ptr %x, align 4
+  %4 = load i32, ptr %y, align 4
+  %5 = icmp ne i32 %3, %4
+  store i1 %5, ptr %neq, align 1
+  %6 = load i32, ptr %x, align 4
+  %7 = load i32, ptr %y, align 4
+  %8 = icmp slt i32 %6, %7
+  store i1 %8, ptr %lt, align 1
+  %9 = load i32, ptr %x, align 4
+  %10 = load i32, ptr %y, align 4
+  %11 = icmp sle i32 %9, %10
+  store i1 %11, ptr %le, align 1
+  %12 = load i32, ptr %x, align 4
+  %13 = load i32, ptr %y, align 4
+  %14 = icmp sgt i32 %12, %13
+  store i1 %14, ptr %gt, align 1
+  %15 = load i32, ptr %x, align 4
+  %16 = load i32, ptr %y, align 4
+  %17 = icmp sge i32 %15, %16
+  store i1 %17, ptr %ge, align 1
+  ret void
+}
+
+; Function Attrs: convergent
+define void @Decimal_expressions_decimal_64_comparisons(i64 noundef %"arguments[0].x", i64 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i64, align 8
+  %y = alloca i64, align 8
+  %eq = alloca i8, align 1
+  %neq = alloca i8, align 1
+  %lt = alloca i8, align 1
+  %le = alloca i8, align 1
+  %gt = alloca i8, align 1
+  %ge = alloca i8, align 1
+  store i64 %"arguments[0].x", ptr %x, align 8
+  store i64 %"arguments[1].y", ptr %y, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = load i64, ptr %y, align 8
+  %2 = icmp eq i64 %0, %1
+  store i1 %2, ptr %eq, align 1
+  %3 = load i64, ptr %x, align 8
+  %4 = load i64, ptr %y, align 8
+  %5 = icmp ne i64 %3, %4
+  store i1 %5, ptr %neq, align 1
+  %6 = load i64, ptr %x, align 8
+  %7 = load i64, ptr %y, align 8
+  %8 = icmp slt i64 %6, %7
+  store i1 %8, ptr %lt, align 1
+  %9 = load i64, ptr %x, align 8
+  %10 = load i64, ptr %y, align 8
+  %11 = icmp sle i64 %9, %10
+  store i1 %11, ptr %le, align 1
+  %12 = load i64, ptr %x, align 8
+  %13 = load i64, ptr %y, align 8
+  %14 = icmp sgt i64 %12, %13
+  store i1 %14, ptr %gt, align 1
+  %15 = load i64, ptr %x, align 8
+  %16 = load i64, ptr %y, align 8
+  %17 = icmp sge i64 %15, %16
+  store i1 %17, ptr %ge, align 1
+  ret void
+}
+
+; Function Attrs: convergent
+define void @Decimal_expressions_decimal_casts(i32 noundef %"arguments[0].i32_value", i64 noundef %"arguments[1].i64_value", float noundef %"arguments[2].f32_value", double noundef %"arguments[3].f64_value", i32 noundef %"arguments[4].d4_value", i64 noundef %"arguments[5].d7_value") #0 {
+entry:
+  %i32_value = alloca i32, align 4
+  %i64_value = alloca i64, align 8
+  %f32_value = alloca float, align 4
+  %f64_value = alloca double, align 8
+  %d4_value = alloca i32, align 4
+  %d7_value = alloca i64, align 8
+  %i32_to_d4 = alloca i32, align 4
+  %i32_to_d7 = alloca i64, align 8
+  %i64_to_d4 = alloca i32, align 4
+  %i64_to_d7 = alloca i64, align 8
+  %d4_to_i32 = alloca i32, align 4
+  %d4_to_i64 = alloca i64, align 8
+  %d7_to_i32 = alloca i32, align 4
+  %d7_to_i64 = alloca i64, align 8
+  %f32_to_d4 = alloca i32, align 4
+  %f32_to_d7 = alloca i64, align 8
+  %f64_to_d4 = alloca i32, align 4
+  %f64_to_d7 = alloca i64, align 8
+  %d4_to_f32 = alloca float, align 4
+  %d4_to_f64 = alloca double, align 8
+  %d7_to_f32 = alloca float, align 4
+  %d7_to_f64 = alloca double, align 8
+  %d4_to_d7 = alloca i64, align 8
+  %d7_to_d4 = alloca i32, align 4
+  %rounded_positive_i32 = alloca i32, align 4
+  %rounded_negative_i32 = alloca i32, align 4
+  %rounded_positive_i64 = alloca i64, align 8
+  %rounded_negative_i64 = alloca i64, align 8
+  %rounded_f32_positive_d4 = alloca i32, align 4
+  %rounded_f32_negative_d4 = alloca i32, align 4
+  %rounded_f64_positive_d7 = alloca i64, align 8
+  %rounded_f64_negative_d7 = alloca i64, align 8
+  store i32 %"arguments[0].i32_value", ptr %i32_value, align 4
+  store i64 %"arguments[1].i64_value", ptr %i64_value, align 8
+  store float %"arguments[2].f32_value", ptr %f32_value, align 4
+  store double %"arguments[3].f64_value", ptr %f64_value, align 8
+  store i32 %"arguments[4].d4_value", ptr %d4_value, align 4
+  store i64 %"arguments[5].d7_value", ptr %d7_value, align 8
+  %0 = load i32, ptr %i32_value, align 4
+  %1 = mul i32 %0, 10000
+  store i32 %1, ptr %i32_to_d4, align 4
+  %2 = load i32, ptr %i32_value, align 4
+  %3 = sext i32 %2 to i64
+  %4 = mul i64 %3, 10000000
+  store i64 %4, ptr %i32_to_d7, align 8
+  %5 = load i64, ptr %i64_value, align 8
+  %6 = trunc i64 %5 to i32
+  %7 = mul i32 %6, 10000
+  store i32 %7, ptr %i64_to_d4, align 4
+  %8 = load i64, ptr %i64_value, align 8
+  %9 = mul i64 %8, 10000000
+  store i64 %9, ptr %i64_to_d7, align 8
+  %10 = load i32, ptr %d4_value, align 4
+  %11 = sext i32 %10 to i64
+  %12 = icmp sge i64 %11, 0
+  %13 = select i1 %12, i64 5000, i64 -5000
+  %14 = add i64 %11, %13
+  %15 = sdiv i64 %14, 10000
+  %16 = trunc i64 %15 to i32
+  store i32 %16, ptr %d4_to_i32, align 4
+  %17 = load i32, ptr %d4_value, align 4
+  %18 = sext i32 %17 to i64
+  %19 = icmp sge i64 %18, 0
+  %20 = select i1 %19, i64 5000, i64 -5000
+  %21 = add i64 %18, %20
+  %22 = sdiv i64 %21, 10000
+  store i64 %22, ptr %d4_to_i64, align 8
+  %23 = load i64, ptr %d7_value, align 8
+  %24 = sext i64 %23 to i128
+  %25 = icmp sge i128 %24, 0
+  %26 = select i1 %25, i128 5000000, i128 -5000000
+  %27 = add i128 %24, %26
+  %28 = sdiv i128 %27, 10000000
+  %29 = trunc i128 %28 to i32
+  store i32 %29, ptr %d7_to_i32, align 4
+  %30 = load i64, ptr %d7_value, align 8
+  %31 = sext i64 %30 to i128
+  %32 = icmp sge i128 %31, 0
+  %33 = select i1 %32, i128 5000000, i128 -5000000
+  %34 = add i128 %31, %33
+  %35 = sdiv i128 %34, 10000000
+  %36 = trunc i128 %35 to i64
+  store i64 %36, ptr %d7_to_i64, align 8
+  %37 = load float, ptr %f32_value, align 4
+  %38 = fmul float %37, 1.000000e+04
+  %39 = fcmp oge float %38, 0.000000e+00
+  %40 = select i1 %39, float 5.000000e-01, float -5.000000e-01
+  %41 = fadd float %38, %40
+  %42 = fptosi float %41 to i32
+  store i32 %42, ptr %f32_to_d4, align 4
+  %43 = load float, ptr %f32_value, align 4
+  %44 = fmul float %43, 1.000000e+07
+  %45 = fcmp oge float %44, 0.000000e+00
+  %46 = select i1 %45, float 5.000000e-01, float -5.000000e-01
+  %47 = fadd float %44, %46
+  %48 = fptosi float %47 to i64
+  store i64 %48, ptr %f32_to_d7, align 8
+  %49 = load double, ptr %f64_value, align 8
+  %50 = fmul double %49, 1.000000e+04
+  %51 = fcmp oge double %50, 0.000000e+00
+  %52 = select i1 %51, double 5.000000e-01, double -5.000000e-01
+  %53 = fadd double %50, %52
+  %54 = fptosi double %53 to i32
+  store i32 %54, ptr %f64_to_d4, align 4
+  %55 = load double, ptr %f64_value, align 8
+  %56 = fmul double %55, 1.000000e+07
+  %57 = fcmp oge double %56, 0.000000e+00
+  %58 = select i1 %57, double 5.000000e-01, double -5.000000e-01
+  %59 = fadd double %56, %58
+  %60 = fptosi double %59 to i64
+  store i64 %60, ptr %f64_to_d7, align 8
+  %61 = load i32, ptr %d4_value, align 4
+  %62 = sitofp i32 %61 to float
+  %63 = fdiv float %62, 1.000000e+04
+  store float %63, ptr %d4_to_f32, align 4
+  %64 = load i32, ptr %d4_value, align 4
+  %65 = sitofp i32 %64 to double
+  %66 = fdiv double %65, 1.000000e+04
+  store double %66, ptr %d4_to_f64, align 8
+  %67 = load i64, ptr %d7_value, align 8
+  %68 = sitofp i64 %67 to float
+  %69 = fdiv float %68, 1.000000e+07
+  store float %69, ptr %d7_to_f32, align 4
+  %70 = load i64, ptr %d7_value, align 8
+  %71 = sitofp i64 %70 to double
+  %72 = fdiv double %71, 1.000000e+07
+  store double %72, ptr %d7_to_f64, align 8
+  %73 = load i32, ptr %d4_value, align 4
+  %74 = sext i32 %73 to i128
+  %75 = mul i128 %74, 1000
+  %76 = trunc i128 %75 to i64
+  store i64 %76, ptr %d4_to_d7, align 8
+  %77 = load i64, ptr %d7_value, align 8
+  %78 = sext i64 %77 to i128
+  %79 = sdiv i128 %78, 1000
+  %80 = trunc i128 %79 to i32
+  store i32 %80, ptr %d7_to_d4, align 4
+  store i32 1, ptr %rounded_positive_i32, align 4
+  store i32 -1, ptr %rounded_negative_i32, align 4
+  store i64 1, ptr %rounded_positive_i64, align 8
+  store i64 -1, ptr %rounded_negative_i64, align 8
+  store i32 12346, ptr %rounded_f32_positive_d4, align 4
+  store i32 -12346, ptr %rounded_f32_negative_d4, align 4
+  store i64 25000001, ptr %rounded_f64_positive_d7, align 8
+  store i64 -25000001, ptr %rounded_f64_negative_d7, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Decimal Comparisons", "[LLVM_IR]")
+  {
+    char const* const input_file = "decimal_expressions.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define void @Decimal_expressions_decimal_constants() #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %c = alloca i64, align 8
+  %d = alloca i32, align 4
+  store i32 15, ptr %a, align 4
+  store i32 15700, ptr %b, align 4
+  store i64 1234567000, ptr %c, align 8
+  store i32 10000, ptr %d, align 4
+  ret void
+}
+
+; Function Attrs: convergent
+define void @Decimal_expressions_decimal_32_arithmetic(i32 noundef %"arguments[0].x", i32 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i32, align 4
+  %y = alloca i32, align 4
+  %sum = alloca i32, align 4
+  %diff = alloca i32, align 4
+  %product = alloca i32, align 4
+  %quotient = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store i32 %"arguments[1].y", ptr %y, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = load i32, ptr %y, align 4
+  %2 = add i32 %0, %1
+  store i32 %2, ptr %sum, align 4
+  %3 = load i32, ptr %x, align 4
+  %4 = load i32, ptr %y, align 4
+  %5 = sub i32 %3, %4
+  store i32 %5, ptr %diff, align 4
+  %6 = load i32, ptr %x, align 4
+  %7 = load i32, ptr %y, align 4
+  %8 = sext i32 %6 to i64
+  %9 = sext i32 %7 to i64
+  %10 = mul i64 %8, %9
+  %11 = sdiv i64 %10, 10000
+  %12 = trunc i64 %11 to i32
+  store i32 %12, ptr %product, align 4
+  %13 = load i32, ptr %x, align 4
+  %14 = load i32, ptr %y, align 4
+  %15 = sext i32 %13 to i64
+  %16 = sext i32 %14 to i64
+  %17 = mul i64 %15, 10000
+  %18 = sdiv i64 %17, %16
+  %19 = trunc i64 %18 to i32
+  store i32 %19, ptr %quotient, align 4
+  ret void
+}
+
+; Function Attrs: convergent
+define void @Decimal_expressions_decimal_64_arithmetic(i64 noundef %"arguments[0].x", i64 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i64, align 8
+  %y = alloca i64, align 8
+  %sum = alloca i64, align 8
+  %diff = alloca i64, align 8
+  %product = alloca i64, align 8
+  %quotient = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  store i64 %"arguments[1].y", ptr %y, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = load i64, ptr %y, align 8
+  %2 = add i64 %0, %1
+  store i64 %2, ptr %sum, align 8
+  %3 = load i64, ptr %x, align 8
+  %4 = load i64, ptr %y, align 8
+  %5 = sub i64 %3, %4
+  store i64 %5, ptr %diff, align 8
+  %6 = load i64, ptr %x, align 8
+  %7 = load i64, ptr %y, align 8
+  %8 = sext i64 %6 to i128
+  %9 = sext i64 %7 to i128
+  %10 = mul i128 %8, %9
+  %11 = sdiv i128 %10, 10000000
+  %12 = trunc i128 %11 to i64
+  store i64 %12, ptr %product, align 8
+  %13 = load i64, ptr %x, align 8
+  %14 = load i64, ptr %y, align 8
+  %15 = sext i64 %13 to i128
+  %16 = sext i64 %14 to i128
+  %17 = mul i128 %15, 10000000
+  %18 = sdiv i128 %17, %16
+  %19 = trunc i128 %18 to i64
+  store i64 %19, ptr %quotient, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define void @Decimal_expressions_decimal_32_comparisons(i32 noundef %"arguments[0].x", i32 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i32, align 4
+  %y = alloca i32, align 4
+  %eq = alloca i8, align 1
+  %neq = alloca i8, align 1
+  %lt = alloca i8, align 1
+  %le = alloca i8, align 1
+  %gt = alloca i8, align 1
+  %ge = alloca i8, align 1
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store i32 %"arguments[1].y", ptr %y, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = load i32, ptr %y, align 4
+  %2 = icmp eq i32 %0, %1
+  store i1 %2, ptr %eq, align 1
+  %3 = load i32, ptr %x, align 4
+  %4 = load i32, ptr %y, align 4
+  %5 = icmp ne i32 %3, %4
+  store i1 %5, ptr %neq, align 1
+  %6 = load i32, ptr %x, align 4
+  %7 = load i32, ptr %y, align 4
+  %8 = icmp slt i32 %6, %7
+  store i1 %8, ptr %lt, align 1
+  %9 = load i32, ptr %x, align 4
+  %10 = load i32, ptr %y, align 4
+  %11 = icmp sle i32 %9, %10
+  store i1 %11, ptr %le, align 1
+  %12 = load i32, ptr %x, align 4
+  %13 = load i32, ptr %y, align 4
+  %14 = icmp sgt i32 %12, %13
+  store i1 %14, ptr %gt, align 1
+  %15 = load i32, ptr %x, align 4
+  %16 = load i32, ptr %y, align 4
+  %17 = icmp sge i32 %15, %16
+  store i1 %17, ptr %ge, align 1
+  ret void
+}
+
+; Function Attrs: convergent
+define void @Decimal_expressions_decimal_64_comparisons(i64 noundef %"arguments[0].x", i64 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i64, align 8
+  %y = alloca i64, align 8
+  %eq = alloca i8, align 1
+  %neq = alloca i8, align 1
+  %lt = alloca i8, align 1
+  %le = alloca i8, align 1
+  %gt = alloca i8, align 1
+  %ge = alloca i8, align 1
+  store i64 %"arguments[0].x", ptr %x, align 8
+  store i64 %"arguments[1].y", ptr %y, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = load i64, ptr %y, align 8
+  %2 = icmp eq i64 %0, %1
+  store i1 %2, ptr %eq, align 1
+  %3 = load i64, ptr %x, align 8
+  %4 = load i64, ptr %y, align 8
+  %5 = icmp ne i64 %3, %4
+  store i1 %5, ptr %neq, align 1
+  %6 = load i64, ptr %x, align 8
+  %7 = load i64, ptr %y, align 8
+  %8 = icmp slt i64 %6, %7
+  store i1 %8, ptr %lt, align 1
+  %9 = load i64, ptr %x, align 8
+  %10 = load i64, ptr %y, align 8
+  %11 = icmp sle i64 %9, %10
+  store i1 %11, ptr %le, align 1
+  %12 = load i64, ptr %x, align 8
+  %13 = load i64, ptr %y, align 8
+  %14 = icmp sgt i64 %12, %13
+  store i1 %14, ptr %gt, align 1
+  %15 = load i64, ptr %x, align 8
+  %16 = load i64, ptr %y, align 8
+  %17 = icmp sge i64 %15, %16
+  store i1 %17, ptr %ge, align 1
+  ret void
+}
+
+; Function Attrs: convergent
 define void @Decimal_expressions_decimal_casts(i32 noundef %"arguments[0].i32_value", i64 noundef %"arguments[1].i64_value", float noundef %"arguments[2].f32_value", double noundef %"arguments[3].f64_value", i32 noundef %"arguments[4].d4_value", i64 noundef %"arguments[5].d7_value") #0 {
 entry:
   %i32_value = alloca i32, align 4
