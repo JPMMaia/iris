@@ -1459,6 +1459,39 @@ var bar: function<(value: *Int32) -> ()> = fns.to_json::<Int32>;
         test_validate_module(input, dependencies, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that calling a function stored in a global variable from another module works", "[Validation][Function_constructors]")
+    {
+        std::string_view const dependency = R"(
+module iris.functions;
+
+function_constructor create_add(Value_type: Type)
+{
+    return function(lhs: Value_type, rhs: Value_type) -> (result: Value_type)
+    {
+        return lhs + rhs;
+    };
+}
+
+export var add_f32 = create_add::<Float32>;
+)";
+
+        std::string_view const input = R"(
+module Test;
+
+import iris.functions as fns;
+
+function run() -> ()
+{
+    var result = fns.add_f32(1.0f32, 2.0f32);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        test_validate_module(input, dependencies, expected_diagnostics);
+    }
+
     TEST_CASE("Alias type is interchangeable with raw instantiated type in member assignment", "[Validation][Function_constructors]")
     {
         std::string_view const input = R"(module Test;

@@ -881,7 +881,7 @@ namespace iris::compiler
                                         };    
                                     }
 
-                                    std::optional<iris::Type_reference> value_type = get_expression_type(module_name, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
+                                    std::optional<iris::Type_reference> value_type = get_expression_type(declaration.module_name, nullptr, scope, global_variable_declaration.initial_value, std::nullopt, declaration_database);
                                     if (!value_type.has_value())
                                         return std::nullopt;
 
