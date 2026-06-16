@@ -6898,4 +6898,60 @@ function run() -> ()
 
         test_validate_module(input, {}, expected_diagnostics);
     }
+
+    TEST_CASE("Validates that decimal comparisons work with same type", "[Validation][Decimal]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run(a: Decimal2, b: Decimal2) -> ()
+{
+    var eq = a == b;
+    var neq = a != b;
+    var lt = a < b;
+    var gt = a > b;
+    var le = a <= b;
+    var ge = a >= b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that decimal comparisons with different types are rejected", "[Validation][Decimal]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run(a: Decimal2, b: Decimal4) -> ()
+{
+    var eq = a == b;
+    var neq = a != b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 14, 5, 20),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Binary expression requires both operands to be of the same type. Left side type 'Decimal2' does not match right hand side type 'Decimal4'.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 15, 6, 21),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Binary expression requires both operands to be of the same type. Left side type 'Decimal2' does not match right hand side type 'Decimal4'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
 }

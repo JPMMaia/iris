@@ -24,6 +24,26 @@ export function decimal_64_arithmetic(x: Decimal7, y: Decimal7) -> ()
     var quotient: Decimal7 = x / y;
 }
 
+export function decimal_32_comparisons(x: Decimal4, y: Decimal4) -> ()
+{
+    var eq: Bool = x == y;
+    var neq: Bool = x != y;
+    var lt: Bool = x < y;
+    var le: Bool = x <= y;
+    var gt: Bool = x > y;
+    var ge: Bool = x >= y;
+}
+
+export function decimal_64_comparisons(x: Decimal7, y: Decimal7) -> ()
+{
+    var eq: Bool = x == y;
+    var neq: Bool = x != y;
+    var lt: Bool = x < y;
+    var le: Bool = x <= y;
+    var gt: Bool = x > y;
+    var ge: Bool = x >= y;
+}
+
 export function decimal_casts(
     i32_value: Int32,
     i64_value: Int64,
