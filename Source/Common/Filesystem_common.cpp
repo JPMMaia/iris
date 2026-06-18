@@ -180,6 +180,13 @@ namespace iris::common
 
     bool extract_zip(std::filesystem::path const& archive_path, std::filesystem::path const& destination_directory)
     {
+        if (std::filesystem::exists(destination_directory))
+        {
+            std::printf("Skipped extract zip to '%s' since it already exists.\n", destination_directory.generic_string().c_str());
+            return true;
+        }
+        std::printf("Extract zip to '%s'.\n", destination_directory.generic_string().c_str());
+
         mz_zip_archive zip_archive;
         std::memset(&zip_archive, 0, sizeof(zip_archive));
 
