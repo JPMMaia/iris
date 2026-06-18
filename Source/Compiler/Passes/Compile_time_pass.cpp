@@ -753,6 +753,9 @@ namespace iris::compiler
             return std::pmr::string{"Custom", parameters.output_allocator};
         }
 
+        if (std::holds_alternative<iris::Decimal_type>(resolved_type.data))
+            return std::pmr::string{"Decimal", parameters.output_allocator};
+
         if (std::holds_alternative<iris::Fundamental_type>(resolved_type.data))
         {
             iris::Fundamental_type const fundamental_type = std::get<iris::Fundamental_type>(resolved_type.data);
@@ -1290,6 +1293,28 @@ namespace iris::compiler
             };
 
             return create_value_and_type(std::move(enum_statement));
+        }
+        else if (expression.name == "decimal_scale")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "decimal_scale() requires exactly one type argument!" };
+
+            if (!expression.arguments.empty())
+                throw std::runtime_error{ "decimal_scale() does not take runtime arguments!" };
+
+            Type_reference const& type_reference = expression.type_arguments[0];
+            std::optional<Type_reference> const underlying_type = get_underlying_type(parameters.declaration_database, type_reference);
+            Type_reference const& resolved_type = underlying_type.value_or(type_reference);
+
+            if (!std::holds_alternative<iris::Decimal_type>(resolved_type.data))
+                throw std::runtime_error{ "decimal_scale() requires a Decimal type argument!" };
+
+            iris::Decimal_type const& decimal_type = std::get<iris::Decimal_type>(resolved_type.data);
+
+            return create_value_and_type(create_constant_expression_statement(
+                create_integer_type_type_reference(32, false),
+                std::pmr::string{std::to_string(decimal_type.scale), parameters.output_allocator}
+            ));
         }
         else if (expression.name == "type_of")
         {

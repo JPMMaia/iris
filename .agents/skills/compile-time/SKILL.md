@@ -98,7 +98,15 @@ compile_time for index in 0u64 to 4u64
 `@get_type_kind::<T>()`
 
 - The compile time pass should replace this by a `iris::Constant_expression` with the an enum value that represents the type of the type T.
-- This enum is named `Type_kind` and should be part of the Bultin module. Some enum values it should contain are `Int`, `Uint`, `Float`, `Struct`, `Union`, `Enum`, `Pointer`, `Array_slice`, `Constant_array`, etc.
+- This enum is named `Type_kind` and should be part of the Bultin module. Some enum values it should contain are `Int`, `Uint`, `Float`, `Struct`, `Union`, `Enum`, `Pointer`, `Array_slice`, `Constant_array`, `Decimal`, etc.
+
+### `decimal_scale`
+
+`@decimal_scale::<T>()`
+
+- Returns the scale of a Decimal type T as a Uint32 constant (1–18). Scale N means the stored integer represents `integer / 10^N`.
+- The compile time pass should replace this by a `iris::Constant_expression` with the scale value as Uint32.
+- Validation should check that T resolves to a Decimal_type; throws if given any other type.
 
 ## Tests
 

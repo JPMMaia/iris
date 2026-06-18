@@ -5,6 +5,7 @@ export enum Type_kind
     Int,
     Uint,
     Float,
+    Decimal,
     Bool,
     Struct,
     Union,

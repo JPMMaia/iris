@@ -7173,7 +7173,7 @@ entry:
   %parameter = alloca i32, align 4
   %a = alloca i32, align 4
   store i32 %"arguments[0].parameter", ptr %parameter, align 4
-  store i32 4, ptr %a, align 4
+  store i32 5, ptr %a, align 4
   ret void
 }
 
