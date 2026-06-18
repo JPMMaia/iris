@@ -75,6 +75,23 @@ export function_constructor to_json(value_type: Type)
         {
             stream.write("null"c);
         }
+        else if kind == Type_kind.Decimal
+        {
+            compile_time var scale = @decimal_scale::<value_type>();
+
+            if (scale < 7u32)
+            {
+                mutable raw_value = 0;
+                cstring.memcpy_s(&raw_value, 4 as cstring.rsize_t, value, 4 as cstring.rsize_t);
+                write_decimal(stream, raw_value as Int64, scale);
+            }
+            else
+            {
+                mutable raw_value = 0i64;
+                cstring.memcpy_s(&raw_value, 8 as cstring.rsize_t, value, 8 as cstring.rsize_t);
+                write_decimal(stream, raw_value, scale);
+            }
+        }
         else if (kind == Type_kind.Int) || (kind == Type_kind.Uint) || (kind == Type_kind.Float)
         {
             mutable format_specifier_buffer: Constant_array::<C_char, 16> = [];
@@ -134,6 +151,38 @@ function write_format_specifier(buffer: Array_slice::<mutable C_char>, specifier
         buffer[1u64 + index] = specifier[index];
     }
     buffer[1u64 + length] = 0 as C_char;
+}
+
+function compute_power_of_10(exp: Uint32) -> (result: Int64)
+{
+    mutable result = 1i64;
+    for index in 0u32 to exp
+    {
+        result = result * 10i64;
+    }
+    return result;
+}
+
+function write_decimal(stream: Write_stream, raw_value: Int64, scale: Uint32) -> ()
+{
+    mutable buffer: Constant_array::<C_char, 64> = [];
+
+    var power_of_10 = compute_power_of_10(scale);
+
+    if (raw_value < 0i64)
+    {
+        var integer_part = -raw_value / power_of_10;
+        var fractional_part = -raw_value % power_of_10;
+        cstdio.snprintf(&buffer[0], 64 as cstdio.rsize_t, "-%lld.%0*lld"c, integer_part, scale as C_int, fractional_part);
+    }
+    else
+    {
+        var integer_part = raw_value / power_of_10;
+        var fractional_part = raw_value % power_of_10;
+        cstdio.snprintf(&buffer[0], 64 as cstdio.rsize_t, "%lld.%0*lld"c, integer_part, scale as C_int, fractional_part);
+    }
+
+    stream.write(&buffer[0]);
 }
 
 export function_constructor print_json(value_type: Type)

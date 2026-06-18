@@ -785,6 +785,52 @@ export function run_get_type_kind() -> ()
         CHECK(expected == actual);
     }
 
+    TEST_CASE("Evaluates compile_time reflection get_type_kind for Decimal", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+export function run_get_type_kind_decimal() -> ()
+{
+    var kind = @get_type_kind::<Decimal4>();
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+export function run_get_type_kind_decimal() -> ()
+{
+    var kind = Type_kind.Decimal;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_get_type_kind_decimal");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection decimal_scale", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+export function run_decimal_scale() -> ()
+{
+    var scale = @decimal_scale::<Decimal4>();
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+export function run_decimal_scale() -> ()
+{
+    var scale = 4u32;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_decimal_scale");
+
+        CHECK(expected == actual);
+    }
+
     TEST_CASE("Evaluates compile_time var, if and Type_kind", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_reflection;
