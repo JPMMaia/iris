@@ -6954,4 +6954,54 @@ function run(a: Decimal2, b: Decimal4) -> ()
 
         test_validate_module(input, {}, expected_diagnostics);
     }
+
+    TEST_CASE("Validates that a decimal literal does not overflow its 32-bit backing integer", "[Validation][Decimal]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run() -> ()
+{
+    var x: Decimal6 = 707107d6;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 23, 5, 31),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Decimal literal '707107' overflows the 32-bit backing integer of Decimal6 (scaled value 707107000000 is out of range [-2147483648, 2147483647]).",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a decimal literal does not overflow its 64-bit backing integer", "[Validation][Decimal]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run() -> ()
+{
+    var x: Decimal7 = 1000000000000d7;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 23, 5, 38),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Decimal literal '1000000000000' overflows the 64-bit backing integer of Decimal7 (scaled value 10000000000000000000 is out of range [-9223372036854775808, 9223372036854775807]).",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
 }

@@ -191,6 +191,12 @@ namespace iris::compiler
         std::optional<iris::Source_range> const& source_range
     );
 
+    std::pmr::vector<iris::compiler::Diagnostic> validate_constant_expression(
+        Validate_expression_parameters const& parameters,
+        iris::Constant_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    );
+
     std::pmr::vector<iris::compiler::Diagnostic> validate_continue_expression(
         Validate_expression_parameters const& parameters,
         iris::Continue_expression const& expression,

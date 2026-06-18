@@ -1638,6 +1638,11 @@ namespace iris::compiler
             iris::Cast_expression const& value = std::get<iris::Cast_expression>(expression.data);
             return validate_cast_expression(parameters, value, expression.source_range);
         }
+        else if (std::holds_alternative<iris::Constant_expression>(expression.data))
+        {
+            iris::Constant_expression const& value = std::get<iris::Constant_expression>(expression.data);
+            return validate_constant_expression(parameters, value, expression.source_range);
+        }
         else if (std::holds_alternative<iris::Continue_expression>(expression.data))
         {
             iris::Continue_expression const& value = std::get<iris::Continue_expression>(expression.data);
@@ -2971,6 +2976,49 @@ namespace iris::compiler
         }
 
         return {};
+    }
+
+    std::pmr::vector<iris::compiler::Diagnostic> validate_constant_expression(
+        Validate_expression_parameters const& parameters,
+        iris::Constant_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    )
+    {
+        if (!std::holds_alternative<iris::Decimal_type>(expression.type.data))
+            return {};
+
+        iris::Decimal_type const& decimal_type = std::get<iris::Decimal_type>(expression.type.data);
+        std::uint32_t const bits = decimal_type.scale <= 6 ? 32 : 64;
+
+        double multiplier = 1.0;
+        for (std::uint32_t i = 0; i < decimal_type.scale; ++i)
+            multiplier *= 10.0;
+
+        char* end_ptr = nullptr;
+        double const float_value = std::strtod(expression.data.c_str(), &end_ptr);
+        double const scaled = float_value * multiplier;
+
+        std::int64_t const min_val = bits < 64
+            ? -(std::int64_t(1) << (bits - 1))
+            : std::numeric_limits<std::int64_t>::min();
+        std::int64_t const max_val = bits < 64
+            ? (std::int64_t(1) << (bits - 1)) - 1
+            : std::numeric_limits<std::int64_t>::max();
+
+        if (scaled >= static_cast<double>(min_val) && scaled <= static_cast<double>(max_val))
+            return {};
+
+        return
+        {
+            create_error_diagnostic(
+                parameters.core_module.source_file_path,
+                source_range,
+                std::format(
+                    "Decimal literal '{}' overflows the {}-bit backing integer of Decimal{} (scaled value {:.0f} is out of range [{}, {}]).",
+                    expression.data, bits, decimal_type.scale, scaled, min_val, max_val
+                )
+            )
+        };
     }
 
     std::pmr::vector<iris::compiler::Diagnostic> validate_continue_expression(

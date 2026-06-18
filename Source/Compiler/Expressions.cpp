@@ -3922,6 +3922,19 @@ namespace iris::compiler
 
             // Round half away from zero: for positive add 0.5, for negative subtract 0.5
             double const scaled = float_value * multiplier;
+
+            std::int64_t const min_value = bits < 64
+                ? -(std::int64_t(1) << (bits - 1))
+                : std::numeric_limits<std::int64_t>::min();
+            std::int64_t const max_value = bits < 64
+                ? (std::int64_t(1) << (bits - 1)) - 1
+                : std::numeric_limits<std::int64_t>::max();
+            if (scaled < static_cast<double>(min_value) || scaled > static_cast<double>(max_value))
+                throw std::runtime_error{ format_error(
+                    std::format("Decimal literal '{}' overflows the {}-bit backing integer (scaled value {:.0f} is out of range [{}, {}])",
+                        expression.data, bits, scaled, min_value, max_value),
+                    source_position) };
+
             std::int64_t const integer_value =
                 scaled >= 0.0 ?
                 static_cast<std::int64_t>(scaled + 0.5) :

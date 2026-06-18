@@ -1,0 +1,6 @@
+module Decimal_overflow;
+
+export function decimal_overflow() -> ()
+{
+    var x: Decimal6 = 707107d6;
+}
