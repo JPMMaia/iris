@@ -5416,9 +5416,8 @@ if_s0_then7:                                      ; preds = %if_s4_after
 
 if_s1_after8:                                     ; preds = %if_s0_then7, %if_s4_after
   %14 = load i8, ptr %c_boolean, align 1
-  %15 = xor i8 %14, -1
-  %16 = trunc i8 %15 to i1
-  br i1 %16, label %if_s0_then9, label %if_s1_after10
+  %15 = icmp eq i8 %14, 0
+  br i1 %15, label %if_s0_then9, label %if_s1_after10
 
 if_s0_then9:                                      ; preds = %if_s1_after8
   call void @If_expressions_print_message(ptr noundef @global_10)
@@ -6648,9 +6647,8 @@ ternary_condition_end3:                           ; preds = %ternary_condition_e
   %7 = phi i32 [ 1, %ternary_condition_then1 ], [ 0, %ternary_condition_else2 ]
   store i32 %7, ptr %b, align 4
   %8 = load i8, ptr %first_boolean, align 1
-  %9 = xor i8 %8, -1
-  %10 = trunc i8 %9 to i1
-  br i1 %10, label %ternary_condition_then4, label %ternary_condition_else5
+  %9 = icmp eq i8 %8, 0
+  br i1 %9, label %ternary_condition_then4, label %ternary_condition_else5
 
 ternary_condition_then4:                          ; preds = %ternary_condition_end3
   br label %ternary_condition_end6
@@ -6659,26 +6657,26 @@ ternary_condition_else5:                          ; preds = %ternary_condition_e
   br label %ternary_condition_end6
 
 ternary_condition_end6:                           ; preds = %ternary_condition_else5, %ternary_condition_then4
-  %11 = phi i32 [ 1, %ternary_condition_then4 ], [ 0, %ternary_condition_else5 ]
-  store i32 %11, ptr %c, align 4
-  %12 = load i8, ptr %first_boolean, align 1
-  %13 = trunc i8 %12 to i1
-  br i1 %13, label %ternary_condition_then7, label %ternary_condition_else8
+  %10 = phi i32 [ 1, %ternary_condition_then4 ], [ 0, %ternary_condition_else5 ]
+  store i32 %10, ptr %c, align 4
+  %11 = load i8, ptr %first_boolean, align 1
+  %12 = trunc i8 %11 to i1
+  br i1 %12, label %ternary_condition_then7, label %ternary_condition_else8
 
 ternary_condition_then7:                          ; preds = %ternary_condition_end6
-  %14 = load i8, ptr %second_boolean, align 1
-  %15 = trunc i8 %14 to i1
-  br i1 %15, label %ternary_condition_then10, label %ternary_condition_else11
+  %13 = load i8, ptr %second_boolean, align 1
+  %14 = trunc i8 %13 to i1
+  br i1 %14, label %ternary_condition_then10, label %ternary_condition_else11
 
 ternary_condition_else8:                          ; preds = %ternary_condition_end6
   br label %ternary_condition_end9
 
 ternary_condition_end9:                           ; preds = %ternary_condition_else8, %ternary_condition_end12
-  %16 = phi i32 [ %19, %ternary_condition_end12 ], [ 0, %ternary_condition_else8 ]
-  store i32 %16, ptr %d, align 4
-  %17 = load i8, ptr %first_boolean, align 1
-  %18 = trunc i8 %17 to i1
-  br i1 %18, label %ternary_condition_then13, label %ternary_condition_else14
+  %15 = phi i32 [ %18, %ternary_condition_end12 ], [ 0, %ternary_condition_else8 ]
+  store i32 %15, ptr %d, align 4
+  %16 = load i8, ptr %first_boolean, align 1
+  %17 = trunc i8 %16 to i1
+  br i1 %17, label %ternary_condition_then13, label %ternary_condition_else14
 
 ternary_condition_then10:                         ; preds = %ternary_condition_then7
   br label %ternary_condition_end12
@@ -6687,25 +6685,25 @@ ternary_condition_else11:                         ; preds = %ternary_condition_t
   br label %ternary_condition_end12
 
 ternary_condition_end12:                          ; preds = %ternary_condition_else11, %ternary_condition_then10
-  %19 = phi i32 [ 2, %ternary_condition_then10 ], [ 1, %ternary_condition_else11 ]
+  %18 = phi i32 [ 2, %ternary_condition_then10 ], [ 1, %ternary_condition_else11 ]
   br label %ternary_condition_end9
 
 ternary_condition_then13:                         ; preds = %ternary_condition_end9
   br label %ternary_condition_end15
 
 ternary_condition_else14:                         ; preds = %ternary_condition_end9
-  %20 = load i8, ptr %second_boolean, align 1
-  %21 = trunc i8 %20 to i1
-  br i1 %21, label %ternary_condition_then16, label %ternary_condition_else17
+  %19 = load i8, ptr %second_boolean, align 1
+  %20 = trunc i8 %19 to i1
+  br i1 %20, label %ternary_condition_then16, label %ternary_condition_else17
 
 ternary_condition_end15:                          ; preds = %ternary_condition_end18, %ternary_condition_then13
-  %22 = phi i32 [ 2, %ternary_condition_then13 ], [ %25, %ternary_condition_end18 ]
-  store i32 %22, ptr %e, align 4
+  %21 = phi i32 [ 2, %ternary_condition_then13 ], [ %24, %ternary_condition_end18 ]
+  store i32 %21, ptr %e, align 4
   store i32 0, ptr %first, align 4
   store i32 1, ptr %second, align 4
-  %23 = load i8, ptr %first_boolean, align 1
-  %24 = trunc i8 %23 to i1
-  br i1 %24, label %ternary_condition_then19, label %ternary_condition_else20
+  %22 = load i8, ptr %first_boolean, align 1
+  %23 = trunc i8 %22 to i1
+  br i1 %23, label %ternary_condition_then19, label %ternary_condition_else20
 
 ternary_condition_then16:                         ; preds = %ternary_condition_else14
   br label %ternary_condition_end18
@@ -6714,24 +6712,24 @@ ternary_condition_else17:                         ; preds = %ternary_condition_e
   br label %ternary_condition_end18
 
 ternary_condition_end18:                          ; preds = %ternary_condition_else17, %ternary_condition_then16
-  %25 = phi i32 [ 1, %ternary_condition_then16 ], [ 0, %ternary_condition_else17 ]
+  %24 = phi i32 [ 1, %ternary_condition_then16 ], [ 0, %ternary_condition_else17 ]
   br label %ternary_condition_end15
 
 ternary_condition_then19:                         ; preds = %ternary_condition_end15
-  %26 = load i32, ptr %first, align 4
+  %25 = load i32, ptr %first, align 4
   br label %ternary_condition_end21
 
 ternary_condition_else20:                         ; preds = %ternary_condition_end15
-  %27 = load i32, ptr %second, align 4
+  %26 = load i32, ptr %second, align 4
   br label %ternary_condition_end21
 
 ternary_condition_end21:                          ; preds = %ternary_condition_else20, %ternary_condition_then19
-  %28 = phi i32 [ %26, %ternary_condition_then19 ], [ %27, %ternary_condition_else20 ]
-  store i32 %28, ptr %f, align 4
+  %27 = phi i32 [ %25, %ternary_condition_then19 ], [ %26, %ternary_condition_else20 ]
+  store i32 %27, ptr %f, align 4
   store i8 1, ptr %c_boolean, align 1
-  %29 = load i8, ptr %c_boolean, align 1
-  %30 = trunc i8 %29 to i1
-  br i1 %30, label %ternary_condition_then22, label %ternary_condition_else23
+  %28 = load i8, ptr %c_boolean, align 1
+  %29 = trunc i8 %28 to i1
+  br i1 %29, label %ternary_condition_then22, label %ternary_condition_else23
 
 ternary_condition_then22:                         ; preds = %ternary_condition_end21
   br label %ternary_condition_end24
@@ -6740,8 +6738,8 @@ ternary_condition_else23:                         ; preds = %ternary_condition_e
   br label %ternary_condition_end24
 
 ternary_condition_end24:                          ; preds = %ternary_condition_else23, %ternary_condition_then22
-  %31 = phi i32 [ 1, %ternary_condition_then22 ], [ 0, %ternary_condition_else23 ]
-  store i32 %31, ptr %g, align 4
+  %30 = phi i32 [ 1, %ternary_condition_then22 ], [ 0, %ternary_condition_else23 ]
+  store i32 %30, ptr %g, align 4
   ret void
 }
 
@@ -6793,7 +6791,7 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
 %struct.iris_json_Write_stream = type {{ ptr }}
 
-@iris_test_source_file_path = internal constant [68 x i8] c"{}/test_framework.iris\00"
+@iris_test_source_file_path = internal constant [68 x i8] c"C:/Users/JPMMa/Desktop/source/iris/Examples/txt/test_framework.iris\00"
 @global_1 = internal constant [4 x i8] c"hhi\00"
 @global_2 = internal constant [3 x i8] c"hi\00"
 @global_3 = internal constant [2 x i8] c"i\00"
@@ -6855,29 +6853,27 @@ entry:
   %5 = trunc i8 %4 to i1
   call void @iris_test_check(i1 noundef zeroext %5, ptr noundef @iris_test_source_file_path, i64 noundef 11)
   %6 = load i8, ptr %__condition, align 1
-  %7 = xor i8 %6, -1
-  %8 = trunc i8 %7 to i1
-  br i1 %8, label %if_s0_then, label %if_s1_after
+  %7 = icmp eq i8 %6, 0
+  br i1 %7, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
   call void @iris.json__at__print_json_difference__at__16983553210230134252(ptr noundef %__lhs, ptr noundef %__rhs)
   br label %if_s1_after
 
 if_s1_after:                                      ; preds = %if_s0_then, %entry
-  %9 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
-  store i32 %9, ptr %__lhs1, align 4
+  %8 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
+  store i32 %8, ptr %__lhs1, align 4
   store i32 5, ptr %__rhs2, align 4
-  %10 = load i32, ptr %__lhs1, align 4
-  %11 = load i32, ptr %__rhs2, align 4
-  %12 = icmp eq i32 %10, %11
-  store i1 %12, ptr %__condition3, align 1
-  %13 = load i8, ptr %__condition3, align 1
-  %14 = trunc i8 %13 to i1
-  call void @iris_test_check(i1 noundef zeroext %14, ptr noundef @iris_test_source_file_path, i64 noundef 12)
-  %15 = load i8, ptr %__condition3, align 1
-  %16 = xor i8 %15, -1
-  %17 = trunc i8 %16 to i1
-  br i1 %17, label %if_s0_then4, label %if_s1_after5
+  %9 = load i32, ptr %__lhs1, align 4
+  %10 = load i32, ptr %__rhs2, align 4
+  %11 = icmp eq i32 %9, %10
+  store i1 %11, ptr %__condition3, align 1
+  %12 = load i8, ptr %__condition3, align 1
+  %13 = trunc i8 %12 to i1
+  call void @iris_test_check(i1 noundef zeroext %13, ptr noundef @iris_test_source_file_path, i64 noundef 12)
+  %14 = load i8, ptr %__condition3, align 1
+  %15 = icmp eq i8 %14, 0
+  br i1 %15, label %if_s0_then4, label %if_s1_after5
 
 if_s0_then4:                                      ; preds = %if_s1_after
   call void @iris.json__at__print_json_difference__at__16983553210230134252(ptr noundef %__lhs1, ptr noundef %__rhs2)
@@ -7201,13 +7197,13 @@ entry:
   %my_boolean = alloca i8, align 1
   %my_c_boolean = alloca i8, align 1
   %my_struct = alloca ptr, align 8
-  %not_variable = alloca i8, align 1
+  %not_variable = alloca i1, align 1
   %bitwise_not_variable = alloca i32, align 4
   %minus_variable = alloca i32, align 4
   %my_mutable_integer = alloca i32, align 4
   %address_of_variable = alloca ptr, align 8
   %indirection_variable = alloca i32, align 4
-  %not_c_variable = alloca i8, align 1
+  %not_c_variable = alloca i1, align 1
   %address_of_member = alloca ptr, align 8
   %minus_variable_2 = alloca float, align 4
   store i32 %"arguments[0].my_integer", ptr %my_integer, align 4
@@ -7217,8 +7213,8 @@ entry:
   store i8 %1, ptr %my_c_boolean, align 1
   store ptr %"arguments[3].my_struct", ptr %my_struct, align 8
   %2 = load i8, ptr %my_boolean, align 1
-  %3 = xor i8 %2, -1
-  store i8 %3, ptr %not_variable, align 1
+  %3 = icmp eq i8 %2, 0
+  store i1 %3, ptr %not_variable, align 1
   %4 = load i32, ptr %my_integer, align 4
   %5 = xor i32 %4, -1
   store i32 %5, ptr %bitwise_not_variable, align 4
@@ -7231,8 +7227,8 @@ entry:
   %9 = load i32, ptr %8, align 4
   store i32 %9, ptr %indirection_variable, align 4
   %10 = load i8, ptr %my_c_boolean, align 1
-  %11 = xor i8 %10, -1
-  store i8 %11, ptr %not_c_variable, align 1
+  %11 = icmp eq i8 %10, 0
+  store i1 %11, ptr %not_c_variable, align 1
   %12 = load ptr, ptr %my_struct, align 8
   %13 = getelementptr inbounds %struct.Unary_expressions_My_struct, ptr %12, i32 0, i32 0
   store ptr %13, ptr %address_of_member, align 8
@@ -7241,6 +7237,38 @@ entry:
   %16 = fneg float %15
   store float %16, ptr %minus_variable_2, align 4
   ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Logical Not And", "[LLVM_IR]")
+  {
+    char const* const input_file = "logical_not_and.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private i1 @Logical_not_and_run(i1 noundef zeroext %"arguments[0].x", i1 noundef zeroext %"arguments[1].y") #0 {
+entry:
+  %x = alloca i8, align 1
+  %y = alloca i8, align 1
+  %0 = zext i1 %"arguments[0].x" to i8
+  store i8 %0, ptr %x, align 1
+  %1 = zext i1 %"arguments[1].y" to i8
+  store i8 %1, ptr %y, align 1
+  %2 = load i8, ptr %x, align 1
+  %3 = icmp eq i8 %2, 0
+  %4 = load i8, ptr %y, align 1
+  %5 = icmp ne i8 %4, 0
+  %6 = and i1 %3, %5
+  ret i1 %6
 }
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
