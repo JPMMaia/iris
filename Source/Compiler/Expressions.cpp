@@ -5555,10 +5555,14 @@ namespace iris::compiler
             if (is_bool(type) || is_c_bool(type))
             {
                 llvm::Value* const loaded_value = load_if_needed(value_expression, expression.expression.expression_index, statement, parameters).value;
+                llvm::Type* const value_type = loaded_value->getType();
+                
+                llvm::Value* const zero = llvm::ConstantInt::get(value_type, 0);
+                llvm::Value* const result = llvm_builder.CreateICmpEQ(loaded_value, zero);
                 return Value_and_type
                 {
                     .name = "",
-                    .value = llvm_builder.CreateNot(loaded_value),
+                    .value = result,
                     .type = type
                 };
             }

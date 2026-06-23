@@ -1,0 +1,6 @@
+module Logical_not_and;
+
+function run(x: Bool, y: Bool) -> (z: Bool)
+{
+    return !x && y;
+}
