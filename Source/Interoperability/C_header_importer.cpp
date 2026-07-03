@@ -2709,6 +2709,53 @@ namespace iris::c
         visit_type_references(declarations, process_type_reference);
     }
 
+    void resolve_declaration_name_collisions(
+        C_declarations& declarations
+    )
+    {
+        std::pmr::unordered_set<std::pmr::string> type_names;
+        for (iris::Alias_type_declaration const& declaration : declarations.alias_type_declarations)
+            type_names.insert(declaration.name);
+        for (iris::Enum_declaration const& declaration : declarations.enum_declarations)
+            type_names.insert(declaration.name);
+        for (iris::Struct_declaration const& declaration : declarations.struct_declarations)
+            type_names.insert(declaration.name);
+        for (iris::Union_declaration const& declaration : declarations.union_declarations)
+            type_names.insert(declaration.name);
+        for (iris::Forward_declaration const& declaration : declarations.forward_declarations)
+            type_names.insert(declaration.name);
+
+        std::pmr::unordered_set<std::pmr::string> all_names = type_names;
+        for (iris::Function_declaration const& declaration : declarations.function_declarations)
+            all_names.insert(declaration.name);
+        for (iris::Global_variable_declaration const& declaration : declarations.global_variable_declarations)
+            all_names.insert(declaration.name);
+
+        auto const rename = [&](std::pmr::string& name, std::optional<std::pmr::string>& unique_name, std::string_view const suffix)
+        {
+            std::pmr::string new_name = name;
+            new_name += suffix;
+            while (all_names.contains(new_name))
+                new_name += "_";
+
+            name = new_name;
+            unique_name = new_name;
+            all_names.insert(std::move(new_name));
+        };
+
+        for (iris::Function_declaration& declaration : declarations.function_declarations)
+        {
+            if (type_names.contains(declaration.name))
+                rename(declaration.name, declaration.unique_name, "_function");
+        }
+
+        for (iris::Global_variable_declaration& declaration : declarations.global_variable_declarations)
+        {
+            if (type_names.contains(declaration.name))
+                rename(declaration.name, declaration.unique_name, "_global");
+        }
+    }
+
     bool ignore_macro(std::string_view const name)
     {
         if (name == "va_start" || name == "va_arg" || name == "va_copy" || name == "va_end" || name == "va_list")
@@ -2934,6 +2981,7 @@ namespace iris::c
 
         C_declarations declarations_with_fixed_width_integers = convert_fixed_width_integers_typedefs_to_integer_types(declarations);
         transform_names(declarations_with_fixed_width_integers, options.remove_prefixes);
+        resolve_declaration_name_collisions(declarations_with_fixed_width_integers);
 
         iris::Declaration_database declaration_database = iris::create_declaration_database();
         iris::add_declarations(
