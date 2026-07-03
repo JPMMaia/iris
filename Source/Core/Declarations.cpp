@@ -102,42 +102,42 @@ namespace iris
 
         for (Alias_type_declaration const& declaration : alias_type_declarations)
         {
-            map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export}));
+            map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
         }
 
         for (Enum_declaration const& declaration : enum_declarations)
         {
-            map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export}));
+            map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
         }
 
         for (Function_constructor const& declaration : function_constructors)
         {
-            map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export}));
+            map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
         }
 
         for (Function_declaration const& declaration : function_declarations)
         {
-            map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export}));
+            map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
         }
 
         for (Global_variable_declaration const& declaration : global_variable_declarations)
         {
-            map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export}));
+            map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
         }
 
         for (Struct_declaration const& declaration : struct_declarations)
         {
-            map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export}));
+            map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
         }
 
         for (Type_constructor const& declaration : type_constructors)
         {
-            map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export}));
+            map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
         }
 
         for (Union_declaration const& declaration : union_declarations)
         {
-            map.insert(std::make_pair(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }}));
+            map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }});
         }
     }
 
