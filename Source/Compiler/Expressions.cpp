@@ -3329,12 +3329,36 @@ namespace iris::compiler
         return std::nullopt;
     }
 
+    static bool is_reinterpret_as_expression(
+        iris::Statement const& statement,
+        iris::Expression const& expression
+    )
+    {
+        if (!std::holds_alternative<iris::Call_expression>(expression.data))
+            return false;
+
+        iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
+
+        iris::Expression const& left_call_expression = statement.expressions[call_expression.expression.expression_index];
+        if (!std::holds_alternative<iris::Instance_call_expression>(left_call_expression.data))
+            return false;
+
+        iris::Instance_call_expression const& instance_call_expression = std::get<iris::Instance_call_expression>(left_call_expression.data);
+
+        iris::Expression const& instance_call_left_expression = statement.expressions[instance_call_expression.left_hand_side.expression_index];
+        if (!std::holds_alternative<iris::Variable_expression>(instance_call_left_expression.data))
+            return false;
+
+        iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(instance_call_left_expression.data);
+        return variable_expression.name == "reinterpret_as";
+    }
+
     bool is_taking_address_of_expression(
         Statement const& statement,
         iris::Expression const& expression
     )
     {
-        return iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression);
+        return iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression) || is_reinterpret_as_expression(statement, expression);
     }
 
     std::pmr::vector<bool> create_is_taking_address_of_expressions_array(
@@ -6469,7 +6493,7 @@ namespace iris::compiler
 
             if (llvm::AllocaInst::classof(value.value) || llvm::GetElementPtrInst::classof(value.value) || llvm::GlobalVariable::classof(value.value))
             {
-                if (iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression) || is_global_array_variable(value.value))
+                if (iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression) || is_reinterpret_as_expression(statement, expression) || is_global_array_variable(value.value))
                 {
                     return value;
                 }

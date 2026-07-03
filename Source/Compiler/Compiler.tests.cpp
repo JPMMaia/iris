@@ -6306,6 +6306,14 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
     char const* const expected_llvm_ir = R"(
 ; Function Attrs: convergent
+define void @Pointers_foo(ptr noundef %"arguments[0].data") #0 {
+entry:
+  %data = alloca ptr, align 8
+  store ptr %"arguments[0].data", ptr %data, align 8
+  ret void
+}
+
+; Function Attrs: convergent
 define void @Pointers_pointers(ptr noundef %"arguments[0].external_pointer") #0 {
 entry:
   %external_pointer = alloca ptr, align 8
@@ -6313,6 +6321,9 @@ entry:
   %pointer_a = alloca ptr, align 8
   %dereferenced_a = alloca i32, align 4
   %p0 = alloca ptr, align 8
+  %array = alloca [2 x i32], i64 2, align 4
+  %data_array = alloca [2 x i32], align 4
+  %p1 = alloca ptr, align 8
   store ptr %"arguments[0].external_pointer", ptr %external_pointer, align 8
   store i32 1, ptr %a, align 4
   store ptr %a, ptr %pointer_a, align 8
@@ -6324,6 +6335,16 @@ entry:
   store ptr %3, ptr %p0, align 8
   %4 = load ptr, ptr %p0, align 8
   store i32 0, ptr %4, align 4
+  %array_element_pointer = getelementptr [2 x i32], ptr %array, i32 0, i32 0
+  store i32 0, ptr %array_element_pointer, align 4
+  %array_element_pointer1 = getelementptr [2 x i32], ptr %array, i32 0, i32 1
+  store i32 1, ptr %array_element_pointer1, align 4
+  %5 = load [2 x i32], ptr %array, align 4
+  store [2 x i32] %5, ptr %data_array, align 4
+  %array_element_pointer2 = getelementptr [2 x i32], ptr %data_array, i32 0, i32 0
+  store ptr %array_element_pointer2, ptr %p1, align 8
+  %array_element_pointer3 = getelementptr [2 x i32], ptr %data_array, i32 0, i32 0
+  call void @Pointers_foo(ptr noundef %array_element_pointer3)
   ret void
 }
 
