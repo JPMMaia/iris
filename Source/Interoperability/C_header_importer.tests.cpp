@@ -1204,6 +1204,71 @@ Sint32 my_global_2 = 0;
         }
     }
 
+    TEST_CASE("Struct and function/global with the same name do not collide")
+    {
+        std::filesystem::path const root_directory_path =
+            std::filesystem::temp_directory_path() / "c_header_importer" / "name_collision";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+struct foo
+{
+    int x;
+};
+
+void foo(void);
+
+struct qux
+{
+    int y;
+};
+
+int qux;
+
+struct bar
+{
+    struct foo a;
+    struct qux b;
+};
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "foo.h";
+        iris::common::write_to_file(header_file_path, header_content);
+
+        std::optional<iris::Module> const header_module_optional =
+            iris::c::import_header("c.foo", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        iris::Module const& header_module = header_module_optional.value();
+
+        // The type keeps its original name.
+        iris::Struct_declaration const& foo_struct = iris::c::find_struct_declaration(header_module, "foo");
+        CHECK(foo_struct.name == "foo");
+        CHECK(foo_struct.member_names[0] == "x");
+
+        iris::Struct_declaration const& qux_struct = iris::c::find_struct_declaration(header_module, "qux");
+        CHECK(qux_struct.name == "qux");
+
+        // The colliding function is renamed with the _function suffix.
+        iris::Function_declaration const& foo_function =
+            iris::c::find_function_declaration(header_module, "foo_function");
+        CHECK(foo_function.unique_name.value() == "foo_function");
+
+        // The colliding global variable is renamed with the _global suffix.
+        iris::Global_variable_declaration const& qux_global =
+            iris::c::find_global_variable_declaration(header_module, "qux_global");
+        CHECK(qux_global.unique_name.value() == "qux_global");
+
+        // The references to `struct foo` / `struct qux` resolve to the structs, so bar's member
+        // default values are generated correctly (this is the path that throws today).
+        iris::Struct_declaration const& bar_struct = iris::c::find_struct_declaration(header_module, "bar");
+        CHECK(bar_struct.member_types[0] == iris::create_custom_type_reference("c.foo", "foo"));
+        CHECK(bar_struct.member_types[1] == iris::create_custom_type_reference("c.foo", "qux"));
+        CHECK(bar_struct.member_default_values[0] ==
+            iris::create_statement({ iris::create_instantiate_expression(iris::Instantiate_expression_type::Default, {}) }));
+        CHECK(bar_struct.member_default_values[1] ==
+            iris::create_statement({ iris::create_instantiate_expression(iris::Instantiate_expression_type::Default, {}) }));
+    }
+
     TEST_CASE("Macro parser extracts continuation text with CRLF line endings")
     {
         std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "macro_parser_continuation";
