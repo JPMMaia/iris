@@ -1,0 +1,13 @@
+module Test_framework_external;
+
+export enum Color
+{
+    Red = 0,
+    Green,
+    Blue,
+}
+
+export function get_color() -> (color: Color)
+{
+    return Color.Green;
+}

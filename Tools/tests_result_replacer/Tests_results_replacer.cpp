@@ -149,6 +149,41 @@ namespace iris::tools::tests_results_replacer
         return output;
     }
 
+    std::pmr::string split_into_concatenated_literals(std::string_view const content)
+    {
+        constexpr std::size_t max_chunk_size = 12000;
+        constexpr std::string_view separator = ")\" R\"(";
+
+        if (content.size() <= max_chunk_size)
+            return std::pmr::string{content};
+
+        std::pmr::string output;
+        output.reserve(content.size() + content.size() / max_chunk_size * separator.size());
+
+        std::size_t chunk_begin = 0;
+        while (chunk_begin < content.size())
+        {
+            std::size_t chunk_end = std::min(chunk_begin + max_chunk_size, content.size());
+
+            // Prefer splitting on a newline boundary for readability.
+            if (chunk_end < content.size())
+            {
+                std::size_t const newline_offset = content.rfind('\n', chunk_end);
+                if (newline_offset != content.npos && newline_offset > chunk_begin)
+                    chunk_end = newline_offset + 1;
+            }
+
+            output.append(content.substr(chunk_begin, chunk_end - chunk_begin));
+
+            if (chunk_end < content.size())
+                output.append(separator);
+
+            chunk_begin = chunk_end;
+        }
+
+        return output;
+    }
+
     void replace_test_contents_alternative(
         std::pmr::string& output_text,
         Test_result const& test_result,
@@ -198,7 +233,9 @@ namespace iris::tools::tests_results_replacer
             current_offset = end_path_offset;
         }
 
-        output_text.replace(begin_offset, end_expected_offset - begin_offset, actual);
+        std::pmr::string const chunked_actual = split_into_concatenated_literals(actual);
+
+        output_text.replace(begin_offset, end_expected_offset - begin_offset, chunked_actual);
     }
 
     std::pmr::string replace_test_contents(std::string_view const input_text, std::span<Test_result const> const test_results)

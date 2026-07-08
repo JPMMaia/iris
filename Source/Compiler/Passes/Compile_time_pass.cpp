@@ -165,7 +165,68 @@ namespace iris::compiler
         return dependencies.alias_imports.back();
     }
 
+    static std::optional<std::string_view> get_module_name_from_alias(
+        iris::Module_dependencies const& dependencies,
+        std::string_view const alias
+    )
+    {
+        auto const location = std::find_if(
+            dependencies.alias_imports.begin(),
+            dependencies.alias_imports.end(),
+            [&](Import_module_with_alias const& alias_import) -> bool { return alias_import.alias == alias; }
+        );
+        if (location == dependencies.alias_imports.end())
+            return std::nullopt;
+
+        return std::string_view{location->module_name};
+    }
+
+    // Returns true when the expression names an enum type, either directly (Selection) or
+    // qualified by a module alias (some_module.Selection). Such an expression, when used as
+    // the base of an access (Selection.A), yields an enum-value constant rather than an lvalue.
+    static bool is_enum_type_expression(
+        std::string_view const module_name,
+        iris::Declaration_database const& declaration_database,
+        iris::Module_dependencies const& dependencies,
+        iris::Statement const& statement,
+        iris::Expression const& expression
+    )
+    {
+        std::string_view enum_module_name = module_name;
+        std::string_view enum_name;
+
+        if (std::holds_alternative<iris::Variable_expression>(expression.data))
+        {
+            enum_name = std::get<iris::Variable_expression>(expression.data).name;
+        }
+        else if (std::holds_alternative<iris::Access_expression>(expression.data))
+        {
+            iris::Access_expression const& access = std::get<iris::Access_expression>(expression.data);
+            iris::Expression const& base = statement.expressions[access.expression.expression_index];
+            if (!std::holds_alternative<iris::Variable_expression>(base.data))
+                return false;
+
+            std::string_view const alias = std::get<iris::Variable_expression>(base.data).name;
+            std::optional<std::string_view> const resolved_module_name = get_module_name_from_alias(dependencies, alias);
+            if (!resolved_module_name.has_value())
+                return false;
+
+            enum_module_name = resolved_module_name.value();
+            enum_name = access.member_name;
+        }
+        else
+        {
+            return false;
+        }
+
+        std::optional<iris::Declaration> const declaration = iris::find_underlying_declaration(declaration_database, enum_module_name, enum_name);
+        return declaration.has_value() && std::holds_alternative<iris::Enum_declaration const*>(declaration->data);
+    }
+
     static bool is_addressable_expression(
+        std::string_view const module_name,
+        iris::Declaration_database const& declaration_database,
+        iris::Module_dependencies const& dependencies,
         iris::Statement const& statement,
         iris::Expression const& expression
     )
@@ -176,19 +237,25 @@ namespace iris::compiler
         {
             iris::Access_expression const& access = std::get<iris::Access_expression>(expression.data);
             iris::Expression const& left = statement.expressions[access.expression.expression_index];
-            return is_addressable_expression(statement, left);
+
+            // An access whose base names an enum type (e.g. Selection.A or module.Selection.A)
+            // is an enum-value constant, not an lvalue, so it cannot have its address taken.
+            if (is_enum_type_expression(module_name, declaration_database, dependencies, statement, left))
+                return false;
+
+            return is_addressable_expression(module_name, declaration_database, dependencies, statement, left);
         }
         if (std::holds_alternative<iris::Access_array_expression>(expression.data))
         {
             iris::Access_array_expression const& access = std::get<iris::Access_array_expression>(expression.data);
             iris::Expression const& left = statement.expressions[access.expression.expression_index];
-            return is_addressable_expression(statement, left);
+            return is_addressable_expression(module_name, declaration_database, dependencies, statement, left);
         }
         if (std::holds_alternative<iris::Dereference_and_access_expression>(expression.data))
         {
             iris::Dereference_and_access_expression const& access = std::get<iris::Dereference_and_access_expression>(expression.data);
             iris::Expression const& left = statement.expressions[access.expression.expression_index];
-            return is_addressable_expression(statement, left);
+            return is_addressable_expression(module_name, declaration_database, dependencies, statement, left);
         }
         return false;
     }
@@ -248,6 +315,9 @@ namespace iris::compiler
     };
 
     static Normalized_operand normalize_check_operand(
+        std::string_view const module_name,
+        iris::Declaration_database const& declaration_database,
+        iris::Module_dependencies const& dependencies,
         std::string_view const temp_name,
         iris::Statement const& source_statement,
         iris::Expression_index const expression_index,
@@ -256,7 +326,7 @@ namespace iris::compiler
     {
         iris::Expression const& expression = source_statement.expressions[expression_index.expression_index];
 
-        if (is_addressable_expression(source_statement, expression))
+        if (is_addressable_expression(module_name, declaration_database, dependencies, source_statement, expression))
         {
             iris::Statement normalized;
             copy_expressions_to_new_statement(normalized, source_statement, expression_index);
@@ -546,12 +616,18 @@ namespace iris::compiler
         // Normalize operands: non-addressable expressions (e.g. binary temporaries) are
         // spilled to local variables so that address-of can safely be applied to them.
         Normalized_operand left_operand = normalize_check_operand(
+            module_name,
+            parameters.declaration_database,
+            parameters.dependencies,
             "__lhs",
             statement,
             binary_expression->left_hand_side,
             parameters.output_allocator
         );
         Normalized_operand right_operand = normalize_check_operand(
+            module_name,
+            parameters.declaration_database,
+            parameters.dependencies,
             "__rhs",
             statement,
             binary_expression->right_hand_side,
