@@ -166,6 +166,8 @@ namespace iris::compiler
     }
 
     static bool is_addressable_expression(
+        std::string_view const module_name,
+        iris::Declaration_database const& declaration_database,
         iris::Statement const& statement,
         iris::Expression const& expression
     )
@@ -176,19 +178,28 @@ namespace iris::compiler
         {
             iris::Access_expression const& access = std::get<iris::Access_expression>(expression.data);
             iris::Expression const& left = statement.expressions[access.expression.expression_index];
-            return is_addressable_expression(statement, left);
+
+            if (std::holds_alternative<iris::Variable_expression>(left.data))
+            {
+                iris::Variable_expression const& base = std::get<iris::Variable_expression>(left.data);
+                std::optional<iris::Declaration> const declaration = iris::find_underlying_declaration(declaration_database, module_name, base.name);
+                if (declaration.has_value() && std::holds_alternative<iris::Enum_declaration const*>(declaration->data))
+                    return false;
+            }
+
+            return is_addressable_expression(module_name, declaration_database, statement, left);
         }
         if (std::holds_alternative<iris::Access_array_expression>(expression.data))
         {
             iris::Access_array_expression const& access = std::get<iris::Access_array_expression>(expression.data);
             iris::Expression const& left = statement.expressions[access.expression.expression_index];
-            return is_addressable_expression(statement, left);
+            return is_addressable_expression(module_name, declaration_database, statement, left);
         }
         if (std::holds_alternative<iris::Dereference_and_access_expression>(expression.data))
         {
             iris::Dereference_and_access_expression const& access = std::get<iris::Dereference_and_access_expression>(expression.data);
             iris::Expression const& left = statement.expressions[access.expression.expression_index];
-            return is_addressable_expression(statement, left);
+            return is_addressable_expression(module_name, declaration_database, statement, left);
         }
         return false;
     }
@@ -248,6 +259,8 @@ namespace iris::compiler
     };
 
     static Normalized_operand normalize_check_operand(
+        std::string_view const module_name,
+        iris::Declaration_database const& declaration_database,
         std::string_view const temp_name,
         iris::Statement const& source_statement,
         iris::Expression_index const expression_index,
@@ -256,7 +269,7 @@ namespace iris::compiler
     {
         iris::Expression const& expression = source_statement.expressions[expression_index.expression_index];
 
-        if (is_addressable_expression(source_statement, expression))
+        if (is_addressable_expression(module_name, declaration_database, source_statement, expression))
         {
             iris::Statement normalized;
             copy_expressions_to_new_statement(normalized, source_statement, expression_index);
@@ -546,12 +559,16 @@ namespace iris::compiler
         // Normalize operands: non-addressable expressions (e.g. binary temporaries) are
         // spilled to local variables so that address-of can safely be applied to them.
         Normalized_operand left_operand = normalize_check_operand(
+            module_name,
+            parameters.declaration_database,
             "__lhs",
             statement,
             binary_expression->left_hand_side,
             parameters.output_allocator
         );
         Normalized_operand right_operand = normalize_check_operand(
+            module_name,
+            parameters.declaration_database,
             "__rhs",
             statement,
             binary_expression->right_hand_side,

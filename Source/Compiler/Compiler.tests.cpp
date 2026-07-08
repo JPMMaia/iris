@@ -6792,6 +6792,12 @@ entry:
   ret i32 %2
 }
 
+; Function Attrs: convergent
+define private i32 @Test_framework_selection() #0 {
+entry:
+  ret i32 0
+}
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 
@@ -6828,6 +6834,11 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_13 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
 @global_14 = internal constant [7 x i8] c"' vs '\00"
 @global_15 = internal constant [3 x i8] c"'\0A\00"
+@global_16 = internal constant [5 x i8] c"null\00"
+@global_17 = internal constant [3 x i8] c"??\00"
+@global_18 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
+@global_19 = internal constant [7 x i8] c"' vs '\00"
+@global_20 = internal constant [3 x i8] c"'\0A\00"
 
 ; Function Attrs: convergent
 declare i32 @fflush(ptr noundef) #0
@@ -6855,6 +6866,12 @@ entry:
 }}
 
 ; Function Attrs: convergent
+define private i32 @Test_framework_selection() #0 {{
+entry:
+  ret i32 0
+}}
+
+; Function Attrs: convergent
 define void @Test_framework_test_addition() #0 {{
 entry:
   %__lhs = alloca i32, align 4
@@ -6863,6 +6880,9 @@ entry:
   %__lhs1 = alloca i32, align 4
   %__rhs2 = alloca i32, align 4
   %__condition3 = alloca i1, align 1
+  %__lhs6 = alloca i32, align 4
+  %__rhs7 = alloca i32, align 4
+  %__condition8 = alloca i1, align 1
   %0 = call i32 @Test_framework_add(i32 noundef 1, i32 noundef 2)
   store i32 %0, ptr %__lhs, align 4
   store i32 3, ptr %__rhs, align 4
@@ -6872,7 +6892,7 @@ entry:
   store i1 %3, ptr %__condition, align 1
   %4 = load i8, ptr %__condition, align 1
   %5 = trunc i8 %4 to i1
-  call void @iris_test_check(i1 noundef zeroext %5, ptr noundef @iris_test_source_file_path, i64 noundef 11)
+  call void @iris_test_check(i1 noundef zeroext %5, ptr noundef @iris_test_source_file_path, i64 noundef 22)
   %6 = load i8, ptr %__condition, align 1
   %7 = icmp eq i8 %6, 0
   br i1 %7, label %if_s0_then, label %if_s1_after
@@ -6891,7 +6911,7 @@ if_s1_after:                                      ; preds = %if_s0_then, %entry
   store i1 %11, ptr %__condition3, align 1
   %12 = load i8, ptr %__condition3, align 1
   %13 = trunc i8 %12 to i1
-  call void @iris_test_check(i1 noundef zeroext %13, ptr noundef @iris_test_source_file_path, i64 noundef 12)
+  call void @iris_test_check(i1 noundef zeroext %13, ptr noundef @iris_test_source_file_path, i64 noundef 23)
   %14 = load i8, ptr %__condition3, align 1
   %15 = icmp eq i8 %14, 0
   br i1 %15, label %if_s0_then4, label %if_s1_after5
@@ -6901,6 +6921,25 @@ if_s0_then4:                                      ; preds = %if_s1_after
   br label %if_s1_after5
 
 if_s1_after5:                                     ; preds = %if_s0_then4, %if_s1_after
+  %16 = call i32 @Test_framework_selection()
+  store i32 %16, ptr %__lhs6, align 4
+  store i32 0, ptr %__rhs7, align 4
+  %17 = load i32, ptr %__lhs6, align 4
+  %18 = load i32, ptr %__rhs7, align 4
+  %19 = icmp eq i32 %17, %18
+  store i1 %19, ptr %__condition8, align 1
+  %20 = load i8, ptr %__condition8, align 1
+  %21 = trunc i8 %20 to i1
+  call void @iris_test_check(i1 noundef zeroext %21, ptr noundef @iris_test_source_file_path, i64 noundef 24)
+  %22 = load i8, ptr %__condition8, align 1
+  %23 = icmp eq i8 %22, 0
+  br i1 %23, label %if_s0_then9, label %if_s1_after10
+
+if_s0_then9:                                      ; preds = %if_s1_after5
+  call void @iris.json__at__print_json_difference__at__1521435198825465952(ptr noundef %__lhs6, ptr noundef %__rhs7)
+  br label %if_s1_after10
+
+if_s1_after10:                                    ; preds = %if_s0_then9, %if_s1_after5
   ret void
 }}
 
@@ -7064,7 +7103,7 @@ entry:
   %value = alloca ptr, align 8
   %array = alloca [16 x i8], i64 16, align 1
   %format_specifier_buffer = alloca [16 x i8], align 1
-  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+)" R"(  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   %format_specifier = alloca ptr, align 8
   %array1 = alloca [64 x i8], i64 64, align 1
   %format_buffer = alloca [64 x i8], align 1
@@ -7154,6 +7193,68 @@ entry:
   call void @iris.json__at__print_json__at__9753731967319569499(ptr noundef %5)
   %6 = call ptr @__acrt_iob_func(i32 noundef 2)
   %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_15)
+  %8 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %9 = call i32 @fflush(ptr noundef %8)
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @iris.json__at__to_json__at__3070122814526398097(ptr noundef %"arguments[0].stream", ptr noundef %"arguments[1].value") #0 {{
+entry:
+  %0 = alloca %struct.iris_json_Write_stream, align 8
+  %value = alloca ptr, align 8
+  %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  store ptr %"arguments[0].stream", ptr %1, align 8
+  store ptr %"arguments[1].value", ptr %value, align 8
+  %2 = load ptr, ptr %value, align 8
+  %3 = icmp eq ptr %2, null
+  br i1 %3, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  %4 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %5 = load ptr, ptr %4, align 8
+  call void %5(ptr noundef @global_16)
+  ret void
+
+if_s1_after:                                      ; preds = %entry
+  %6 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %7 = load ptr, ptr %6, align 8
+  call void %7(ptr noundef @global_17)
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @iris.json__at__print_json__at__1614900316607571923(ptr noundef %"arguments[0].value") #0 {{
+entry:
+  %value = alloca ptr, align 8
+  %stream = alloca %struct.iris_json_Write_stream, align 8
+  store ptr %"arguments[0].value", ptr %value, align 8
+  %0 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
+  store ptr @iris.json.print_to_stderr, ptr %0, align 8
+  %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
+  %2 = load ptr, ptr %1, align 8
+  %3 = load ptr, ptr %value, align 8
+  call void @iris.json__at__to_json__at__3070122814526398097(ptr noundef %2, ptr noundef %3)
+  ret void
+}}
+
+; Function Attrs: convergent
+define private void @iris.json__at__print_json_difference__at__1521435198825465952(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
+entry:
+  %lhs = alloca ptr, align 8
+  %rhs = alloca ptr, align 8
+  store ptr %"arguments[0].lhs", ptr %lhs, align 8
+  store ptr %"arguments[1].rhs", ptr %rhs, align 8
+  %0 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_18)
+  %2 = load ptr, ptr %rhs, align 8
+  call void @iris.json__at__print_json__at__1614900316607571923(ptr noundef %2)
+  %3 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_19)
+  %5 = load ptr, ptr %lhs, align 8
+  call void @iris.json__at__print_json__at__1614900316607571923(ptr noundef %5)
+  %6 = call ptr @__acrt_iob_func(i32 noundef 2)
+  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_20)
   %8 = call ptr @__acrt_iob_func(i32 noundef 2)
   %9 = call i32 @fflush(ptr noundef %8)
   ret void

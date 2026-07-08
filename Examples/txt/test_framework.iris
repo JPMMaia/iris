@@ -5,9 +5,21 @@ function add(a: Int32, b: Int32) -> (result: Int32)
     return a + b;
 }
 
+enum Selection
+{
+    A = 0,
+    B,
+}
+
+function selection() -> (selection: Selection)
+{
+    return Selection.A;
+}
+
 @test
 function test_addition() -> ()
 {
     check(add(1, 2) == 3);
     check(add(2, 3) == 5);
+    check(selection() == Selection.A);
 }
