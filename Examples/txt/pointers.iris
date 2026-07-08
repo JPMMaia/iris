@@ -13,9 +13,7 @@ export function pointers(external_pointer: *mutable Int32) -> ()
     mutable p0 = offset_pointer(external_pointer, 2i64);
     *p0 = 0;
 
-    var data_array: Constant_array::<Uint32, 2> = [
-        0u32, 1u32
-    ];
+    var data_array: Constant_array::<Uint32, 2> = [0u32, 1u32];
     var p1 = reinterpret_as::<*Byte>(&data_array[0]);
     foo(reinterpret_as::<*Byte>(&data_array[0]));
 }
