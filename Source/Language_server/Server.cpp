@@ -4,8 +4,11 @@ module;
 #include <cstdlib>
 #include <filesystem>
 #include <memory_resource>
+#include <optional>
 #include <span>
 #include <sstream>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include <lsp/messagehandler.h>
@@ -891,7 +894,24 @@ namespace iris::language_server
         std::optional<int> const version = workspace_data.core_module_versions[core_module_index];
 
         Diagnostics_state& diagnostics_state = workspace_data.diagnostics_states[core_module_index];
-        bool const are_diagnostics_dirty = version.has_value() ? diagnostics_state.version != version : true;
+
+        // Recompute when this module or any of its transitive dependencies changed since the
+        // diagnostics were last produced (or when a forced recompute was requested), rather
+        // than only when this document's own version changed. Otherwise editing a dependency
+        // would leave this document with stale diagnostics.
+        std::pmr::polymorphic_allocator<> temporaries_allocator;
+        std::pmr::vector<std::pair<std::pmr::string, std::optional<int>>> current_dependency_versions =
+            collect_transitive_dependency_versions(
+                core_module_index,
+                workspace_data.core_modules,
+                workspace_data.core_module_versions,
+                {},
+                temporaries_allocator
+            );
+
+        bool const are_diagnostics_dirty =
+            diagnostics_state.force_recompute
+            || current_dependency_versions != diagnostics_state.validated_dependency_versions;
 
         if (!are_diagnostics_dirty)
         {
@@ -914,7 +934,21 @@ namespace iris::language_server
             {}
         );
 
+        diagnostics_state.force_recompute = false;
+        diagnostics_state.validated_dependency_versions = std::move(current_dependency_versions);
+
         return report;
+    }
+
+    void invalidate_all_diagnostics(
+        Server& server
+    )
+    {
+        for (Workspace_data& workspace_data : server.workspaces_data)
+        {
+            for (Diagnostics_state& diagnostics_state : workspace_data.diagnostics_states)
+                diagnostics_state.force_recompute = true;
+        }
     }
 
     lsp::TextDocument_InlayHintResult compute_document_inlay_hints(

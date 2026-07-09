@@ -1,5 +1,7 @@
 module;
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <format>
@@ -8,7 +10,9 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <lsp/types.h>
@@ -141,30 +145,61 @@ namespace iris::language_server
         return item;
     }
 
-    static bool is_any_dependency_dirty(
-        iris::Module const& core_module,
+    std::pmr::vector<std::pair<std::pmr::string, std::optional<int>>> collect_transitive_dependency_versions(
+        std::size_t const core_module_index,
         std::span<iris::Module const> const core_modules,
         std::span<std::optional<int> const> const core_module_versions,
-        std::span<Diagnostics_state const> const core_module_diagnostics_states
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        for (iris::Import_module_with_alias const& alias : core_module.dependencies.alias_imports)
-        {
-            for (std::size_t index = 0; index < core_modules.size(); ++index)
-            {
-                iris::Module const& dependency = core_modules[index];
+        std::pmr::unordered_map<std::string_view, std::size_t> name_to_index{temporaries_allocator};
+        name_to_index.reserve(core_modules.size());
+        for (std::size_t index = 0; index < core_modules.size(); ++index)
+            name_to_index.emplace(std::string_view{core_modules[index].name}, index);
 
-                if (alias.module_name == dependency.name)
-                {
-                    std::optional<int> const dependency_version = core_module_versions[index];
-                    Diagnostics_state const& dependency_diagnostics_state = core_module_diagnostics_states[index];
-                    if (dependency_diagnostics_state.version != dependency_version)
-                        return true;
-                }
+        std::pmr::vector<std::pair<std::pmr::string, std::optional<int>>> versions{output_allocator};
+
+        std::pmr::unordered_set<std::size_t> visited{temporaries_allocator};
+        std::pmr::vector<std::size_t> pending{temporaries_allocator};
+        pending.push_back(core_module_index);
+
+        while (!pending.empty())
+        {
+            std::size_t const current_index = pending.back();
+            pending.pop_back();
+
+            if (!visited.insert(current_index).second)
+                continue;
+
+            iris::Module const& current_module = core_modules[current_index];
+            versions.emplace_back(
+                std::pmr::string{current_module.name, output_allocator},
+                core_module_versions[current_index]
+            );
+
+            for (iris::Import_module_with_alias const& alias : current_module.dependencies.alias_imports)
+            {
+                auto const location = name_to_index.find(std::string_view{alias.module_name});
+                if (location != name_to_index.end())
+                    pending.push_back(location->second);
             }
         }
 
-        return false;
+        std::ranges::sort(versions, {}, [](auto const& entry) -> std::string_view { return entry.first; });
+
+        return versions;
+    }
+
+    static bool are_module_diagnostics_dirty(
+        Diagnostics_state const& diagnostics_state,
+        std::span<std::pair<std::pmr::string, std::optional<int>> const> const current_dependency_versions
+    )
+    {
+        if (diagnostics_state.force_recompute)
+            return true;
+
+        return !std::ranges::equal(current_dependency_versions, diagnostics_state.validated_dependency_versions);
     }
 
     static std::string generate_new_result_id(
@@ -198,11 +233,20 @@ namespace iris::language_server
             std::filesystem::path const& source_file_path = core_module_source_file_paths[core_module_index];
             std::optional<int> const version = core_module_versions[core_module_index];
             Diagnostics_state& diagnostics_state = core_module_diagnostics_states[core_module_index];
-            iris::Module const& core_module = core_modules[core_module_index];
 
-            bool const is_core_module_dirty = diagnostics_state.version != version;
-            bool const is_any_core_module_dependency_dirty = is_any_dependency_dirty(core_module, core_modules, core_module_versions, core_module_diagnostics_states);
-            bool const are_diagnostics_dirty = is_core_module_dirty || is_any_core_module_dependency_dirty;
+            // Dirtiness is derived from the current versions of this module's transitive
+            // dependency closure only, so it is independent of the order in which modules
+            // are processed here and of the other pull path (per-document diagnostics).
+            std::pmr::vector<std::pair<std::pmr::string, std::optional<int>>> current_dependency_versions =
+                collect_transitive_dependency_versions(
+                    core_module_index,
+                    core_modules,
+                    core_module_versions,
+                    temporaries_allocator,
+                    temporaries_allocator
+                );
+
+            bool const are_diagnostics_dirty = are_module_diagnostics_dirty(diagnostics_state, current_dependency_versions);
 
             lsp::DocumentUri const document_uri = lsp::DocumentUri::fromPath(source_file_path.generic_string());
             std::optional<lsp::PreviousResultId> const previous_result_id = find_previous_result_id(
@@ -226,8 +270,12 @@ namespace iris::language_server
                 }
             }
 
+            iris::Module const& core_module = core_modules[core_module_index];
+
             diagnostics_state.version = version;
             diagnostics_state.result_id = generate_new_result_id(diagnostics_state.result_id);
+            diagnostics_state.force_recompute = false;
+            diagnostics_state.validated_dependency_versions = std::move(current_dependency_versions);
 
             std::pmr::vector<iris::compiler::Diagnostic> parser_diagnostics = create_parser_diagnostics(
                 source_file_path,

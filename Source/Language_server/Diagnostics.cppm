@@ -4,6 +4,8 @@ module;
 #include <memory_resource>
 #include <optional>
 #include <span>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include <lsp/types.h>
@@ -22,7 +24,22 @@ namespace iris::language_server
         std::pmr::vector<iris::compiler::Diagnostic> diagnostics;
         std::optional<int> version;
         std::string result_id;
+        bool force_recompute = false;
+
+        // Snapshot of {module name -> document version} for this module and its full
+        // transitive alias-import closure, captured when the diagnostics were last
+        // computed. Diagnostics are stale (and must be recomputed) whenever the current
+        // versions of that closure differ from this snapshot.
+        std::pmr::vector<std::pair<std::pmr::string, std::optional<int>>> validated_dependency_versions;
     };
+
+    export std::pmr::vector<std::pair<std::pmr::string, std::optional<int>>> collect_transitive_dependency_versions(
+        std::size_t const core_module_index,
+        std::span<iris::Module const> const core_modules,
+        std::span<std::optional<int> const> const core_module_versions,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
 
     export std::pmr::vector<iris::compiler::Diagnostic> create_parser_diagnostics(
         std::filesystem::path const& source_file_path,

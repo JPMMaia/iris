@@ -16,6 +16,12 @@
   "main": "./out/extension.js",
   "activationEvents": [],
   "contributes": {
+    "commands": [
+      {
+        "command": "iris.recomputeDiagnostics",
+        "title": "Iris: Recompute Diagnostics"
+      }
+    ],
     "breakpoints": [
       {
         "language": "iris"

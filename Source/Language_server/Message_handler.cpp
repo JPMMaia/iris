@@ -221,6 +221,22 @@ namespace iris::language_server
             }
         );
 
+        message_handler.add<Recompute_diagnostics>(
+            [&]() -> void
+            {
+                invalidate_all_diagnostics(server);
+
+                if (has_workspace_diagnostic_refresh_capability)
+                {
+                    message_handler.sendRequest<lsp::requests::Workspace_Diagnostic_Refresh>(
+                        [](lsp::Workspace_Diagnostic_RefreshResult&&)
+                        {
+                        }
+                    );
+                }
+            }
+        );
+
         // TODO use workspace/didChangeWatchedFiles to watch for changes in artifact and repository files
       
          while(running)

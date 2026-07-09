@@ -43,4 +43,11 @@ namespace iris::language_server
         static constexpr auto Direction = lsp::MessageDirection::ServerToClient;
         static constexpr auto Type = lsp::Message::Notification;
     };
+
+    struct Recompute_diagnostics
+    {
+        static constexpr auto Method = std::string_view("iris/recomputeDiagnostics");
+        static constexpr auto Direction = lsp::MessageDirection::ClientToServer;
+        static constexpr auto Type = lsp::Message::Notification;
+    };
 }

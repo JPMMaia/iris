@@ -125,6 +125,10 @@ namespace iris::language_server
         lsp::DocumentDiagnosticParams const& parameters
     );
 
+    export void invalidate_all_diagnostics(
+        Server& server
+    );
+
     export lsp::TextDocument_InlayHintResult compute_document_inlay_hints(
         Server& server,
         lsp::InlayHintParams const& parameters

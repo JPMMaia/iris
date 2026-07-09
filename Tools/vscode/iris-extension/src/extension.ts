@@ -168,6 +168,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 
 	await workspace_initialized_promise;
 
+	context.subscriptions.push(
+		vscode.commands.registerCommand("iris.recomputeDiagnostics", async () => {
+			if (client !== undefined) {
+				await client.sendNotification("iris/recomputeDiagnostics");
+			}
+		})
+	);
+
 	// Set up test executable watcher (discover and show tests in the Test Explorer)
 	try {
 		output_channel.appendLine("Starting test adapter");
