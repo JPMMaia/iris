@@ -3943,6 +3943,62 @@ function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that can assign to member of mutable variable of instantiated type", "[Validation][Mutability]")
+    {
+        std::string_view const input = R"(module Test;
+
+type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+type_constructor Transform(Value_type: Type)
+{
+    return struct
+    {
+        translation: Vector3::<Value_type> = {};
+    };
+}
+
+using Transformf32 = Transform::<Float32>;
+
+function identity_transform() -> (transform: Transformf32)
+{
+    return explicit {
+        translation: { x: 0.0f32, y: 0.0f32, z: 0.0f32 }
+    };
+}
+
+function run() -> ()
+{
+    mutable transform = identity_transform();
+    transform.translation = {};
+    transform.translation.x = 2.0f32;
+
+    var non_mutable_transform = identity_transform();
+    non_mutable_transform.translation.x = 3.0f32;
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(37, 5, 37, 49),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot modify non-mutable value.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that non-mutable pointer cannot be assigned to mutable pointer", "[Validation][Mutability]")
     {
         std::string_view const input = R"(module Test;

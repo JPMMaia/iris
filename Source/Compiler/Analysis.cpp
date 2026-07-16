@@ -1109,10 +1109,10 @@ namespace iris::compiler
                         return Type_info
                         {
                             .type = struct_declaration.member_types[member_index],
-                            .is_mutable = false,
+                            .is_mutable = type_info->is_mutable,
                         };
                     }
-                    
+
                     // If member is not found, then try to find function in the module
                     iris::Type_reference const& custom_type_reference = create_custom_type_reference(type_instance.type_constructor.module_reference.name, data.member_name);
                     std::optional<Declaration> const declaration = find_declaration(
