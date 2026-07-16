@@ -21,6 +21,30 @@ Components:
   - The `Server` struct owns parallel vectors indexed by `core_module_index`; every lookup goes
     through `find_workspace_core_module_index`, which returns nothing for a file the workspace does
     not know about, in which case each feature silently no-ops.
+
+### Comparing paths and uris
+
+Never compare a `lsp::DocumentUri` or a `std::filesystem::path` with `==`. A path spelled by the
+client (`c:/foo/bar.iris`) and the same path produced by expanding an artifact glob
+(`C:\foo\bar.iris`) denote one file but compare unequal, and the symptom is silent: the lookup
+fails and the feature does nothing at all.
+
+Use `compare_document_uris` from `iris.language_server.core` (`Source/Language_server/Core.cpp`),
+which ignores case and separator differences. `Server.cpp` wraps it in `are_file_paths_equal` for
+path-to-path comparisons, and `Diagnostics.cpp` converts with `lsp::DocumentUri::fromPath` before
+comparing.
+
+When writing tests, note that `lsp::DocumentUri::fromPath` runs `std::filesystem::canonical` on a
+file that exists (`fileuri.cpp`), which quietly restores the real drive-letter case. A test that
+builds a differently cased uri that way proves nothing. Parse the uri instead, the way one
+arriving over the wire is handled:
+
+```cpp
+lsp::DocumentUri const uri = lsp::DocumentUri{lsp::Uri::parse("file:///c:/foo/bar.iris")};
+```
+
+Also note `lsp::Uri::path()` keeps the leading `/` while `lsp::FileUri::path()` strips it on
+Windows, so `to_filesystem_path` taking a `lsp::Uri const&` is deliberate.
 - `Source/Language_server/Code_action.cpp`: Handles Code Action requests.
 - `Source/Language_server/Completion.cpp`: Handles Completion requests.
 - `Source/Language_server/Diagnostics.cpp`: Uses the Core Module Validation to create Diagnostic reports.

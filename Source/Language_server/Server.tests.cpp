@@ -252,6 +252,50 @@ export function main() -> (result: Int32)
             return workspace_did_change_watched_files(server, parameters);
         }
 
+        // Clients do not agree with the filesystem on how a Windows path is spelled: a uri may
+        // arrive with a lower case drive letter where the artifact globs produced an upper case
+        // one. The uri is parsed rather than built with DocumentUri::fromPath, because fromPath
+        // runs std::filesystem::canonical on a file that exists and would restore the real case,
+        // which a uri arriving over the wire is never subjected to.
+        static lsp::DocumentUri to_lower_case_drive_uri(std::filesystem::path const& file)
+        {
+            std::string generic = file.generic_string();
+            if (generic.size() >= 2 && generic[1] == ':')
+                generic[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(generic[0])));
+
+            return lsp::DocumentUri{lsp::Uri::parse("file:///" + generic)};
+        }
+
+        static void open_document_with_uri(Server& server, lsp::DocumentUri const& uri, int const version, std::string_view const text)
+        {
+            lsp::DidOpenTextDocumentParams parameters;
+            parameters.textDocument.uri = uri;
+            parameters.textDocument.languageId = "iris";
+            parameters.textDocument.version = version;
+            parameters.textDocument.text = std::string{text};
+            text_document_did_open(server, parameters);
+        }
+
+        static void change_document_full_text_with_uri(Server& server, lsp::DocumentUri const& uri, int const version, std::string_view const new_text)
+        {
+            lsp::DidChangeTextDocumentParams parameters;
+            parameters.textDocument.uri = uri;
+            parameters.textDocument.version = version;
+            parameters.contentChanges.push_back(lsp::TextDocumentContentChangeEvent_Text{ .text = std::string{new_text} });
+            text_document_did_change(server, parameters);
+        }
+
+        static bool notify_watched_file_change_with_uri(
+            Server& server,
+            lsp::DocumentUri const& uri,
+            lsp::FileChangeType const type
+        )
+        {
+            lsp::DidChangeWatchedFilesParams parameters;
+            parameters.changes.push_back(lsp::FileEvent{ .uri = uri, .type = type });
+            return workspace_did_change_watched_files(server, parameters);
+        }
+
         static bool is_core_module_known(
             Server const& server,
             std::filesystem::path const& file
@@ -754,6 +798,81 @@ export function extra_function() -> ()
 
         // Files the server does not care about are ignored.
         CHECK_FALSE(notify_watched_file_change(server, workspace.directory / "README.md", lsp::FileChangeType::Created));
+
+        destroy_server(server);
+    }
+
+    TEST_CASE("Watched file events tolerate differently cased paths", "[Language_server][Server][Watched_files]")
+    {
+        Glob_workspace const workspace = write_glob_workspace("iris_language_server_watched_files_path_case");
+
+        Server server = create_configured_server(workspace.directory);
+        REQUIRE(server.workspaces_data.size() == 1);
+
+        lsp::DocumentUri const main_file_uri = to_lower_case_drive_uri(workspace.main_file);
+        REQUIRE(main_file_uri.isValid());
+
+        open_document_with_uri(server, main_file_uri, 1, R"(module app;
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return 0;
+}
+)");
+
+        // The edit only exists in the editor, and arrives spelled the way the client spells paths.
+        change_document_full_text_with_uri(
+            server,
+            main_file_uri,
+            2,
+            R"(module app;
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return 0
+)"
+        );
+
+        lsp::DocumentDiagnosticReport const edited = pull_document_diagnostics(server, workspace.main_file, std::nullopt);
+        REQUIRE(std::holds_alternative<lsp::RelatedFullDocumentDiagnosticReport>(edited));
+        REQUIRE_FALSE(std::get<lsp::RelatedFullDocumentDiagnosticReport>(edited).items.empty());
+
+        // A build directory event spelled differently must still be recognized as being under the
+        // build directory, otherwise generated sources would trigger a rebuild.
+        CHECK_FALSE(
+            notify_watched_file_change_with_uri(
+                server,
+                to_lower_case_drive_uri(workspace.build_directory / "generated.iris"),
+                lsp::FileChangeType::Created
+            )
+        );
+
+        std::filesystem::path const created_file = workspace.directory / "extra.iris";
+        iris::common::write_to_file(
+            created_file,
+            R"(module extra;
+
+export function extra_function() -> ()
+{
+}
+)"
+        );
+        REQUIRE(
+            notify_watched_file_change_with_uri(
+                server,
+                to_lower_case_drive_uri(created_file),
+                lsp::FileChangeType::Created
+            )
+        );
+
+        // The open document was tracked under the client's spelling while the rebuilt workspace
+        // lists it under the filesystem's, so preserving its unsaved tree depends on the two
+        // being compared case insensitively.
+        lsp::DocumentDiagnosticReport const after_rebuild = pull_document_diagnostics(server, workspace.main_file, std::nullopt);
+        REQUIRE(std::holds_alternative<lsp::RelatedFullDocumentDiagnosticReport>(after_rebuild));
+        CHECK_FALSE(std::get<lsp::RelatedFullDocumentDiagnosticReport>(after_rebuild).items.empty());
 
         destroy_server(server);
     }

@@ -512,12 +512,32 @@ namespace iris::language_server
         return core_modules;
     }
 
+    // Paths that reach the server from different places do not agree on case or separators: a
+    // client may send 'c:/foo' where an artifact glob produced 'C:\foo'. Comparing them as
+    // std::filesystem::path would treat those as different files, so they are compared the same
+    // way document uris are.
+    static bool are_file_paths_equal(
+        std::filesystem::path const& left,
+        std::filesystem::path const& right
+    )
+    {
+        return compare_document_uris(
+            lsp::DocumentUri::fromPath(left.generic_string()),
+            lsp::DocumentUri::fromPath(right.generic_string())
+        );
+    }
+
     static bool is_document_open(
         Server const& server,
         std::filesystem::path const& file_path
     )
     {
-        return std::ranges::find(server.open_document_paths, file_path) != server.open_document_paths.end();
+        auto const location = std::ranges::find_if(
+            server.open_document_paths,
+            [&](std::filesystem::path const& open_document_path) -> bool { return are_file_paths_equal(open_document_path, file_path); }
+        );
+
+        return location != server.open_document_paths.end();
     }
 
     // Finds a source file in workspace data that is about to be discarded, so that state which
@@ -532,7 +552,10 @@ namespace iris::language_server
             std::pmr::vector<std::filesystem::path> const& source_file_paths =
                 previous_workspaces_data[workspace_index].core_module_source_file_paths;
 
-            auto const location = std::find(source_file_paths.begin(), source_file_paths.end(), file_path);
+            auto const location = std::ranges::find_if(
+                source_file_paths,
+                [&](std::filesystem::path const& source_file_path) -> bool { return are_file_paths_equal(source_file_path, file_path); }
+            );
             if (location == source_file_paths.end())
                 continue;
 
@@ -755,10 +778,11 @@ namespace iris::language_server
         {
             std::filesystem::path const file_path = to_filesystem_path(workspace_data.builder.target, uri);
 
-            auto const location = std::find(
-                workspace_data.core_module_source_file_paths.begin(),
-                workspace_data.core_module_source_file_paths.end(),
-                file_path
+            // The uri is spelled by the client while these paths were produced by expanding the
+            // artifact globs, so the two need not agree on case or separators.
+            auto const location = std::ranges::find_if(
+                workspace_data.core_module_source_file_paths,
+                [&](std::filesystem::path const& source_file_path) -> bool { return are_file_paths_equal(source_file_path, file_path); }
             );
             if (location == workspace_data.core_module_source_file_paths.end())
                 continue;
@@ -1090,11 +1114,21 @@ namespace iris::language_server
         std::filesystem::path const& directory
     )
     {
-        std::filesystem::path const relative = path.lexically_normal().lexically_relative(directory.lexically_normal());
-        if (relative.empty())
-            return false;
+        // Walks the ancestors rather than using lexically_relative, so that the comparison
+        // tolerates the same case and separator differences as everywhere else.
+        std::filesystem::path current = path.lexically_normal();
 
-        return *relative.begin() != "..";
+        while (true)
+        {
+            std::filesystem::path parent = current.parent_path();
+            if (parent == current)
+                return false;
+
+            if (are_file_paths_equal(parent, directory))
+                return true;
+
+            current = std::move(parent);
+        }
     }
 
     static bool is_project_file_name(
