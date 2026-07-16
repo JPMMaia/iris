@@ -50,4 +50,18 @@ namespace iris::language_server
         static constexpr auto Direction = lsp::MessageDirection::ClientToServer;
         static constexpr auto Type = lsp::Message::Notification;
     };
+
+    // Announces that a watched file event rebuilt the workspace. Unlike Workspace_initialized,
+    // which only ever fires once, this may fire any number of times, which lets a client (or a
+    // test) wait for a specific rebuild to finish.
+    struct Workspace_rebuilt
+    {
+        static constexpr auto Method = std::string_view("iris/workspaceRebuilt");
+        static constexpr auto Direction = lsp::MessageDirection::ServerToClient;
+        static constexpr auto Type = lsp::Message::Notification;
+    };
+
+    void register_did_change_watched_files(
+        lsp::MessageHandler& message_handler
+    );
 }

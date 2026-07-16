@@ -142,10 +142,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 	const client_options: LanguageClientOptions = {
 		// Register the server for plain text documents
 		documentSelector: [{ scheme: 'file', language: 'iris' }],
-		synchronize: {
-			// Notify the server about file changes to '.clientrc files contained in the workspace
-			fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
-		},
+		// The server registers its own file watchers via client/registerCapability, so that the
+		// watched patterns stay next to the workspace discovery logic that must agree with them.
 		outputChannel: output_channel
 	};
 

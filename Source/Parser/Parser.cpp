@@ -68,7 +68,11 @@ namespace iris::parser
 
     void destroy_tree(Parse_tree&& tree)
     {
+        if (tree.ts_tree == nullptr)
+            return;
+
         ts_tree_delete(tree.ts_tree);
+        tree.ts_tree = nullptr;
     }
 
     static std::uint32_t calculate_new_end_byte(

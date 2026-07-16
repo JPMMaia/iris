@@ -11,3 +11,6 @@ tsconfig.lsif.json
 tsconfig.tsbuildinfo
 .vscode-test/
 Testing
+
+# Written and removed by the file watcher tests; only present if a run was interrupted.
+test_fixture/projects/other/file_watcher_*.iris

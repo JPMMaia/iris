@@ -77,6 +77,7 @@ namespace iris::language_server
         bool has_workspace_inlay_hint_refresh_capability = false;
         bool has_workspace_folder_capability = false;
         bool has_definition_link_support = false;
+        bool has_did_change_watched_files_dynamic_registration_capability = false;
         
         message_handler.add<lsp::requests::Initialize>(
             [&](lsp::requests::Initialize::Params&& parameters) -> lsp::requests::Initialize::Result
@@ -97,6 +98,11 @@ namespace iris::language_server
                     {
                         has_workspace_inlay_hint_refresh_capability = client_capabilities.workspace->inlayHint->refreshSupport.value_or(false);
                     }
+
+                    if (client_capabilities.workspace->didChangeWatchedFiles)
+                    {
+                        has_did_change_watched_files_dynamic_registration_capability = client_capabilities.workspace->didChangeWatchedFiles->dynamicRegistration.value_or(false);
+                    }
                 }
 
                 if (client_capabilities.textDocument)
@@ -114,6 +120,13 @@ namespace iris::language_server
         message_handler.add<lsp::notifications::Initialized>(
             [&](lsp::notifications::Initialized::Params&& parameters) -> void
             {
+                // Registered before the configurations are requested so that files created
+                // while the initial workspace build is still in flight are not missed.
+                if (has_did_change_watched_files_dynamic_registration_capability)
+                {
+                    register_did_change_watched_files(message_handler);
+                }
+
                 if (has_workspace_folder_capability)
                 {
                     message_handler.add<lsp::notifications::Workspace_DidChangeWorkspaceFolders>(
@@ -237,8 +250,38 @@ namespace iris::language_server
             }
         );
 
-        // TODO use workspace/didChangeWatchedFiles to watch for changes in artifact and repository files
-      
+        message_handler.add<lsp::notifications::Workspace_DidChangeWatchedFiles>(
+            [&](lsp::notifications::Workspace_DidChangeWatchedFiles::Params&& parameters) -> void
+            {
+                // TODO debounce rebuilds across back-to-back notifications. Events within a
+                // single notification are already coalesced into one rebuild, but the message
+                // loop has no idle hook to defer work to.
+                bool const rebuilt = workspace_did_change_watched_files(server, parameters);
+                if (!rebuilt)
+                    return;
+
+                message_handler.sendNotification<Workspace_rebuilt>();
+
+                if (has_workspace_diagnostic_refresh_capability)
+                {
+                    message_handler.sendRequest<lsp::requests::Workspace_Diagnostic_Refresh>(
+                        [](lsp::Workspace_Diagnostic_RefreshResult&&)
+                        {
+                        }
+                    );
+                }
+
+                if (has_workspace_inlay_hint_refresh_capability)
+                {
+                    message_handler.sendRequest<lsp::requests::Workspace_InlayHint_Refresh>(
+                        [](lsp::Workspace_InlayHint_RefreshResult&&)
+                        {
+                        }
+                    );
+                }
+            }
+        );
+
          while(running)
          {
             try
@@ -302,6 +345,49 @@ namespace iris::language_server
                         }
                     );
                 }
+            },
+            [](const lsp::Error& error)
+            {
+                std::fprintf(stderr, error.message());
+            }
+        );
+    }
+
+    void register_did_change_watched_files(
+        lsp::MessageHandler& message_handler
+    )
+    {
+        // The protocol has no static server-side declaration for file watching, so the watchers
+        // have to be registered dynamically. The patterns are kept here rather than in a client
+        // so that they stay next to the workspace discovery logic they must agree with.
+        lsp::DidChangeWatchedFilesRegistrationOptions registration_options
+        {
+            .watchers =
+            {
+                lsp::FileSystemWatcher{ .globPattern = lsp::Pattern{"**/*.iris"} },
+                lsp::FileSystemWatcher{ .globPattern = lsp::Pattern{"**/iris_artifact.json"} },
+                lsp::FileSystemWatcher{ .globPattern = lsp::Pattern{"**/iris_presets.json"} },
+                lsp::FileSystemWatcher{ .globPattern = lsp::Pattern{"**/iris_repository.json"} },
+            },
+        };
+
+        lsp::requests::Client_RegisterCapability::Params registration_parameters
+        {
+            .registrations =
+            {
+                lsp::Registration
+                {
+                    .id = "iris-did-change-watched-files",
+                    .method = std::string{lsp::notifications::Workspace_DidChangeWatchedFiles::Method},
+                    .registerOptions = lsp::toJson(std::move(registration_options)),
+                },
+            },
+        };
+
+        message_handler.sendRequest<lsp::requests::Client_RegisterCapability>(
+            std::move(registration_parameters),
+            [](lsp::requests::Client_RegisterCapability::Result&&)
+            {
             },
             [](const lsp::Error& error)
             {

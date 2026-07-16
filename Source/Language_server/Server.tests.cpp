@@ -167,6 +167,106 @@ export function main() -> (result: Int32)
             return server;
         }
 
+        struct Glob_workspace
+        {
+            std::filesystem::path directory;
+            std::filesystem::path main_file;
+            std::filesystem::path build_directory;
+        };
+
+        // Writes a single-artifact workspace whose sources are matched by a glob rather than
+        // listed explicitly, so that a file created after initialization is picked up by a
+        // rebuild. Mirrors the 'other' fixture used by the extension tests.
+        static Glob_workspace write_glob_workspace(
+            std::string_view const name
+        )
+        {
+            std::filesystem::path const workspace_directory = create_clean_temporary_directory(name);
+
+            iris::common::write_to_file(
+                workspace_directory / "iris_artifact.json",
+                R"({
+    "name": "app",
+    "version": "0.1.0",
+    "type": "executable",
+    "sources": [
+        {
+            "type": "iris",
+            "include": [
+                "./**/*.iris"
+            ]
+        }
+    ],
+    "executable": {
+        "source": "${PROJECT_ROOT}/main.iris"
+    }
+})"
+            );
+
+            iris::common::write_to_file(
+                workspace_directory / "main.iris",
+                R"(module app;
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return 0;
+}
+)"
+            );
+
+            iris::common::write_to_file(
+                workspace_directory / "iris_presets.json",
+                std::format(
+                    R"({{
+    "build_directory": "preset_build",
+    "function_contracts": "disabled",
+    "environment_variables": {{
+        "PROJECT_ROOT": "{}"
+    }}
+}})",
+                    workspace_directory.generic_string()
+                )
+            );
+
+            return Glob_workspace{
+                .directory = workspace_directory,
+                .main_file = workspace_directory / "main.iris",
+                .build_directory = workspace_directory / "preset_build",
+            };
+        }
+
+        static bool notify_watched_file_change(
+            Server& server,
+            std::filesystem::path const& file,
+            lsp::FileChangeType const type
+        )
+        {
+            lsp::DidChangeWatchedFilesParams parameters;
+            parameters.changes.push_back(
+                lsp::FileEvent{
+                    .uri = lsp::DocumentUri::fromPath(file.generic_string()),
+                    .type = type,
+                }
+            );
+            return workspace_did_change_watched_files(server, parameters);
+        }
+
+        static bool is_core_module_known(
+            Server const& server,
+            std::filesystem::path const& file
+        )
+        {
+            std::filesystem::path const normalized_file = file.lexically_normal();
+
+            for (auto const& workspace_data : server.workspaces_data)
+            {
+                if (std::ranges::find(workspace_data.core_module_source_file_paths, normalized_file) != workspace_data.core_module_source_file_paths.end())
+                    return true;
+            }
+            return false;
+        }
+
         static void open_document(Server& server, std::filesystem::path const& file, int const version, std::string_view const text)
         {
             lsp::DidOpenTextDocumentParams parameters;
@@ -519,6 +619,211 @@ export function dep_renamed() -> ()
         lsp::RelatedFullDocumentDiagnosticReport const& recomputed_full = std::get<lsp::RelatedFullDocumentDiagnosticReport>(recomputed);
         REQUIRE(recomputed_full.resultId.has_value());
         CHECK(recomputed_full.resultId.value() != first_result_id);
+
+        destroy_server(server);
+    }
+
+    TEST_CASE("A created source file becomes known to the workspace", "[Language_server][Server][Watched_files]")
+    {
+        Glob_workspace const workspace = write_glob_workspace("iris_language_server_watched_files_created");
+
+        Server server = create_configured_server(workspace.directory);
+        REQUIRE(server.workspaces_data.size() == 1);
+
+        std::filesystem::path const created_file = workspace.directory / "extra.iris";
+
+        // A file that did not exist at initialization is unknown, so every feature no-ops on it.
+        CHECK_FALSE(is_core_module_known(server, created_file));
+        lsp::DocumentDiagnosticReport const before = pull_document_diagnostics(server, created_file, std::nullopt);
+        CHECK(std::holds_alternative<lsp::RelatedUnchangedDocumentDiagnosticReport>(before));
+
+        iris::common::write_to_file(
+            created_file,
+            R"(module extra;
+
+export function extra_function() -> ()
+{
+}
+)"
+        );
+
+        CHECK(notify_watched_file_change(server, created_file, lsp::FileChangeType::Created));
+
+        CHECK(is_core_module_known(server, created_file));
+        lsp::DocumentDiagnosticReport const after = pull_document_diagnostics(server, created_file, std::nullopt);
+        CHECK(std::holds_alternative<lsp::RelatedFullDocumentDiagnosticReport>(after));
+
+        destroy_server(server);
+    }
+
+    TEST_CASE("A deleted source file is dropped from the workspace", "[Language_server][Server][Watched_files]")
+    {
+        Glob_workspace const workspace = write_glob_workspace("iris_language_server_watched_files_deleted");
+
+        std::filesystem::path const extra_file = workspace.directory / "extra.iris";
+        iris::common::write_to_file(
+            extra_file,
+            R"(module extra;
+
+export function extra_function() -> ()
+{
+}
+)"
+        );
+
+        Server server = create_configured_server(workspace.directory);
+        REQUIRE(server.workspaces_data.size() == 1);
+        REQUIRE(is_core_module_known(server, extra_file));
+
+        std::filesystem::remove(extra_file);
+
+        CHECK(notify_watched_file_change(server, extra_file, lsp::FileChangeType::Deleted));
+
+        CHECK_FALSE(is_core_module_known(server, extra_file));
+
+        destroy_server(server);
+    }
+
+    TEST_CASE("Unsaved edits survive a rebuild triggered by an unrelated file", "[Language_server][Server][Watched_files]")
+    {
+        Glob_workspace const workspace = write_glob_workspace("iris_language_server_watched_files_unsaved_edits");
+
+        Server server = create_configured_server(workspace.directory);
+        REQUIRE(server.workspaces_data.size() == 1);
+
+        open_document(server, workspace.main_file, 1, R"(module app;
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return 0;
+}
+)");
+
+        // Introduce a syntax error that exists only in the editor, never on disk.
+        change_document_full_text(
+            server,
+            workspace.main_file,
+            2,
+            R"(module app;
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return 0
+)"
+        );
+
+        lsp::DocumentDiagnosticReport const edited = pull_document_diagnostics(server, workspace.main_file, std::nullopt);
+        REQUIRE(std::holds_alternative<lsp::RelatedFullDocumentDiagnosticReport>(edited));
+        REQUIRE_FALSE(std::get<lsp::RelatedFullDocumentDiagnosticReport>(edited).items.empty());
+
+        // Creating an unrelated file rebuilds the workspace. The rebuild re-reads sources from
+        // disk, where main.iris is still valid, so without preserving the open document's parse
+        // tree the unsaved error would vanish (and the client's next incremental edit would then
+        // be applied against the wrong base text).
+        std::filesystem::path const created_file = workspace.directory / "extra.iris";
+        iris::common::write_to_file(
+            created_file,
+            R"(module extra;
+
+export function extra_function() -> ()
+{
+}
+)"
+        );
+        REQUIRE(notify_watched_file_change(server, created_file, lsp::FileChangeType::Created));
+
+        lsp::DocumentDiagnosticReport const after_rebuild = pull_document_diagnostics(server, workspace.main_file, std::nullopt);
+        REQUIRE(std::holds_alternative<lsp::RelatedFullDocumentDiagnosticReport>(after_rebuild));
+        CHECK_FALSE(std::get<lsp::RelatedFullDocumentDiagnosticReport>(after_rebuild).items.empty());
+
+        destroy_server(server);
+    }
+
+    TEST_CASE("Irrelevant watched file events do not rebuild the workspace", "[Language_server][Server][Watched_files]")
+    {
+        Glob_workspace const workspace = write_glob_workspace("iris_language_server_watched_files_irrelevant");
+
+        Server server = create_configured_server(workspace.directory);
+        REQUIRE(server.workspaces_data.size() == 1);
+
+        // Generated sources under the build directory must never trigger a rebuild, otherwise
+        // compiling the workspace would feed the watcher back into itself.
+        CHECK_FALSE(notify_watched_file_change(server, workspace.build_directory / "generated.iris", lsp::FileChangeType::Created));
+
+        // Files the server does not care about are ignored.
+        CHECK_FALSE(notify_watched_file_change(server, workspace.directory / "README.md", lsp::FileChangeType::Created));
+
+        destroy_server(server);
+    }
+
+    TEST_CASE("A workspace that fails validation still occupies its slot", "[Language_server][Server][Watched_files]")
+    {
+        Glob_workspace const workspace = write_glob_workspace("iris_language_server_watched_files_invalid_presets");
+
+        // Presets that point at a repository which does not exist. Rebuilds make this reachable
+        // at any time, for instance while iris_presets.json is being edited.
+        iris::common::write_to_file(
+            workspace.directory / "iris_presets.json",
+            std::format(
+                R"({{
+    "build_directory": "preset_build",
+    "repository_paths": [
+        "does_not_exist.json"
+    ],
+    "environment_variables": {{
+        "PROJECT_ROOT": "{}"
+    }}
+}})",
+                workspace.directory.generic_string()
+            )
+        );
+
+        std::vector<std::string> shown_messages;
+        Server server = create_server(
+            Server_logger{
+                .window_log_message = [](lsp::LogMessageParams&&) {},
+                .window_show_message = [&](lsp::ShowMessageParams&& parameters)
+                {
+                    shown_messages.push_back(parameters.message);
+                },
+            }
+        );
+
+        lsp::WorkspaceFolder const workspace_folder{
+            .uri = lsp::DocumentUri::fromPath(workspace.directory.generic_string()),
+            .name = "workspace",
+        };
+        set_workspace_folders(server, {&workspace_folder, 1});
+
+        lsp::Workspace_ConfigurationResult configurations;
+        configurations.push_back(lsp::json::Object{});
+        set_workspace_folder_configurations(server, configurations);
+
+        CHECK_FALSE(shown_messages.empty());
+
+        // The workspace keeps its slot even though it failed to load. Leaving workspaces_data
+        // shorter than workspace_folders would make compute_workspace_diagnostics report nothing
+        // at all, for every workspace, until the next configuration round-trip.
+        REQUIRE(server.workspaces_data.size() == server.workspace_folders.size());
+
+        lsp::WorkspaceDiagnosticParams parameters;
+        parameters.identifier = "iris";
+        lsp::WorkspaceDiagnosticReport const report = compute_workspace_diagnostics(server, parameters);
+        CHECK(report.items.empty());
+
+        destroy_server(server);
+    }
+
+    TEST_CASE("A changed artifact file rebuilds the workspace", "[Language_server][Server][Watched_files]")
+    {
+        Glob_workspace const workspace = write_glob_workspace("iris_language_server_watched_files_artifact_changed");
+
+        Server server = create_configured_server(workspace.directory);
+        REQUIRE(server.workspaces_data.size() == 1);
+
+        CHECK(notify_watched_file_change(server, workspace.directory / "iris_artifact.json", lsp::FileChangeType::Changed));
 
         destroy_server(server);
     }

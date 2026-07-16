@@ -18,7 +18,7 @@ namespace iris::parser
     export struct Parse_tree
     {
         std::pmr::u8string text;
-        TSTree* ts_tree;
+        TSTree* ts_tree = nullptr;
     };
 
     export std::string_view get_node_value(

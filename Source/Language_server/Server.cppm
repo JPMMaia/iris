@@ -44,6 +44,15 @@ namespace iris::language_server
     export struct Server
     {
         std::pmr::vector<lsp::WorkspaceFolder> workspace_folders;
+        // Cached so that a rebuild triggered by a file event does not need another
+        // workspace/configuration round-trip with the client.
+        lsp::Workspace_ConfigurationResult workspace_configurations;
+        // Aligned with workspace_folders. Recorded even for workspaces that fail validation, so
+        // that watched file events can be filtered against the build directory regardless.
+        std::pmr::vector<std::filesystem::path> workspace_build_directory_paths;
+        // Documents the client currently has open. Their in-memory parse trees hold unsaved
+        // edits and must survive a rebuild.
+        std::pmr::vector<std::filesystem::path> open_document_paths;
         std::pmr::vector<Workspace_data> workspaces_data;
         iris::parser::Parser parser;
         Server_logger logger;
@@ -82,6 +91,20 @@ namespace iris::language_server
     export void set_workspace_folder_configurations(
         Server& server,
         lsp::Workspace_ConfigurationResult const& configurations
+    );
+
+    // Rediscovers every workspace's source files and re-creates its Declaration_database from
+    // the cached configurations. Parse trees and versions of open documents are carried over so
+    // that unsaved editor state is not replaced by the contents on disk.
+    export void rebuild_workspaces_data(
+        Server& server
+    );
+
+    // Returns true if the events warranted a rebuild, so that the caller can skip asking the
+    // client to refresh when nothing changed.
+    export bool workspace_did_change_watched_files(
+        Server& server,
+        lsp::DidChangeWatchedFilesParams const& parameters
     );
 
     export void text_document_did_open(

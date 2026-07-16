@@ -204,11 +204,11 @@ namespace iris::language_server
             std::printf("Language Server exit\n");
     }
 
-    void destroy_workspaces_data(
-        Server& server
+    static void destroy_workspaces_data_vector(
+        std::pmr::vector<Workspace_data>& workspaces_data
     )
     {
-        for (Workspace_data& workspace_data : server.workspaces_data)
+        for (Workspace_data& workspace_data : workspaces_data)
         {
             for (std::size_t index = 0; index < workspace_data.core_module_parse_trees.size(); ++index)
             {
@@ -216,7 +216,14 @@ namespace iris::language_server
             }
         }
 
-        server.workspaces_data.clear();
+        workspaces_data.clear();
+    }
+
+    void destroy_workspaces_data(
+        Server& server
+    )
+    {
+        destroy_workspaces_data_vector(server.workspaces_data);
     }
 
     void set_workspace_folders(
@@ -226,6 +233,10 @@ namespace iris::language_server
     {
         server.workspace_folders.clear();
         destroy_workspaces_data(server);
+
+        // The cached configurations are indexed by workspace folder, so they no longer apply.
+        server.workspace_configurations.clear();
+        server.workspace_build_directory_paths.clear();
 
         server.workspace_folders.assign(workspace_folders.begin(), workspace_folders.end());
     }
@@ -501,6 +512,83 @@ namespace iris::language_server
         return core_modules;
     }
 
+    static bool is_document_open(
+        Server const& server,
+        std::filesystem::path const& file_path
+    )
+    {
+        return std::ranges::find(server.open_document_paths, file_path) != server.open_document_paths.end();
+    }
+
+    // Finds a source file in workspace data that is about to be discarded, so that state which
+    // only exists in memory can be carried over to the rebuilt workspace.
+    static std::optional<std::pair<std::size_t, std::size_t>> find_previous_core_module_index(
+        std::pmr::vector<Workspace_data> const& previous_workspaces_data,
+        std::filesystem::path const& file_path
+    )
+    {
+        for (std::size_t workspace_index = 0; workspace_index < previous_workspaces_data.size(); ++workspace_index)
+        {
+            std::pmr::vector<std::filesystem::path> const& source_file_paths =
+                previous_workspaces_data[workspace_index].core_module_source_file_paths;
+
+            auto const location = std::find(source_file_paths.begin(), source_file_paths.end(), file_path);
+            if (location == source_file_paths.end())
+                continue;
+
+            return std::pair<std::size_t, std::size_t>{
+                workspace_index,
+                static_cast<std::size_t>(std::distance(source_file_paths.begin(), location))
+            };
+        }
+
+        return std::nullopt;
+    }
+
+    // Hands the in-memory parse tree and client version of every open document over to the
+    // freshly parsed workspace. A rebuild re-reads sources from disk, which would otherwise
+    // discard unsaved edits; worse, text_document_did_change applies incremental edits against
+    // the stored tree, so replacing it with the on-disk text would make every subsequent edit
+    // range apply at the wrong offset.
+    static void preserve_open_document_state(
+        Server const& server,
+        std::pmr::vector<Workspace_data>& previous_workspaces_data,
+        std::span<std::filesystem::path const> const core_module_source_file_paths,
+        std::pmr::vector<iris::parser::Parse_tree>& core_module_parse_trees,
+        std::pmr::vector<std::optional<int>>& core_module_versions
+    )
+    {
+        for (std::size_t index = 0; index < core_module_source_file_paths.size(); ++index)
+        {
+            std::filesystem::path const& source_file_path = core_module_source_file_paths[index];
+
+            if (!is_document_open(server, source_file_path))
+                continue;
+
+            std::optional<std::pair<std::size_t, std::size_t>> const previous_location =
+                find_previous_core_module_index(previous_workspaces_data, source_file_path);
+            if (!previous_location.has_value())
+                continue;
+
+            Workspace_data& previous_workspace_data = previous_workspaces_data[previous_location->first];
+            std::size_t const previous_index = previous_location->second;
+
+            iris::parser::Parse_tree& previous_parse_tree = previous_workspace_data.core_module_parse_trees[previous_index];
+            if (previous_parse_tree.ts_tree == nullptr)
+                continue;
+
+            iris::parser::destroy_tree(std::move(core_module_parse_trees[index]));
+
+            core_module_parse_trees[index] = std::move(previous_parse_tree);
+            // Parse_tree holds a raw TSTree* and moving it does not clear the source, so the
+            // previous entry must be nulled or destroy_workspaces_data_vector would free the
+            // tree that was just handed over.
+            previous_parse_tree.ts_tree = nullptr;
+
+            core_module_versions[index] = previous_workspace_data.core_module_versions[previous_index];
+        }
+    }
+
     void set_workspace_folder_configurations(
         Server& server,
         lsp::Workspace_ConfigurationResult const& configurations
@@ -509,14 +597,30 @@ namespace iris::language_server
         if (configurations.size() != server.workspace_folders.size())
             return;
 
-        destroy_workspaces_data(server);
+        server.workspace_configurations = configurations;
+
+        rebuild_workspaces_data(server);
+    }
+
+    void rebuild_workspaces_data(
+        Server& server
+    )
+    {
+        if (server.workspace_configurations.size() != server.workspace_folders.size())
+            return;
+
+        // Keep the old data alive until the new data is built, so that open documents can hand
+        // their unsaved parse trees over to it.
+        std::pmr::vector<Workspace_data> previous_workspaces_data = std::move(server.workspaces_data);
+        server.workspaces_data.clear();
+        server.workspace_build_directory_paths.clear();
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
 
         std::pmr::polymorphic_allocator<> output_allocator;
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
-        for (std::size_t index = 0; index < configurations.size(); ++index)
+        for (std::size_t index = 0; index < server.workspace_configurations.size(); ++index)
         {
             lsp::WorkspaceFolder const& workspace_folder = server.workspace_folders[index];
 
@@ -530,11 +634,19 @@ namespace iris::language_server
             std::pmr::vector<std::filesystem::path> const header_search_paths = get_header_search_paths(presets);
             std::pmr::vector<std::filesystem::path> const repository_paths = get_repository_paths(presets);
 
-            if (!validate_paths(server, header_search_paths))
-                return;
+            // Recorded before validation so that watched file events under the build directory
+            // can still be filtered out for a workspace that failed to load.
+            server.workspace_build_directory_paths.push_back(build_directory_path);
 
-            if (!validate_paths(server, repository_paths))
-                return;
+            // A workspace that fails validation still occupies its slot: leaving workspaces_data
+            // shorter than workspace_folders would make compute_workspace_diagnostics report
+            // nothing at all until the next configuration round-trip. An empty placeholder is
+            // inert because every lookup goes through core_module_source_file_paths.
+            if (!validate_paths(server, header_search_paths) || !validate_paths(server, repository_paths))
+            {
+                server.workspaces_data.push_back(Workspace_data{});
+                continue;
+            }
 
             iris::compiler::Compilation_options const compilation_options = get_compilation_options(presets);
             iris::compiler::Builder_options const builder_options = get_builder_options(presets);
@@ -587,6 +699,16 @@ namespace iris::language_server
                 temporaries_allocator
             );
 
+            // Must happen before the core modules are converted, so that they and the
+            // declaration database describe the text the editor actually shows.
+            preserve_open_document_state(
+                server,
+                previous_workspaces_data,
+                core_module_source_file_paths,
+                core_module_parse_trees,
+                core_module_versions
+            );
+
             std::pmr::vector<iris::Module> core_modules = convert_to_core_modules(
                 core_module_source_file_paths,
                 core_module_parse_trees,
@@ -618,6 +740,10 @@ namespace iris::language_server
 
             server.workspaces_data.push_back(std::move(workspace_data));
         }
+
+        // Any tree that was handed over to the new workspace data was nulled out, so this only
+        // frees the trees that were genuinely replaced.
+        destroy_workspaces_data_vector(previous_workspaces_data);
     }
 
     static std::optional<std::pair<Workspace_data&, std::size_t>> find_workspace_core_module_index(
@@ -650,6 +776,16 @@ namespace iris::language_server
         lsp::DidOpenTextDocumentParams const& parameters
     )
     {
+        // Tracked before the lookup below, which fails for a file that the workspace does not
+        // know about yet. Such a file becomes known once a rebuild picks it up, and by then it
+        // must already count as open.
+        std::filesystem::path const file_path = to_filesystem_path(
+            iris::compiler::get_default_target(),
+            parameters.textDocument.uri
+        ).lexically_normal();
+        if (!is_document_open(server, file_path))
+            server.open_document_paths.push_back(file_path);
+
         std::optional<std::pair<Workspace_data&, std::size_t>> const result = find_workspace_core_module_index(
             server,
             parameters.textDocument.uri
@@ -665,6 +801,15 @@ namespace iris::language_server
         lsp::DidCloseTextDocumentParams const& parameters
     )
     {
+        std::filesystem::path const file_path = to_filesystem_path(
+            iris::compiler::get_default_target(),
+            parameters.textDocument.uri
+        ).lexically_normal();
+
+        auto const location = std::ranges::find(server.open_document_paths, file_path);
+        if (location != server.open_document_paths.end())
+            server.open_document_paths.erase(location);
+
         std::optional<std::pair<Workspace_data&, std::size_t>> const result = find_workspace_core_module_index(
             server,
             parameters.textDocument.uri
@@ -938,6 +1083,90 @@ namespace iris::language_server
         diagnostics_state.validated_dependency_versions = std::move(current_dependency_versions);
 
         return report;
+    }
+
+    static bool is_path_under_directory(
+        std::filesystem::path const& path,
+        std::filesystem::path const& directory
+    )
+    {
+        std::filesystem::path const relative = path.lexically_normal().lexically_relative(directory.lexically_normal());
+        if (relative.empty())
+            return false;
+
+        return *relative.begin() != "..";
+    }
+
+    static bool is_project_file_name(
+        std::filesystem::path const& file_name
+    )
+    {
+        return file_name == "iris_artifact.json"
+            || file_name == "iris_presets.json"
+            || file_name == "iris_repository.json";
+    }
+
+    static bool does_watched_file_event_need_rebuild(
+        Server const& server,
+        std::filesystem::path const& file_path,
+        lsp::FileChangeType const change_type
+    )
+    {
+        // Sources generated by a build would otherwise feed the watcher back into itself:
+        // search_files does not exclude the build directory, so they are discovered as if they
+        // were workspace sources.
+        for (std::filesystem::path const& build_directory_path : server.workspace_build_directory_paths)
+        {
+            if (is_path_under_directory(file_path, build_directory_path))
+                return false;
+        }
+
+        // A project file describes which sources exist and how they are compiled, so any change
+        // to one can change the whole workspace.
+        if (is_project_file_name(file_path.filename()))
+            return true;
+
+        if (file_path.extension() != ".iris")
+            return false;
+
+        // Creating or deleting a source changes the set of core modules.
+        if (change_type != lsp::FileChangeType::Changed)
+            return true;
+
+        // An open document's edits already arrive through textDocument/didChange, and rebuilding
+        // on every save of the file being edited would be pure waste. A closed document has no
+        // other path back into the server, so it does need a rebuild.
+        return !is_document_open(server, file_path);
+    }
+
+    bool workspace_did_change_watched_files(
+        Server& server,
+        lsp::DidChangeWatchedFilesParams const& parameters
+    )
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        bool needs_rebuild = false;
+
+        for (lsp::FileEvent const& change : parameters.changes)
+        {
+            std::filesystem::path const file_path = to_filesystem_path(target, change.uri).lexically_normal();
+
+            if (does_watched_file_event_need_rebuild(server, file_path, change.type))
+            {
+                // Clients batch file events, so a single rebuild covers the whole notification.
+                needs_rebuild = true;
+                break;
+            }
+        }
+
+        if (!needs_rebuild)
+            return false;
+
+        rebuild_workspaces_data(server);
+        invalidate_all_diagnostics(server);
+
+        return true;
     }
 
     void invalidate_all_diagnostics(
