@@ -939,6 +939,10 @@
       "required": true,
       "types": [
         {
+          "type": "Comment",
+          "named": true
+        },
+        {
           "type": "Expression_instantiate_member_name",
           "named": true
         },
