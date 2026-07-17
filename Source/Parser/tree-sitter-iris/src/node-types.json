@@ -596,6 +596,10 @@
       "required": true,
       "types": [
         {
+          "type": "Expression_block",
+          "named": true
+        },
+        {
           "type": "Generic_expression",
           "named": true
         }

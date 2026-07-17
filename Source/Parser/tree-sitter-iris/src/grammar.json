@@ -1548,17 +1548,8 @@
           ]
         },
         {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "Expression_defer"
-            },
-            {
-              "type": "STRING",
-              "value": ";"
-            }
-          ]
+          "type": "SYMBOL",
+          "name": "Expression_defer"
         },
         {
           "type": "SYMBOL",
@@ -2524,8 +2515,26 @@
           "value": "defer"
         },
         {
-          "type": "SYMBOL",
-          "name": "Generic_expression"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "Generic_expression"
+                },
+                {
+                  "type": "STRING",
+                  "value": ";"
+                }
+              ]
+            },
+            {
+              "type": "SYMBOL",
+              "name": "Expression_block"
+            }
+          ]
         }
       ]
     },

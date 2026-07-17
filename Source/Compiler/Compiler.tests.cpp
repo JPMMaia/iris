@@ -4639,6 +4639,43 @@ if_s1_after19:                                    ; preds = %for_loop_then15
   br label %for_loop_update_index16
 }
 
+; Function Attrs: convergent
+define private void @Defer_expressions_run_defer_blocks(i1 noundef zeroext %"arguments[0].condition") #0 {
+entry:
+  %condition = alloca i8, align 1
+  %v22 = alloca i32, align 4
+  %0 = zext i1 %"arguments[0].condition" to i8
+  store i8 %0, ptr %condition, align 1
+  store i32 22, ptr %v22, align 4
+  %1 = load i8, ptr %condition, align 1
+  %2 = trunc i8 %1 to i1
+  br i1 %2, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  call void @Defer_expressions_do_defer(i32 noundef 23)
+  call void @Defer_expressions_do_defer(i32 noundef 24)
+  br label %if_s1_after
+
+if_s1_after:                                      ; preds = %if_s0_then, %entry
+  br label %while_loop_condition
+
+while_loop_condition:                             ; preds = %if_s1_after
+  %3 = load i8, ptr %condition, align 1
+  %4 = trunc i8 %3 to i1
+  br i1 %4, label %while_loop_then, label %while_loop_after
+
+while_loop_then:                                  ; preds = %while_loop_condition
+  call void @Defer_expressions_do_defer(i32 noundef 25)
+  br label %while_loop_after
+
+while_loop_after:                                 ; preds = %while_loop_then, %while_loop_condition
+  %5 = load i32, ptr %v22, align 4
+  call void @Defer_expressions_do_defer(i32 noundef %5)
+  call void @Defer_expressions_do_defer(i32 noundef 20)
+  call void @Defer_expressions_do_defer(i32 noundef 21)
+  ret void
+}
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 )";
 

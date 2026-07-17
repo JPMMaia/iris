@@ -100,3 +100,79 @@ export function run() -> ()
                         (Expression_variable
                           (Variable_name
                             (Identifier)))))))))))))))
+
+=========================
+Defer block expressions
+=========================
+
+module Defer_block_expressions;
+
+export function destroy_object(id: Int32) -> ()
+{
+}
+
+export function run() -> ()
+{
+    defer
+    {
+        var instance_0 = 0;
+        destroy_object(instance_0);
+    }
+}
+
+---
+
+(Module
+  (Module_head
+    (Module_declaration
+      (Module_name
+        (Identifier_with_dots
+          (Identifier)))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Type_name
+                  (Identifier))))))
+        (Function_output_parameters))
+      (Function_definition
+        (Block))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters)
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_defer
+              (Expression_block
+                (Statement
+                  (Expression_variable_declaration
+                    (Expression_variable_mutability)
+                    (Variable_name
+                      (Identifier))
+                    (Generic_expression
+                      (Expression_constant
+                        (Number)))))
+                (Statement
+                  (Expression_call
+                    (Generic_expression
+                      (Expression_variable
+                        (Variable_name
+                          (Identifier))))
+                    (Expression_call_arguments
+                      (Generic_expression_or_instantiate
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))))))))))))))

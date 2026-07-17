@@ -138,3 +138,31 @@ function run(condition: Bool, value: Int32) -> ()
 ```
 
 Deferred statements execute in **LIFO order** (last registered, first executed). The deferral is always to the scope in which `defer` appears, not the function.
+
+To defer more than one statement, follow `defer` with a block. The block form takes no trailing semicolon:
+
+```iris
+function run() -> ()
+{
+    var id = create_object();
+
+    defer
+    {
+        log("destroying");
+        destroy_object(id);
+    }
+}
+```
+
+The whole block runs as a unit when the scope exits, and the statements inside it run in the order written. A block counts as a single entry for LIFO purposes, so it is ordered against other `defer`s by where it was registered.
+
+A deferred block introduces its own scope, so it may declare locals and may itself contain a `defer`:
+
+```iris
+defer
+{
+    do_defer(0);
+
+    defer do_defer(1);   // runs when the deferred block ends, so after 0
+}
+```

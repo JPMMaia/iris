@@ -277,9 +277,16 @@ namespace iris
     );
 
     static bool statement_ends_with_semicolon(
+        iris::Statement const& statement,
         iris::Expression const& expression
     )
     {
+        if (std::holds_alternative<iris::Defer_expression>(expression.data))
+        {
+            iris::Defer_expression const& value = std::get<iris::Defer_expression>(expression.data);
+            return statement_ends_with_semicolon(statement, get_expression(statement, value.expression_to_defer));
+        }
+
         bool const does_not_end_with_semicolon =
             std::holds_alternative<iris::Block_expression>(expression.data) ||
             std::holds_alternative<iris::Comment_expression>(expression.data) ||
@@ -304,7 +311,7 @@ namespace iris
             iris::Expression const& first_expression = statement.expressions[0];
             add_format_expression(buffer, statement, first_expression, indentation, options);
 
-            if (add_semicolon && statement_ends_with_semicolon(first_expression))
+            if (add_semicolon && statement_ends_with_semicolon(statement, first_expression))
                 add_text(buffer, ";");
         }
     }
@@ -419,7 +426,7 @@ namespace iris
         else if (std::holds_alternative<Defer_expression>(expression.data))
         {
             Defer_expression const& value = std::get<Defer_expression>(expression.data);
-            add_format_expression_defer(buffer, statement, value, options);
+            add_format_expression_defer(buffer, statement, value, indentation, options);
         }
         else if (std::holds_alternative<Dereference_and_access_expression>(expression.data))
         {
@@ -874,7 +881,7 @@ namespace iris
         iris::Expression const& wrapped_expression = get_expression(statement, expression.expression);
         add_format_expression(buffer, statement, wrapped_expression, indentation, options);
 
-        if (statement_ends_with_semicolon(wrapped_expression))
+        if (statement_ends_with_semicolon(statement, wrapped_expression))
             add_text(buffer, ";");
     }
 
@@ -1076,11 +1083,24 @@ namespace iris
         String_buffer& buffer,
         Statement const& statement,
         Defer_expression const& expression,
+        std::uint32_t const outside_indentation,
         Format_options const& options
     )
     {
-        add_text(buffer, "defer ");
-        add_format_expression(buffer, statement, get_expression(statement, expression.expression_to_defer), 0, options);
+        Expression const& expression_to_defer = get_expression(statement, expression.expression_to_defer);
+
+        if (std::holds_alternative<Block_expression>(expression_to_defer.data))
+        {
+            add_text(buffer, "defer");
+            add_new_line(buffer);
+            add_indentation(buffer, outside_indentation);
+            add_format_expression(buffer, statement, expression_to_defer, outside_indentation, options);
+        }
+        else
+        {
+            add_text(buffer, "defer ");
+            add_format_expression(buffer, statement, expression_to_defer, 0, options);
+        }
     }
     
     void add_format_expression_dereference_and_access(

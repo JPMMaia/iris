@@ -248,6 +248,7 @@ namespace iris
         String_buffer& buffer,
         Statement const& statement,
         Defer_expression const& expression,
+        std::uint32_t const outside_indentation,
         Format_options const& options
     );
 

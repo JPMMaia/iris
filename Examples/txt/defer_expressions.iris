@@ -93,3 +93,41 @@ function run(condition: Bool, value: Int32) -> ()
         }
     }
 }
+
+function run_defer_blocks(condition: Bool) -> ()
+{
+    defer
+    {
+        do_defer(20);
+        do_defer(21);
+    }
+
+    var v22 = 22;
+    defer
+    {
+        do_defer(v22);
+    }
+
+    if condition
+    {
+        defer
+        {
+            do_defer(23);
+
+            defer
+            {
+                do_defer(24);
+            }
+        }
+    }
+
+    while condition
+    {
+        defer
+        {
+            do_defer(25);
+        }
+
+        break;
+    }
+}
