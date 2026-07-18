@@ -14,6 +14,7 @@ import {
 } from 'vscode-languageclient/node.js';
 
 import { create_test_controller, setup_test_executables_watcher } from './test_adapter';
+import { Dependency_graph, show_graph_panel } from './graph_panel';
 
 let client: LanguageClient | undefined = undefined;
 let server_process: child_process.ChildProcess | undefined = undefined;
@@ -171,6 +172,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<Langua
 			if (client !== undefined) {
 				await client.sendNotification("iris/recomputeDiagnostics");
 			}
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand("iris.showWorkspaceDependencyGraph", async () => {
+			if (client === undefined) {
+				return;
+			}
+			const graph = await client.sendRequest<Dependency_graph>("iris/moduleDependencyGraph", { scope: "workspace" });
+			show_graph_panel(context, "Iris Workspace Dependency Graph", graph);
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand("iris.showModuleDependencyGraph", async () => {
+			if (client === undefined) {
+				return;
+			}
+			const uri = vscode.window.activeTextEditor?.document.uri.toString();
+			if (uri === undefined) {
+				vscode.window.showWarningMessage("Open an Iris file to show its dependency graph.");
+				return;
+			}
+			const graph = await client.sendRequest<Dependency_graph>("iris/moduleDependencyGraph", { scope: "currentModule", textDocumentUri: uri });
+			show_graph_panel(context, "Iris Module Dependency Graph", graph);
 		})
 	);
 

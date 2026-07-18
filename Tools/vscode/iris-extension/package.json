@@ -20,6 +20,14 @@
       {
         "command": "iris.recomputeDiagnostics",
         "title": "Iris: Recompute Diagnostics"
+      },
+      {
+        "command": "iris.showWorkspaceDependencyGraph",
+        "title": "Iris: Show Workspace Dependency Graph"
+      },
+      {
+        "command": "iris.showModuleDependencyGraph",
+        "title": "Iris: Show Dependency Graph for Current Module"
       }
     ],
     "breakpoints": [
@@ -115,6 +123,7 @@
   },
   "dependencies": {
     "@vscode/vsce": "^3.6.0",
+    "cytoscape": "^3.34.0",
     "vscode-languageclient": "^9.0.1"
   },
   "private": true

@@ -16,10 +16,52 @@ module;
 
 module iris.language_server.message_handler;
 
+import iris.graph;
 import iris.language_server.server;
 
 namespace iris::language_server
 {
+    namespace
+    {
+        lsp::json::Value module_dependency_graph_to_json(
+            iris::graph::Graph const& graph
+        )
+        {
+            auto const to_std_string = [](std::pmr::string const& value) -> std::string
+            {
+                return std::string{ std::string_view{ value } };
+            };
+
+            lsp::json::Array nodes;
+            nodes.reserve(graph.nodes.size());
+            for (iris::graph::Graph_node const& node : graph.nodes)
+            {
+                lsp::json::Object node_object;
+                node_object["id"] = to_std_string(node.id);
+                node_object["label"] = to_std_string(node.label);
+                node_object["external"] = node.external;
+                if (node.file_path.has_value())
+                    node_object["filePath"] = to_std_string(*node.file_path);
+                nodes.push_back(lsp::json::Value{ std::move(node_object) });
+            }
+
+            lsp::json::Array edges;
+            edges.reserve(graph.edges.size());
+            for (iris::graph::Graph_edge const& edge : graph.edges)
+            {
+                lsp::json::Object edge_object;
+                edge_object["from"] = to_std_string(edge.from);
+                edge_object["to"] = to_std_string(edge.to);
+                edges.push_back(lsp::json::Value{ std::move(edge_object) });
+            }
+
+            lsp::json::Object root;
+            root["nodes"] = lsp::json::Value{ std::move(nodes) };
+            root["edges"] = lsp::json::Value{ std::move(edges) };
+            return lsp::json::Value{ std::move(root) };
+        }
+    }
+
     Message_handler create_message_handler()
     {
         return
@@ -247,6 +289,30 @@ namespace iris::language_server
                         }
                     );
                 }
+            }
+        );
+
+        // Custom request that returns a module dependency graph as { nodes, edges }.
+        // scope is "workspace" (all modules) or "currentModule" (the module named by
+        // textDocumentUri plus its transitive dependencies).
+        message_handler.add(
+            std::string_view("iris/moduleDependencyGraph"),
+            [&](lsp::json::Value&& parameters) -> lsp::json::Value
+            {
+                std::string_view scope = "workspace";
+                std::optional<lsp::Uri> text_document_uri;
+
+                if (parameters.isObject())
+                {
+                    lsp::json::Object const& parameters_object = parameters.object();
+                    if (lsp::json::Value const* const scope_value = parameters_object.find("scope"); scope_value != nullptr && scope_value->isString())
+                        scope = scope_value->string();
+                    if (lsp::json::Value const* const uri_value = parameters_object.find("textDocumentUri"); uri_value != nullptr && uri_value->isString())
+                        text_document_uri = lsp::Uri::parse(uri_value->string());
+                }
+
+                iris::graph::Graph const graph = compute_module_dependency_graph(server, scope, text_document_uri);
+                return module_dependency_graph_to_json(graph);
             }
         );
 

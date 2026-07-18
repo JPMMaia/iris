@@ -2,7 +2,9 @@ module;
 
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include <lsp/messagehandler.h>
@@ -16,6 +18,7 @@ import iris.compiler.diagnostic;
 import iris.compiler.target;
 import iris.core;
 import iris.core.declarations;
+import iris.graph;
 import iris.language_server.diagnostics;
 import iris.parser.parse_tree;
 import iris.parser.parser;
@@ -160,6 +163,15 @@ namespace iris::language_server
     export lsp::TextDocument_SignatureHelpResult compute_text_document_signature_help(
         Server& server,
         lsp::SignatureHelpParams const& parameters
+    );
+
+    // Builds a module dependency graph. When `scope` is "currentModule" the graph is rooted at
+    // the module identified by `text_document_uri` and contains only its transitive dependencies.
+    // Otherwise (scope "workspace") the graph contains every module across all workspaces.
+    export iris::graph::Graph compute_module_dependency_graph(
+        Server& server,
+        std::string_view scope,
+        std::optional<lsp::Uri> const& text_document_uri
     );
 
     std::filesystem::path to_filesystem_path(

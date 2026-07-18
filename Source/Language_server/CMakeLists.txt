@@ -5,7 +5,7 @@ set_target_properties(Iris_language_server PROPERTIES OUTPUT_NAME "iris_language
 
 target_compile_features(Iris_language_server PUBLIC cxx_std_23)
 
-target_link_libraries(Iris_language_server PUBLIC Iris::Common Iris::Core Iris::Compiler Iris::Parser)
+target_link_libraries(Iris_language_server PUBLIC Iris::Common Iris::Core Iris::Compiler Iris::Graph Iris::Parser)
 
 target_link_libraries(Iris_language_server PRIVATE lsp)
 

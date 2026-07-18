@@ -29,6 +29,8 @@ import iris.compiler.target;
 import iris.compiler.validation;
 import iris.core;
 import iris.core.declarations;
+import iris.graph;
+import iris.graph.module_dependency;
 import iris.language_server.code_action;
 import iris.language_server.completion;
 import iris.language_server.core;
@@ -1306,6 +1308,54 @@ namespace iris::language_server
             workspace_data.core_modules[core_module_index],
             parameters.position,
             server.logger.window_log_message
+        );
+    }
+
+    iris::graph::Graph compute_module_dependency_graph(
+        Server& server,
+        std::string_view const scope,
+        std::optional<lsp::Uri> const& text_document_uri
+    )
+    {
+        std::pmr::polymorphic_allocator<> const output_allocator{ std::pmr::get_default_resource() };
+
+        if (scope == "currentModule")
+        {
+            if (!text_document_uri.has_value())
+                return iris::graph::Graph{ .nodes = std::pmr::vector<iris::graph::Graph_node>{ output_allocator }, .edges = std::pmr::vector<iris::graph::Graph_edge>{ output_allocator } };
+
+            std::optional<std::pair<Workspace_data&, std::size_t>> const workspace_core_module_pair =
+                find_workspace_core_module_index(server, *text_document_uri);
+            if (!workspace_core_module_pair.has_value())
+                return iris::graph::Graph{ .nodes = std::pmr::vector<iris::graph::Graph_node>{ output_allocator }, .edges = std::pmr::vector<iris::graph::Graph_edge>{ output_allocator } };
+
+            Workspace_data const& workspace_data = workspace_core_module_pair->first;
+            std::size_t const core_module_index = workspace_core_module_pair->second;
+            std::string_view const root_module_name = workspace_data.core_modules[core_module_index].name;
+
+            std::pmr::vector<iris::Module const*> const subset = iris::graph::collect_module_and_dependencies(
+                workspace_data.core_modules,
+                root_module_name,
+                output_allocator
+            );
+
+            return iris::graph::create_module_dependency_graph(
+                std::span<iris::Module const* const>{ subset },
+                output_allocator
+            );
+        }
+
+        // "workspace" scope (default): every module across all workspaces.
+        std::pmr::vector<iris::Module const*> all_modules{ output_allocator };
+        for (Workspace_data const& workspace_data : server.workspaces_data)
+        {
+            for (iris::Module const& module : workspace_data.core_modules)
+                all_modules.push_back(&module);
+        }
+
+        return iris::graph::create_module_dependency_graph(
+            std::span<iris::Module const* const>{ all_modules },
+            output_allocator
         );
     }
 }
