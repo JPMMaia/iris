@@ -846,12 +846,27 @@ namespace iris::compiler
                 }
             }
             
+            if (sorted_nodes_indices.size() == rank_start_index)
+            {
+                std::pmr::string cycle_modules{temporaries_allocator};
+                for (std::size_t node_index = 0; node_index < nodes.size(); ++node_index)
+                {
+                    if (edges.contains(node_index))
+                    {
+                        if (!cycle_modules.empty())
+                            cycle_modules += ", ";
+                        cycle_modules += nodes[node_index].module_name;
+                    }
+                }
+                throw std::runtime_error{ std::format("Circular module dependency detected among: {}", std::string_view{cycle_modules}) };
+            }
+
             for (std::size_t index = rank_start_index; index < sorted_nodes_indices.size(); ++index)
             {
                 std::size_t const node_index = sorted_nodes_indices[index];
                 std::erase_if(edges, [&](std::pair<std::size_t const, std::size_t> const& edge) -> bool { return edge.second == node_index; });
             }
-            
+
             ranks.push_back({ .start_index = rank_start_index, .count = sorted_nodes_indices.size() - rank_start_index });
         }
         
