@@ -189,11 +189,7 @@ namespace iris::parser
         Parse_node const& node
     )
     {
-        std::optional<Parse_node> const module_head = get_child_node(tree, node, 0);
-        if (!module_head.has_value())
-            return std::nullopt;
-
-        std::optional<Parse_node> const module_declaration = get_child_node(tree, module_head.value(), 0);
+        std::optional<Parse_node> const module_declaration = get_child_node(tree, node, 0);
         if (!module_declaration.has_value())
             return std::nullopt;
 
@@ -291,11 +287,7 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::optional<Parse_node> const module_head_node = get_child_node(tree, node, 0);
-        if (!module_head_node.has_value())
-            return std::nullopt;
-
-        std::optional<Parse_node> const module_declaration_node = get_child_node(tree, module_head_node.value(), 0);
+        std::optional<Parse_node> const module_declaration_node = get_child_node(tree, node, 0);
         if (!module_declaration_node.has_value())
             return std::nullopt;
 
@@ -315,17 +307,16 @@ namespace iris::parser
 
         output.dependencies.alias_imports = create_import_modules(
             tree,
-            module_head_node,
+            node,
             output_allocator,
             temporaries_allocator
         );
 
         Module_info const module_info = create_module_info(output);
 
-        std::pmr::vector<Parse_node> const child_nodes = get_child_nodes(tree, node, temporaries_allocator);
-        for (std::size_t child_index = 1; child_index < child_nodes.size(); ++child_index)
+        std::pmr::vector<Parse_node> const declaration_nodes = get_child_nodes(tree, node, "Declaration", temporaries_allocator);
+        for (Parse_node const& declaration_node : declaration_nodes)
         {
-            Parse_node const declaration_node = child_nodes[child_index];
             node_to_declaration(output, module_info, tree, declaration_node, output_allocator, temporaries_allocator);
         }
 
@@ -334,30 +325,23 @@ namespace iris::parser
 
     std::pmr::vector<Import_module_with_alias> create_import_modules(
         Parse_tree const& tree,
-        std::optional<Parse_node> const& module_head_node,
+        Parse_node const& module_node,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         std::pmr::vector<Import_module_with_alias> output{output_allocator};
-        
-        if (!module_head_node.has_value())
-            return output;
 
-        std::pmr::vector<Parse_node> const child_nodes = get_child_nodes(tree, module_head_node.value(), temporaries_allocator);
-        if (child_nodes.size() <= 1)
-            return output;
+        std::pmr::vector<Parse_node> const import_nodes = get_child_nodes(tree, module_node, "Import", temporaries_allocator);
+        output.reserve(import_nodes.size());
 
-        output.reserve(child_nodes.size() - 1);
-
-        for (std::size_t child_index = 1; child_index < child_nodes.size(); ++child_index)
+        for (Parse_node const& import_node : import_nodes)
         {
-            Parse_node const child_node = child_nodes[child_index];
-
             std::optional<Import_module_with_alias> import_alias = node_to_import_module_with_alias(
                 tree,
-                child_node,
-                output_allocator
+                import_node,
+                output_allocator,
+                temporaries_allocator
             );
 
             if (import_alias.has_value())
@@ -370,7 +354,8 @@ namespace iris::parser
     std::optional<Import_module_with_alias> node_to_import_module_with_alias(
         Parse_tree const& tree,
         Parse_node const& node,
-        std::pmr::polymorphic_allocator<> const& output_allocator
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         std::optional<Parse_node> const import_name_node = get_child_node(tree, node, "Import_name");
@@ -384,6 +369,13 @@ namespace iris::parser
         std::string_view const import_name = get_node_value(tree, import_name_node.value());
         std::string_view const import_alias = get_node_value(tree, import_alias_node.value());
 
+        std::optional<std::pmr::string> comment;
+        std::optional<Parse_node> const comment_node = get_child_node(tree, node, "Comment");
+        if (comment_node.has_value())
+        {
+            comment = extract_comments_from_node(tree, comment_node.value(), output_allocator, temporaries_allocator);
+        }
+
         Source_range const source_range = get_node_source_range(node);
 
         return Import_module_with_alias
@@ -391,6 +383,7 @@ namespace iris::parser
             .module_name = create_string(import_name, output_allocator),
             .alias = create_string(import_alias, output_allocator),
             .usages = {},
+            .comment = std::move(comment),
             .source_range = source_range,
         };
     }

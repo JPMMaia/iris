@@ -55,18 +55,17 @@ export function run_for_loops() -> ()
 ---
 
 (Module
-  (Module_head
-    (Module_declaration
-      (Module_name
-        (Identifier_with_dots
-          (Identifier))))
-    (Import
-      (Import_name
-        (Identifier_with_dots
-          (Identifier)
-          (Identifier)))
-      (Import_alias
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
         (Identifier))))
+  (Import
+    (Import_name
+      (Identifier_with_dots
+        (Identifier)
+        (Identifier)))
+    (Import_alias
+      (Identifier)))
   (Declaration
     (Struct
       (Struct_name

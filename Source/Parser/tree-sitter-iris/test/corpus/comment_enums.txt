@@ -18,11 +18,10 @@ enum My_enum
 ---
 
 (Module
-  (Module_head
-    (Module_declaration
-      (Module_name
-        (Identifier_with_dots
-          (Identifier)))))
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
   (Declaration
     (Comment)
     (Enum

@@ -17,11 +17,10 @@ module.exports = grammar({
   ],
 
   rules: {
-    Module: $ => seq($.Module_head, repeat($.Declaration)),
-    Module_head: $ => seq($.Module_declaration, repeat($.Import)),
+    Module: $ => seq($.Module_declaration, repeat($.Import), repeat($.Declaration)),
     Module_declaration: $ => seq(optional($.Comment), "module", $.Module_name, ";"),
     Module_name: $ => $.Identifier_with_dots,
-    Import: $ => seq("import", $.Import_name, "as", $.Import_alias, ";"),
+    Import: $ => seq(optional($.Comment), "import", $.Import_name, "as", $.Import_alias, ";"),
     Import_name: $ => $.Identifier_with_dots,
     Import_alias: $ => $.Identifier,
     Declaration: $ => seq(optional($.Comment), repeat($.Declaration_attribute), optional("export"), choice(

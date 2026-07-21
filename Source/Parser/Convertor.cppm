@@ -41,7 +41,7 @@ namespace iris::parser
 
     std::pmr::vector<Import_module_with_alias> create_import_modules(
         Parse_tree const& tree,
-        std::optional<Parse_node> const& module_head_node,
+        Parse_node const& module_node,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
@@ -49,7 +49,8 @@ namespace iris::parser
     export std::optional<Import_module_with_alias> node_to_import_module_with_alias(
         Parse_tree const& tree,
         Parse_node const& node,
-        std::pmr::polymorphic_allocator<> const& output_allocator
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
     bool is_variadic(

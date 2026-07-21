@@ -13,11 +13,10 @@ export function use_alias(size: My_int) -> ()
 ---
 
 (Module
-  (Module_head
-    (Module_declaration
-      (Module_name
-        (Identifier_with_dots
-          (Identifier)))))
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
   (Declaration
     (Alias
       (Alias_name

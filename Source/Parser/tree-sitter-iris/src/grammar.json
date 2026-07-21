@@ -7,22 +7,6 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "Module_head"
-        },
-        {
-          "type": "REPEAT",
-          "content": {
-            "type": "SYMBOL",
-            "name": "Declaration"
-          }
-        }
-      ]
-    },
-    "Module_head": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "SYMBOL",
           "name": "Module_declaration"
         },
         {
@@ -30,6 +14,13 @@
           "content": {
             "type": "SYMBOL",
             "name": "Import"
+          }
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "Declaration"
           }
         }
       ]
@@ -70,6 +61,18 @@
     "Import": {
       "type": "SEQ",
       "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "Comment"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
         {
           "type": "STRING",
           "value": "import"

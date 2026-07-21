@@ -893,6 +893,7 @@ namespace iris
         std::pmr::string module_name;
         std::pmr::string alias;
         std::pmr::vector<std::pmr::string> usages;
+        std::optional<std::pmr::string> comment;
         std::optional<Source_range> source_range;
 
         friend bool operator==(Import_module_with_alias const& lhs, Import_module_with_alias const& rhs);

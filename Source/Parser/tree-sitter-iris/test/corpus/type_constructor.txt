@@ -21,11 +21,10 @@ function run() -> ()
 ---
 
 (Module
-  (Module_head
-    (Module_declaration
-      (Module_name
-        (Identifier_with_dots
-          (Identifier)))))
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
   (Declaration
     (Type_constructor
       (Type_constructor_name

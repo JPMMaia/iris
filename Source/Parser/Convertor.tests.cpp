@@ -238,6 +238,12 @@ namespace iris::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts comment_imports.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "comment_imports.iris";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts comment_module_declaration.iris", "[Convertor]")
     {
         std::string_view const input_file = "comment_module_declaration.iris";

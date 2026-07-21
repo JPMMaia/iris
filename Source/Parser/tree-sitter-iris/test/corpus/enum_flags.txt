@@ -40,11 +40,10 @@ export function use_enums(enum_argument: My_enum_flag) -> (result: Int32)
 ---
 
 (Module
-  (Module_head
-    (Module_declaration
-      (Module_name
-        (Identifier_with_dots
-          (Identifier)))))
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
   (Declaration
     (Enum
       (Enum_name

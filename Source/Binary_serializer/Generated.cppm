@@ -1213,6 +1213,7 @@ namespace iris::binary_serializer
         serialize(serializer, value.module_name);
         serialize(serializer, value.alias);
         serialize(serializer, value.usages);
+        serialize(serializer, value.comment);
         serialize(serializer, value.source_range);
     }
 
@@ -1222,6 +1223,7 @@ namespace iris::binary_serializer
         deserialize(deserializer, value.module_name);
         deserialize(deserializer, value.alias);
         deserialize(deserializer, value.usages);
+        deserialize(deserializer, value.comment);
         deserialize(deserializer, value.source_range);
     }
 

@@ -1,0 +1,73 @@
+=========================
+Comment imports
+=========================
+
+module Comment_imports;
+
+// Standard input and output
+import C.stdio as stdio;
+
+// Standard library
+// with a multi-line comment
+import C.stdlib as stdlib;
+
+---
+
+(Module
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
+  (Import
+    (Comment)
+    (Import_name
+      (Identifier_with_dots
+        (Identifier)
+        (Identifier)))
+    (Import_alias
+      (Identifier)))
+  (Import
+    (Comment)
+    (Import_name
+      (Identifier_with_dots
+        (Identifier)
+        (Identifier)))
+    (Import_alias
+      (Identifier))))
+
+=========================
+Comment imports followed by comment declaration
+=========================
+
+module Comment_imports_followed_by_comment_declaration;
+
+// An import comment
+import C.stdio as stdio;
+
+// A declaration comment
+using My_alias = Int32;
+
+---
+
+(Module
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
+  (Import
+    (Comment)
+    (Import_name
+      (Identifier_with_dots
+        (Identifier)
+        (Identifier)))
+    (Import_alias
+      (Identifier)))
+  (Declaration
+    (Comment)
+    (Alias
+      (Alias_name
+        (Identifier))
+      (Alias_type
+        (Type
+          (Type_name
+            (Identifier)))))))

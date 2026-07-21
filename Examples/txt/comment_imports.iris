@@ -1,0 +1,13 @@
+module Comment_imports;
+
+// Import comment
+// Another line
+import Alias as Alias;
+import Enums as Enums;
+// Third import comment
+import Structs as Structs;
+
+export function use_alias(my_enum: Alias.My_alias_to_enum) -> ()
+{
+    var a = Alias.My_alias_to_enum.A;
+}

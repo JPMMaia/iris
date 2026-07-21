@@ -1605,6 +1605,7 @@ namespace iris::json
         data["module_name"] = to_json(value.module_name);
         data["alias"] = to_json(value.alias);
         data["usages"] = to_json(value.usages);
+        if (value.comment.has_value()) data["comment"] = to_json(value.comment);
         if (value.source_range.has_value()) data["source_range"] = to_json(value.source_range);
         return data;
     }
@@ -1615,6 +1616,7 @@ namespace iris::json
         from_json(data.at("module_name"), value.module_name);
         from_json(data.at("alias"), value.alias);
         if (data.contains("usages")) from_json(data.at("usages"), value.usages);
+        if (data.contains("comment")) from_json(data.at("comment"), value.comment);
         if (data.contains("source_range")) from_json(data.at("source_range"), value.source_range);
     }
 

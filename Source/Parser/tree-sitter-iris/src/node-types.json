@@ -1840,6 +1840,10 @@
       "required": true,
       "types": [
         {
+          "type": "Comment",
+          "named": true
+        },
+        {
           "type": "Import_alias",
           "named": true
         },
@@ -1894,7 +1898,11 @@
           "named": true
         },
         {
-          "type": "Module_head",
+          "type": "Import",
+          "named": true
+        },
+        {
+          "type": "Module_declaration",
           "named": true
         }
       ]
@@ -1914,25 +1922,6 @@
         },
         {
           "type": "Module_name",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "Module_head",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "Import",
-          "named": true
-        },
-        {
-          "type": "Module_declaration",
           "named": true
         }
       ]

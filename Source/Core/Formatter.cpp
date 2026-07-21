@@ -261,6 +261,12 @@ namespace iris
         Format_options const& options
     )
     {
+        if (alias_import.comment.has_value())
+        {
+            add_comment(buffer, alias_import.comment.value(), 0);
+            add_new_line(buffer);
+        }
+
         add_text(buffer, "import ");
         add_text(buffer, alias_import.module_name);
         add_text(buffer, " as ");
