@@ -3235,6 +3235,43 @@ function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that a for loop range and step accept complex expressions", "[Validation][For_loop_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct My_struct
+{
+    a: Int32 = 0;
+}
+
+function run(ring: Uint32) -> ()
+{
+    for offset in 0u32 to (2u32 * ring + 1u32)
+    {
+    }
+
+    var counts: Constant_array::<Int32, 4> = [0, 1, 2, 3];
+    var instance: My_struct = {};
+
+    for index in 0 to counts[0]
+    {
+    }
+
+    for index in 0u32 to instance.a as Uint32
+    {
+    }
+
+    for index in (0) to instance.a step_by (1)
+    {
+    }
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
 
     TEST_CASE("Validates that function pointers with same type but different parameter names can be assigned", "[Validation][Function_pointer_type]")
     {

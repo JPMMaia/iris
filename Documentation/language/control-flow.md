@@ -55,6 +55,22 @@ for index in 0 to 3
 }
 ```
 
+### Computed Bounds
+
+The range bounds and the step are ordinary expressions, so they can be computed:
+
+```iris
+for offset in 0u32 to (2u32 * ring + 1u32)
+{
+    print_integer(offset);
+}
+
+for index in 0 to counts[0]
+{
+    print_integer(index);
+}
+```
+
 ### Step
 
 ```iris

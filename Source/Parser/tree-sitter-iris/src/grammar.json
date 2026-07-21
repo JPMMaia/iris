@@ -2666,6 +2666,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "Expression_access_array"
+        },
+        {
+          "type": "SYMBOL",
           "name": "Expression_binary"
         },
         {
@@ -2674,11 +2678,31 @@
         },
         {
           "type": "SYMBOL",
+          "name": "Expression_cast"
+        },
+        {
+          "type": "SYMBOL",
           "name": "Expression_constant"
         },
         {
           "type": "SYMBOL",
           "name": "Expression_dereference_and_access"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_instance_call"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_parenthesis"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_reflection_call"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_ternary_condition"
         },
         {
           "type": "SYMBOL",

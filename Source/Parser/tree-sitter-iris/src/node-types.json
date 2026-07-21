@@ -688,6 +688,10 @@
           "named": true
         },
         {
+          "type": "Expression_access_array",
+          "named": true
+        },
+        {
           "type": "Expression_binary",
           "named": true
         },
@@ -696,11 +700,31 @@
           "named": true
         },
         {
+          "type": "Expression_cast",
+          "named": true
+        },
+        {
           "type": "Expression_constant",
           "named": true
         },
         {
           "type": "Expression_dereference_and_access",
+          "named": true
+        },
+        {
+          "type": "Expression_instance_call",
+          "named": true
+        },
+        {
+          "type": "Expression_parenthesis",
+          "named": true
+        },
+        {
+          "type": "Expression_reflection_call",
+          "named": true
+        },
+        {
+          "type": "Expression_ternary_condition",
           "named": true
         },
         {

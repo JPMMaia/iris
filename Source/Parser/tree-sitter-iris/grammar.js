@@ -204,10 +204,16 @@ module.exports = grammar({
     Expression_for_loop_reverse: $ => "reverse",
     Expression_for_loop_number_expression: $ => choice(
       $.Expression_access,
+      $.Expression_access_array,
       $.Expression_binary,
       $.Expression_call,
+      $.Expression_cast,
       $.Expression_constant,
       $.Expression_dereference_and_access,
+      $.Expression_instance_call,
+      $.Expression_parenthesis,
+      $.Expression_reflection_call,
+      $.Expression_ternary_condition,
       $.Expression_unary,
       $.Expression_variable
     ),

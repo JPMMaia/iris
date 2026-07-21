@@ -50,6 +50,28 @@ export function run_for_loops() -> ()
     {
         print_integer(index);
     }
+
+    var counts: Constant_array::<Int32, 4> = [0, 1, 2, 3];
+
+    for offset in 0 to (2 * v0.a + 1)
+    {
+        print_integer(offset);
+    }
+
+    for index in 0 to counts[0]
+    {
+        print_integer(index);
+    }
+
+    for index in 0 to v0.a as Int32
+    {
+        print_integer(index);
+    }
+
+    for index in (0) to v0.a step_by (1)
+    {
+        print_integer(index);
+    }
 }
 
 ---
@@ -316,6 +338,189 @@ export function run_for_loops() -> ()
                           (Variable_name
                             (Identifier))))
                       (Identifier)))))
+              (Expression_for_loop_statements
+                (Statement
+                  (Expression_call
+                    (Generic_expression
+                      (Expression_variable
+                        (Variable_name
+                          (Identifier))))
+                    (Expression_call_arguments
+                      (Generic_expression_or_instantiate
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier)))))))))))
+          (Statement
+            (Expression_variable_declaration_with_type
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Expression_variable_declaration_type
+                (Type
+                  (Constant_array_type
+                    (Type
+                      (Type_name
+                        (Identifier)))
+                    (Constant_array_length
+                      (Number)))))
+              (Generic_expression_or_instantiate
+                (Generic_expression
+                  (Expression_create_array
+                    (Generic_expression_or_instantiate
+                      (Generic_expression
+                        (Expression_constant
+                          (Number))))
+                    (Generic_expression_or_instantiate
+                      (Generic_expression
+                        (Expression_constant
+                          (Number))))
+                    (Generic_expression_or_instantiate
+                      (Generic_expression
+                        (Expression_constant
+                          (Number))))
+                    (Generic_expression_or_instantiate
+                      (Generic_expression
+                        (Expression_constant
+                          (Number)))))))))
+          (Statement
+            (Expression_for_loop
+              (Expression_for_loop_head
+                (Expression_for_loop_variable
+                  (Identifier))
+                (Expression_for_loop_range_begin
+                  (Expression_for_loop_number_expression
+                    (Expression_constant
+                      (Number))))
+                (Expression_for_loop_range_end
+                  (Expression_for_loop_number_expression
+                    (Expression_parenthesis
+                      (Generic_expression
+                        (Expression_binary
+                          (Generic_expression
+                            (Expression_binary
+                              (Generic_expression
+                                (Expression_constant
+                                  (Number)))
+                              (Generic_expression
+                                (Expression_access
+                                  (Generic_expression
+                                    (Expression_variable
+                                      (Variable_name
+                                        (Identifier))))
+                                  (Expression_access_member_name
+                                    (Identifier))))))
+                          (Generic_expression
+                            (Expression_constant
+                              (Number)))))))))
+              (Expression_for_loop_statements
+                (Statement
+                  (Expression_call
+                    (Generic_expression
+                      (Expression_variable
+                        (Variable_name
+                          (Identifier))))
+                    (Expression_call_arguments
+                      (Generic_expression_or_instantiate
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier)))))))))))
+          (Statement
+            (Expression_for_loop
+              (Expression_for_loop_head
+                (Expression_for_loop_variable
+                  (Identifier))
+                (Expression_for_loop_range_begin
+                  (Expression_for_loop_number_expression
+                    (Expression_constant
+                      (Number))))
+                (Expression_for_loop_range_end
+                  (Expression_for_loop_number_expression
+                    (Expression_access_array
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier))))
+                      (Generic_expression
+                        (Expression_constant
+                          (Number)))))))
+              (Expression_for_loop_statements
+                (Statement
+                  (Expression_call
+                    (Generic_expression
+                      (Expression_variable
+                        (Variable_name
+                          (Identifier))))
+                    (Expression_call_arguments
+                      (Generic_expression_or_instantiate
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier)))))))))))
+          (Statement
+            (Expression_for_loop
+              (Expression_for_loop_head
+                (Expression_for_loop_variable
+                  (Identifier))
+                (Expression_for_loop_range_begin
+                  (Expression_for_loop_number_expression
+                    (Expression_constant
+                      (Number))))
+                (Expression_for_loop_range_end
+                  (Expression_for_loop_number_expression
+                    (Expression_cast
+                      (Generic_expression
+                        (Expression_access
+                          (Generic_expression
+                            (Expression_variable
+                              (Variable_name
+                                (Identifier))))
+                          (Expression_access_member_name
+                            (Identifier))))
+                      (Expression_type
+                        (Type
+                          (Type_name
+                            (Identifier))))))))
+              (Expression_for_loop_statements
+                (Statement
+                  (Expression_call
+                    (Generic_expression
+                      (Expression_variable
+                        (Variable_name
+                          (Identifier))))
+                    (Expression_call_arguments
+                      (Generic_expression_or_instantiate
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier)))))))))))
+          (Statement
+            (Expression_for_loop
+              (Expression_for_loop_head
+                (Expression_for_loop_variable
+                  (Identifier))
+                (Expression_for_loop_range_begin
+                  (Expression_for_loop_number_expression
+                    (Expression_parenthesis
+                      (Generic_expression
+                        (Expression_constant
+                          (Number))))))
+                (Expression_for_loop_range_end
+                  (Expression_for_loop_number_expression
+                    (Expression_access
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier))))
+                      (Expression_access_member_name
+                        (Identifier)))))
+                (Expression_for_loop_step
+                  (Expression_for_loop_number_expression
+                    (Expression_parenthesis
+                      (Generic_expression
+                        (Expression_constant
+                          (Number)))))))
               (Expression_for_loop_statements
                 (Statement
                   (Expression_call
