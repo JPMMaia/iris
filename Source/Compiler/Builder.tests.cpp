@@ -6,10 +6,12 @@ import iris.compiler.project;
 import iris.compiler.compile_commands_generator;
 import iris.compiler.target;
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <span>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include <catch2/catch_all.hpp>
@@ -455,6 +457,204 @@ namespace iris::compiler
         };
 
         test_builder("Type_constructors", {"iris_artifact.json"}, target, repository_paths, expected_output_paths);
+    }
+
+    static void write_source_file(
+        std::filesystem::path const& file_path,
+        std::string_view const content
+    )
+    {
+        std::ofstream output_stream{ file_path, std::ios::binary | std::ios::trunc };
+        output_stream.write(content.data(), content.size());
+    }
+
+    // Regression test: an incremental build used to consider a module's bitcode up to date whenever
+    // it was newer than that module's own '.irisb', ignoring the modules it imports. Changing the
+    // layout of a struct in a library therefore left the dependent modules compiled against the old
+    // layout, with no error reported.
+    TEST_CASE("Incremental build recompiles dependents when a struct layout changes", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "builder_incremental_struct_layout";
+        std::filesystem::path const source_directory_path = root_directory_path / "source";
+        std::filesystem::path const build_directory_path = root_directory_path / "build";
+
+        std::filesystem::remove_all(root_directory_path);
+        std::filesystem::create_directories(root_directory_path);
+        std::filesystem::copy(
+            g_examples_directory / "Link_with_library",
+            source_directory_path,
+            std::filesystem::copy_options::recursive
+        );
+
+        std::filesystem::path const library_source_path = source_directory_path / "my_library" / "my_library.iris";
+        std::filesystem::path const app_source_path = source_directory_path / "my_app" / "my_app.iris";
+
+        write_source_file(
+            library_source_path,
+            "module my_library;\n"
+            "\n"
+            "export struct My_data\n"
+            "{\n"
+            "    first: Int32 = 1;\n"
+            "    last: Int32 = 2;\n"
+            "}\n"
+            "\n"
+            "export function hello_from_library() -> (result: Int32)\n"
+            "{\n"
+            "    return 1;\n"
+            "}\n"
+        );
+
+        write_source_file(
+            app_source_path,
+            "module my_app;\n"
+            "\n"
+            "import my_library as my_library;\n"
+            "\n"
+            "@unique_name(\"main\")\n"
+            "export function main() -> (result: Int32)\n"
+            "{\n"
+            "    var data: my_library.My_data = {};\n"
+            "    return data.last;\n"
+            "}\n"
+        );
+
+        std::pmr::vector<std::filesystem::path> const artifact_absolute_paths
+        {
+            source_directory_path / "my_app" / "iris_artifact.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_standard_repository_file_path,
+            source_directory_path / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const header_search_directories = iris::common::get_default_header_search_directories();
+
+        iris::compiler::Compilation_options const compilation_options{};
+        iris::compiler::Builder_options const builder_options{};
+
+        auto const build = [&]() -> void
+        {
+            Builder builder = create_builder(
+                target,
+                build_directory_path,
+                header_search_directories,
+                repository_paths,
+                compilation_options,
+                builder_options,
+                {}
+            );
+
+            build_artifacts(builder, artifact_absolute_paths);
+        };
+
+        build();
+
+        std::filesystem::path const app_bitcode_path = build_directory_path / "artifacts" / "my_app.bc";
+        REQUIRE(std::filesystem::exists(app_bitcode_path));
+
+        std::filesystem::file_time_type const first_build_time = std::filesystem::last_write_time(app_bitcode_path);
+
+        // Make sure the edit below cannot share a filesystem timestamp with the first build.
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 1100 });
+
+        // Insert a field in the middle of the struct: 'last' moves from offset 4 to offset 8.
+        // 'my_app.iris' is left untouched, exactly as in the reported bug.
+        write_source_file(
+            library_source_path,
+            "module my_library;\n"
+            "\n"
+            "export struct My_data\n"
+            "{\n"
+            "    first: Int32 = 1;\n"
+            "    inserted: Int32 = 3;\n"
+            "    last: Int32 = 2;\n"
+            "}\n"
+            "\n"
+            "export function hello_from_library() -> (result: Int32)\n"
+            "{\n"
+            "    return 1;\n"
+            "}\n"
+        );
+
+        // Incremental build: the build directory is deliberately kept.
+        build();
+
+        REQUIRE(std::filesystem::exists(app_bitcode_path));
+
+        std::filesystem::file_time_type const second_build_time = std::filesystem::last_write_time(app_bitcode_path);
+        CHECK(second_build_time > first_build_time);
+    }
+
+    // A build with no source changes must not recompile anything, otherwise the fix above would
+    // have turned every incremental build into a full rebuild.
+    TEST_CASE("Incremental build does not recompile unchanged modules", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "builder_incremental_no_changes";
+        std::filesystem::path const source_directory_path = root_directory_path / "source";
+        std::filesystem::path const build_directory_path = root_directory_path / "build";
+
+        std::filesystem::remove_all(root_directory_path);
+        std::filesystem::create_directories(root_directory_path);
+        std::filesystem::copy(
+            g_examples_directory / "Link_with_library",
+            source_directory_path,
+            std::filesystem::copy_options::recursive
+        );
+
+        std::pmr::vector<std::filesystem::path> const artifact_absolute_paths
+        {
+            source_directory_path / "my_app" / "iris_artifact.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_standard_repository_file_path,
+            source_directory_path / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const header_search_directories = iris::common::get_default_header_search_directories();
+
+        iris::compiler::Compilation_options const compilation_options{};
+        iris::compiler::Builder_options const builder_options{};
+
+        auto const build = [&]() -> void
+        {
+            Builder builder = create_builder(
+                target,
+                build_directory_path,
+                header_search_directories,
+                repository_paths,
+                compilation_options,
+                builder_options,
+                {}
+            );
+
+            build_artifacts(builder, artifact_absolute_paths);
+        };
+
+        build();
+
+        std::filesystem::path const app_bitcode_path = build_directory_path / "artifacts" / "my_app.bc";
+        std::filesystem::path const library_bitcode_path = build_directory_path / "artifacts" / "my_library.bc";
+        REQUIRE(std::filesystem::exists(app_bitcode_path));
+        REQUIRE(std::filesystem::exists(library_bitcode_path));
+
+        std::filesystem::file_time_type const first_app_time = std::filesystem::last_write_time(app_bitcode_path);
+        std::filesystem::file_time_type const first_library_time = std::filesystem::last_write_time(library_bitcode_path);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 1100 });
+
+        build();
+
+        CHECK(std::filesystem::last_write_time(app_bitcode_path) == first_app_time);
+        CHECK(std::filesystem::last_write_time(library_bitcode_path) == first_library_time);
     }
 
     TEST_CASE("Locate artifacts in a directory", "[Builder]")

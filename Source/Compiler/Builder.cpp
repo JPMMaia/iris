@@ -62,6 +62,118 @@ namespace iris::compiler
         }
     }
 
+    // Tracks, per module, the most recent modification time among the module's own '.irisb' file and
+    // the '.irisb' files of every module it transitively imports.
+    //
+    // Generated output depends on the declarations of the imported modules (struct layouts, for
+    // instance), so comparing an output file against the module's own '.irisb' alone is not enough:
+    // when an imported module changes its layout, every module downstream of it must be regenerated
+    // as well. Without this, an incremental build silently keeps outputs that encode the old layout.
+    struct Module_input_times
+    {
+        std::filesystem::path hl_build_directory;
+        std::pmr::unordered_map<std::pmr::string, iris::Module const*> modules_by_name;
+        std::pmr::unordered_map<std::pmr::string, std::filesystem::file_time_type> cache;
+    };
+
+    // Time that no output file can ever be newer than, used to force regeneration whenever the
+    // inputs of a module cannot be determined.
+    static constexpr std::filesystem::file_time_type get_always_out_of_date_time()
+    {
+        return std::filesystem::file_time_type::max();
+    }
+
+    static Module_input_times create_module_input_times(
+        std::filesystem::path const& hl_build_directory,
+        std::span<iris::Module const* const> const modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::unordered_map<std::pmr::string, iris::Module const*> modules_by_name{output_allocator};
+        modules_by_name.reserve(modules.size());
+
+        for (iris::Module const* const core_module : modules)
+            modules_by_name.insert_or_assign(std::pmr::string{core_module->name}, core_module);
+
+        return Module_input_times
+        {
+            .hl_build_directory = hl_build_directory,
+            .modules_by_name = std::move(modules_by_name),
+            .cache = std::pmr::unordered_map<std::pmr::string, std::filesystem::file_time_type>{output_allocator},
+        };
+    }
+
+    static Module_input_times create_module_input_times(
+        std::filesystem::path const& hl_build_directory,
+        std::span<iris::Module const> const modules,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::vector<iris::Module const*> module_pointers{output_allocator};
+        module_pointers.reserve(modules.size());
+
+        for (iris::Module const& core_module : modules)
+            module_pointers.push_back(&core_module);
+
+        return create_module_input_times(hl_build_directory, module_pointers, output_allocator);
+    }
+
+    // Returns the newest modification time among the '.irisb' of 'module_name' and the '.irisb' of
+    // all its transitive dependencies. Results are memoized so that each module is visited once.
+    //
+    // An unknown module, or one whose '.irisb' is missing, yields 'get_always_out_of_date_time()',
+    // which propagates to every module that imports it. The value is also inserted into the cache
+    // before recursing, so a dependency cycle resolves to "always out of date" instead of recursing
+    // forever.
+    static std::filesystem::file_time_type get_newest_input_time(
+        Module_input_times& input_times,
+        std::pmr::string const& module_name
+    )
+    {
+        auto const cached = input_times.cache.find(module_name);
+        if (cached != input_times.cache.end())
+            return cached->second;
+
+        input_times.cache.insert_or_assign(module_name, get_always_out_of_date_time());
+
+        std::filesystem::path const module_file_path = input_times.hl_build_directory / std::format("{}.irisb", module_name);
+        if (!std::filesystem::exists(module_file_path))
+            return get_always_out_of_date_time();
+
+        std::filesystem::file_time_type newest_input_time = std::filesystem::last_write_time(module_file_path);
+
+        auto const module_location = input_times.modules_by_name.find(module_name);
+        if (module_location == input_times.modules_by_name.end())
+            return get_always_out_of_date_time();
+
+        for (Import_module_with_alias const& alias_import : module_location->second->dependencies.alias_imports)
+        {
+            newest_input_time = std::max(
+                newest_input_time,
+                get_newest_input_time(input_times, alias_import.module_name)
+            );
+
+            if (newest_input_time == get_always_out_of_date_time())
+                break;
+        }
+
+        input_times.cache.insert_or_assign(module_name, newest_input_time);
+
+        return newest_input_time;
+    }
+
+    static bool is_output_up_to_date(
+        Module_input_times& input_times,
+        std::pmr::string const& module_name,
+        std::filesystem::path const& output_file_path
+    )
+    {
+        if (!std::filesystem::exists(output_file_path))
+            return false;
+
+        return std::filesystem::last_write_time(output_file_path) > get_newest_input_time(input_times, module_name);
+    }
+
     static std::pmr::vector<iris::Module const*> filter_empty(
         std::span<iris::Module const> const header_modules,
         std::pmr::polymorphic_allocator<> const& output_allocator
@@ -680,22 +792,18 @@ namespace iris::compiler
         iris::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& output_header_paths,
         iris::Declaration_database const& declaration_database,
+        Module_input_times& input_times,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         std::filesystem::path const& output_c_header_path = output_header_paths.at(core_module.name);
         std::filesystem::path const output_cpp_header_path = std::filesystem::path{output_c_header_path}.replace_extension("hpp");
 
-        if (core_module.source_file_path.has_value())
+        if (std::filesystem::exists(output_cpp_header_path))
         {
-            std::filesystem::path const& source_file_path = core_module.source_file_path.value();
-
-            if (std::filesystem::exists(output_c_header_path) && std::filesystem::exists(output_cpp_header_path))
+            if (is_output_up_to_date(input_times, core_module.name, output_c_header_path))
             {
-                if (is_file_newer_than(output_c_header_path, source_file_path))
-                {
-                    return;
-                }
+                return;
             }
         }
 
@@ -904,6 +1012,12 @@ namespace iris::compiler
 
         Source_file_graph const graph = create_source_file_graph(c_header_groups.c_headers, core_modules, output_header_paths, temporaries_allocator);
 
+        Module_input_times input_times = create_module_input_times(
+            get_hl_build_directory(builder.build_directory_path),
+            std::span<iris::Module const>{core_modules.data(), core_modules.size()},
+            temporaries_allocator
+        );
+
         std::pmr::vector<iris::Module> header_modules{output_allocator};
         header_modules.resize(c_header_groups.c_headers.size());
 
@@ -935,6 +1049,7 @@ namespace iris::compiler
                         core_module,
                         output_header_paths,
                         declaration_database,
+                        input_times,
                         temporaries_allocator
                     );
                 }
@@ -1335,6 +1450,12 @@ namespace iris::compiler
 
         std::pmr::vector<iris::Module> test_modules{temporaries_allocator};
 
+        Module_input_times input_times = create_module_input_times(
+            get_hl_build_directory(builder.build_directory_path),
+            core_modules,
+            temporaries_allocator
+        );
+
         for (std::filesystem::path const& artifact_file_path : artifact_file_paths)
         {
             auto const artifact_location = std::find_if(artifacts.begin(), artifacts.end(), [&](Artifact const& artifact) -> bool { return artifact.file_path == artifact_file_path; });
@@ -1351,13 +1472,18 @@ namespace iris::compiler
 
             std::pmr::string const test_module_name = iris::compiler::get_test_module_name(artifact.name);
             std::filesystem::path const output_assembly_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}.{}", test_module_name, extension);
+            // The test module aggregates every module of the artifact, so it is up to date only if
+            // its output is newer than the inputs of all of them, dependencies of other artifacts
+            // included.
             if (std::filesystem::exists(output_assembly_file))
             {
                 bool is_up_to_date = true;
 
                 for (std::filesystem::path const& source_file : iris_source_files)
                 {
-                    if (is_file_newer_than(source_file, output_assembly_file))
+                    std::optional<std::pmr::string> const source_module_name = iris::parser::read_module_name(source_file);
+
+                    if (!source_module_name.has_value() || !is_output_up_to_date(input_times, source_module_name.value(), output_assembly_file))
                     {
                         is_up_to_date = false;
                         break;
@@ -1446,6 +1572,7 @@ namespace iris::compiler
         Builder& builder,
         iris::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
+        Module_input_times& input_times,
         LLVM_data& llvm_data,
         std::span<iris::Module const* const> const all_sorted_modules,
         Declaration_database const& declaration_database,
@@ -1460,16 +1587,11 @@ namespace iris::compiler
         std::filesystem::path const output_assembly_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}{}.{}", core_module.name, test_extension, extension);
         std::filesystem::path const output_llvm_ir_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}{}.{}", core_module.name, test_extension, "ll");
 
-        if (std::filesystem::exists(output_assembly_file))
+        if (!builder.output_llvm_ir || std::filesystem::exists(output_llvm_ir_file))
         {
-            if (!builder.output_llvm_ir || std::filesystem::exists(output_llvm_ir_file))
+            if (is_output_up_to_date(input_times, core_module.name, output_assembly_file))
             {
-                auto const input_module_file_iterator = module_name_to_file_path_map.find(core_module.name);
-
-                if (input_module_file_iterator != module_name_to_file_path_map.end() && std::filesystem::exists(input_module_file_iterator->second) && is_file_newer_than(output_assembly_file, input_module_file_iterator->second))
-                {
-                    return;
-                }
+                return;
             }
         }
 
@@ -1511,6 +1633,12 @@ namespace iris::compiler
     {
         start_timer(get_profiler(builder), "compile_and_write_to_bitcode_files");
 
+        Module_input_times input_times = create_module_input_times(
+            get_hl_build_directory(builder.build_directory_path),
+            all_sorted_modules,
+            {}
+        );
+
         // TODO to paralelize, llvm_data and compilation_database should be const
 
         for (std::size_t index = 0; index < core_modules.size(); ++index)
@@ -1520,6 +1648,7 @@ namespace iris::compiler
                 builder,
                 core_module,
                 module_name_to_file_path_map,
+                input_times,
                 llvm_data,
                 all_sorted_modules,
                 declaration_database,
