@@ -101,4 +101,49 @@ namespace iris::graph
         CHECK(find_node(graph, "C") != nullptr);
         CHECK(find_node(graph, "Unrelated") == nullptr);
     }
+
+    TEST_CASE("collect_module_and_dependencies keeps the root module even when it is unnamed", "[graph]")
+    {
+        std::pmr::polymorphic_allocator<> const allocator{ std::pmr::get_default_resource() };
+
+        std::pmr::vector<iris::Module> modules;
+        modules.push_back(create_module("B", {}));
+
+        // A module that failed to parse keeps an empty name, so it cannot be found by name.
+        iris::Module const root = create_module("", { "B" });
+
+        std::pmr::vector<iris::Module const*> const subset =
+            collect_module_and_dependencies(std::span<iris::Module const>{ modules }, root, allocator);
+
+        REQUIRE(subset.size() == 2);
+        CHECK(subset[0] == &root);
+
+        Graph const graph = create_module_dependency_graph(std::span<iris::Module const* const>{ subset }, allocator);
+        CHECK(find_node(graph, "") != nullptr);
+        CHECK(find_node(graph, "B") != nullptr);
+        CHECK(has_edge(graph, "", "B"));
+    }
+
+    TEST_CASE("collect_module_and_dependencies from the root module gathers transitive deps", "[graph]")
+    {
+        std::pmr::polymorphic_allocator<> const allocator{ std::pmr::get_default_resource() };
+
+        std::pmr::vector<iris::Module> modules;
+        modules.push_back(create_module("A", { "B" }));
+        modules.push_back(create_module("B", { "C" }));
+        modules.push_back(create_module("C", { "A" })); // cycle back to A
+        modules.push_back(create_module("Unrelated", {}));
+
+        std::pmr::vector<iris::Module const*> const subset =
+            collect_module_and_dependencies(std::span<iris::Module const>{ modules }, modules[0], allocator);
+
+        CHECK(subset.size() == 3); // A, B, C but not Unrelated
+        CHECK(subset[0] == &modules[0]);
+
+        Graph const graph = create_module_dependency_graph(std::span<iris::Module const* const>{ subset }, allocator);
+        CHECK(find_node(graph, "A") != nullptr);
+        CHECK(find_node(graph, "B") != nullptr);
+        CHECK(find_node(graph, "C") != nullptr);
+        CHECK(find_node(graph, "Unrelated") == nullptr);
+    }
 }

@@ -26,6 +26,8 @@ export function show_graph_panel(
 ): void {
 	const column = vscode.window.activeTextEditor?.viewColumn;
 
+	const panel_already_existed = current_panel !== undefined;
+
 	if (current_panel !== undefined) {
 		current_panel.title = title;
 		current_panel.reveal(column);
@@ -61,11 +63,14 @@ export function show_graph_panel(
 	});
 	current_panel.onDidDispose(() => message_subscription.dispose());
 
-	webview.html = get_html(webview, context.extensionUri);
-
-	// If the panel already existed the webview is already loaded and will not fire
-	// 'ready' again, so push the new graph directly as well.
-	webview.postMessage({ type: 'setGraph', graph });
+	if (panel_already_existed) {
+		// The webview is already loaded and will not fire 'ready' again, so push the new
+		// graph directly. A fresh panel must not be sent the graph here: it would render
+		// once from this message and once more from its 'ready' handshake.
+		webview.postMessage({ type: 'setGraph', graph });
+	} else {
+		webview.html = get_html(webview, context.extensionUri);
+	}
 }
 
 function get_html(webview: vscode.Webview, extension_uri: vscode.Uri): string {
@@ -156,7 +161,7 @@ function get_html(webview: vscode.Webview, extension_uri: vscode.Uri): string {
 		}
 	</style>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
 	<div id="sidebar">
 		<div id="toolbar">
 			<button id="show-all">Show all</button>

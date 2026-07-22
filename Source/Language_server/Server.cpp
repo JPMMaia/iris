@@ -1331,11 +1331,11 @@ namespace iris::language_server
 
             Workspace_data const& workspace_data = workspace_core_module_pair->first;
             std::size_t const core_module_index = workspace_core_module_pair->second;
-            std::string_view const root_module_name = workspace_data.core_modules[core_module_index].name;
+            iris::Module const& root_module = workspace_data.core_modules[core_module_index];
 
             std::pmr::vector<iris::Module const*> const subset = iris::graph::collect_module_and_dependencies(
                 workspace_data.core_modules,
-                root_module_name,
+                root_module,
                 output_allocator
             );
 

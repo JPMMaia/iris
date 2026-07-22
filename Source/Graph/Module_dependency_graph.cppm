@@ -36,4 +36,14 @@ namespace iris::graph
         std::string_view root_module_name,
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
+
+    // Overload that takes the root module itself. Unlike the overload above, the root is
+    // always the first element of the result even when it cannot be found in `all_modules`
+    // (for example when its name is empty because the module failed to parse). Prefer this
+    // one whenever the root module is already at hand.
+    export std::pmr::vector<iris::Module const*> collect_module_and_dependencies(
+        std::span<iris::Module const> all_modules,
+        iris::Module const& root_module,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    );
 }

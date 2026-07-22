@@ -91,6 +91,66 @@ namespace iris::graph
         return graph;
     }
 
+    namespace
+    {
+        // Walks the dependencies of the modules in `pending`, appending every module that
+        // can be resolved to `result`. `visited` and `result` may already be seeded with a
+        // root module that was not resolved by name.
+        void collect_dependencies(
+            std::span<iris::Module const> const all_modules,
+            std::pmr::vector<std::string_view>& pending,
+            std::pmr::set<std::string_view>& visited,
+            std::pmr::vector<iris::Module const*>& result
+        )
+        {
+            while (!pending.empty())
+            {
+                std::string_view const current_name = pending.back();
+                pending.pop_back();
+
+                if (visited.contains(current_name))
+                    continue;
+                visited.insert(current_name);
+
+                iris::Module const* const module = find_module_by_name(all_modules, current_name);
+                if (module == nullptr)
+                    continue;
+
+                result.push_back(module);
+
+                for (iris::Import_module_with_alias const& import : module->dependencies.alias_imports)
+                {
+                    if (!visited.contains(import.module_name))
+                        pending.push_back(import.module_name);
+                }
+            }
+        }
+    }
+
+    std::pmr::vector<iris::Module const*> collect_module_and_dependencies(
+        std::span<iris::Module const> const all_modules,
+        iris::Module const& root_module,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::vector<iris::Module const*> result{ output_allocator };
+        std::pmr::set<std::string_view> visited{ output_allocator };
+        std::pmr::vector<std::string_view> pending{ output_allocator };
+
+        // The root is added directly rather than looked up by name so that it is always
+        // part of the result, even when `all_modules` does not contain it or when its name
+        // is empty because the module could not be parsed.
+        result.push_back(&root_module);
+        visited.insert(root_module.name);
+
+        for (iris::Import_module_with_alias const& import : root_module.dependencies.alias_imports)
+            pending.push_back(import.module_name);
+
+        collect_dependencies(all_modules, pending, visited, result);
+
+        return result;
+    }
+
     std::pmr::vector<iris::Module const*> collect_module_and_dependencies(
         std::span<iris::Module const> const all_modules,
         std::string_view const root_module_name,
@@ -103,27 +163,7 @@ namespace iris::graph
 
         pending.push_back(root_module_name);
 
-        while (!pending.empty())
-        {
-            std::string_view const current_name = pending.back();
-            pending.pop_back();
-
-            if (visited.contains(current_name))
-                continue;
-            visited.insert(current_name);
-
-            iris::Module const* const module = find_module_by_name(all_modules, current_name);
-            if (module == nullptr)
-                continue;
-
-            result.push_back(module);
-
-            for (iris::Import_module_with_alias const& import : module->dependencies.alias_imports)
-            {
-                if (!visited.contains(import.module_name))
-                    pending.push_back(import.module_name);
-            }
-        }
+        collect_dependencies(all_modules, pending, visited, result);
 
         return result;
     }
