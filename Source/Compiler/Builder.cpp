@@ -121,10 +121,11 @@ namespace iris::compiler
     // Returns the newest modification time among the '.irisb' of 'module_name' and the '.irisb' of
     // all its transitive dependencies. Results are memoized so that each module is visited once.
     //
-    // An unknown module, or one whose '.irisb' is missing, yields 'get_always_out_of_date_time()',
-    // which propagates to every module that imports it. The value is also inserted into the cache
-    // before recursing, so a dependency cycle resolves to "always out of date" instead of recursing
-    // forever.
+    // A module whose '.irisb' is missing yields 'get_always_out_of_date_time()', which propagates
+    // to every module that imports it. A module that is not tracked but whose '.irisb' exists (a C
+    // header module, typically) contributes its own '.irisb' time without recursing. The value is
+    // inserted into the cache before recursing, so a dependency cycle resolves to "always out of
+    // date" instead of recursing forever.
     static std::filesystem::file_time_type get_newest_input_time(
         Module_input_times& input_times,
         std::pmr::string const& module_name
@@ -144,7 +145,16 @@ namespace iris::compiler
 
         auto const module_location = input_times.modules_by_name.find(module_name);
         if (module_location == input_times.modules_by_name.end())
-            return get_always_out_of_date_time();
+        {
+            // The module is not among the tracked modules. This is the normal case for a C header
+            // module, whose '.irisb' is regenerated whenever the underlying header changes, so its
+            // own modification time is a sound input time. Its dependency list is not available
+            // here, so recursion stops. Returning 'always out of date' instead would poison the
+            // cache (the placeholder inserted above) and force every importer to regenerate on
+            // every build.
+            input_times.cache.insert_or_assign(module_name, newest_input_time);
+            return newest_input_time;
+        }
 
         for (Import_module_with_alias const& alias_import : module_location->second->dependencies.alias_imports)
         {
