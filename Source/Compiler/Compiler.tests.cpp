@@ -399,103 +399,100 @@ entry:
 ; Function Attrs: convergent
 define void @Array_slices_run() #0 !dbg !35 {{
 entry:
-  %array = alloca [4 x i32], i64 4, align 4, !dbg !39
   %a = alloca [4 x i32], align 4, !dbg !39
-  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !40
-  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !41
-  %array4 = alloca [1 x i32], i64 1, align 4, !dbg !42
-  %2 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !42
-  %b = alloca i32, align 4, !dbg !43
-  %c = alloca ptr, align 8, !dbg !43
-  %3 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !44
-  %d = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !45
-  %f = alloca i32, align 4, !dbg !46
-  %g = alloca ptr, align 8, !dbg !46
-  %4 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !47
-  %h = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !47
-  %i = alloca ptr, align 8, !dbg !48
-  %j = alloca ptr, align 8, !dbg !49
-  %array_element_pointer = getelementptr [4 x i32], ptr %array, i32 0, i32 0, !dbg !39
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !39
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !40
+  %array = alloca [1 x i32], align 4, !dbg !41
+  %2 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !41
+  %b = alloca i32, align 4, !dbg !42
+  %c = alloca ptr, align 8, !dbg !42
+  %3 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !43
+  %d = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !44
+  %f = alloca i32, align 4, !dbg !45
+  %g = alloca ptr, align 8, !dbg !45
+  %4 = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !46
+  %h = alloca %struct.iris_builtin_Generic_array_slice, align 8, !dbg !46
+  %i = alloca ptr, align 8, !dbg !47
+  %j = alloca ptr, align 8, !dbg !48
+  %array_element_pointer = getelementptr [4 x i32], ptr %a, i32 0, i32 0, !dbg !39
   store i32 0, ptr %array_element_pointer, align 4, !dbg !39
-  %array_element_pointer1 = getelementptr [4 x i32], ptr %array, i32 0, i32 1, !dbg !39
+  %array_element_pointer1 = getelementptr [4 x i32], ptr %a, i32 0, i32 1, !dbg !39
   store i32 1, ptr %array_element_pointer1, align 4, !dbg !39
-  %array_element_pointer2 = getelementptr [4 x i32], ptr %array, i32 0, i32 2, !dbg !39
+  %array_element_pointer2 = getelementptr [4 x i32], ptr %a, i32 0, i32 2, !dbg !39
   store i32 2, ptr %array_element_pointer2, align 4, !dbg !39
-  %array_element_pointer3 = getelementptr [4 x i32], ptr %array, i32 0, i32 3, !dbg !39
+  %array_element_pointer3 = getelementptr [4 x i32], ptr %a, i32 0, i32 3, !dbg !39
   store i32 3, ptr %array_element_pointer3, align 4, !dbg !39
-  %5 = load [4 x i32], ptr %array, align 4, !dbg !39
-    #dbg_declare(ptr %a, !50, !DIExpression(), !40)
-  store [4 x i32] %5, ptr %a, align 4, !dbg !40
-  %data_pointer = getelementptr [4 x i32], ptr %a, i32 0, i32 0, !dbg !40
-  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !40
-  store ptr %data_pointer, ptr %6, align 8, !dbg !40
-  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !40
-  store i64 4, ptr %7, align 8, !dbg !40
-  %8 = getelementptr inbounds {{ ptr, i64 }}, ptr %0, i32 0, i32 0, !dbg !41
-  %9 = load ptr, ptr %8, align 8, !dbg !41
-  %10 = getelementptr inbounds {{ ptr, i64 }}, ptr %0, i32 0, i32 1, !dbg !41
-  %11 = load i64, ptr %10, align 8, !dbg !41
-  call void @Array_slices_take(ptr %9, i64 %11), !dbg !41
-  %12 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !41
-  store ptr null, ptr %12, align 8, !dbg !41
-  %13 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !41
-  store i64 0, ptr %13, align 8, !dbg !41
-  %14 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 0, !dbg !42
-  %15 = load ptr, ptr %14, align 8, !dbg !42
-  %16 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 1, !dbg !42
-  %17 = load i64, ptr %16, align 8, !dbg !42
-  call void @Array_slices_take(ptr %15, i64 %17), !dbg !42
-  %array_element_pointer5 = getelementptr [1 x i32], ptr %array4, i32 0, i32 0, !dbg !42
-  store i32 4, ptr %array_element_pointer5, align 4, !dbg !42
-  %data_pointer6 = getelementptr [1 x i32], ptr %array4, i32 0, i32 0, !dbg !42
-  %18 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 0, !dbg !42
-  store ptr %data_pointer6, ptr %18, align 8, !dbg !42
-  %19 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 1, !dbg !42
-  store i64 1, ptr %19, align 8, !dbg !42
-  %20 = getelementptr inbounds {{ ptr, i64 }}, ptr %2, i32 0, i32 0, !dbg !52
-  %21 = load ptr, ptr %20, align 8, !dbg !52
-  %22 = getelementptr inbounds {{ ptr, i64 }}, ptr %2, i32 0, i32 1, !dbg !52
-  %23 = load i64, ptr %22, align 8, !dbg !52
-  call void @Array_slices_take(ptr %21, i64 %23), !dbg !52
-    #dbg_declare(ptr %b, !53, !DIExpression(), !43)
-  store i32 0, ptr %b, align 4, !dbg !43
-    #dbg_declare(ptr %c, !54, !DIExpression(), !44)
-  store ptr %b, ptr %c, align 8, !dbg !44
-  %24 = load ptr, ptr %c, align 8, !dbg !44
-  %25 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 0, !dbg !44
-  store ptr %24, ptr %25, align 8, !dbg !44
-  %26 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 1, !dbg !44
-  store i64 1, ptr %26, align 8, !dbg !44
-  %27 = load %struct.iris_builtin_Generic_array_slice, ptr %3, align 8, !dbg !44
-    #dbg_declare(ptr %d, !55, !DIExpression(), !45)
-  store %struct.iris_builtin_Generic_array_slice %27, ptr %d, align 8, !dbg !45
-  %28 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 0, !dbg !60
-  %29 = load ptr, ptr %28, align 8, !dbg !60
-  %30 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 1, !dbg !60
-  %31 = load i64, ptr %30, align 8, !dbg !60
-  call void @Array_slices_take(ptr %29, i64 %31), !dbg !60
-    #dbg_declare(ptr %f, !61, !DIExpression(), !46)
-  store i32 0, ptr %f, align 4, !dbg !46
-    #dbg_declare(ptr %g, !62, !DIExpression(), !47)
-  store ptr %f, ptr %g, align 8, !dbg !47
-  %32 = load ptr, ptr %g, align 8, !dbg !47
-  %33 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !47
-  store ptr %32, ptr %33, align 8, !dbg !47
-  %34 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !47
-  store i64 1, ptr %34, align 8, !dbg !47
-  %35 = load %struct.iris_builtin_Generic_array_slice, ptr %4, align 8, !dbg !47
-    #dbg_declare(ptr %h, !63, !DIExpression(), !48)
-  store %struct.iris_builtin_Generic_array_slice %35, ptr %h, align 8, !dbg !48
-  %36 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
-  %37 = load ptr, ptr %36, align 8, !dbg !48
-    #dbg_declare(ptr %i, !64, !DIExpression(), !49)
-  store ptr %37, ptr %i, align 8, !dbg !49
-  %38 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !49
-  %39 = load ptr, ptr %38, align 8, !dbg !49
-  %array_element_pointer7 = getelementptr i32, ptr %39, i32 0, !dbg !49
-    #dbg_declare(ptr %j, !65, !DIExpression(), !66)
-  store ptr %array_element_pointer7, ptr %j, align 8, !dbg !66
-  ret void, !dbg !66
+    #dbg_declare(ptr %a, !49, !DIExpression(), !39)
+  %data_pointer = getelementptr [4 x i32], ptr %a, i32 0, i32 0, !dbg !39
+  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0, !dbg !39
+  store ptr %data_pointer, ptr %5, align 8, !dbg !39
+  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !39
+  store i64 4, ptr %6, align 8, !dbg !39
+  %7 = getelementptr inbounds {{ ptr, i64 }}, ptr %0, i32 0, i32 0, !dbg !40
+  %8 = load ptr, ptr %7, align 8, !dbg !40
+  %9 = getelementptr inbounds {{ ptr, i64 }}, ptr %0, i32 0, i32 1, !dbg !40
+  %10 = load i64, ptr %9, align 8, !dbg !40
+  call void @Array_slices_take(ptr %8, i64 %10), !dbg !40
+  %11 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !40
+  store ptr null, ptr %11, align 8, !dbg !40
+  %12 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !40
+  store i64 0, ptr %12, align 8, !dbg !40
+  %13 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 0, !dbg !41
+  %14 = load ptr, ptr %13, align 8, !dbg !41
+  %15 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 1, !dbg !41
+  %16 = load i64, ptr %15, align 8, !dbg !41
+  call void @Array_slices_take(ptr %14, i64 %16), !dbg !41
+  %array_element_pointer4 = getelementptr [1 x i32], ptr %array, i32 0, i32 0, !dbg !41
+  store i32 4, ptr %array_element_pointer4, align 4, !dbg !41
+  %data_pointer5 = getelementptr [1 x i32], ptr %array, i32 0, i32 0, !dbg !41
+  %17 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 0, !dbg !41
+  store ptr %data_pointer5, ptr %17, align 8, !dbg !41
+  %18 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 1, !dbg !41
+  store i64 1, ptr %18, align 8, !dbg !41
+  %19 = getelementptr inbounds {{ ptr, i64 }}, ptr %2, i32 0, i32 0, !dbg !51
+  %20 = load ptr, ptr %19, align 8, !dbg !51
+  %21 = getelementptr inbounds {{ ptr, i64 }}, ptr %2, i32 0, i32 1, !dbg !51
+  %22 = load i64, ptr %21, align 8, !dbg !51
+  call void @Array_slices_take(ptr %20, i64 %22), !dbg !51
+    #dbg_declare(ptr %b, !52, !DIExpression(), !42)
+  store i32 0, ptr %b, align 4, !dbg !42
+    #dbg_declare(ptr %c, !53, !DIExpression(), !43)
+  store ptr %b, ptr %c, align 8, !dbg !43
+  %23 = load ptr, ptr %c, align 8, !dbg !43
+  %24 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 0, !dbg !43
+  store ptr %23, ptr %24, align 8, !dbg !43
+  %25 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 1, !dbg !43
+  store i64 1, ptr %25, align 8, !dbg !43
+  %26 = load %struct.iris_builtin_Generic_array_slice, ptr %3, align 8, !dbg !43
+    #dbg_declare(ptr %d, !54, !DIExpression(), !44)
+  store %struct.iris_builtin_Generic_array_slice %26, ptr %d, align 8, !dbg !44
+  %27 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 0, !dbg !59
+  %28 = load ptr, ptr %27, align 8, !dbg !59
+  %29 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 1, !dbg !59
+  %30 = load i64, ptr %29, align 8, !dbg !59
+  call void @Array_slices_take(ptr %28, i64 %30), !dbg !59
+    #dbg_declare(ptr %f, !60, !DIExpression(), !45)
+  store i32 0, ptr %f, align 4, !dbg !45
+    #dbg_declare(ptr %g, !61, !DIExpression(), !46)
+  store ptr %f, ptr %g, align 8, !dbg !46
+  %31 = load ptr, ptr %g, align 8, !dbg !46
+  %32 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !46
+  store ptr %31, ptr %32, align 8, !dbg !46
+  %33 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !46
+  store i64 1, ptr %33, align 8, !dbg !46
+  %34 = load %struct.iris_builtin_Generic_array_slice, ptr %4, align 8, !dbg !46
+    #dbg_declare(ptr %h, !62, !DIExpression(), !47)
+  store %struct.iris_builtin_Generic_array_slice %34, ptr %h, align 8, !dbg !47
+  %35 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !47
+  %36 = load ptr, ptr %35, align 8, !dbg !47
+    #dbg_declare(ptr %i, !63, !DIExpression(), !48)
+  store ptr %36, ptr %i, align 8, !dbg !48
+  %37 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
+  %38 = load ptr, ptr %37, align 8, !dbg !48
+  %array_element_pointer6 = getelementptr i32, ptr %38, i32 0, !dbg !48
+    #dbg_declare(ptr %j, !64, !DIExpression(), !65)
+  store ptr %array_element_pointer6, ptr %j, align 8, !dbg !65
+  ret void, !dbg !65
 }}
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
@@ -542,34 +539,33 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
 !36 = !DISubroutineType(types: !37)
 !37 = !{{null}}
 !38 = !{{}}
-!39 = !DILocation(line: 17, column: 1, scope: !35)
-!40 = !DILocation(line: 18, column: 5, scope: !35)
-!41 = !DILocation(line: 19, column: 5, scope: !35)
-!42 = !DILocation(line: 20, column: 5, scope: !35)
-!43 = !DILocation(line: 23, column: 5, scope: !35)
-!44 = !DILocation(line: 24, column: 5, scope: !35)
-!45 = !DILocation(line: 25, column: 5, scope: !35)
-!46 = !DILocation(line: 28, column: 5, scope: !35)
-!47 = !DILocation(line: 29, column: 5, scope: !35)
-!48 = !DILocation(line: 30, column: 5, scope: !35)
-!49 = !DILocation(line: 31, column: 5, scope: !35)
-!50 = !DILocalVariable(name: "a", scope: !35, file: !2, line: 18, type: !51)
-!51 = !DICompositeType(tag: DW_TAG_array_type, baseType: !10, size: 4)
-!52 = !DILocation(line: 21, column: 5, scope: !35)
-!53 = !DILocalVariable(name: "b", scope: !35, file: !2, line: 23, type: !10)
-!54 = !DILocalVariable(name: "c", scope: !35, file: !2, line: 24, type: !9)
-!55 = !DILocalVariable(name: "d", scope: !35, file: !2, line: 25, type: !56)
-!56 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<int32_t>", scope: !35, size: 128, align: 64, elements: !57)
-!57 = !{{!58, !59}}
-!58 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !35, baseType: !9, size: 64, align: 64)
-!59 = !DIDerivedType(tag: DW_TAG_member, name: "length", scope: !35, baseType: !12, size: 64, align: 64, offset: 64)
-!60 = !DILocation(line: 26, column: 5, scope: !35)
-!61 = !DILocalVariable(name: "f", scope: !35, file: !2, line: 28, type: !10)
-!62 = !DILocalVariable(name: "g", scope: !35, file: !2, line: 29, type: !9)
-!63 = !DILocalVariable(name: "h", scope: !35, file: !2, line: 30, type: !56)
-!64 = !DILocalVariable(name: "i", scope: !35, file: !2, line: 31, type: !9)
-!65 = !DILocalVariable(name: "j", scope: !35, file: !2, line: 32, type: !9)
-!66 = !DILocation(line: 32, column: 5, scope: !35)
+!39 = !DILocation(line: 18, column: 5, scope: !35)
+!40 = !DILocation(line: 19, column: 5, scope: !35)
+!41 = !DILocation(line: 20, column: 5, scope: !35)
+!42 = !DILocation(line: 23, column: 5, scope: !35)
+!43 = !DILocation(line: 24, column: 5, scope: !35)
+!44 = !DILocation(line: 25, column: 5, scope: !35)
+!45 = !DILocation(line: 28, column: 5, scope: !35)
+!46 = !DILocation(line: 29, column: 5, scope: !35)
+!47 = !DILocation(line: 30, column: 5, scope: !35)
+!48 = !DILocation(line: 31, column: 5, scope: !35)
+!49 = !DILocalVariable(name: "a", scope: !35, file: !2, line: 18, type: !50)
+!50 = !DICompositeType(tag: DW_TAG_array_type, baseType: !10, size: 4)
+!51 = !DILocation(line: 21, column: 5, scope: !35)
+!52 = !DILocalVariable(name: "b", scope: !35, file: !2, line: 23, type: !10)
+!53 = !DILocalVariable(name: "c", scope: !35, file: !2, line: 24, type: !9)
+!54 = !DILocalVariable(name: "d", scope: !35, file: !2, line: 25, type: !55)
+!55 = !DICompositeType(tag: DW_TAG_structure_type, name: "Array_slice::<int32_t>", scope: !35, size: 128, align: 64, elements: !56)
+!56 = !{{!57, !58}}
+!57 = !DIDerivedType(tag: DW_TAG_member, name: "data", scope: !35, baseType: !9, size: 64, align: 64)
+!58 = !DIDerivedType(tag: DW_TAG_member, name: "length", scope: !35, baseType: !12, size: 64, align: 64, offset: 64)
+!59 = !DILocation(line: 26, column: 5, scope: !35)
+!60 = !DILocalVariable(name: "f", scope: !35, file: !2, line: 28, type: !10)
+!61 = !DILocalVariable(name: "g", scope: !35, file: !2, line: 29, type: !9)
+!62 = !DILocalVariable(name: "h", scope: !35, file: !2, line: 30, type: !55)
+!63 = !DILocalVariable(name: "i", scope: !35, file: !2, line: 31, type: !9)
+!64 = !DILocalVariable(name: "j", scope: !35, file: !2, line: 32, type: !9)
+!65 = !DILocation(line: 32, column: 5, scope: !35)
 )", g_test_source_files_path.generic_string());
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
@@ -1885,31 +1881,28 @@ bounds_check_fail:                                ; preds = %entry
 define i32 @Bounds_check_0_access_fixed_array(i32 noundef %"arguments[0].index") #0 {
 entry:
   %index = alloca i32, align 4
-  %array = alloca [4 x i32], i64 4, align 4
   %a = alloca [4 x i32], align 4
   store i32 %"arguments[0].index", ptr %index, align 4
-  %array_element_pointer = getelementptr [4 x i32], ptr %array, i32 0, i32 0
+  %array_element_pointer = getelementptr [4 x i32], ptr %a, i32 0, i32 0
   store i32 0, ptr %array_element_pointer, align 4
-  %array_element_pointer1 = getelementptr [4 x i32], ptr %array, i32 0, i32 1
+  %array_element_pointer1 = getelementptr [4 x i32], ptr %a, i32 0, i32 1
   store i32 1, ptr %array_element_pointer1, align 4
-  %array_element_pointer2 = getelementptr [4 x i32], ptr %array, i32 0, i32 2
+  %array_element_pointer2 = getelementptr [4 x i32], ptr %a, i32 0, i32 2
   store i32 2, ptr %array_element_pointer2, align 4
-  %array_element_pointer3 = getelementptr [4 x i32], ptr %array, i32 0, i32 3
+  %array_element_pointer3 = getelementptr [4 x i32], ptr %a, i32 0, i32 3
   store i32 3, ptr %array_element_pointer3, align 4
-  %0 = load [4 x i32], ptr %array, align 4
-  store [4 x i32] %0, ptr %a, align 4
-  %1 = load i32, ptr %index, align 4
-  %bounds_check_index = zext i32 %1 to i64
+  %0 = load i32, ptr %index, align 4
+  %bounds_check_index = zext i32 %0 to i64
   %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
   br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
 
 bounds_check_pass:                                ; preds = %entry
-  %array_element_pointer4 = getelementptr [4 x i32], ptr %a, i32 0, i32 %1
-  %2 = load i32, ptr %array_element_pointer4, align 4
-  ret i32 %2
+  %array_element_pointer4 = getelementptr [4 x i32], ptr %a, i32 0, i32 %0
+  %1 = load i32, ptr %array_element_pointer4, align 4
+  ret i32 %1
 
 bounds_check_fail:                                ; preds = %entry
-  %3 = call i32 @puts(ptr @function_contract_error_string.1)
+  %2 = call i32 @puts(ptr @function_contract_error_string.1)
   call void @abort()
   unreachable
 }
@@ -2269,57 +2262,47 @@ define void @Constant_array_expressions_foo() #0 {
 entry:
   %a = alloca [0 x i32], align 4
   %b = alloca [0 x i32], align 4
-  %array = alloca [4 x i32], i64 4, align 4
   %c = alloca [4 x i32], align 4
   %d = alloca i32, align 4
   %instance = alloca %struct.Constant_array_expressions_My_struct, align 4
-  %array7 = alloca [4 x i32], i64 4, align 4
+  %array = alloca [4 x i32], align 4
   %e = alloca i32, align 4
-  %array13 = alloca [8 x i32], i64 8, align 4
   %f = alloca [8 x i32], align 4
-  %array_element_pointer = getelementptr [4 x i32], ptr %array, i32 0, i32 0
+  %array_element_pointer = getelementptr [4 x i32], ptr %c, i32 0, i32 0
   store i32 0, ptr %array_element_pointer, align 4
-  %array_element_pointer1 = getelementptr [4 x i32], ptr %array, i32 0, i32 1
+  %array_element_pointer1 = getelementptr [4 x i32], ptr %c, i32 0, i32 1
   store i32 1, ptr %array_element_pointer1, align 4
-  %array_element_pointer2 = getelementptr [4 x i32], ptr %array, i32 0, i32 2
+  %array_element_pointer2 = getelementptr [4 x i32], ptr %c, i32 0, i32 2
   store i32 2, ptr %array_element_pointer2, align 4
-  %array_element_pointer3 = getelementptr [4 x i32], ptr %array, i32 0, i32 3
+  %array_element_pointer3 = getelementptr [4 x i32], ptr %c, i32 0, i32 3
   store i32 3, ptr %array_element_pointer3, align 4
-  %0 = load [4 x i32], ptr %array, align 4
-  store [4 x i32] %0, ptr %c, align 4
   %array_element_pointer4 = getelementptr [4 x i32], ptr %c, i32 0, i32 0
   store i32 0, ptr %array_element_pointer4, align 4
   %array_element_pointer5 = getelementptr [4 x i32], ptr %c, i32 0, i32 1
   store i32 1, ptr %array_element_pointer5, align 4
   %array_element_pointer6 = getelementptr [4 x i32], ptr %c, i32 0, i32 3
-  %1 = load i32, ptr %array_element_pointer6, align 4
-  store i32 %1, ptr %d, align 4
-  %array_element_pointer8 = getelementptr [4 x i32], ptr %array7, i32 0, i32 0
-  store i32 0, ptr %array_element_pointer8, align 4
-  %array_element_pointer9 = getelementptr [4 x i32], ptr %array7, i32 0, i32 1
-  store i32 2, ptr %array_element_pointer9, align 4
-  %array_element_pointer10 = getelementptr [4 x i32], ptr %array7, i32 0, i32 2
-  store i32 4, ptr %array_element_pointer10, align 4
-  %array_element_pointer11 = getelementptr [4 x i32], ptr %array7, i32 0, i32 3
-  store i32 6, ptr %array_element_pointer11, align 4
-  %2 = load [4 x i32], ptr %array7, align 4
+  %0 = load i32, ptr %array_element_pointer6, align 4
+  store i32 %0, ptr %d, align 4
+  %array_element_pointer7 = getelementptr [4 x i32], ptr %array, i32 0, i32 0
+  store i32 0, ptr %array_element_pointer7, align 4
+  %array_element_pointer8 = getelementptr [4 x i32], ptr %array, i32 0, i32 1
+  store i32 2, ptr %array_element_pointer8, align 4
+  %array_element_pointer9 = getelementptr [4 x i32], ptr %array, i32 0, i32 2
+  store i32 4, ptr %array_element_pointer9, align 4
+  %array_element_pointer10 = getelementptr [4 x i32], ptr %array, i32 0, i32 3
+  store i32 6, ptr %array_element_pointer10, align 4
+  %1 = load [4 x i32], ptr %array, align 4
+  %2 = getelementptr inbounds %struct.Constant_array_expressions_My_struct, ptr %instance, i32 0, i32 0
+  store [4 x i32] %1, ptr %2, align 4
   %3 = getelementptr inbounds %struct.Constant_array_expressions_My_struct, ptr %instance, i32 0, i32 0
-  store [4 x i32] %2, ptr %3, align 4
-  %4 = getelementptr inbounds %struct.Constant_array_expressions_My_struct, ptr %instance, i32 0, i32 0
-  %array_element_pointer12 = getelementptr [4 x i32], ptr %4, i32 0, i32 0
-  %5 = load i32, ptr %array_element_pointer12, align 4
-  store i32 %5, ptr %e, align 4
-  call void @llvm.memset.p0.i64(ptr align 4 %array13, i8 0, i64 32, i1 false)
-  %6 = load [8 x i32], ptr %array13, align 4
-  store [8 x i32] %6, ptr %f, align 4
+  %array_element_pointer11 = getelementptr [4 x i32], ptr %3, i32 0, i32 0
+  %4 = load i32, ptr %array_element_pointer11, align 4
+  store i32 %4, ptr %e, align 4
+  store [8 x i32] zeroinitializer, ptr %f, align 4
   ret void
 }
 
-; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
-
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
-attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -2545,9 +2528,8 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
 ; Function Attrs: convergent
 define private void @soa_array_view_type_run() #0 {
 entry:
-  %soa_array = alloca %__hl_soa_array, align 8
-  %soa_array_storage = alloca [32 x i8], align 4
   %particles = alloca %__hl_soa_array, align 8
+  %soa_array_storage = alloca [32 x i8], align 4
   %soa_array_view = alloca %__hl_soa_array_view, align 8
   %view = alloca %__hl_soa_array_view, align 8
   %start_index = alloca i64, align 8
@@ -2564,7 +2546,7 @@ entry:
   %soa_array_view58 = alloca %__hl_soa_array_view, align 8
   %full_view = alloca %__hl_soa_array_view, align 8
   %soa_array_data = getelementptr [32 x i8], ptr %soa_array_storage, i32 0, i32 0
-  %1 = getelementptr inbounds nuw %__hl_soa_array, ptr %soa_array, i32 0, i32 0
+  %1 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
   store ptr %soa_array_data, ptr %1, align 8
   %soa_member_base_pointer = getelementptr i8, ptr %soa_array_data, i64 0
   %soa_member_element_pointer = getelementptr float, ptr %soa_member_base_pointer, i64 0
@@ -2590,165 +2572,163 @@ entry:
   %soa_member_base_pointer13 = getelementptr i8, ptr %soa_array_data, i64 16
   %soa_member_element_pointer14 = getelementptr float, ptr %soa_member_base_pointer13, i64 3
   store float 0.000000e+00, ptr %soa_member_element_pointer14, align 4
-  %2 = load %__hl_soa_array, ptr %soa_array, align 8
-  store %__hl_soa_array %2, ptr %particles, align 8
-  %3 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %4 = load ptr, ptr %3, align 8
-  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
-  store i32 1, ptr %5, align 4
-  %6 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
-  store i32 3, ptr %6, align 4
-  %7 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
-  store i64 4, ptr %7, align 8
-  %8 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
-  store ptr %4, ptr %8, align 8
-  %9 = load %__hl_soa_array_view, ptr %soa_array_view, align 8
-  store %__hl_soa_array_view %9, ptr %view, align 8
-  %10 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %11 = load i64, ptr %10, align 8
-  store i64 %11, ptr %start_index, align 8
-  %12 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 1
-  %13 = load i64, ptr %12, align 8
-  store i64 %13, ptr %end_index, align 8
-  %14 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %15 = load i64, ptr %14, align 8
-  store i64 %15, ptr %length, align 8
-  %16 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %17 = load ptr, ptr %16, align 8
-  store ptr %17, ptr %data, align 8
-  %18 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %19 = load ptr, ptr %18, align 8
-  %20 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %21 = load i64, ptr %20, align 8
-  %22 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %23 = load i64, ptr %22, align 8
-  %soa_adjusted_index = add i64 %23, 0
-  %soa_member_base_pointer15 = getelementptr i8, ptr %19, i64 0
+  %2 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %4 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 0
+  store i32 1, ptr %4, align 4
+  %5 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 1
+  store i32 3, ptr %5, align 4
+  %6 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 2
+  store i64 4, ptr %6, align 8
+  %7 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
+  store ptr %3, ptr %7, align 8
+  %8 = load %__hl_soa_array_view, ptr %soa_array_view, align 8
+  store %__hl_soa_array_view %8, ptr %view, align 8
+  %9 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %10 = load i64, ptr %9, align 8
+  store i64 %10, ptr %start_index, align 8
+  %11 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 1
+  %12 = load i64, ptr %11, align 8
+  store i64 %12, ptr %end_index, align 8
+  %13 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %14 = load i64, ptr %13, align 8
+  store i64 %14, ptr %length, align 8
+  %15 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %16 = load ptr, ptr %15, align 8
+  store ptr %16, ptr %data, align 8
+  %17 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %18 = load ptr, ptr %17, align 8
+  %19 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %20 = load i64, ptr %19, align 8
+  %21 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %22 = load i64, ptr %21, align 8
+  %soa_adjusted_index = add i64 %22, 0
+  %soa_member_base_pointer15 = getelementptr i8, ptr %18, i64 0
   %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i64 %soa_adjusted_index
-  %24 = load float, ptr %soa_member_element_pointer16, align 4
-  %25 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 0
-  store float %24, ptr %25, align 4
-  %soa_member_block_size = mul i64 %21, 4
+  %23 = load float, ptr %soa_member_element_pointer16, align 4
+  %24 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 0
+  store float %23, ptr %24, align 4
+  %soa_member_block_size = mul i64 %20, 4
   %soa_member_block_offset = add i64 0, %soa_member_block_size
   %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
   %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
-  %soa_member_base_pointer17 = getelementptr i8, ptr %19, i64 %soa_offset_aligned
+  %soa_member_base_pointer17 = getelementptr i8, ptr %18, i64 %soa_offset_aligned
   %soa_member_element_pointer18 = getelementptr float, ptr %soa_member_base_pointer17, i64 %soa_adjusted_index
-  %26 = load float, ptr %soa_member_element_pointer18, align 4
-  %27 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 1
-  store float %26, ptr %27, align 4
-  %28 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 0
-  store float 3.000000e+00, ptr %28, align 4
-  %29 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 1
-  store float 4.000000e+00, ptr %29, align 4
-  %30 = load %struct.soa_array_view_type_Particle, ptr %0, align 4
-  %31 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %32 = load ptr, ptr %31, align 8
-  %33 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %34 = load i64, ptr %33, align 8
-  %35 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %36 = load i64, ptr %35, align 8
-  %soa_adjusted_index19 = add i64 %36, 0
-  store %struct.soa_array_view_type_Particle %30, ptr %soa_assignment_struct, align 4
-  %37 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
-  %soa_member_base_pointer20 = getelementptr i8, ptr %32, i64 0
+  %25 = load float, ptr %soa_member_element_pointer18, align 4
+  %26 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 1
+  store float %25, ptr %26, align 4
+  %27 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 0
+  store float 3.000000e+00, ptr %27, align 4
+  %28 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 1
+  store float 4.000000e+00, ptr %28, align 4
+  %29 = load %struct.soa_array_view_type_Particle, ptr %0, align 4
+  %30 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %31 = load ptr, ptr %30, align 8
+  %32 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %33 = load i64, ptr %32, align 8
+  %34 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %35 = load i64, ptr %34, align 8
+  %soa_adjusted_index19 = add i64 %35, 0
+  store %struct.soa_array_view_type_Particle %29, ptr %soa_assignment_struct, align 4
+  %36 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
+  %soa_member_base_pointer20 = getelementptr i8, ptr %31, i64 0
   %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i64 %soa_adjusted_index19
-  %38 = load float, ptr %37, align 4
-  store float %38, ptr %soa_member_element_pointer21, align 4
-  %39 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
-  %soa_member_block_size22 = mul i64 %34, 4
+  %37 = load float, ptr %36, align 4
+  store float %37, ptr %soa_member_element_pointer21, align 4
+  %38 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
+  %soa_member_block_size22 = mul i64 %33, 4
   %soa_member_block_offset23 = add i64 0, %soa_member_block_size22
   %soa_offset_adjusted24 = add i64 %soa_member_block_offset23, 3
   %soa_offset_aligned25 = and i64 %soa_offset_adjusted24, -4
-  %soa_member_base_pointer26 = getelementptr i8, ptr %32, i64 %soa_offset_aligned25
+  %soa_member_base_pointer26 = getelementptr i8, ptr %31, i64 %soa_offset_aligned25
   %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i64 %soa_adjusted_index19
-  %40 = load float, ptr %39, align 4
-  store float %40, ptr %soa_member_element_pointer27, align 4
-  %41 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %42 = load ptr, ptr %41, align 8
-  %43 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %44 = load i64, ptr %43, align 8
-  %45 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %46 = load i64, ptr %45, align 8
-  %soa_adjusted_index28 = add i64 %46, 0
-  %soa_member_base_pointer29 = getelementptr i8, ptr %42, i64 0
+  %39 = load float, ptr %38, align 4
+  store float %39, ptr %soa_member_element_pointer27, align 4
+  %40 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %41 = load ptr, ptr %40, align 8
+  %42 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %43 = load i64, ptr %42, align 8
+  %44 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %45 = load i64, ptr %44, align 8
+  %soa_adjusted_index28 = add i64 %45, 0
+  %soa_member_base_pointer29 = getelementptr i8, ptr %41, i64 0
   %soa_member_element_pointer30 = getelementptr float, ptr %soa_member_base_pointer29, i64 %soa_adjusted_index28
   store float 1.000000e+00, ptr %soa_member_element_pointer30, align 4
-  %47 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %48 = load ptr, ptr %47, align 8
-  %49 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %50 = load i64, ptr %49, align 8
-  %51 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %52 = load i64, ptr %51, align 8
-  %soa_adjusted_index31 = add i64 %52, 1
-  %soa_member_block_size32 = mul i64 %50, 4
+  %46 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %47 = load ptr, ptr %46, align 8
+  %48 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %49 = load i64, ptr %48, align 8
+  %50 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %51 = load i64, ptr %50, align 8
+  %soa_adjusted_index31 = add i64 %51, 1
+  %soa_member_block_size32 = mul i64 %49, 4
   %soa_member_block_offset33 = add i64 0, %soa_member_block_size32
   %soa_offset_adjusted34 = add i64 %soa_member_block_offset33, 3
   %soa_offset_aligned35 = and i64 %soa_offset_adjusted34, -4
-  %soa_member_base_pointer36 = getelementptr i8, ptr %48, i64 %soa_offset_aligned35
+  %soa_member_base_pointer36 = getelementptr i8, ptr %47, i64 %soa_offset_aligned35
   %soa_member_element_pointer37 = getelementptr float, ptr %soa_member_base_pointer36, i64 %soa_adjusted_index31
   store float 2.000000e+00, ptr %soa_member_element_pointer37, align 4
-  %53 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %54 = load ptr, ptr %53, align 8
-  %55 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %56 = load i64, ptr %55, align 8
-  %57 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %58 = load i64, ptr %57, align 8
-  %soa_adjusted_index38 = add i64 %58, 0
-  %soa_member_base_pointer40 = getelementptr i8, ptr %54, i64 0
+  %52 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %53 = load ptr, ptr %52, align 8
+  %54 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %55 = load i64, ptr %54, align 8
+  %56 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %57 = load i64, ptr %56, align 8
+  %soa_adjusted_index38 = add i64 %57, 0
+  %soa_member_base_pointer40 = getelementptr i8, ptr %53, i64 0
   %soa_member_element_pointer41 = getelementptr float, ptr %soa_member_base_pointer40, i64 %soa_adjusted_index38
-  %59 = load float, ptr %soa_member_element_pointer41, align 4
-  %60 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 0
-  store float %59, ptr %60, align 4
-  %soa_member_block_size42 = mul i64 %56, 4
+  %58 = load float, ptr %soa_member_element_pointer41, align 4
+  %59 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 0
+  store float %58, ptr %59, align 4
+  %soa_member_block_size42 = mul i64 %55, 4
   %soa_member_block_offset43 = add i64 0, %soa_member_block_size42
   %soa_offset_adjusted44 = add i64 %soa_member_block_offset43, 3
   %soa_offset_aligned45 = and i64 %soa_offset_adjusted44, -4
-  %soa_member_base_pointer46 = getelementptr i8, ptr %54, i64 %soa_offset_aligned45
+  %soa_member_base_pointer46 = getelementptr i8, ptr %53, i64 %soa_offset_aligned45
   %soa_member_element_pointer47 = getelementptr float, ptr %soa_member_base_pointer46, i64 %soa_adjusted_index38
-  %61 = load float, ptr %soa_member_element_pointer47, align 4
-  %62 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 1
-  store float %61, ptr %62, align 4
-  %63 = load %struct.soa_array_view_type_Particle, ptr %soa_element39, align 4
-  store %struct.soa_array_view_type_Particle %63, ptr %p_0, align 4
-  %64 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %65 = load ptr, ptr %64, align 8
-  %66 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %67 = load i64, ptr %66, align 8
-  %68 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %69 = load i64, ptr %68, align 8
-  %soa_adjusted_index48 = add i64 %69, 0
-  %soa_member_base_pointer49 = getelementptr i8, ptr %65, i64 0
+  %60 = load float, ptr %soa_member_element_pointer47, align 4
+  %61 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 1
+  store float %60, ptr %61, align 4
+  %62 = load %struct.soa_array_view_type_Particle, ptr %soa_element39, align 4
+  store %struct.soa_array_view_type_Particle %62, ptr %p_0, align 4
+  %63 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %64 = load ptr, ptr %63, align 8
+  %65 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %66 = load i64, ptr %65, align 8
+  %67 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %68 = load i64, ptr %67, align 8
+  %soa_adjusted_index48 = add i64 %68, 0
+  %soa_member_base_pointer49 = getelementptr i8, ptr %64, i64 0
   %soa_member_element_pointer50 = getelementptr float, ptr %soa_member_base_pointer49, i64 %soa_adjusted_index48
-  %70 = load float, ptr %soa_member_element_pointer50, align 4
-  store float %70, ptr %x0, align 4
-  %71 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %72 = load ptr, ptr %71, align 8
-  %73 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %74 = load i64, ptr %73, align 8
-  %75 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %76 = load i64, ptr %75, align 8
-  %soa_adjusted_index51 = add i64 %76, 1
-  %soa_member_block_size52 = mul i64 %74, 4
+  %69 = load float, ptr %soa_member_element_pointer50, align 4
+  store float %69, ptr %x0, align 4
+  %70 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %71 = load ptr, ptr %70, align 8
+  %72 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %73 = load i64, ptr %72, align 8
+  %74 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %75 = load i64, ptr %74, align 8
+  %soa_adjusted_index51 = add i64 %75, 1
+  %soa_member_block_size52 = mul i64 %73, 4
   %soa_member_block_offset53 = add i64 0, %soa_member_block_size52
   %soa_offset_adjusted54 = add i64 %soa_member_block_offset53, 3
   %soa_offset_aligned55 = and i64 %soa_offset_adjusted54, -4
-  %soa_member_base_pointer56 = getelementptr i8, ptr %72, i64 %soa_offset_aligned55
+  %soa_member_base_pointer56 = getelementptr i8, ptr %71, i64 %soa_offset_aligned55
   %soa_member_element_pointer57 = getelementptr float, ptr %soa_member_base_pointer56, i64 %soa_adjusted_index51
-  %77 = load float, ptr %soa_member_element_pointer57, align 4
-  store float %77, ptr %y1, align 4
-  %78 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %79 = load ptr, ptr %78, align 8
-  %80 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
-  store i64 0, ptr %80, align 8
-  %81 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
+  %76 = load float, ptr %soa_member_element_pointer57, align 4
+  store float %76, ptr %y1, align 4
+  %77 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %78 = load ptr, ptr %77, align 8
+  %79 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
+  store i64 0, ptr %79, align 8
+  %80 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
+  store i64 4, ptr %80, align 8
+  %81 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
   store i64 4, ptr %81, align 8
-  %82 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
-  store i64 4, ptr %82, align 8
-  %83 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
-  store ptr %79, ptr %83, align 8
-  %84 = load %__hl_soa_array_view, ptr %soa_array_view58, align 8
-  store %__hl_soa_array_view %84, ptr %full_view, align 8
+  %82 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
+  store ptr %78, ptr %82, align 8
+  %83 = load %__hl_soa_array_view, ptr %soa_array_view58, align 8
+  store %__hl_soa_array_view %83, ptr %full_view, align 8
   ret void
 }
 
@@ -6358,7 +6338,6 @@ entry:
   %pointer_a = alloca ptr, align 8
   %dereferenced_a = alloca i32, align 4
   %p0 = alloca ptr, align 8
-  %array = alloca [2 x i32], i64 2, align 4
   %data_array = alloca [2 x i32], align 4
   %p1 = alloca ptr, align 8
   store ptr %"arguments[0].external_pointer", ptr %external_pointer, align 8
@@ -6372,12 +6351,10 @@ entry:
   store ptr %3, ptr %p0, align 8
   %4 = load ptr, ptr %p0, align 8
   store i32 0, ptr %4, align 4
-  %array_element_pointer = getelementptr [2 x i32], ptr %array, i32 0, i32 0
+  %array_element_pointer = getelementptr [2 x i32], ptr %data_array, i32 0, i32 0
   store i32 0, ptr %array_element_pointer, align 4
-  %array_element_pointer1 = getelementptr [2 x i32], ptr %array, i32 0, i32 1
+  %array_element_pointer1 = getelementptr [2 x i32], ptr %data_array, i32 0, i32 1
   store i32 1, ptr %array_element_pointer1, align 4
-  %5 = load [2 x i32], ptr %array, align 4
-  store [2 x i32] %5, ptr %data_array, align 4
   %array_element_pointer2 = getelementptr [2 x i32], ptr %data_array, i32 0, i32 0
   store ptr %array_element_pointer2, ptr %p1, align 8
   %array_element_pointer3 = getelementptr [2 x i32], ptr %data_array, i32 0, i32 0
@@ -7173,11 +7150,9 @@ define private void @iris.json__at__to_json__at__3489948734076117284(ptr noundef
 entry:
   %0 = alloca %struct.iris_json_Write_stream, align 8
   %value = alloca ptr, align 8
-  %array = alloca [16 x i8], i64 16, align 1
   %format_specifier_buffer = alloca [16 x i8], align 1
   %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   %format_specifier = alloca ptr, align 8
-  %array1 = alloca [64 x i8], i64 64, align 1
   %format_buffer = alloca [64 x i8], align 1
   %2 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
   store ptr %"arguments[0].stream", ptr %2, align 8
@@ -7193,32 +7168,28 @@ if_s0_then:                                       ; preds = %entry
   ret void
 
 if_s1_after:                                      ; preds = %entry
-  call void @llvm.memset.p0.i64(ptr align 1 %array, i8 0, i64 16, i1 false)
-  %7 = load [16 x i8], ptr %array, align 1
-  store [16 x i8] %7, ptr %format_specifier_buffer, align 1
+  store [16 x i8] zeroinitializer, ptr %format_specifier_buffer, align 1
   %data_pointer = getelementptr [16 x i8], ptr %format_specifier_buffer, i32 0, i32 0
-  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
-  store ptr %data_pointer, ptr %8, align 8
-  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
-  store i64 16, ptr %9, align 8
-  %10 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 0
-  %11 = load ptr, ptr %10, align 8
-  %12 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 1
-  %13 = load i64, ptr %12, align 8
-  %14 = call ptr @iris.json.create_format_specifier(ptr %11, i64 %13, i32 noundef 0, i64 noundef 4)
-  store ptr %14, ptr %format_specifier, align 8
-  call void @llvm.memset.p0.i64(ptr align 1 %array1, i8 0, i64 64, i1 false)
-  %15 = load [64 x i8], ptr %array1, align 1
-  store [64 x i8] %15, ptr %format_buffer, align 1
+  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  store ptr %data_pointer, ptr %7, align 8
+  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  store i64 16, ptr %8, align 8
+  %9 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 0
+  %10 = load ptr, ptr %9, align 8
+  %11 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 1
+  %12 = load i64, ptr %11, align 8
+  %13 = call ptr @iris.json.create_format_specifier(ptr %10, i64 %12, i32 noundef 0, i64 noundef 4)
+  store ptr %13, ptr %format_specifier, align 8
+  store [64 x i8] zeroinitializer, ptr %format_buffer, align 1
   %array_element_pointer = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
-  %16 = load ptr, ptr %value, align 8
-  %17 = load ptr, ptr %format_specifier, align 8
-  %18 = load i32, ptr %16, align 4
-  %19 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 64, ptr noundef %17, i32 noundef %18)
-  %20 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
-  %21 = load ptr, ptr %20, align 8
-  %array_element_pointer2 = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
-  call void %21(ptr noundef %array_element_pointer2)
+  %14 = load ptr, ptr %value, align 8
+  %15 = load ptr, ptr %format_specifier, align 8
+  %16 = load i32, ptr %14, align 4
+  %17 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 64, ptr noundef %15, i32 noundef %16)
+  %18 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %19 = load ptr, ptr %18, align 8
+  %array_element_pointer1 = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
+  call void %19(ptr noundef %array_element_pointer1)
   ret void
 }}
 
@@ -7397,14 +7368,10 @@ entry:
 ; Function Attrs: convergent
 declare void @iris_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
 
-; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
-
 ; Function Attrs: convergent
 )" R"(declare ptr @__acrt_iob_func(i32 noundef) #0
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
-attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
 )", g_test_source_files_path.generic_string(), test_source_file_path.size() + 1, test_source_file_path);
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.is_test_mode = true});
@@ -9696,7 +9663,7 @@ entry:
 define private void @c_interoperability_run() #0 {
 entry:
   %v0 = alloca i32, align 4
-  %array = alloca [1 x ptr], i64 1, align 8
+  %array = alloca [1 x ptr], align 8
   %array1 = alloca [1 x ptr], align 8
   %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   store i32 0, ptr %v0, align 4
@@ -9738,7 +9705,7 @@ entry:
 define private void @c_interoperability_run() #0 {
 entry:
   %v0 = alloca i32, align 4
-  %array = alloca [1 x ptr], i64 1, align 8
+  %array = alloca [1 x ptr], align 8
   %array1 = alloca [1 x ptr], align 8
   %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
   %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8

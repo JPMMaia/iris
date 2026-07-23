@@ -4140,15 +4140,17 @@ namespace iris::compiler
                 llvm::Type* const llvm_element_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, element_type, type_database);
                 std::uint64_t const array_length = requested_array_type.size;
 
-                std::uint64_t const element_alloc_size_in_bytes = parameters.llvm_data_layout.getTypeAllocSize(llvm_element_type);
-                llvm::Align const alignment = parameters.llvm_data_layout.getABITypeAlign(llvm_element_type);
-                std::uint64_t const array_alloc_size_in_bytes = array_length*element_alloc_size_in_bytes;
-
                 llvm::ArrayType* const array_type = llvm::ArrayType::get(llvm_element_type, array_length);
-                llvm::ConstantInt* const array_length_constant = llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_context), array_length);
 
-                llvm::AllocaInst* const array_alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, array_type, "array", array_length_constant);
-                create_memset_to_0_call(parameters.llvm_builder, array_alloca, array_alloc_size_in_bytes, alignment);
+                // The allocated type is already [array_length x element], so the alloca must
+                // reserve a single instance of it. Passing array_length as the array size
+                // operand would reserve array_length * array_length elements.
+                llvm::AllocaInst* const array_alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, array_type, "array");
+
+                // Same form the zero_initialized {} path emits, so that both spellings of a
+                // zeroed constant array produce identical code.
+                llvm::Constant* const zero_value = llvm::ConstantAggregateZero::get(array_type);
+                create_store_instruction(llvm_builder, llvm_data_layout, zero_value, array_alloca);
 
                 return Value_and_type
                 {
@@ -4194,8 +4196,9 @@ namespace iris::compiler
                 return constant_array.value();
         }
     
-        llvm::ConstantInt* const array_length_constant = llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_context), array_length);
-        llvm::AllocaInst* const array_alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, array_type, "array", array_length_constant);
+        // The allocated type is already [array_length x element], so the alloca must reserve
+        // a single instance of it, not array_length of them.
+        llvm::AllocaInst* const array_alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, array_type, "array");
 
         for (std::uint64_t index = 0; index < array_length; ++index)
         {
@@ -5822,7 +5825,8 @@ namespace iris::compiler
 
         iris::Expression const& right_hand_side_expression = statement.expressions[expression.right_hand_side.expression_index];
         bool const is_right_side_instantiate_expression = std::holds_alternative<iris::Instantiate_expression>(right_hand_side_expression.data);
-        if (is_right_side_instantiate_expression)
+        bool const is_right_side_constant_array_expression = std::holds_alternative<iris::Constant_array_expression>(right_hand_side_expression.data);
+        if (is_right_side_instantiate_expression || is_right_side_constant_array_expression)
         {
             if (parameters.debug_info != nullptr)
                 set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
@@ -5837,7 +5841,25 @@ namespace iris::compiler
             new_parameters
         );
 
-        if (is_right_side_instantiate_expression && llvm::AllocaInst::classof(right_hand_side.value))
+        // Both an instantiate expression and an array literal materialize a fresh temporary of
+        // the declared type that nothing else refers to yet, so the variable can adopt it
+        // directly instead of allocating a second one and copying into it. The literal is only
+        // adopted when it really produced the declared type, since it may instead have been
+        // converted to something else (an array slice, for instance).
+        bool adopt_right_hand_side_alloca = false;
+        if (llvm::AllocaInst::classof(right_hand_side.value))
+        {
+            llvm::AllocaInst const* const candidate = static_cast<llvm::AllocaInst const*>(right_hand_side.value);
+
+            adopt_right_hand_side_alloca =
+                is_right_side_instantiate_expression ||
+                (is_right_side_constant_array_expression &&
+                    !candidate->isArrayAllocation() &&
+                    candidate->getAllocatedType() == llvm_type &&
+                    right_hand_side.type == core_type);
+        }
+
+        if (adopt_right_hand_side_alloca)
         {
             llvm::AllocaInst* const alloca_instruction = static_cast<llvm::AllocaInst*>(right_hand_side.value);
             alloca_instruction->setName(expression.name.c_str());
