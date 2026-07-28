@@ -2295,6 +2295,75 @@ namespace iris::compiler
         throw std::runtime_error{ format_error(std::format("Binary operation '{}' not implemented!", static_cast<std::uint32_t>(operation)), source_position) };
     }
 
+    // `a && b` and `a || b` must not evaluate `b` when `a` already decides the result. This is
+    // lowered the same way the ternary condition is: branch on the left operand, evaluate the
+    // right one only on the edge where it can still matter, and merge with a phi node.
+    Value_and_type create_logical_short_circuit_expression_value(
+        Binary_expression const& expression,
+        Statement const& statement,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::LLVMContext& llvm_context = parameters.llvm_context;
+        llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+        llvm::Function* const llvm_parent_function = parameters.llvm_parent_function;
+
+        bool const is_and = expression.operation == Binary_operation::Logical_and;
+
+        auto const create_bool_value = [&llvm_builder, &llvm_context](Value_and_type const& value) -> llvm::Value*
+        {
+            llvm::Value* const converted_value = convert_to_boolean(llvm_context, llvm_builder, value.value, value.type);
+            if (converted_value->getType()->isIntegerTy() && !converted_value->getType()->isIntegerTy(1))
+            {
+                llvm::Value* const zero_value = llvm::ConstantInt::get(converted_value->getType(), 0);
+                return llvm_builder.CreateICmpNE(converted_value, zero_value);
+            }
+
+            return converted_value;
+        };
+
+        llvm::BasicBlock* const right_hand_side_block = llvm::BasicBlock::Create(llvm_context, is_and ? "logical_and_rhs" : "logical_or_rhs", llvm_parent_function);
+        llvm::BasicBlock* const end_block = llvm::BasicBlock::Create(llvm_context, is_and ? "logical_and_end" : "logical_or_end", llvm_parent_function);
+
+        // Left hand side:
+        Value_and_type const left_hand_side = create_loaded_expression_value(expression.left_hand_side.expression_index, statement, parameters);
+        llvm::Value* const left_bool_value = create_bool_value(left_hand_side);
+        llvm::BasicBlock* const left_hand_side_end_block = llvm_builder.GetInsertBlock();
+
+        // `&&` continues on true, `||` continues on false:
+        if (is_and)
+            llvm_builder.CreateCondBr(left_bool_value, right_hand_side_block, end_block);
+        else
+            llvm_builder.CreateCondBr(left_bool_value, end_block, right_hand_side_block);
+
+        // Right hand side:
+        llvm_builder.SetInsertPoint(right_hand_side_block);
+        Value_and_type const right_hand_side = create_loaded_expression_value(expression.right_hand_side.expression_index, statement, parameters);
+
+        if (!left_hand_side.type.has_value() || !right_hand_side.type.has_value())
+            throw std::runtime_error{ format_error("Left or right side type is null!", parameters.source_position) };
+
+        if (!are_types_compatible(parameters.declaration_database, *left_hand_side.type, *right_hand_side.type))
+            throw std::runtime_error{ format_error("Left and right side types do not match!", parameters.source_position) };
+
+        llvm::Value* const right_bool_value = create_bool_value(right_hand_side);
+        llvm_builder.CreateBr(end_block);
+        llvm::BasicBlock* const right_hand_side_end_block = llvm_builder.GetInsertBlock();
+
+        // End:
+        llvm_builder.SetInsertPoint(end_block);
+        llvm::PHINode* const phi_node = llvm_builder.CreatePHI(llvm::Type::getInt1Ty(llvm_context), 2);
+        phi_node->addIncoming(llvm::ConstantInt::getBool(llvm_context, !is_and), left_hand_side_end_block);
+        phi_node->addIncoming(right_bool_value, right_hand_side_end_block);
+
+        return Value_and_type
+        {
+            .name = "",
+            .value = phi_node,
+            .type = create_bool_type_reference()
+        };
+    }
+
     Value_and_type create_binary_expression_value(
         Binary_expression const& expression,
         Statement const& statement,
@@ -2302,6 +2371,15 @@ namespace iris::compiler
     )
     {
         llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+
+        bool const is_logical_operation =
+            expression.operation == Binary_operation::Logical_and ||
+            expression.operation == Binary_operation::Logical_or;
+
+        // Basic blocks can only be created inside a function, so a constant initializer outside one
+        // falls back to the non-branching form, where evaluating both operands cannot be observed.
+        if (is_logical_operation && parameters.llvm_parent_function != nullptr)
+            return create_logical_short_circuit_expression_value(expression, statement, parameters);
 
         Value_and_type const& left_hand_side = create_loaded_expression_value(expression.left_hand_side.expression_index, statement, parameters);
         Value_and_type const& right_hand_side = create_loaded_expression_value(expression.right_hand_side.expression_index, statement, parameters);

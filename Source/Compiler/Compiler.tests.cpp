@@ -894,9 +894,15 @@ entry:
   store i32 %39, ptr %case_9, align 4
   %40 = load i32, ptr %a, align 4
   %41 = icmp eq i32 %40, 0
+  br i1 %41, label %logical_and_rhs, label %logical_and_end
+
+logical_and_rhs:                                  ; preds = %entry
   %42 = load i32, ptr %b, align 4
   %43 = icmp eq i32 %42, 1
-  %44 = and i1 %41, %43
+  br label %logical_and_end
+
+logical_and_end:                                  ; preds = %logical_and_rhs, %entry
+  %44 = phi i1 [ false, %entry ], [ %43, %logical_and_rhs ]
   store i1 %44, ptr %case_10, align 1
   %45 = load i32, ptr %a, align 4
   %46 = load i32, ptr %b, align 4
@@ -909,10 +915,16 @@ entry:
   %52 = load i32, ptr %a, align 4
   %53 = load i32, ptr %b, align 4
   %54 = icmp slt i32 %52, %53
+  br i1 %54, label %logical_and_rhs1, label %logical_and_end2
+
+logical_and_rhs1:                                 ; preds = %logical_and_end
   %55 = load i32, ptr %b, align 4
   %56 = load i32, ptr %c, align 4
   %57 = icmp slt i32 %55, %56
-  %58 = and i1 %54, %57
+  br label %logical_and_end2
+
+logical_and_end2:                                 ; preds = %logical_and_rhs1, %logical_and_end
+  %58 = phi i1 [ false, %logical_and_end ], [ %57, %logical_and_rhs1 ]
   store i1 %58, ptr %case_12, align 1
   %59 = load i32, ptr %a, align 4
   %60 = load i32, ptr %b, align 4
@@ -1106,37 +1118,67 @@ entry:
   %7 = icmp ne i8 %5, %6
   store i1 %7, ptr %not_equal, align 1
   %8 = load i8, ptr %first_boolean, align 1
-  %9 = load i8, ptr %second_boolean, align 1
-  %10 = icmp ne i8 %8, 0
-  %11 = icmp ne i8 %9, 0
-  %12 = and i1 %10, %11
+  %9 = trunc i8 %8 to i1
+  br i1 %9, label %logical_and_rhs, label %logical_and_end
+
+logical_and_rhs:                                  ; preds = %entry
+  %10 = load i8, ptr %second_boolean, align 1
+  %11 = trunc i8 %10 to i1
+  br label %logical_and_end
+
+logical_and_end:                                  ; preds = %logical_and_rhs, %entry
+  %12 = phi i1 [ false, %entry ], [ %11, %logical_and_rhs ]
   store i1 %12, ptr %logical_and, align 1
   %13 = load i8, ptr %first_boolean, align 1
-  %14 = load i8, ptr %second_boolean, align 1
-  %15 = icmp ne i8 %13, 0
-  %16 = icmp ne i8 %14, 0
-  %17 = or i1 %15, %16
+  %14 = trunc i8 %13 to i1
+  br i1 %14, label %logical_or_end, label %logical_or_rhs
+
+logical_or_rhs:                                   ; preds = %logical_and_end
+  %15 = load i8, ptr %second_boolean, align 1
+  %16 = trunc i8 %15 to i1
+  br label %logical_or_end
+
+logical_or_end:                                   ; preds = %logical_or_rhs, %logical_and_end
+  %17 = phi i1 [ true, %logical_and_end ], [ %16, %logical_or_rhs ]
   store i1 %17, ptr %logical_or, align 1
   %18 = load i8, ptr %first_boolean, align 1
-  %19 = load i8, ptr %first_boolean, align 1
-  %20 = load i8, ptr %second_boolean, align 1
-  %21 = icmp eq i8 %19, %20
-  %22 = icmp ne i8 %18, 0
-  %23 = and i1 %22, %21
+  %19 = trunc i8 %18 to i1
+  br i1 %19, label %logical_and_rhs1, label %logical_and_end2
+
+logical_and_rhs1:                                 ; preds = %logical_or_end
+  %20 = load i8, ptr %first_boolean, align 1
+  %21 = load i8, ptr %second_boolean, align 1
+  %22 = icmp eq i8 %20, %21
+  br label %logical_and_end2
+
+logical_and_end2:                                 ; preds = %logical_and_rhs1, %logical_or_end
+  %23 = phi i1 [ false, %logical_or_end ], [ %22, %logical_and_rhs1 ]
   store i1 %23, ptr %mix, align 1
   %24 = load i8, ptr %first_boolean, align 1
-  %25 = load i8, ptr %first_boolean, align 1
-  %26 = load i8, ptr %second_boolean, align 1
-  %27 = icmp ne i8 %25, %26
-  %28 = icmp ne i8 %24, 0
-  %29 = or i1 %28, %27
+  %25 = trunc i8 %24 to i1
+  br i1 %25, label %logical_or_end4, label %logical_or_rhs3
+
+logical_or_rhs3:                                  ; preds = %logical_and_end2
+  %26 = load i8, ptr %first_boolean, align 1
+  %27 = load i8, ptr %second_boolean, align 1
+  %28 = icmp ne i8 %26, %27
+  br label %logical_or_end4
+
+logical_or_end4:                                  ; preds = %logical_or_rhs3, %logical_and_end2
+  %29 = phi i1 [ true, %logical_and_end2 ], [ %28, %logical_or_rhs3 ]
   store i1 %29, ptr %mix_0, align 1
   %30 = load i8, ptr %first_boolean, align 1
   %31 = load i8, ptr %second_boolean, align 1
   %32 = icmp eq i8 %30, %31
+  br i1 %32, label %logical_and_rhs5, label %logical_and_end6
+
+logical_and_rhs5:                                 ; preds = %logical_or_end4
   %33 = load i8, ptr %first_boolean, align 1
-  %34 = icmp ne i8 %33, 0
-  %35 = and i1 %32, %34
+  %34 = trunc i8 %33 to i1
+  br label %logical_and_end6
+
+logical_and_end6:                                 ; preds = %logical_and_rhs5, %logical_or_end4
+  %35 = phi i1 [ false, %logical_or_end4 ], [ %34, %logical_and_rhs5 ]
   store i1 %35, ptr %mix_1, align 1
   ret void
 }
@@ -7488,9 +7530,15 @@ entry:
   store i8 %1, ptr %y, align 1
   %2 = load i8, ptr %x, align 1
   %3 = icmp eq i8 %2, 0
+  br i1 %3, label %logical_and_rhs, label %logical_and_end
+
+logical_and_rhs:                                  ; preds = %entry
   %4 = load i8, ptr %y, align 1
-  %5 = icmp ne i8 %4, 0
-  %6 = and i1 %3, %5
+  %5 = trunc i8 %4 to i1
+  br label %logical_and_end
+
+logical_and_end:                                  ; preds = %logical_and_rhs, %entry
+  %6 = phi i1 [ false, %entry ], [ %5, %logical_and_rhs ]
   ret i1 %6
 }
 
