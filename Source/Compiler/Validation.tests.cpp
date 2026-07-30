@@ -1288,6 +1288,53 @@ export function use_vector3f32_pointer(value: *Vector3f32) -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that struct members can be accessed through an alias of a struct", "[Validation][Alias]")
+    {
+        std::string_view const input = R"(module Test;
+
+export struct Resources
+{
+    count: Uint32 = 0u32;
+    total: Uint32 = 0u32;
+}
+
+export using Resources_alias = Resources;
+
+export function read_through_alias(resources: *Resources_alias) -> (count: Uint32)
+{
+    return resources->count;
+}
+
+export function double_through_alias(resources: *Resources_alias) -> (doubled: Uint32)
+{
+    return resources->count * 2u32;
+}
+
+export function sum_through_alias(resources: *Resources_alias) -> (total: Uint32)
+{
+    mutable total = 0u32;
+
+    for i in 0u32 to resources->count
+    {
+        total = total + i;
+    }
+
+    return total;
+}
+
+export function read_value_through_alias(resources: Resources_alias) -> (count: Uint32)
+{
+    return resources.count;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that alias to instantiated type can be initialized in local scope", "[Validation][Function_constructors]")
     {
         std::string_view const input = R"(module Test;

@@ -1162,7 +1162,7 @@ namespace iris::compiler
                     if (!element_type.has_value())
                         return std::nullopt;
 
-                    std::optional<Declaration> const declaration = find_declaration(
+                    std::optional<Declaration> const declaration = find_underlying_declaration(
                         declaration_database,
                         element_type.value()
                     );
@@ -1604,7 +1604,7 @@ namespace iris::compiler
                 }
             }
 
-            std::optional<Declaration> const declaration = find_declaration(declaration_database, left_side_value_type.value());
+            std::optional<Declaration> const declaration = find_underlying_declaration(declaration_database, left_side_value_type.value());
             if (!declaration.has_value())
                 return std::nullopt;
 

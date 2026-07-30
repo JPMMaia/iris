@@ -4375,7 +4375,7 @@ namespace iris::compiler
                                 return create_access_struct_member(
                                     loaded_left_hand_side,
                                     dereference_and_access_expression.member_name,
-                                    module_name,
+                                    declaration_value.module_name,
                                     struct_declaration,
                                     parameters
                                 );
@@ -4386,7 +4386,7 @@ namespace iris::compiler
                                 return create_access_union_member(
                                     loaded_left_hand_side,
                                     dereference_and_access_expression.member_name,
-                                    module_name,
+                                    declaration_value.module_name,
                                     union_declaration,
                                     parameters
                                 );
