@@ -259,7 +259,7 @@ namespace iris::compiler
             info.source = std::filesystem::path{substitute_variables(json.at("source").get<std::string>(), environment_variables, "executable.source")};
         
         if (json.contains("entry_point"))
-            info.source = json.at("entry_point").get<std::pmr::string>();
+            info.entry_point = json.at("entry_point").get<std::pmr::string>();
         
         return info;
     }
