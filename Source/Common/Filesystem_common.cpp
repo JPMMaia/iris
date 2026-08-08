@@ -1,7 +1,6 @@
 module;
 
 #include <curl/curl.h>
-#include <miniz.h>
 #include <reproc/run.h>
 
 module iris.common.filesystem_common;
@@ -178,57 +177,6 @@ namespace iris::common
         return std::move(buffer);
     }
 
-    bool extract_zip(std::filesystem::path const& archive_path, std::filesystem::path const& destination_directory)
-    {
-        if (std::filesystem::exists(destination_directory))
-        {
-            std::printf("Skipped extract zip to '%s' since it already exists.\n", destination_directory.generic_string().c_str());
-            return true;
-        }
-        std::printf("Extract zip to '%s'.\n", destination_directory.generic_string().c_str());
-
-        mz_zip_archive zip_archive;
-        std::memset(&zip_archive, 0, sizeof(zip_archive));
-
-        if (!mz_zip_reader_init_file(&zip_archive, reinterpret_cast<char const*>(archive_path.u8string().c_str()), 0))
-            return false;
-
-        mz_uint num_files = mz_zip_reader_get_num_files(&zip_archive);
-        for (mz_uint i = 0; i < num_files; ++i)
-        {
-            mz_zip_archive_file_stat file_stat;
-            if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat))
-                continue;
-
-            std::string const filename = file_stat.m_filename;
-
-            // Strip leading directory component so files extract directly into destination_directory
-            std::string const relative_name = [&filename]() -> std::string
-            {
-                std::size_t const sep = filename.find_first_of("/\\");
-                if (sep != std::string::npos)
-                    return filename.substr(sep + 1);
-                return filename;
-            }();
-
-            std::filesystem::path const out_path = destination_directory / relative_name;
-
-            if (file_stat.m_uncomp_size == 0 && relative_name.empty())
-            {
-                std::filesystem::create_directories(out_path);
-                continue;
-            }
-
-            std::filesystem::create_directories(out_path.parent_path());
-
-            if (!mz_zip_reader_extract_file_to_file(&zip_archive, filename.c_str(), out_path.generic_string().c_str(), 0))
-                continue;
-        }
-
-        mz_zip_reader_end(&zip_archive);
-        return true;
-    }
-
     static std::pmr::vector<std::pmr::string> split_command(std::string_view const command, std::pmr::polymorphic_allocator<std::pmr::string> const& alloc)
     {
         std::pmr::vector<std::pmr::string> args{alloc};
@@ -389,68 +337,4 @@ namespace iris::common
         return clone_directory;
     }
 
-    std::optional<std::pmr::string> create_zip_from_directory(
-        std::filesystem::path const& source_directory,
-        std::filesystem::path const& output_zip_path
-    )
-    {
-        std::printf("Creating zip archive: %s\n", output_zip_path.generic_string().c_str());
-
-        // Create parent directories if needed
-        std::error_code ec;
-        std::filesystem::create_directories(output_zip_path.parent_path(), ec);
-        if (ec)
-        {
-            return std::pmr::string{std::format("Failed to create output directory: {}", ec.message())};
-        }
-
-        // Initialize miniz zip writer
-        mz_zip_archive zip_archive;
-        std::memset(&zip_archive, 0, sizeof(zip_archive));
-
-        std::filesystem::path const root_directory_name = output_zip_path.stem();
-
-        std::string const output_path_str = output_zip_path.generic_string();
-        if (!mz_zip_writer_init_file(&zip_archive, output_path_str.c_str(), 0))
-        {
-            return std::pmr::string{"Failed to initialize zip writer"};
-        }
-
-        // Add each file to the archive
-        for (auto const& entry : std::filesystem::recursive_directory_iterator(source_directory))
-        {
-            if (entry.is_regular_file())
-            {
-                std::filesystem::path const& file_path = entry.path();
-                std::filesystem::path const relative_path = root_directory_name / std::filesystem::relative(file_path, source_directory);
-
-                mz_bool const result = mz_zip_writer_add_file(
-                    &zip_archive,
-                    relative_path.generic_string().c_str(),
-                    file_path.generic_string().c_str(),
-                    nullptr,
-                    0,
-                    MZ_BEST_COMPRESSION
-                );
-
-                if (!result)
-                {
-                    mz_zip_writer_end(&zip_archive);
-                    std::filesystem::remove(output_zip_path, ec);
-                    return std::pmr::string{std::format("Failed to add file '{}' to archive", relative_path.generic_string())};
-                }       
-            }
-        }
-
-        // Finalize and end
-        if (!mz_zip_writer_finalize_archive(&zip_archive))
-        {
-            mz_zip_writer_end(&zip_archive);
-            std::filesystem::remove(output_zip_path, ec);
-            return std::pmr::string{"Failed to finalize archive"};
-        }
-
-        mz_zip_writer_end(&zip_archive);
-        return std::nullopt; // success, no error
-    }
 }

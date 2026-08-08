@@ -33,11 +33,6 @@ namespace iris::common
         std::filesystem::path const& destination_path
     );
 
-    export bool extract_zip(
-        std::filesystem::path const& archive_path,
-        std::filesystem::path const& destination_directory
-    );
-
     export int execute_command(
         std::filesystem::path const& working_directory,
         std::string_view const command
@@ -49,10 +44,5 @@ namespace iris::common
         std::string_view const url,
         std::string_view const git_ref,
         bool recurse_submodules
-    );
-
-    export std::optional<std::pmr::string> create_zip_from_directory(
-        std::filesystem::path const& source_directory,
-        std::filesystem::path const& output_zip_path
     );
 }

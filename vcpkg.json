@@ -8,7 +8,7 @@
     "tree-sitter",
     "xxhash",
     "zlib",
-    "miniz",
+    "7zip",
     "curl",
     "reproc",
     {

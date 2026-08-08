@@ -13,6 +13,7 @@ import iris.binary_serializer;
 import iris.core;
 import iris.core.struct_layout;
 import iris.common;
+import iris.common.archive;
 import iris.common.filesystem;
 import iris.common.filesystem_common;
 import iris.compiler;
@@ -2261,6 +2262,25 @@ namespace iris::compiler
         return std::pmr::vector<std::filesystem::path>{std::move(found_files), output_allocator};
     }
 
+    // Extensions accepted for a dependency archive, in lookup order.
+    static constexpr std::array<std::string_view, 2> g_dependency_archive_extensions = {".7z", ".zip"};
+
+    static std::optional<std::filesystem::path> find_dependency_archive(
+        std::filesystem::path const& storage_path,
+        std::string_view const name,
+        std::string_view const version
+    )
+    {
+        for (std::string_view const extension : g_dependency_archive_extensions)
+        {
+            std::filesystem::path const candidate = storage_path / std::format("{}-{}{}", name, version, extension);
+            if (std::filesystem::exists(candidate))
+                return candidate;
+        }
+
+        return std::nullopt;
+    }
+
     void download_dependency(
         Iris_project const& project,
         Project_dependency const& dependency
@@ -2271,14 +2291,15 @@ namespace iris::compiler
         std::filesystem::path const storage_path = std::filesystem::current_path() / project.dependencies_storage_path;
         std::filesystem::create_directories(storage_path);
 
-        std::string const archive_name = std::format("{}-{}.zip", dependency.name, dependency.version);
-        std::filesystem::path const archive_path = storage_path / archive_name;
-
-        if (std::filesystem::exists(archive_path))
+        if (std::optional<std::filesystem::path> const existing_archive = find_dependency_archive(storage_path, dependency.name, dependency.version))
         {
-            std::printf("Archive already exists: %s\n", archive_path.generic_string().c_str());
+            std::printf("Archive already exists: %s\n", existing_archive->generic_string().c_str());
             return;
         }
+
+        // Downloads and git clones are always stored as .zip.
+        std::string const archive_name = std::format("{}-{}.zip", dependency.name, dependency.version);
+        std::filesystem::path const archive_path = storage_path / archive_name;
 
         // Branch: git repo vs. direct archive
         if (iris::common::is_git_url(dependency.source_url))
@@ -2310,8 +2331,8 @@ namespace iris::compiler
                 std::filesystem::remove_all(git_dir);
             }
 
-            // Create zip
-            auto const zip_error = iris::common::create_zip_from_directory(cloned_directory, archive_path);
+            // Create archive
+            auto const zip_error = iris::common::create_archive_from_directory(cloned_directory, archive_path);
 
             // Clean up temp directory
             std::filesystem::remove_all(cloned_directory);
@@ -2370,15 +2391,19 @@ namespace iris::compiler
         std::printf("Building dependency '%s'...\n", dependency.name.c_str());
 
         std::filesystem::path const storage_path = std::filesystem::current_path() / project.dependencies_storage_path;
-        std::string const archive_name = std::format("{}-{}.zip", dependency.name, dependency.version);
-        std::filesystem::path const archive_path = storage_path / archive_name;
 
-        if (!std::filesystem::exists(archive_path))
+        std::optional<std::filesystem::path> const archive_path = find_dependency_archive(storage_path, dependency.name, dependency.version);
+
+        if (!archive_path.has_value())
         {
             iris::common::print_message_and_exit(
                 std::format(
-                    "Archive not found: {}. Did you run 'download-dependencies'?",
-                    archive_path.generic_string()
+                    "Archive not found: {}/{}-{} with extension {} or {}. Did you run 'download-dependencies'?",
+                    storage_path.generic_string(),
+                    dependency.name,
+                    dependency.version,
+                    g_dependency_archive_extensions[0],
+                    g_dependency_archive_extensions[1]
                 )
             );
         }
@@ -2388,9 +2413,21 @@ namespace iris::compiler
 
         std::filesystem::path const extract_path = build_path / std::format("{}-{}", dependency.name, dependency.version);
 
-        if (!iris::common::extract_zip(archive_path, extract_path))
+        std::optional<std::pmr::string> const extract_error = iris::common::extract_archive(*archive_path, extract_path);
+
+        if (extract_error.has_value())
         {
-            iris::common::print_message_and_exit(std::format("Failed to extract '{}'", archive_path.generic_string()));
+            // Remove the partial extraction so it is not mistaken for a completed one on the next run.
+            std::error_code remove_error;
+            std::filesystem::remove_all(extract_path, remove_error);
+
+            iris::common::print_message_and_exit(
+                std::format(
+                    "Failed to extract '{}': {}",
+                    archive_path->generic_string(),
+                    extract_error->c_str()
+                )
+            );
         }
 
         for (std::string_view const build_command : dependency.build_commands)

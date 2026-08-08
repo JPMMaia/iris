@@ -15,7 +15,8 @@ namespace iris::common
         std::pmr::string buffer;
         buffer.resize(1024);
 
-        int const bytes = GetModuleFileName(nullptr, buffer.data(), buffer.size());
+        // Explicitly the narrow variant: linking 7-Zip defines UNICODE for this target.
+        int const bytes = GetModuleFileNameA(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
 
         std::filesystem::path const executable_path = std::string_view{ buffer.data(), buffer.data() + bytes + 1 };
         return executable_path.parent_path();
