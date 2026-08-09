@@ -3777,6 +3777,38 @@ function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Deduces the type to instantiate from an argument of a call to an imported function", "[Validation][Instantiate_expression]")
+    {
+        std::string_view const dependency = R"(module My_module;
+
+export struct My_struct
+{
+    a: Int32 = 0;
+}
+
+export function use(instance: My_struct) -> ()
+{
+}
+)";
+
+        std::string_view const input = R"(module Test;
+
+import My_module as my_module;
+
+function run() -> ()
+{
+    my_module.use({});
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        std::array<std::string_view, 1> const dependencies = { dependency };
+        test_validate_module(input, dependencies, expected_diagnostics);
+    }
+
 
     TEST_CASE("Validates function calls with implicit arguments", "[Validation][Implicit_arguments]")
     {

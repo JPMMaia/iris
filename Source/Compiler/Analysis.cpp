@@ -553,28 +553,42 @@ namespace iris::compiler
     }
 
     
-    iris::Function_declaration const* get_function_declaration_to_call(
+    std::optional<iris::Function_type> get_function_type_to_call(
         std::string_view const module_name,
+        Scope const& scope,
         iris::Statement const& statement,
         iris::Expression const& expression,
         iris::Declaration_database const& declaration_database
     )
     {
-        if (std::holds_alternative<iris::Access_expression>(expression.data))
-        {
-            //iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data); // TODO
-            assert(false);
-        }
-        else if (std::holds_alternative<iris::Variable_expression>(expression.data))
-        {
-            iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
+        // The callable expression can be a plain variable that names a function, a module
+        // qualified access such as 'my_module.my_function', a function pointer variable, and so on.
+        // All of these evaluate to a function pointer type, so ask for the expression type instead
+        // of pattern matching on each expression kind.
+        std::optional<iris::Type_reference> const callable_type = get_expression_type(
+            module_name,
+            nullptr,
+            scope,
+            statement,
+            expression,
+            std::nullopt,
+            declaration_database
+        );
+        if (!callable_type.has_value())
+            return std::nullopt;
 
-            std::optional<Declaration> const declaration = find_declaration(declaration_database, module_name, variable_expression.name);
-            if (declaration.has_value() && std::holds_alternative<iris::Function_declaration const*>(declaration->data))
-                return std::get<iris::Function_declaration const*>(declaration->data);
-        }
+        std::optional<iris::Type_reference> const underlying_callable_type = get_underlying_type(
+            declaration_database,
+            callable_type.value()
+        );
+        if (!underlying_callable_type.has_value())
+            return std::nullopt;
 
-        return nullptr;
+        if (!std::holds_alternative<iris::Function_pointer_type>(underlying_callable_type->data))
+            return std::nullopt;
+
+        iris::Function_pointer_type const& function_pointer_type = std::get<iris::Function_pointer_type>(underlying_callable_type->data);
+        return function_pointer_type.type;
     }
 
     std::optional<iris::Type_reference> get_type_to_instantiate(
@@ -631,14 +645,15 @@ namespace iris::compiler
                     iris::Expression_index const& argument_expression = call_expression.arguments[argument_index];
                     if (argument_expression.expression_index == expression_index)
                     {
-                        iris::Function_declaration const* const function_declaration_to_call = get_function_declaration_to_call(
+                        std::optional<iris::Function_type> const function_type_to_call = get_function_type_to_call(
                             module_name,
+                            scope,
                             statement,
                             statement.expressions[call_expression.expression.expression_index],
                             declaration_database
                         );
-                        if (function_declaration_to_call != nullptr && argument_index < function_declaration_to_call->type.input_parameter_types.size())
-                            return function_declaration_to_call->type.input_parameter_types[argument_index];
+                        if (function_type_to_call.has_value() && argument_index < function_type_to_call->input_parameter_types.size())
+                            return function_type_to_call->input_parameter_types[argument_index];
                         else
                             return std::nullopt;
                     }
