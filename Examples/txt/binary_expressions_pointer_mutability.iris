@@ -1,0 +1,12 @@
+module Binary_expression_pointer_mutability;
+
+function get_pointer(p: *mutable Int32) -> (r: *mutable Int32)
+{
+    return p;
+}
+
+export function run() -> ()
+{
+    mutable a = 0;
+    var v0 = get_pointer(&a) == &a;
+}

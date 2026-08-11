@@ -10,6 +10,7 @@ import llvm;
 import iris.core;
 import iris.core.declarations;
 import iris.core.execution_engine;
+import iris.core.formatter;
 import iris.core.types;
 import iris.compiler.analysis;
 import iris.compiler.clang_data;
@@ -33,6 +34,32 @@ namespace iris::compiler
         if (!source_position.has_value())
             return std::format("{} (location unknown)", message);
         return std::format("{} (at line {}, column {})", message, source_position->line, source_position->column);
+    }
+
+    // Type mismatches reaching code generation are always worth naming: validation has already
+    // approved the expression, so the message is the only clue about which rule the two disagree on.
+    static std::string format_type_mismatch_error(
+        std::string_view const message,
+        iris::Module const& core_module,
+        std::optional<Type_reference> const& left_hand_side_type,
+        std::optional<Type_reference> const& right_hand_side_type,
+        std::optional<Source_position> const& source_position
+    )
+    {
+        std::pmr::polymorphic_allocator<> allocator{};
+
+        std::pmr::string const left_hand_side_type_name = iris::format_type_reference(core_module.dependencies, left_hand_side_type, allocator, allocator);
+        std::pmr::string const right_hand_side_type_name = iris::format_type_reference(core_module.dependencies, right_hand_side_type, allocator, allocator);
+
+        return format_error(
+            std::format(
+                "{} Left side type is '{}' but right side type is '{}'.",
+                message,
+                std::string_view{ left_hand_side_type_name },
+                std::string_view{ right_hand_side_type_name }
+            ),
+            source_position
+        );
     }
 
     Expression_parameters set_core_module(Expression_parameters const& parameters, iris::Module const& core_module)
@@ -1385,6 +1412,7 @@ namespace iris::compiler
         Value_and_type const& left_hand_side,
         Value_and_type const& right_hand_side,
         Binary_operation operation,
+        iris::Module const& core_module,
         Declaration_database const& declaration_database,
         std::optional<Source_position> const& source_position
     );
@@ -1410,7 +1438,7 @@ namespace iris::compiler
             right_hand_side_parameters.expression_type = left_hand_side_value.type;
             Value_and_type const right_hand_side_value = create_loaded_expression_value(right_hand_side.expression_index, statement, right_hand_side_parameters);
 
-            Value_and_type const result = create_binary_operation_instruction(llvm_builder, left_hand_side_value, right_hand_side_value, operation, parameters.declaration_database, parameters.source_position);
+            Value_and_type const result = create_binary_operation_instruction(llvm_builder, left_hand_side_value, right_hand_side_value, operation, parameters.core_module, parameters.declaration_database, parameters.source_position);
 
             return result;
         }
@@ -1709,6 +1737,22 @@ namespace iris::compiler
             if ((is_function_pointer(underlying_first) && is_null_pointer_type(underlying_second)) || (is_null_pointer_type(underlying_first) && is_function_pointer(underlying_second)))
                 return true;
 
+            if (is_pointer(underlying_first) && is_pointer(underlying_second))
+            {
+                Pointer_type const& first_pointer_type = std::get<Pointer_type>(underlying_first.data);
+                Pointer_type const& second_pointer_type = std::get<Pointer_type>(underlying_second.data);
+
+                // Mutability is deliberately not compared. It changes nothing about the code generated
+                // for a pointer, and code generation cannot recover it anyway: the address-of operator
+                // here has no access to the mutability of its operand and always produces a non-mutable
+                // pointer. Comparing it would reject `returns_mutable_pointer(...) == &local`, which
+                // validation (which does track mutability, through Analysis) already accepted.
+                if (first_pointer_type.element_type.empty() || second_pointer_type.element_type.empty())
+                    return first_pointer_type.element_type.empty() && second_pointer_type.element_type.empty();
+
+                return are_types_compatible(declaration_database, first_pointer_type.element_type[0], second_pointer_type.element_type[0]);
+            }
+
             return underlying_first == underlying_second;
         }
 
@@ -1728,6 +1772,7 @@ namespace iris::compiler
         Value_and_type const& left_hand_side,
         Value_and_type const& right_hand_side,
         Binary_operation const operation,
+        iris::Module const& core_module,
         Declaration_database const& declaration_database,
         std::optional<Source_position> const& source_position
     )
@@ -1736,7 +1781,7 @@ namespace iris::compiler
             throw std::runtime_error{ format_error("Left or right side type is null!", source_position) };
 
         if (!are_types_compatible(declaration_database, *left_hand_side.type, *right_hand_side.type))
-            throw std::runtime_error{ format_error("Left and right side types do not match!", source_position) };
+            throw std::runtime_error{ format_type_mismatch_error("Left and right side types do not match!", core_module, left_hand_side.type, right_hand_side.type, source_position) };
 
         std::optional<Type_reference> const underling_type = get_underlying_type(declaration_database, left_hand_side.type.value());
         Type_reference const& type = underling_type.has_value() ? underling_type.value() : left_hand_side.type.value();
@@ -2344,7 +2389,7 @@ namespace iris::compiler
             throw std::runtime_error{ format_error("Left or right side type is null!", parameters.source_position) };
 
         if (!are_types_compatible(parameters.declaration_database, *left_hand_side.type, *right_hand_side.type))
-            throw std::runtime_error{ format_error("Left and right side types do not match!", parameters.source_position) };
+            throw std::runtime_error{ format_type_mismatch_error("Left and right side types do not match!", parameters.core_module, left_hand_side.type, right_hand_side.type, parameters.source_position) };
 
         llvm::Value* const right_bool_value = create_bool_value(right_hand_side);
         llvm_builder.CreateBr(end_block);
@@ -2385,7 +2430,17 @@ namespace iris::compiler
         Value_and_type const& right_hand_side = create_loaded_expression_value(expression.right_hand_side.expression_index, statement, parameters);
         Binary_operation const operation = expression.operation;
 
-        Value_and_type value = create_binary_operation_instruction(llvm_builder, left_hand_side, right_hand_side, operation, parameters.declaration_database, parameters.source_position);
+        // Debug info is what normally supplies the position, so without it an error here would have
+        // nothing but "location unknown" to offer. The operands carry their own ranges either way.
+        std::optional<Source_position> source_position = parameters.source_position;
+        if (!source_position.has_value())
+        {
+            iris::Expression const& left_hand_side_expression = statement.expressions[expression.left_hand_side.expression_index];
+            if (left_hand_side_expression.source_range.has_value())
+                source_position = left_hand_side_expression.source_range->start;
+        }
+
+        Value_and_type value = create_binary_operation_instruction(llvm_builder, left_hand_side, right_hand_side, operation, parameters.core_module, parameters.declaration_database, source_position);
         return value;
     }
 
@@ -4463,7 +4518,7 @@ namespace iris::compiler
             };
 
             Binary_operation const compare_operation = expression.range_comparison_operation;
-            Value_and_type const condition_value = create_binary_operation_instruction(llvm_builder, loaded_variable_value, range_end_value, compare_operation, parameters.declaration_database, parameters.source_position);
+            Value_and_type const condition_value = create_binary_operation_instruction(llvm_builder, loaded_variable_value, range_end_value, compare_operation, parameters.core_module, parameters.declaration_database, parameters.source_position);
 
             llvm_builder.CreateCondBr(condition_value.value, then_block, after_block);
         }

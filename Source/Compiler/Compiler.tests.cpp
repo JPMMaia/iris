@@ -1281,6 +1281,45 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  // Pointer mutability must not take part in the operand compatibility check: the address-of
+  // operator produces a non-mutable pointer during code generation, so comparing it against a
+  // mutable pointer used to be rejected as a type mismatch long after validation had accepted it.
+  TEST_CASE("Compile Binary Expressions Pointer Mutability", "[LLVM_IR]")
+  {
+    char const* const input_file = "binary_expressions_pointer_mutability.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define void @Binary_expression_pointer_mutability_run() #0 {
+entry:
+  %a = alloca i32, align 4
+  %v0 = alloca i1, align 1
+  store i32 0, ptr %a, align 4
+  %0 = call ptr @Binary_expression_pointer_mutability_get_pointer(ptr noundef %a)
+  %1 = icmp eq ptr %0, %a
+  store i1 %1, ptr %v0, align 1
+  ret void
+}
+
+; Function Attrs: convergent
+define private ptr @Binary_expression_pointer_mutability_get_pointer(ptr noundef %"arguments[0].p") #0 {
+entry:
+  %p = alloca ptr, align 8
+  store ptr %"arguments[0].p", ptr %p, align 8
+  %0 = load ptr, ptr %p, align 8
+  ret ptr %0
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
 
   TEST_CASE("Compile Bit Fields", "[LLVM_IR]")
   {
