@@ -6447,10 +6447,6 @@ namespace iris::compiler
             Source_position const source_position = expression.source_range->start;
             new_parameters.source_position = source_position;
         }
-        else
-        {
-            new_parameters.source_position = std::nullopt;
-        }
 
         if (std::holds_alternative<Access_expression>(expression.data))
         {

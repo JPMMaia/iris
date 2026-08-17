@@ -63,6 +63,27 @@ function run() -> ()
 }
 ```
 
+### Visibility
+
+The function is looked up in the module that declares the receiver's type, and that module must be
+the current module or one it imports directly. Reaching the module only transitively — through
+another import — is not enough:
+
+```iris
+module app;
+
+import holder as holder_module;   // holder imports thing, app does not
+
+function run() -> ()
+{
+    mutable holder: holder_module.Holder = {};
+    var thing = holder_module.get_thing(&holder);
+    thing->reset();               // error: 'reset' is declared in module 'thing'
+}
+```
+
+Add `import thing as thing_module;` to make the call resolve.
+
 ## Variadic Functions
 
 Append `...` after the last named parameter to accept additional C-style variadic arguments:

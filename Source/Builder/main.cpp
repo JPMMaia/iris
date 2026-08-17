@@ -629,7 +629,6 @@ int main(int const argc, char const* const* argv)
         catch (std::exception const& error)
         {
             std::cerr << error.what() << std::endl;
-            std::cerr << program;
             std::exit(1);
         }
     }
@@ -677,7 +676,6 @@ int main(int const argc, char const* const* argv)
         catch (std::exception const& error)
         {
             std::cerr << error.what() << std::endl;
-            std::cerr << program;
             std::exit(1);
         }
     }
@@ -731,7 +729,6 @@ int main(int const argc, char const* const* argv)
         catch (std::exception const& error)
         {
             std::cerr << error.what() << std::endl;
-            std::cerr << program;
             std::exit(1);
         }
     }

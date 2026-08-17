@@ -765,8 +765,70 @@ namespace iris::compiler
         };
     }
 
+    std::pmr::string get_type_module_name(
+        std::string_view const declaration_module_name,
+        std::string_view const declaration_name
+    )
+    {
+        std::optional<iris::Custom_type_reference> const type_instance_reference = unmangle_type_instance_name(declaration_name);
+        if (type_instance_reference.has_value())
+            return type_instance_reference->module_reference.name;
+        return std::pmr::string{declaration_module_name};
+    }
+
+    bool is_module_visible_from(
+        iris::Declaration_database const& declaration_database,
+        std::string_view const current_module_name,
+        std::string_view const declaration_module_name
+    )
+    {
+        if (declaration_module_name == current_module_name)
+            return true;
+
+        // The dependencies of a module are not registered while its own declarations are still
+        // being added, so a missing entry means "cannot tell" rather than "not visible".
+        auto const dependencies_location = declaration_database.dependencies.find(std::pmr::string{current_module_name});
+        if (dependencies_location == declaration_database.dependencies.end())
+            return true;
+
+        iris::Module_dependencies const& dependencies = *dependencies_location->second;
+        return find_import_module_with_module_name(dependencies, declaration_module_name) != nullptr;
+    }
+
+    std::optional<std::pmr::string> find_implicit_function_module(
+        iris::Declaration_database const& declaration_database,
+        Declaration const& receiver_declaration,
+        std::string_view const member_name
+    )
+    {
+        auto const declares_function = [&](std::string_view const module_name) -> bool
+        {
+            std::optional<Declaration> const declaration = find_underlying_declaration(
+                declaration_database,
+                module_name,
+                member_name
+            );
+            return declaration.has_value() && std::holds_alternative<iris::Function_declaration const*>(declaration->data);
+        };
+
+        if (declares_function(receiver_declaration.module_name))
+            return std::pmr::string{receiver_declaration.module_name};
+
+        // A generic instance lives in the module that instantiated it, but its functions are
+        // declared in the module the type constructor came from.
+        std::pmr::string const origin_module_name = get_type_module_name(
+            receiver_declaration.module_name,
+            get_declaration_name(receiver_declaration)
+        );
+        if (origin_module_name != receiver_declaration.module_name && declares_function(origin_module_name))
+            return origin_module_name;
+
+        return std::nullopt;
+    }
+
     std::optional<Type_info> get_implicit_function_type(
         iris::Declaration_database const& declaration_database,
+        std::string_view const current_module_name,
         std::string_view const declaration_module_name,
         std::string_view const member_name
     )
@@ -781,6 +843,12 @@ namespace iris::compiler
 
         if (std::holds_alternative<iris::Function_declaration const*>(implicit_declaration->data))
         {
+            // Method-call sugar is rewritten into a qualified call by the implicit function pass,
+            // which can only name modules that are imported here. Accepting a module that is only
+            // reachable transitively would push the failure into code generation.
+            if (!is_module_visible_from(declaration_database, current_module_name, declaration_module_name))
+                return std::nullopt;
+
             iris::Function_declaration const& implicit_function_declaration = *std::get<iris::Function_declaration const*>(implicit_declaration->data);
             return Type_info
             {
@@ -1076,6 +1144,7 @@ namespace iris::compiler
 
                 std::optional<Type_info> const implicit_function_type = get_implicit_function_type(
                     declaration_database,
+                    module_name,
                     declaration->module_name,
                     data.member_name
                 );
@@ -1631,6 +1700,7 @@ namespace iris::compiler
             {
                 std::optional<Type_info> const implicit_function_type = get_implicit_function_type(
                     declaration_database,
+                    module_name,
                     declaration->module_name,
                     data.member_name
                 );

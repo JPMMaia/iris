@@ -19,17 +19,6 @@ namespace iris::compiler
         bool dereference;
     };
 
-    static std::pmr::string get_type_module_name(
-        std::string_view const declaration_module_name,
-        std::string_view const declaration_name
-    )
-    {
-        std::optional<iris::Custom_type_reference> const type_instance_reference = unmangle_type_instance_name(declaration_name);
-        if (type_instance_reference.has_value())
-            return type_instance_reference->module_reference.name;
-        return std::pmr::string{declaration_module_name};
-    }
-
     static std::optional<Implicit_function_data> find_implicit_function_auxiliary(
         std::string_view const module_name,
         iris::Statement const& statement,
@@ -79,7 +68,13 @@ namespace iris::compiler
                         dependencies,
                         declaration_module_name
                     );
-                    std::optional<std::string_view> const import_alias = 
+                    // Without an alias the call is rewritten into a bare name, which code generation
+                    // only resolves against this module. Validation rejects the call before we get
+                    // here, so this is a backstop against emitting a name that cannot be generated.
+                    if (import_module_with_alias == nullptr && declaration_module_name != module_name)
+                        return std::nullopt;
+
+                    std::optional<std::string_view> const import_alias =
                         import_module_with_alias != nullptr ?
                         std::optional<std::string_view>{import_module_with_alias->alias} :
                         std::optional<std::string_view>{};
@@ -165,6 +160,11 @@ namespace iris::compiler
 
         iris::Call_expression const& call_expression = std::get<iris::Call_expression>(statement.expressions[call_expression_index].data);
 
+        // The synthesized expressions stand in for the original ones, so they inherit their source
+        // ranges: without them any later diagnostic about this call has no location to report.
+        std::optional<iris::Source_range> const callee_source_range = statement.expressions[call_expression.expression.expression_index].source_range;
+        std::optional<iris::Source_range> const receiver_source_range = statement.expressions[left_access_expression_index].source_range;
+
         std::pmr::vector<iris::Expression> new_expressions = statement.expressions;
         new_expressions.reserve(statement.expressions.size() + 3);
 
@@ -174,10 +174,12 @@ namespace iris::compiler
         {
             Expression_reference<iris::Access_expression> access_alias_expression = create_expression_inside_statement<iris::Access_expression>(new_expressions);
             access_alias_expression.value->member_name = std::pmr::string{function_name};
-            
+            new_expressions[access_alias_expression.index].source_range = callee_source_range;
+
             Expression_reference<iris::Variable_expression> alias_name_expression = create_expression_inside_statement<iris::Variable_expression>(new_expressions);
             alias_name_expression.value->name = std::pmr::string{import_alias.value()};
             access_alias_expression.value->expression = {.expression_index = alias_name_expression.index};
+            new_expressions[alias_name_expression.index].source_range = callee_source_range;
 
             new_left_access_expression_index = access_alias_expression.index;
         }
@@ -185,6 +187,7 @@ namespace iris::compiler
         {
             Expression_reference<iris::Variable_expression> function_name_expression = create_expression_inside_statement<iris::Variable_expression>(new_expressions);
             function_name_expression.value->name = std::pmr::string{function_name};
+            new_expressions[function_name_expression.index].source_range = callee_source_range;
 
             new_left_access_expression_index = function_name_expression.index;
         }
@@ -199,6 +202,7 @@ namespace iris::compiler
                 .expression = {.expression_index = left_access_expression_index },
                 .operation = iris::Unary_operation::Address_of
             };
+            new_expressions[new_take_address_expression.index].source_range = receiver_source_range;
             new_call_left_side_index = new_take_address_expression.index;
         }
 

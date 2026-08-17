@@ -183,6 +183,55 @@ function run() -> ()
         test_implicit_function_pass_on_function(input, dependencies, "run", expected);
     }
 
+    TEST_CASE("Does not replace implicit call when the module is only reachable transitively", "[Implicit_function_pass][Passes]")
+    {
+        std::string_view const module_a_text = R"(module Implicit_arguments;
+
+export struct My_struct
+{
+    v0: Int32 = 1;
+}
+
+export function get_v0(instance: *My_struct) -> (result: Int32)
+{
+    return instance->v0;
+}
+)";
+
+        std::string_view const module_b_text = R"(module Implicit_arguments_holder;
+
+import Implicit_arguments as em;
+
+export struct Holder
+{
+    instance: em.My_struct = {};
+}
+
+export function get_instance(holder: *mutable Holder) -> (result: *mutable em.My_struct)
+{
+    return &holder->instance;
+}
+)";
+
+        std::string_view const input = R"(module Implicit_arguments_external;
+
+import Implicit_arguments_holder as hm;
+
+function run() -> ()
+{
+    mutable holder: hm.Holder = {};
+    var instance = hm.get_instance(&holder);
+    var a = instance->get_v0();
+}
+)";
+
+        std::pmr::vector<std::string_view> const dependencies = { module_a_text, module_b_text };
+
+        // The rewrite would have to name 'Implicit_arguments', which is not imported here, so the
+        // statement is left alone; validation rejects the call before code generation sees it.
+        test_implicit_function_pass_on_function(input, dependencies, "run", input);
+    }
+
     TEST_CASE("Replaces implicit pointer call with explicit function call for imported module", "[Implicit_function_pass][Passes]")
     {
         std::string_view const dependency_text = R"(module Implicit_arguments;

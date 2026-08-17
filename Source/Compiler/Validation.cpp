@@ -2511,6 +2511,94 @@ namespace iris::compiler
         return std::nullopt;
     }
 
+    static std::optional<iris::compiler::Diagnostic> create_missing_import_diagnostic_for_implicit_call(
+        Validate_expression_parameters const& parameters,
+        iris::Call_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    )
+    {
+        iris::Expression const& callee_expression = parameters.statement.expressions[expression.expression.expression_index];
+
+        iris::Expression_index receiver_expression_index = {};
+        std::string_view member_name = {};
+        bool dereference = false;
+
+        if (std::holds_alternative<iris::Access_expression>(callee_expression.data))
+        {
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(callee_expression.data);
+            receiver_expression_index = access_expression.expression;
+            member_name = access_expression.member_name;
+        }
+        else if (std::holds_alternative<iris::Dereference_and_access_expression>(callee_expression.data))
+        {
+            iris::Dereference_and_access_expression const& access_expression = std::get<iris::Dereference_and_access_expression>(callee_expression.data);
+            receiver_expression_index = access_expression.expression;
+            member_name = access_expression.member_name;
+            dereference = true;
+        }
+        else
+        {
+            return std::nullopt;
+        }
+
+        iris::Expression const& receiver_expression = parameters.statement.expressions[receiver_expression_index.expression_index];
+        if (!std::holds_alternative<iris::Variable_expression>(receiver_expression.data))
+            return std::nullopt;
+
+        iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(receiver_expression.data);
+
+        Variable const* const variable = find_variable_from_scope(parameters.scope, variable_expression.name);
+        if (variable == nullptr)
+            return std::nullopt;
+
+        std::optional<Type_reference> const receiver_type =
+            dereference ?
+            remove_pointer(variable->type) :
+            std::optional<Type_reference>{variable->type};
+        if (!receiver_type.has_value())
+            return std::nullopt;
+
+        std::optional<Declaration> const declaration = find_underlying_declaration(
+            parameters.declaration_database,
+            receiver_type.value()
+        );
+        if (!declaration.has_value() || !std::holds_alternative<Struct_declaration const*>(declaration->data))
+            return std::nullopt;
+
+        Struct_declaration const& struct_declaration = *std::get<Struct_declaration const*>(declaration->data);
+
+        auto const member_location = std::find(
+            struct_declaration.member_names.begin(),
+            struct_declaration.member_names.end(),
+            member_name
+        );
+        if (member_location != struct_declaration.member_names.end())
+            return std::nullopt;
+
+        std::optional<std::pmr::string> const function_module_name = find_implicit_function_module(
+            parameters.declaration_database,
+            declaration.value(),
+            member_name
+        );
+        if (!function_module_name.has_value())
+            return std::nullopt;
+
+        if (is_module_visible_from(parameters.declaration_database, parameters.core_module.name, function_module_name.value()))
+            return std::nullopt;
+
+        return create_error_diagnostic(
+            parameters.core_module.source_file_path,
+            source_range,
+            std::format(
+                "'{}' is declared in module '{}', which is not imported by '{}'. Add 'import {} as ...;'.",
+                member_name,
+                std::string_view{function_module_name.value()},
+                std::string_view{parameters.core_module.name},
+                std::string_view{function_module_name.value()}
+            )
+        );
+    }
+
     std::pmr::vector<iris::compiler::Diagnostic> validate_call_expression(
         Validate_expression_parameters const& parameters,
         iris::Call_expression const& expression,
@@ -2813,6 +2901,14 @@ namespace iris::compiler
 
         if (!function_pointer_type_optional.has_value())
         {
+            std::optional<iris::compiler::Diagnostic> missing_import_diagnostic = create_missing_import_diagnostic_for_implicit_call(
+                parameters,
+                expression,
+                source_range
+            );
+            if (missing_import_diagnostic.has_value())
+                return { std::move(missing_import_diagnostic.value()) };
+
             return
             {
                 create_error_diagnostic(

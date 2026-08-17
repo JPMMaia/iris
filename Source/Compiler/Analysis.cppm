@@ -138,6 +138,23 @@ namespace iris::compiler
     export Type_info create_type_info(iris::Type_reference type, bool is_mutable);
     export std::optional<Type_info> create_type_info(std::optional<iris::Type_reference> type, bool is_mutable);
 
+    export std::pmr::string get_type_module_name(
+        std::string_view const declaration_module_name,
+        std::string_view const declaration_name
+    );
+
+    export bool is_module_visible_from(
+        iris::Declaration_database const& declaration_database,
+        std::string_view const current_module_name,
+        std::string_view const declaration_module_name
+    );
+
+    export std::optional<std::pmr::string> find_implicit_function_module(
+        iris::Declaration_database const& declaration_database,
+        Declaration const& receiver_declaration,
+        std::string_view const member_name
+    );
+
     export std::optional<Type_info> get_expression_type_info(
         std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,

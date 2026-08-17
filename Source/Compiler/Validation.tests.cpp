@@ -3936,6 +3936,100 @@ export function foo(a: *My_struct, b: My_struct) -> ()
     }
 
 
+    TEST_CASE("Validates that a function of a transitively reachable module is not visible", "[Validation][Implicit_arguments]")
+    {
+        std::string_view const module_a_input = R"(module module_a;
+
+export struct My_struct
+{
+    value: Int32 = 0;
+}
+
+export function reset(instance: *mutable My_struct) -> ()
+{
+    instance->value = 0;
+}
+)";
+
+        std::string_view const module_b_input = R"(module module_b;
+
+import module_a as module_a;
+
+export struct Holder
+{
+    instance: module_a.My_struct = {};
+}
+
+export function get_instance(holder: *mutable Holder) -> (result: *mutable module_a.My_struct)
+{
+    return &holder->instance;
+}
+)";
+
+        std::string_view const input = R"(module Test;
+
+import module_b as module_b;
+
+function run() -> ()
+{
+    mutable holder: module_b.Holder = {};
+    var instance = module_b.get_instance(&holder);
+    instance->reset();
+}
+)";
+
+        std::pmr::vector<std::string_view> const dependencies = { module_a_input, module_b_input };
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(9, 5, 9, 22),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "'reset' is declared in module 'module_a', which is not imported by 'Test'. Add 'import module_a as ...;'.",
+                .related_information = {},
+            },
+        };
+
+        test_validate_module(input, dependencies, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a function of a directly imported module is visible", "[Validation][Implicit_arguments]")
+    {
+        std::string_view const module_a_input = R"(module module_a;
+
+export struct My_struct
+{
+    value: Int32 = 0;
+}
+
+export function reset(instance: *mutable My_struct) -> ()
+{
+    instance->value = 0;
+}
+)";
+
+        std::string_view const input = R"(module Test;
+
+import module_a as module_a;
+
+function run() -> ()
+{
+    mutable instance: module_a.My_struct = {};
+    instance.reset();
+}
+)";
+
+        std::pmr::vector<std::string_view> const dependencies = { module_a_input };
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, dependencies, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that cannot assign to non-mutable variable", "[Validation][Mutability]")
     {
         std::string_view const input = R"(module Test;
