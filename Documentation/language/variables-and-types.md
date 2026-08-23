@@ -95,6 +95,61 @@ Append `c` to a string literal to produce a `*C_char` (a null-terminated C strin
 var greeting = "Hello"c;   // type: *C_char
 ```
 
+### Multi-line strings
+
+A literal written with `"""` may span several lines and may contain unescaped `"`. It ends at the first `"""`:
+
+```iris
+var usage = """
+Usage: tool [options]
+  -h   show "help"
+"""c;
+```
+
+The content is **verbatim**: nothing is stripped. Leading indentation is kept, and so is the line break that follows the opening delimiter. The literal above is exactly these bytes:
+
+```
+\nUsage: tool [options]\n  -h   show "help"\n
+```
+
+If you indent the literal to line up with the surrounding code, that indentation becomes part of the value.
+
+Two restrictions follow from the delimiter rules:
+
+- a `"""` literal cannot end with a `"` — write it as `\"` in a single-line literal instead
+- a `"..."` literal cannot span lines; a line break inside one is a parse error
+
+### Escape sequences
+
+The same escapes are recognised in both string forms and in char literals:
+
+| Escape | Byte | Meaning |
+|---|---|---|
+| `\\` | 0x5C | backslash |
+| `\"` | 0x22 | double quote |
+| `\'` | 0x27 | single quote |
+| `\n` | 0x0A | line feed |
+| `\t` | 0x09 | tab |
+| `\r` | 0x0D | carriage return |
+| `\0` | 0x00 | null |
+
+Any other escape is a compile error, so a Windows path has to double its separators:
+
+```iris
+var path = "C:\\Users\\me"c;
+```
+
+## Char Literals
+
+A char literal is written with single quotes and has type `C_char`. It uses the escape table
+above:
+
+```iris
+var letter = 'a';
+var newline = '\n';
+var quote = '\'';
+```
+
 ## Global Variables
 
 Variables declared outside of any function are module-level globals:

@@ -1,0 +1,20 @@
+module String_literals;
+
+export function foo() -> ()
+{
+    var plain = "abc"c;
+    var escaped_quote = "a\"b"c;
+    var escaped_backslash = "a\\b"c;
+    var escaped_newline = "a\nb"c;
+    var escaped_tab = "a\tb"c;
+    var escaped_carriage_return = "a\rb"c;
+    var two_newlines = "a\n\nb"c;
+    var backslash_then_n = "a\\nb"c;
+    var multi_line = """
+line one
+line two
+"""c;
+    var multi_line_with_quotes = """
+he said "hi" and "" too
+"""c;
+}

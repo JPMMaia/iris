@@ -10,6 +10,15 @@ namespace iris::compiler
 {
     export std::string_view to_string_view(llvm::StringRef const string);
 
+    // Decodes the escape sequences of a string literal into the bytes it denotes.
+    // The input is the raw source text between the delimiters, so it is shared by both the
+    // "..." and the """...""" forms. Throws on an escape that the language does not define.
+    export std::pmr::string unescape_string_literal(
+        std::string_view const value,
+        std::optional<Source_position> const& source_position,
+        std::pmr::polymorphic_allocator<char> const& output_allocator = {}
+    );
+
     export std::string mangle_name(
         std::string_view const module_name,
         std::string_view const declaration_name,

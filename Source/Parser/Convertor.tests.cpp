@@ -508,6 +508,12 @@ namespace iris::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts string_literals.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "string_literals.iris";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts switch_expressions.iris", "[Convertor]")
     {
         std::string_view const input_file = "switch_expressions.iris";

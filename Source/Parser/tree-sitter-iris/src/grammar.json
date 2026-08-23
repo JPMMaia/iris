@@ -3540,8 +3540,20 @@
       "value": "\\d+([.]\\d+)?[a-z0-9]*"
     },
     "String": {
-      "type": "PATTERN",
-      "value": "\"(?:(?:\\\\\")|[^\"])*\"[a-z0-9]*"
+      "type": "TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "PATTERN",
+            "value": "\"\"\"(?:[^\"]|\"[^\"]|\"\"[^\"])*\"\"\"[a-z0-9]*"
+          },
+          {
+            "type": "PATTERN",
+            "value": "\"(?:\\\\.|[^\"\\\\\\n])*\"[a-z0-9]*"
+          }
+        ]
+      }
     },
     "Char": {
       "type": "PATTERN",

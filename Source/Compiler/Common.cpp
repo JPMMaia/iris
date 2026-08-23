@@ -14,6 +14,65 @@ namespace iris::compiler
         return std::string_view{ string.data(), string.size() };
     }
 
+    static std::string format_escape_error(
+        std::string_view const message,
+        std::optional<Source_position> const& source_position
+    )
+    {
+        if (!source_position.has_value())
+            return std::format("{} (location unknown)", message);
+        return std::format("{} (at line {}, column {})", message, source_position->line, source_position->column);
+    }
+
+    std::pmr::string unescape_string_literal(
+        std::string_view const value,
+        std::optional<Source_position> const& source_position,
+        std::pmr::polymorphic_allocator<char> const& output_allocator
+    )
+    {
+        std::pmr::string output{ output_allocator };
+        output.reserve(value.size());
+
+        // A single left to right pass. Anything that already consumed a character is appended
+        // immediately, so a replacement can never be rescanned and no index arithmetic is needed.
+        for (std::size_t index = 0; index < value.size(); ++index)
+        {
+            char const character = value[index];
+
+            if (character != '\\')
+            {
+                output.push_back(character);
+                continue;
+            }
+
+            if (index + 1 == value.size())
+                throw std::runtime_error{ format_escape_error("String literal ends with an incomplete escape sequence.", source_position) };
+
+            char const escaped = value[index + 1];
+            ++index;
+
+            switch (escaped)
+            {
+            case '\\': output.push_back('\\'); break;
+            case '"': output.push_back('"'); break;
+            case '\'': output.push_back('\''); break;
+            case 'n': output.push_back('\n'); break;
+            case 't': output.push_back('\t'); break;
+            case 'r': output.push_back('\r'); break;
+            case '0': output.push_back('\0'); break;
+            default:
+                throw std::runtime_error{
+                    format_escape_error(
+                        std::format("Unknown escape sequence '\\{}' in string literal.", escaped),
+                        source_position
+                    )
+                };
+            }
+        }
+
+        return output;
+    }
+
     std::string mangle_name(
         std::string_view const module_name,
         std::string_view const declaration_name,

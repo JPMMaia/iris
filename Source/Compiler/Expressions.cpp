@@ -414,24 +414,6 @@ namespace iris::compiler
         return fold_constant(statement_value.value, parameters.llvm_data_layout, parameters.source_position);
     }
 
-    static std::pmr::string replace_string_literal_special_values(std::string_view const value)
-    {
-        std::pmr::string output = std::pmr::string{value};
-
-        size_t index = 0;
-        while (true)
-        {
-            index = output.find("\\n", index);
-            if (index == std::pmr::string::npos)
-                break;
-
-            output.replace(index, 2, "\n");
-
-            index += 2;
-        }
-
-        return output;
-    }
 
     static llvm::Value* create_c_string_constant(
         llvm::LLVMContext& llvm_context,
@@ -447,10 +429,8 @@ namespace iris::compiler
                 return llvm_global_value;
         }
 
-        std::pmr::string const final_string = replace_string_literal_special_values(string_data);
-
         std::uint64_t const null_terminator_size = 1;
-        std::uint64_t const array_size = final_string.size() + null_terminator_size;
+        std::uint64_t const array_size = string_data.size() + null_terminator_size;
         llvm::ArrayType* const array_type = llvm::ArrayType::get(llvm::IntegerType::get(llvm_context, 8), array_size);
 
         bool const is_constant = true;
@@ -460,7 +440,9 @@ namespace iris::compiler
             array_type,
             is_constant,
             llvm::GlobalValue::InternalLinkage,
-            llvm::ConstantDataArray::getString(llvm_context, final_string.c_str()),
+            // StringRef rather than a C string: the data may contain an embedded '\0', and
+            // array_size above is computed from the full length.
+            llvm::ConstantDataArray::getString(llvm_context, llvm::StringRef{ string_data.data(), string_data.size() }),
             global_variable_name
         );
 
@@ -4109,7 +4091,8 @@ namespace iris::compiler
         }
         else if (is_c_string(type))
         {
-            llvm::Value* const instruction = create_c_string_constant(llvm_context, llvm_module, expression.data);
+            std::pmr::string const string_data = unescape_string_literal(expression.data, source_position);
+            llvm::Value* const instruction = create_c_string_constant(llvm_context, llvm_module, string_data);
 
             return
             {
@@ -6875,7 +6858,10 @@ namespace iris::compiler
 
         llvm_builder.SetInsertPoint(fail_block);
 
-        std::string const error_message = std::format("In function '{}.{}' {} '{}' failed!", core_module.name, function_declaration.name, condition_type_to_string(condition_type), function_condition.description);
+        // The description comes straight from a string literal, so it still carries its escape
+        // sequences; decode them before they reach the message that is printed at run time.
+        std::pmr::string const description = unescape_string_literal(function_condition.description, expression_parameters.source_position);
+        std::string const error_message = std::format("In function '{}.{}' {} '{}' failed!", core_module.name, function_declaration.name, condition_type_to_string(condition_type), std::string_view{ description });
         create_log_error_instruction(llvm_context, llvm_module, llvm_builder, error_message.c_str());
         create_abort_instruction(llvm_context, llvm_module, llvm_builder);
         llvm_builder.CreateUnreachable();

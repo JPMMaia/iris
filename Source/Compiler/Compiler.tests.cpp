@@ -6636,6 +6636,58 @@ attributes #1 = { nocallback nofree nosync nounwind willreturn }
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile String Literals", "[LLVM_IR]")
+  {
+    char const* const input_file = "string_literals.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+@global_0 = internal constant [4 x i8] c"abc\00"
+@global_1 = internal constant [4 x i8] c"a\22b\00"
+@global_2 = internal constant [4 x i8] c"a\\b\00"
+@global_3 = internal constant [4 x i8] c"a\0Ab\00"
+@global_4 = internal constant [4 x i8] c"a\09b\00"
+@global_5 = internal constant [4 x i8] c"a\0Db\00"
+@global_6 = internal constant [5 x i8] c"a\0A\0Ab\00"
+@global_7 = internal constant [5 x i8] c"a\\nb\00"
+@global_8 = internal constant [20 x i8] c"\0Aline one\0Aline two\0A\00"
+@global_9 = internal constant [26 x i8] c"\0Ahe said \22hi\22 and \22\22 too\0A\00"
+
+; Function Attrs: convergent
+define void @String_literals_foo() #0 {
+entry:
+  %plain = alloca ptr, align 8
+  %escaped_quote = alloca ptr, align 8
+  %escaped_backslash = alloca ptr, align 8
+  %escaped_newline = alloca ptr, align 8
+  %escaped_tab = alloca ptr, align 8
+  %escaped_carriage_return = alloca ptr, align 8
+  %two_newlines = alloca ptr, align 8
+  %backslash_then_n = alloca ptr, align 8
+  %multi_line = alloca ptr, align 8
+  %multi_line_with_quotes = alloca ptr, align 8
+  store ptr @global_0, ptr %plain, align 8
+  store ptr @global_1, ptr %escaped_quote, align 8
+  store ptr @global_2, ptr %escaped_backslash, align 8
+  store ptr @global_3, ptr %escaped_newline, align 8
+  store ptr @global_4, ptr %escaped_tab, align 8
+  store ptr @global_5, ptr %escaped_carriage_return, align 8
+  store ptr @global_6, ptr %two_newlines, align 8
+  store ptr @global_7, ptr %backslash_then_n, align 8
+  store ptr @global_8, ptr %multi_line, align 8
+  store ptr @global_9, ptr %multi_line_with_quotes, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Switch Expressions", "[LLVM_IR]")
   {
     char const* const input_file = "switch_expressions.iris";
@@ -10255,7 +10307,41 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
+
+  TEST_CASE("Unescape string literals", "[Strings]")
+  {
+    auto const unescape = [](std::string_view const value) -> std::string
+    {
+      std::pmr::string const result = iris::compiler::unescape_string_literal(value, std::nullopt);
+      return std::string{ result.begin(), result.end() };
+    };
+
+    // The input of each check is written as a raw string literal, so it reads exactly like the
+    // source text between the delimiters. The expected value is the bytes it must decode to.
+    CHECK(unescape(R"(abc)") == "abc");
+    CHECK(unescape(R"()") == "");
+
+    CHECK(unescape(R"([\n])") == "[\n]");
+    CHECK(unescape(R"([\n\n])") == "[\n\n]");
+    CHECK(unescape(R"([\n\n\n])") == "[\n\n\n]");
+    CHECK(unescape(R"([\t])") == "[\t]");
+    CHECK(unescape(R"([\r])") == "[\r]");
+    CHECK(unescape(R"([\"])") == "[\"]");
+    CHECK(unescape(R"([\'])") == "[']");
+    CHECK(unescape(R"([\\])") == "[\\]");
+
+    // An escaped backslash must not combine with the character that follows it.
+    CHECK(unescape(R"([\\n])") == "[\\n]");
+    CHECK(unescape(R"([\\t])") == "[\\t]");
+    CHECK(unescape(R"([\\\n])") == "[\\\n]");
+
+    // Embedded null terminators survive as bytes.
+    CHECK(unescape(R"(a\0b)") == std::string("a\0b", 3));
+
+    // Raw newlines, as produced by a multi-line literal, are passed through untouched.
+    CHECK(unescape("\nline one\nline two\n") == "\nline one\nline two\n");
+
+    CHECK_THROWS(unescape(R"([\d])"));
+    CHECK_THROWS(unescape(R"(trailing\)"));
+  }
 }
-
-
-

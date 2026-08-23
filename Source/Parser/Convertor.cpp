@@ -99,10 +99,12 @@ namespace iris::parser
         std::string_view const value
     )
     {
-        if (value.size() < 3)
+        std::size_t const delimiter_size = (value.size() >= 6 && value.starts_with("\"\"\"")) ? 3 : 1;
+
+        if (value.size() < 2 * delimiter_size)
             return value;
 
-        return value.substr(1, value.size() - 2);
+        return value.substr(delimiter_size, value.size() - 2 * delimiter_size);
     }
 
     std::string_view get_string_suffix(
@@ -1174,7 +1176,7 @@ namespace iris::parser
             std::string_view const string = get_node_value(tree, name_node.value());
             if (string.size() > 2)
             {
-                std::string_view const content = string.substr(1, string.size() - 2);
+                std::string_view const content = get_string_content(string);
                 output.description = create_string(content, output_allocator);
             }
         }
@@ -2110,7 +2112,7 @@ namespace iris::parser
         if (message_node.has_value())
         {
             std::string_view const message = get_node_value(tree, message_node.value());
-            output.message = create_string(message.substr(1, message.size() - 2), output_allocator);
+            output.message = create_string(get_string_content(message), output_allocator);
         }
         
         std::optional<Parse_node> const statement_node = get_child_node(tree, node, "Generic_expression");
@@ -2537,7 +2539,7 @@ namespace iris::parser
             std::string_view const suffix = get_string_suffix(value);
 
             std::string_view const value_without_suffix = value.substr(0, value.size() - suffix.size());
-            std::string_view const value_without_quotes = value_without_suffix.substr(1, value_without_suffix.size() - 2);
+            std::string_view const value_without_quotes = get_string_content(value_without_suffix);
 
             if (suffix == "c")
             {

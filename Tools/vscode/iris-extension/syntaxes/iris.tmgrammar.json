@@ -78,6 +78,27 @@
         "strings": {
             "patterns": [
                 {
+                    "name": "string.quoted.triple.iris",
+                    "begin": "\"\"\"",
+                    "beginCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.begin.iris"
+                        }
+                    },
+                    "end": "\"\"\"",
+                    "endCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.end.iris"
+                        }
+                    },
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.iris",
+                            "match": "\\\\."
+                        }
+                    ]
+                },
+                {
                     "name": "string.quoted.double.iris",
                     "begin": "\"",
                     "beginCaptures": {

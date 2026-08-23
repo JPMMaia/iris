@@ -45,6 +45,7 @@ namespace iris
     )
     {
         buffer.string_stream << text;
+        buffer.current_line += static_cast<std::uint32_t>(std::ranges::count(text, '\n'));
     }
 
     static void add_integer_text(
@@ -63,12 +64,32 @@ namespace iris
         buffer.string_stream << value;
     }
 
+    // Emits a string literal around its stored text. The module does not record which delimiter
+    // the source used, so it is derived from the content: only the multi-line form can carry a
+    // raw line break, and a single-line literal is left in the shorter form.
+    static void add_string_literal_text(
+        String_buffer& buffer,
+        std::string_view const data,
+        std::string_view const suffix = ""
+    )
+    {
+        bool const is_multi_line =
+            data.find('\n') != std::string_view::npos ||
+            data.find('\r') != std::string_view::npos;
+
+        std::string_view const delimiter = is_multi_line ? "\"\"\"" : "\"";
+
+        add_text(buffer, delimiter);
+        add_text(buffer, data);
+        add_text(buffer, delimiter);
+        add_text(buffer, suffix);
+    }
+
     static void add_new_line(
         String_buffer& buffer
     )
     {
         add_text(buffer, "\n");
-        buffer.current_line += 1;
     }
 
     static void add_indentation(
@@ -602,9 +623,8 @@ namespace iris
 
         if (expression.message.has_value())
         {
-            add_text(buffer, "\"");
-            add_text(buffer, expression.message.value());
-            add_text(buffer, "\" ");
+            add_string_literal_text(buffer, expression.message.value());
+            add_text(buffer, " ");
         }
 
         add_text(buffer, "{ ");
@@ -932,9 +952,7 @@ namespace iris
             }
             case iris::Fundamental_type::String:
             {
-                add_text(buffer, "\"");
-                add_text(buffer, expression.data);
-                add_text(buffer, "\"");
+                add_string_literal_text(buffer, expression.data);
                 break;
             }
             case iris::Fundamental_type::C_bool:
@@ -1047,9 +1065,7 @@ namespace iris
         }
         else if (iris::is_c_string(type))
         {
-            add_text(buffer, "\"");
-            add_text(buffer, expression.data);
-            add_text(buffer, "\"c");
+            add_string_literal_text(buffer, expression.data, "c");
         }
         else
         {
@@ -1986,9 +2002,9 @@ namespace iris
     )
     {
         add_text(buffer, is_precondition ? "precondition" : "postcondition");
-        add_text(buffer, " \"");
-        add_text(buffer, condition.description);
-        add_text(buffer, "\" { ");
+        add_text(buffer, " ");
+        add_string_literal_text(buffer, condition.description);
+        add_text(buffer, " { ");
         add_format_statement(buffer, condition.condition, 0, options, false);
         add_text(buffer, " }");
     }
