@@ -41,6 +41,12 @@ namespace iris::c
         iris::Union_declaration const& declaration
     );
 
+    static void add_lambda_declaration(
+        std::pmr::vector<iris::Declaration>& sorted_declarations,
+        iris::Module const& core_module,
+        iris::Lambda_declaration const& declaration
+    );
+
     static void add_type_reference_declaration(
         std::pmr::vector<iris::Declaration>& sorted_declarations,
         iris::Module const& core_module,
@@ -78,6 +84,13 @@ namespace iris::c
                     add_union_declaration(sorted_declarations, core_module, *union_type.value());
                     return;
                 }
+
+                std::optional<Lambda_declaration const*> const lambda_type = find_lambda_declaration(core_module, custom_type_reference.name);
+                if (lambda_type.has_value())
+                {
+                    add_lambda_declaration(sorted_declarations, core_module, *lambda_type.value());
+                    return;
+                }
             }
         }
         else if (std::holds_alternative<iris::Function_pointer_type>(type_reference.data))
@@ -86,6 +99,14 @@ namespace iris::c
             for (iris::Type_reference const& type : function_pointer_type.type.input_parameter_types)
                 add_type_reference_declaration(sorted_declarations, core_module, type);
             for (iris::Type_reference const& type : function_pointer_type.type.output_parameter_types)
+                add_type_reference_declaration(sorted_declarations, core_module, type);
+        }
+        else if (std::holds_alternative<iris::Lambda_type>(type_reference.data))
+        {
+            iris::Lambda_type const& lambda_type = std::get<iris::Lambda_type>(type_reference.data);
+            for (iris::Type_reference const& type : lambda_type.input_parameter_types)
+                add_type_reference_declaration(sorted_declarations, core_module, type);
+            for (iris::Type_reference const& type : lambda_type.output_parameter_types)
                 add_type_reference_declaration(sorted_declarations, core_module, type);
         }
     }
@@ -135,6 +156,24 @@ namespace iris::c
         sorted_declarations.push_back(iris::Declaration{.data = &declaration});
     }
 
+    void add_lambda_declaration(
+        std::pmr::vector<iris::Declaration>& sorted_declarations,
+        iris::Module const& core_module,
+        iris::Lambda_declaration const& declaration
+    )
+    {
+        if (contains_declaration(sorted_declarations, iris::Declaration{.data = &declaration}))
+            return;
+
+        for (iris::Type_reference const& parameter_type : declaration.input_parameter_types)
+            add_type_reference_declaration(sorted_declarations, core_module, parameter_type);
+
+        for (iris::Type_reference const& parameter_type : declaration.output_parameter_types)
+            add_type_reference_declaration(sorted_declarations, core_module, parameter_type);
+
+        sorted_declarations.push_back(iris::Declaration{.data = &declaration});
+    }
+
     static std::pmr::vector<iris::Declaration> sort_declarations(
         iris::Module const& core_module,
         std::pmr::polymorphic_allocator<> const& output_allocator,
@@ -161,6 +200,16 @@ namespace iris::c
         for (iris::Alias_type_declaration const& declaration : core_module.internal_declarations.alias_type_declarations)
         {
             add_alias_type_declaration(sorted_declarations, core_module, declaration);
+        }
+
+        for (iris::Lambda_declaration const& declaration : core_module.export_declarations.lambda_declarations)
+        {
+            add_lambda_declaration(sorted_declarations, core_module, declaration);
+        }
+
+        for (iris::Lambda_declaration const& declaration : core_module.internal_declarations.lambda_declarations)
+        {
+            add_lambda_declaration(sorted_declarations, core_module, declaration);
         }
 
         for (iris::Struct_declaration const& declaration : core_module.export_declarations.struct_declarations)
@@ -288,7 +337,8 @@ namespace iris::c
         String_stream& stream,
         std::string_view const module_name,
         std::string_view const declaration_name,
-        std::string_view const declaration_kind
+        std::string_view const declaration_kind,
+        std::optional<std::string_view> const data = std::nullopt
     )
     {
         stream << "/** IRIS_META v=1 module=";
@@ -297,6 +347,11 @@ namespace iris::c
         stream << declaration_name;
         stream << " kind=";
         stream << declaration_kind;
+        if (data.has_value())
+        {
+            stream << " data=";
+            stream << data.value();
+        }
         stream << " */\n";
     }
 
@@ -306,6 +361,8 @@ namespace iris::c
             return "struct";
         else if (std::holds_alternative<Union_declaration const*>(declaration.data))
             return "union";
+        else if (std::holds_alternative<Lambda_declaration const*>(declaration.data))
+            return "struct";
         else
             return std::nullopt;
     }
@@ -798,13 +855,86 @@ namespace iris::c
         write_c_array_slice_struct(stream, declaration_database, declaration_type, core_module_name, declaration_name, unique_name);
     }
 
+    // The `data=` payload of a lambda's IRIS_META comment: the signature as it was written in Iris,
+    // which is what the importer reads back to rebuild the Lambda_declaration. The C struct below it
+    // is the ABI, and cannot be inverted into Iris types on its own (Int32 and C_int are both int32_t).
+    static std::pmr::string create_lambda_signature_text(
+        iris::Module_dependencies const& dependencies,
+        iris::Lambda_declaration const& declaration
+    )
+    {
+        std::pmr::string result;
+
+        auto const add_parameters = [&dependencies, &result](
+            std::span<std::pmr::string const> const parameter_names,
+            std::span<iris::Type_reference const> const parameter_types
+        ) -> void
+        {
+            result += "(";
+
+            for (std::size_t index = 0; index < parameter_names.size(); ++index)
+            {
+                result += parameter_names[index];
+                result += ": ";
+                result += iris::format_type_reference(dependencies, parameter_types[index], {}, {});
+
+                if (index + 1 < parameter_names.size())
+                    result += ", ";
+            }
+
+            result += ")";
+        };
+
+        add_parameters(declaration.input_parameter_names, declaration.input_parameter_types);
+        result += " -> ";
+        add_parameters(declaration.output_parameter_names, declaration.output_parameter_types);
+
+        return result;
+    }
+
+    void write_c_lambda_declaration(
+        String_stream& stream,
+        iris::Declaration_database const declaration_database,
+        iris::Module const& core_module,
+        iris::Lambda_declaration const& declaration
+    )
+    {
+        std::pmr::string const signature_text = create_lambda_signature_text(core_module.dependencies, declaration);
+
+        write_iris_meta_comment(stream, core_module.name, declaration.name, "lambda", signature_text);
+
+        stream << "struct ";
+        write_c_declaration_name(stream, core_module.name, declaration.name, declaration.unique_name);
+        stream << "\n{\n";
+
+        // A lambda value is a function pointer plus the environment it was created with, and the
+        // generated function takes that environment as a trailing parameter.
+        stream << "    ";
+        write_c_type_name(stream, declaration_database, declaration.output_parameter_types, std::nullopt);
+        stream << " (*function_pointer)(";
+
+        for (std::size_t index = 0; index < declaration.input_parameter_names.size(); ++index)
+        {
+            write_c_type_name(stream, declaration_database, declaration.input_parameter_types[index], declaration.input_parameter_names[index]);
+            stream << ", ";
+        }
+
+        stream << "void* user_data);\n";
+        stream << "    void* user_data;\n";
+        stream << "};\n\n";
+
+        write_c_array_slice_struct(stream, declaration_database, "struct", core_module.name, declaration.name, declaration.unique_name);
+    }
+
     void write_c_declaration(
         String_stream& stream,
         iris::Declaration_database const declaration_database,
-        std::string_view const core_module_name,
+        iris::Module const& core_module,
         iris::Declaration const& declaration
     )
     {
+        std::string_view const core_module_name = core_module.name;
+
         if (std::holds_alternative<iris::Alias_type_declaration const*>(declaration.data))
         {
             iris::Alias_type_declaration const& alias_type_declaration = *std::get<iris::Alias_type_declaration const*>(declaration.data);
@@ -855,6 +985,11 @@ namespace iris::c
                 union_declaration.member_types,
                 {}
             );
+        }
+        else if (std::holds_alternative<iris::Lambda_declaration const*>(declaration.data))
+        {
+            iris::Lambda_declaration const& lambda_declaration = *std::get<iris::Lambda_declaration const*>(declaration.data);
+            write_c_lambda_declaration(stream, declaration_database, core_module, lambda_declaration);
         }
     }
 
@@ -936,7 +1071,7 @@ namespace iris::c
         write_extern_c_begin(stream);
 
         for (iris::Declaration const& declaration : declarations)
-            write_c_declaration(stream, declaration_database, core_module.name, declaration);
+            write_c_declaration(stream, declaration_database, core_module, declaration);
 
         for (iris::Function_declaration const& declaration : core_module.export_declarations.function_declarations)
             write_c_function_declaration(stream, declaration_database, core_module.name, declaration);
@@ -1263,6 +1398,9 @@ namespace iris::c
             write_cpp_using_declaration(stream, core_module.name, declaration.name, declaration.unique_name, true);
 
         for (iris::Union_declaration const& declaration : core_module.export_declarations.union_declarations)
+            write_cpp_using_declaration(stream, core_module.name, declaration.name, declaration.unique_name, true);
+
+        for (iris::Lambda_declaration const& declaration : core_module.export_declarations.lambda_declarations)
             write_cpp_using_declaration(stream, core_module.name, declaration.name, declaration.unique_name, true);
 
         if (!core_module.export_declarations.function_declarations.empty())

@@ -1015,7 +1015,7 @@ struct Array_slice_my_namespace_Comparator
 };
 
 /** IRIS_META v=1 module=my.namespace name=filter kind=function */
-void my_namespace_filter(struct Int32* values, uint64_t count, struct my_namespace_Comparator predicate);
+void my_namespace_filter(int32_t const* values, uint64_t count, struct my_namespace_Comparator predicate);
 /** IRIS_META v=1 module=my.namespace name=apply kind=function */
 int32_t my_namespace_apply(struct my_namespace_Comparator cmp, int32_t x, int32_t y);
 )RAW";
@@ -1108,7 +1108,7 @@ struct Array_slice_my_namespace_Comparator
 struct my_namespace_Sorter
 {
     struct my_namespace_Comparator compare;
-    struct Int32* data;
+    int32_t const* data;
     uint64_t count;
 };
 
@@ -1133,7 +1133,7 @@ export lambda Processor(value: *Int32, count: Uint64) -> (result: Bool);
 /** IRIS_META v=1 module=my.namespace name=Processor kind=lambda data=(value: *Int32, count: Uint64) -> (result: Bool) */
 struct my_namespace_Processor
 {
-    bool (*function_pointer)(int32_t* value, uint64_t count, void* user_data);
+    bool (*function_pointer)(int32_t const* value, uint64_t count, void* user_data);
     void* user_data;
 };
 

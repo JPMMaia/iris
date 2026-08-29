@@ -15,6 +15,7 @@ import iris.core;
 import iris.core.declarations;
 import iris.core.expressions;
 import iris.core.types;
+import iris.parser.type_name_parser;
 
 namespace iris::c
 {
@@ -129,6 +130,7 @@ namespace iris::c
         std::pmr::string module_name;
         std::pmr::string declaration_name;
         std::pmr::string kind;
+        std::optional<std::pmr::string> data;
     };
 
     std::optional<std::string_view> find_iris_meta_field(
@@ -157,6 +159,31 @@ namespace iris::c
         return raw_comment.substr(value_begin, value_end - value_begin);
     }
 
+    // `data=` is the last field of the comment and its value contains spaces, so unlike the other
+    // fields it runs to the end of the comment rather than to the next space.
+    std::optional<std::string_view> find_iris_meta_data_field(
+        std::string_view const raw_comment
+    )
+    {
+        std::size_t const start = raw_comment.find("data=");
+        if (start == std::string_view::npos)
+            return std::nullopt;
+
+        std::string_view value = raw_comment.substr(start + 5);
+
+        std::size_t const comment_end = value.rfind("*/");
+        if (comment_end != std::string_view::npos)
+            value = value.substr(0, comment_end);
+
+        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back())))
+            value.remove_suffix(1);
+
+        if (value.empty())
+            return std::nullopt;
+
+        return value;
+    }
+
     std::optional<Iris_meta_comment> parse_iris_meta_comment(CXCursor const cursor)
     {
         String const raw_comment_string = clang_Cursor_getRawCommentText(cursor);
@@ -170,11 +197,14 @@ namespace iris::c
         if (!module_name.has_value() || !declaration_name.has_value() || !kind.has_value())
             return std::nullopt;
 
+        std::optional<std::string_view> const data = find_iris_meta_data_field(raw_comment);
+
         return Iris_meta_comment
         {
             .module_name = std::pmr::string{*module_name},
             .declaration_name = std::pmr::string{*declaration_name},
-            .kind = std::pmr::string{*kind}
+            .kind = std::pmr::string{*kind},
+            .data = data.has_value() ? std::optional<std::pmr::string>{std::pmr::string{*data}} : std::nullopt
         };
     }
 
@@ -1488,6 +1518,181 @@ namespace iris::c
         return std::pmr::string{ std::format("anonymous_{}", anonymous_member_count) };
     }
 
+    // Parses the Iris signature carried in a lambda's `data=` metadata, for example
+    // `(a: Int32, b: Int32) -> (result: Int32)`. The C struct underneath it is only the ABI: it
+    // cannot say whether an `int32_t` was written as `Int32` or `C_int`, so the signature is read
+    // from the metadata rather than reconstructed from the fields.
+    static std::optional<iris::Type_reference> parse_lambda_parameter_type(
+        std::string_view const module_name,
+        std::string_view type_name
+    )
+    {
+        if (type_name.starts_with("*"))
+        {
+            type_name.remove_prefix(1);
+
+            bool const is_mutable = type_name.starts_with("mutable ");
+            if (is_mutable)
+                type_name.remove_prefix(8);
+
+            std::optional<iris::Type_reference> const element_type = parse_lambda_parameter_type(module_name, type_name);
+
+            std::pmr::vector<iris::Type_reference> element_types;
+            if (element_type.has_value())
+                element_types.push_back(element_type.value());
+
+            return iris::create_pointer_type_type_reference(std::move(element_types), is_mutable);
+        }
+
+        return iris::parser::parse_type_name(module_name, type_name, {});
+    }
+
+    struct Lambda_signature
+    {
+        std::pmr::vector<std::pmr::string> input_parameter_names;
+        std::pmr::vector<iris::Type_reference> input_parameter_types;
+        std::pmr::vector<std::pmr::string> output_parameter_names;
+        std::pmr::vector<iris::Type_reference> output_parameter_types;
+    };
+
+    static std::string_view trim(std::string_view value)
+    {
+        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front())))
+            value.remove_prefix(1);
+
+        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back())))
+            value.remove_suffix(1);
+
+        return value;
+    }
+
+    // Reads one `(name: Type, ...)` list starting at `index`, which must be at its `(`, and leaves
+    // `index` just past the matching `)`.
+    static bool parse_lambda_parameter_list(
+        std::string_view const module_name,
+        std::string_view const signature,
+        std::size_t& index,
+        std::pmr::vector<std::pmr::string>& parameter_names,
+        std::pmr::vector<iris::Type_reference>& parameter_types
+    )
+    {
+        if (index >= signature.size() || signature[index] != '(')
+            return false;
+
+        index += 1;
+
+        std::size_t depth = 0;
+        std::size_t parameter_start = index;
+
+        auto const add_parameter = [&](std::string_view const parameter) -> bool
+        {
+            std::string_view const trimmed = trim(parameter);
+            if (trimmed.empty())
+                return true;
+
+            std::size_t const separator = trimmed.find(':');
+            if (separator == std::string_view::npos)
+                return false;
+
+            std::optional<iris::Type_reference> const parameter_type = parse_lambda_parameter_type(module_name, trim(trimmed.substr(separator + 1)));
+            if (!parameter_type.has_value())
+                return false;
+
+            parameter_names.push_back(std::pmr::string{trim(trimmed.substr(0, separator))});
+            parameter_types.push_back(parameter_type.value());
+            return true;
+        };
+
+        while (index < signature.size())
+        {
+            char const character = signature[index];
+
+            if (character == '(')
+            {
+                depth += 1;
+            }
+            else if (character == ')')
+            {
+                if (depth == 0)
+                {
+                    if (!add_parameter(signature.substr(parameter_start, index - parameter_start)))
+                        return false;
+
+                    index += 1;
+                    return true;
+                }
+
+                depth -= 1;
+            }
+            else if (character == ',' && depth == 0)
+            {
+                if (!add_parameter(signature.substr(parameter_start, index - parameter_start)))
+                    return false;
+
+                parameter_start = index + 1;
+            }
+
+            index += 1;
+        }
+
+        return false;
+    }
+
+    static std::optional<Lambda_signature> parse_lambda_signature(
+        std::string_view const module_name,
+        std::string_view const signature
+    )
+    {
+        Lambda_signature result;
+
+        std::size_t index = 0;
+        while (index < signature.size() && std::isspace(static_cast<unsigned char>(signature[index])))
+            index += 1;
+
+        if (!parse_lambda_parameter_list(module_name, signature, index, result.input_parameter_names, result.input_parameter_types))
+            return std::nullopt;
+
+        std::string_view const remainder = trim(signature.substr(index));
+        if (!remainder.starts_with("->"))
+            return std::nullopt;
+
+        index = signature.size() - remainder.size() + 2;
+        while (index < signature.size() && std::isspace(static_cast<unsigned char>(signature[index])))
+            index += 1;
+
+        if (!parse_lambda_parameter_list(module_name, signature, index, result.output_parameter_names, result.output_parameter_types))
+            return std::nullopt;
+
+        return result;
+    }
+
+    static std::optional<iris::Lambda_declaration> create_lambda_declaration(
+        CXCursor const cursor,
+        Iris_meta_comment const& metadata
+    )
+    {
+        if (!metadata.data.has_value())
+            return std::nullopt;
+
+        std::optional<Lambda_signature> signature = parse_lambda_signature(metadata.module_name, metadata.data.value());
+        if (!signature.has_value())
+            return std::nullopt;
+
+        Header_source_location const cursor_location = get_cursor_source_location(cursor);
+
+        return iris::Lambda_declaration
+        {
+            .name = metadata.declaration_name,
+            .unique_name = metadata.declaration_name,
+            .input_parameter_types = std::move(signature->input_parameter_types),
+            .output_parameter_types = std::move(signature->output_parameter_types),
+            .input_parameter_names = std::move(signature->input_parameter_names),
+            .output_parameter_names = std::move(signature->output_parameter_names),
+            .comment = std::nullopt,
+            .source_location = cursor_location.source_location,
+        };
+    }
+
     iris::Union_declaration create_union_declaration(C_declarations& declarations, CXCursor const cursor);
 
     iris::Struct_declaration create_struct_declaration(C_declarations& declarations, CXCursor const cursor)
@@ -2429,6 +2634,13 @@ namespace iris::c
             else
                 internal_declarations.function_declarations.push_back(declaration);
         }
+
+        // A lambda only ever comes from an IRIS_META comment, which names the module that already
+        // exports it. This header re-declares it so its types resolve here; it does not own it.
+        for (iris::Lambda_declaration const& declaration : declarations.lambda_declarations)
+        {
+            internal_declarations.lambda_declarations.push_back(declaration);
+        }
     }
 
     template <typename Function_t>
@@ -2923,6 +3135,19 @@ namespace iris::c
             {
                 if (clang_isCursorDefinition(current_cursor))
                 {
+                    // A lambda reaches C as the struct that carries its ABI. The IRIS_META comment is
+                    // the sole criterion: a struct that merely has the same shape stays a struct.
+                    std::optional<Iris_meta_comment> const metadata = parse_iris_meta_comment(current_cursor);
+                    if (metadata.has_value() && metadata->kind == "lambda")
+                    {
+                        std::optional<iris::Lambda_declaration> lambda_declaration = create_lambda_declaration(current_cursor, metadata.value());
+                        if (lambda_declaration.has_value())
+                        {
+                            declarations->lambda_declarations.push_back(std::move(lambda_declaration.value()));
+                            return CXChildVisit_Continue;
+                        }
+                    }
+
                     declarations->struct_declarations.push_back(create_struct_declaration(*declarations, current_cursor));
                 }
                 else

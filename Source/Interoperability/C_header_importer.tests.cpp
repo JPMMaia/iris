@@ -2076,7 +2076,7 @@ struct my_namespace_Comparator
         CHECK(header_module.source_file_path == header_file_path);
 
         // Verify the Lambda_declaration was created in internal declarations
-        iris::Lambda_declaration const& lambda = find_lambda_declaration(header_module, "Comparator");
+        iris::Lambda_declaration const& lambda = iris::c::find_lambda_declaration(header_module, "Comparator");
 
         CHECK(lambda.name == "Comparator");
         REQUIRE(lambda.unique_name.has_value());
@@ -2124,7 +2124,7 @@ struct my_namespace_Callback
 
         CHECK(header_module.source_file_path == header_file_path);
 
-        iris::Lambda_declaration const& lambda = find_lambda_declaration(header_module, "Callback");
+        iris::Lambda_declaration const& lambda = iris::c::find_lambda_declaration(header_module, "Callback");
 
         CHECK(lambda.name == "Callback");
 
@@ -2170,12 +2170,12 @@ struct my_namespace_Predicate
         // Verify both lambdas were created
         REQUIRE(header_module.internal_declarations.lambda_declarations.size() == 2);
 
-        iris::Lambda_declaration const& comparator = find_lambda_declaration(header_module, "Comparator");
+        iris::Lambda_declaration const& comparator = iris::c::find_lambda_declaration(header_module, "Comparator");
         CHECK(comparator.name == "Comparator");
         CHECK(comparator.input_parameter_types.size() == 2);
         CHECK(comparator.output_parameter_types.size() == 1);
 
-        iris::Lambda_declaration const& predicate = find_lambda_declaration(header_module, "Predicate");
+        iris::Lambda_declaration const& predicate = iris::c::find_lambda_declaration(header_module, "Predicate");
         CHECK(predicate.name == "Predicate");
         CHECK(predicate.input_parameter_types.size() == 1);
         CHECK(predicate.output_parameter_types.size() == 1);
@@ -2207,7 +2207,7 @@ struct Comparator
         CHECK(header_module.internal_declarations.lambda_declarations.empty());
 
         // Verify the struct was imported as a regular struct
-        iris::Struct_declaration const& struct_decl = find_struct_declaration(header_module, "Comparator");
+        iris::Struct_declaration const& struct_decl = iris::c::find_struct_declaration(header_module, "Comparator");
         CHECK(struct_decl.name == "Comparator");
         CHECK(struct_decl.member_names.size() == 2);
         CHECK(struct_decl.member_names[0] == "function_pointer");

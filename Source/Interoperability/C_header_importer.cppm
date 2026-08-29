@@ -31,6 +31,7 @@ namespace iris::c
         std::pmr::vector<iris::Global_variable_declaration> global_variable_declarations;
         std::pmr::vector<iris::Struct_declaration> struct_declarations;
         std::pmr::vector<iris::Union_declaration> union_declarations;
+        std::pmr::vector<iris::Lambda_declaration> lambda_declarations;
         std::pmr::vector<iris::Function_declaration> function_declarations;
         std::pmr::vector<C_macro_declaration> macro_declarations;
         std::pmr::unordered_map<std::pmr::string, Imported_declaration_metadata> metadata_by_c_name;
