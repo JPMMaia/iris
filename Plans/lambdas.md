@@ -500,7 +500,7 @@ lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
 
 export function main() -> ()
 {
-    var cmp: Comparator = (a, b) => a - b;
+    var cmp: Comparator = lambda(a, b) => a - b;
 }
 ```
 
@@ -513,7 +513,7 @@ lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
 export function main() -> ()
 {
     var offset: Int32 = 10;
-    var cmp: Comparator = (a, b) => a - b + offset;
+    var cmp: Comparator = lambda(a, b) => a - b + offset;
 }
 ```
 

@@ -7629,6 +7629,63 @@ export function get_mapper() -> (result: Mapper)
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates returning a lambda that captures", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function make_adder() -> (result: Mapper)
+{
+    var offset: Int32 = 10;
+    return lambda(x) => x + offset;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(8, 12, 8, 35),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Lambda captures 'offset' from the enclosing function and cannot be returned from it.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates returning a lambda that captures several variables", "[Validation][Lambda]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Mapper(value: Int32) -> (result: Int32);
+
+export function make_adder() -> (result: Mapper)
+{
+    var offset: Int32 = 10;
+    var scale: Int32 = 2;
+    return lambda(x) => x * scale + offset;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(9, 12, 9, 43),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Lambda captures 'scale', 'offset' from the enclosing function and cannot be returned from it.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates lambda call through variable", "[Validation][Lambda]")
     {
         std::string_view const input = R"(module Test;

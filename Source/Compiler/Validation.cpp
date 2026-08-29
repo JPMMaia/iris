@@ -1630,6 +1630,61 @@ namespace iris::compiler
         std::size_t const expression_index
     );
 
+    // True when the expression at `expression_index` is what a `return` in this statement returns.
+    static bool is_returned_expression(
+        iris::Statement const& statement,
+        std::size_t const expression_index
+    )
+    {
+        for (iris::Expression const& expression : statement.expressions)
+        {
+            if (!std::holds_alternative<iris::Return_expression>(expression.data))
+                continue;
+
+            iris::Return_expression const& return_expression = std::get<iris::Return_expression>(expression.data);
+            if (!return_expression.expression.has_value())
+                continue;
+
+            std::size_t current_index = return_expression.expression->expression_index;
+
+            // Follow parentheses, so that `return (lambda ...)` reads the same as `return lambda ...`.
+            while (current_index < statement.expressions.size())
+            {
+                if (current_index == expression_index)
+                    return true;
+
+                if (!std::holds_alternative<iris::Parenthesis_expression>(statement.expressions[current_index].data))
+                    break;
+
+                current_index = std::get<iris::Parenthesis_expression>(statement.expressions[current_index].data).expression.expression_index;
+            }
+        }
+
+        return false;
+    }
+
+    static std::pmr::vector<std::pmr::string> get_lambda_captures(
+        iris::Lambda_expression const& lambda_expression,
+        Scope const& scope
+    )
+    {
+        if (lambda_expression.captured_variables.has_value())
+            return lambda_expression.captured_variables.value();
+
+        std::pmr::vector<std::pmr::string> enclosing_names;
+        enclosing_names.reserve(scope.variables.size());
+        for (Variable const& variable : scope.variables)
+            enclosing_names.push_back(variable.name);
+
+        iris::Lambda_expression lambda_expression_copy = lambda_expression;
+        compute_lambda_captures(lambda_expression_copy, enclosing_names);
+
+        if (!lambda_expression_copy.captured_variables.has_value())
+            return {};
+
+        return lambda_expression_copy.captured_variables.value();
+    }
+
     std::pmr::vector<iris::compiler::Diagnostic> validate_lambda_expression(
         Validate_expression_parameters const& parameters,
         iris::Lambda_expression const& lambda_expression,
@@ -1731,6 +1786,40 @@ namespace iris::compiler
         );
         if (!lambda_type.has_value())
             return {};
+
+        // The captured values live in an environment allocated in the frame of the function the
+        // lambda was written in, and the lambda holds a pointer to it. Returning the lambda would
+        // outlive that frame and leave the pointer dangling, so it is rejected here rather than
+        // miscompiled. A lambda that captures nothing carries a null environment and is free to
+        // travel anywhere.
+        if (is_returned_expression(parameters.statement, parameters.expression_index))
+        {
+            std::pmr::vector<std::pmr::string> const captured_variables = get_lambda_captures(lambda_expression, parameters.scope);
+
+            if (!captured_variables.empty())
+            {
+                std::string captured_names;
+                for (std::size_t index = 0; index < captured_variables.size(); ++index)
+                {
+                    if (index > 0)
+                        captured_names += "', '";
+
+                    captured_names += std::string_view{captured_variables[index]};
+                }
+
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format(
+                            "Lambda captures '{}' from the enclosing function and cannot be returned from it.",
+                            captured_names
+                        )
+                    )
+                };
+            }
+        }
 
         // Validate the body itself, with the lambda parameters in scope. Without this, names
         // used only inside the body are never checked.
