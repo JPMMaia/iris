@@ -4,6 +4,7 @@ import std;
 
 import iris.core;
 import iris.core.declarations;
+import iris.compiler.lambda_database;
 import iris.compiler;
 import iris.compiler.artifact;
 import iris.compiler.project;
@@ -134,6 +135,7 @@ namespace iris::compiler
         LLVM_data& llvm_data,
         std::span<iris::Module const* const> const all_sorted_modules,
         Declaration_database const& declaration_database,
+        Lambda_database const& lambda_database,
         Compilation_options const& compilation_options,
         bool const is_test_mode
     );

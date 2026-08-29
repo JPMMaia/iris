@@ -324,6 +324,99 @@ namespace iris
         return std::nullopt;
     }
 
+    Struct_declaration create_lambda_struct_declaration(
+        std::pmr::string name,
+        std::optional<std::pmr::string> unique_name,
+        std::span<Type_reference const> const input_parameter_types,
+        std::span<Type_reference const> const output_parameter_types,
+        std::span<std::pmr::string const> const input_parameter_names
+    )
+    {
+        Type_reference const user_data_type = create_pointer_type_type_reference({}, true);
+
+        std::pmr::vector<Type_reference> function_input_parameter_types{ input_parameter_types.begin(), input_parameter_types.end() };
+        function_input_parameter_types.push_back(user_data_type);
+
+        std::pmr::vector<std::pmr::string> function_input_parameter_names{ input_parameter_names.begin(), input_parameter_names.end() };
+        function_input_parameter_names.resize(input_parameter_types.size());
+        for (std::size_t index = 0; index < function_input_parameter_names.size(); ++index)
+        {
+            if (function_input_parameter_names[index].empty())
+                function_input_parameter_names[index] = std::pmr::string{ std::format("parameter_{}", index) };
+        }
+        function_input_parameter_names.push_back(std::pmr::string{ "user_data" });
+
+        std::pmr::vector<std::pmr::string> function_output_parameter_names;
+        function_output_parameter_names.reserve(output_parameter_types.size());
+        for (std::size_t index = 0; index < output_parameter_types.size(); ++index)
+            function_output_parameter_names.push_back(std::pmr::string{ std::format("result_{}", index) });
+
+        Type_reference const function_pointer_type = create_function_type_type_reference(
+            Function_type
+            {
+                .input_parameter_types = std::move(function_input_parameter_types),
+                .output_parameter_types = { output_parameter_types.begin(), output_parameter_types.end() },
+                .is_variadic = false,
+            },
+            std::move(function_input_parameter_names),
+            std::move(function_output_parameter_names)
+        );
+
+        std::pmr::vector<Type_reference> member_types;
+        member_types.push_back(function_pointer_type);
+        member_types.push_back(user_data_type);
+
+        std::pmr::vector<std::pmr::string> member_names;
+        member_names.push_back(std::pmr::string{ "function_pointer" });
+        member_names.push_back(std::pmr::string{ "user_data" });
+
+        // Both members default to null, so an uninitialized lambda is a well-defined empty one.
+        auto const create_null_pointer_default_value = []() -> Statement
+        {
+            Statement statement;
+            statement.expressions.push_back(Expression{ .data = Null_pointer_expression{} });
+            return statement;
+        };
+
+        std::pmr::vector<Statement> member_default_values;
+        member_default_values.push_back(create_null_pointer_default_value());
+        member_default_values.push_back(create_null_pointer_default_value());
+
+        return Struct_declaration
+        {
+            .name = std::move(name),
+            .unique_name = std::move(unique_name),
+            .member_types = std::move(member_types),
+            .member_names = std::move(member_names),
+            .member_bit_fields = { std::nullopt, std::nullopt },
+            .member_default_values = std::move(member_default_values),
+            .is_packed = false,
+            .is_literal = false,
+        };
+    }
+
+    Struct_declaration create_lambda_struct_declaration(Lambda_declaration const& lambda_declaration)
+    {
+        return create_lambda_struct_declaration(
+            lambda_declaration.name,
+            lambda_declaration.unique_name,
+            lambda_declaration.input_parameter_types,
+            lambda_declaration.output_parameter_types,
+            lambda_declaration.input_parameter_names
+        );
+    }
+
+    std::pmr::vector<Struct_declaration> create_lambda_struct_declarations(std::span<Lambda_declaration const> const lambda_declarations)
+    {
+        std::pmr::vector<Struct_declaration> struct_declarations;
+        struct_declarations.reserve(lambda_declarations.size());
+
+        for (Lambda_declaration const& lambda_declaration : lambda_declarations)
+            struct_declarations.push_back(create_lambda_struct_declaration(lambda_declaration));
+
+        return struct_declarations;
+    }
+
 
     Type_reference create_fundamental_type_type_reference(Fundamental_type const value)
     {

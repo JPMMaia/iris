@@ -18,6 +18,7 @@ import iris.compiler.clang_code_generation;
 import iris.compiler.common;
 import iris.compiler.debug_info;
 import iris.compiler.instructions;
+import iris.compiler.lambda_database;
 import iris.compiler.test_framework;
 import iris.compiler.types;
 
@@ -78,6 +79,7 @@ namespace iris::compiler
             .core_module = core_module,
             .core_module_dependencies = parameters.core_module_dependencies,
             .declaration_database = parameters.declaration_database,
+            .lambda_database = parameters.lambda_database,
             .type_database = parameters.type_database,
             .enum_value_constants = parameters.enum_value_constants,
             .blocks = parameters.blocks,
@@ -3494,6 +3496,136 @@ namespace iris::compiler
         return output;
     }
 
+    Value_and_type create_lambda_expression_value(
+        Lambda_expression const& expression,
+        Statement const& statement,
+        Expression_parameters const& parameters
+    )
+    {
+        if (parameters.llvm_parent_function == nullptr)
+            throw std::runtime_error{ format_error("Can only create lambdas inside functions!", parameters.source_position) };
+
+        if (!parameters.function_declaration.has_value())
+            throw std::runtime_error{ format_error("Can only create lambdas inside functions!", parameters.source_position) };
+
+        std::pmr::string const lambda_key = create_lambda_key(
+            parameters.core_module.name,
+            parameters.function_declaration.value()->name,
+            expression
+        );
+
+        std::optional<std::string_view> const generated_function_name_optional = find_generated_lambda_function_name(parameters.lambda_database, lambda_key);
+        if (!generated_function_name_optional.has_value())
+            throw std::runtime_error{ format_error("Lambda expression was not lowered by the lambda pass!", parameters.source_position) };
+
+        std::string_view const generated_function_name = generated_function_name_optional.value();
+
+        llvm::LLVMContext& llvm_context = parameters.llvm_context;
+        llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
+        llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+
+        llvm::Function* const llvm_lambda_function = get_llvm_function(
+            parameters.core_module,
+            parameters.llvm_module,
+            generated_function_name
+        );
+        if (llvm_lambda_function == nullptr)
+            throw std::runtime_error{ format_error(std::format("Could not find generated lambda function '{}'!", generated_function_name), parameters.source_position) };
+
+        std::optional<Function_declaration const*> const lambda_function_declaration = find_function_declaration(parameters.core_module, generated_function_name);
+        if (!lambda_function_declaration.has_value())
+            throw std::runtime_error{ format_error(std::format("Could not find declaration of generated lambda function '{}'!", generated_function_name), parameters.source_position) };
+
+        std::span<std::pmr::string const> const captured_names =
+            expression.captured_variables.has_value() ?
+            std::span<std::pmr::string const>{ expression.captured_variables.value() } :
+            std::span<std::pmr::string const>{};
+
+        llvm::Value* user_data = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm_context, 0));
+
+        if (!captured_names.empty())
+        {
+            std::pmr::string const environment_name = get_lambda_environment_struct_name(generated_function_name);
+
+            Type_reference const environment_type_reference = create_custom_type_reference(parameters.core_module.name, environment_name);
+            llvm::Type* const llvm_environment_type = type_reference_to_llvm_type(
+                llvm_context,
+                llvm_data_layout,
+                environment_type_reference,
+                parameters.type_database
+            );
+
+            llvm::AllocaInst* const llvm_environment = create_alloca_instruction(
+                llvm_builder,
+                llvm_data_layout,
+                *parameters.llvm_parent_function,
+                llvm_environment_type,
+                environment_name
+            );
+
+            if (parameters.debug_info != nullptr)
+                set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
+
+            for (std::size_t index = 0; index < captured_names.size(); ++index)
+            {
+                std::string_view const captured_name = captured_names[index];
+
+                std::optional<Value_and_type> const captured_variable = search_in_function_scope(
+                    captured_name,
+                    parameters.function_arguments,
+                    parameters.local_variables
+                );
+                if (!captured_variable.has_value())
+                    throw std::runtime_error{ format_error(std::format("Could not find captured variable '{}'!", captured_name), parameters.source_position) };
+
+                llvm::Type* const llvm_member_type = static_cast<llvm::StructType*>(llvm_environment_type)->getElementType(static_cast<unsigned>(index));
+
+                llvm::Value* const captured_value =
+                    captured_variable->value->getType()->isPointerTy() && llvm::AllocaInst::classof(captured_variable->value) ?
+                    static_cast<llvm::Value*>(create_load_instruction(llvm_builder, llvm_data_layout, llvm_member_type, captured_variable->value)) :
+                    captured_variable->value;
+
+                llvm::Value* const llvm_member_pointer = llvm_builder.CreateStructGEP(llvm_environment_type, llvm_environment, static_cast<unsigned>(index));
+                create_store_instruction(llvm_builder, llvm_data_layout, captured_value, llvm_member_pointer);
+            }
+
+            user_data = llvm_environment;
+        }
+
+        llvm::StructType* const llvm_lambda_type = create_lambda_llvm_type(llvm_context);
+
+        llvm::Value* lambda_value = llvm::UndefValue::get(llvm_lambda_type);
+        lambda_value = llvm_builder.CreateInsertValue(lambda_value, llvm_lambda_function, { 0 });
+        lambda_value = llvm_builder.CreateInsertValue(lambda_value, user_data, { 1 });
+
+        // Prefer the type the context asked for, so a named lambda keeps its name; fall back to
+        // the anonymous signature of the function the pass generated.
+        std::optional<Type_reference> lambda_type_reference = std::nullopt;
+        if (parameters.expression_type.has_value() && resolve_lambda_type(parameters.declaration_database, parameters.expression_type).has_value())
+        {
+            lambda_type_reference = parameters.expression_type;
+        }
+        else
+        {
+            Function_declaration const& declaration = *lambda_function_declaration.value();
+            std::pmr::vector<Type_reference> input_parameter_types{
+                declaration.type.input_parameter_types.begin(),
+                declaration.type.input_parameter_types.end() - 1
+            };
+            lambda_type_reference = create_lambda_type_type_reference(
+                std::move(input_parameter_types),
+                declaration.type.output_parameter_types
+            );
+        }
+
+        return Value_and_type
+        {
+            .name = "",
+            .value = lambda_value,
+            .type = std::move(lambda_type_reference)
+        };
+    }
+
     Value_and_type create_call_expression_value(
         Call_expression const& expression,
         Statement const& statement,
@@ -3530,11 +3662,43 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator = parameters.temporaries_allocator;
 
         Value_and_type const left_hand_side = create_loaded_expression_value(expression.expression.expression_index, statement, parameters);
-        std::optional<Type_reference> const resolved_lhs_type = left_hand_side.type.has_value() ? get_underlying_type(parameters.declaration_database, left_hand_side.type.value()) : std::nullopt;
-        if (!resolved_lhs_type.has_value() || !std::holds_alternative<Function_pointer_type>(resolved_lhs_type.value().data))
+
+        // A lambda value carries its own callee: the function pointer in the first word and the
+        // environment it was built with in the second, which the generated function takes as a
+        // trailing parameter.
+        std::optional<iris::Lambda_type> const called_lambda_type = resolve_lambda_type(parameters.declaration_database, left_hand_side.type);
+
+        std::optional<Type_reference> const resolved_lhs_type =
+            called_lambda_type.has_value() ?
+            std::optional<Type_reference>{} :
+            (left_hand_side.type.has_value() ? get_underlying_type(parameters.declaration_database, left_hand_side.type.value()) : std::nullopt);
+
+        if (!called_lambda_type.has_value() && (!resolved_lhs_type.has_value() || !std::holds_alternative<Function_pointer_type>(resolved_lhs_type.value().data)))
             throw std::runtime_error{ format_error(std::format("Left hand side of call expression is not a function!"), parameters.source_position) };
 
-        Function_pointer_type const& function_pointer_type = std::get<Function_pointer_type>(resolved_lhs_type.value().data);
+        Type_reference const lambda_function_pointer_type_reference = called_lambda_type.has_value() ?
+            [&]
+            {
+                std::pmr::vector<Type_reference> input_parameter_types = called_lambda_type->input_parameter_types;
+                input_parameter_types.push_back(create_pointer_type_type_reference({}, true));
+
+                return create_function_type_type_reference(
+                    Function_type
+                    {
+                        .input_parameter_types = std::move(input_parameter_types),
+                        .output_parameter_types = called_lambda_type->output_parameter_types,
+                        .is_variadic = false,
+                    },
+                    {},
+                    {}
+                );
+            }() :
+            Type_reference{};
+
+        Function_pointer_type const& function_pointer_type =
+            called_lambda_type.has_value() ?
+            std::get<Function_pointer_type>(lambda_function_pointer_type_reference.data) :
+            std::get<Function_pointer_type>(resolved_lhs_type.value().data);
 
         llvm::FunctionType* const llvm_function_type = convert_to_llvm_function_type(
             parameters.clang_module_data,
@@ -3542,11 +3706,22 @@ namespace iris::compiler
             function_pointer_type.type
         );
 
+        llvm::Value* llvm_function_callee = left_hand_side.value;
+        std::optional<llvm::Value*> lambda_user_data;
+
+        if (called_lambda_type.has_value())
+        {
+            llvm_function_callee = parameters.llvm_builder.CreateExtractValue(left_hand_side.value, { 0 }, "lambda_function_pointer");
+            lambda_user_data = parameters.llvm_builder.CreateExtractValue(left_hand_side.value, { 1 }, "lambda_user_data");
+        }
+
+        std::size_t const argument_count = expression.arguments.size() + (lambda_user_data.has_value() ? 1 : 0);
+
         std::pmr::vector<llvm::Value*> llvm_arguments{ temporaries_allocator };
-        llvm_arguments.resize(expression.arguments.size());
+        llvm_arguments.resize(argument_count);
 
         std::pmr::vector<std::optional<Type_reference>> argument_types{temporaries_allocator};
-        argument_types.resize(expression.arguments.size());
+        argument_types.resize(argument_count);
 
         for (unsigned i = 0; i < expression.arguments.size(); ++i)
         {
@@ -3562,15 +3737,22 @@ namespace iris::compiler
             argument_types[output_index] = temporary.type;
         }
 
-        std::pmr::vector<bool> const is_taking_address_of_array = create_is_taking_address_of_expressions_array(
+        if (lambda_user_data.has_value())
+        {
+            llvm_arguments.back() = lambda_user_data.value();
+            argument_types.back() = create_pointer_type_type_reference({}, true);
+        }
+
+        std::pmr::vector<bool> is_taking_address_of_array = create_is_taking_address_of_expressions_array(
             expression,
             statement
         );
+        is_taking_address_of_array.resize(argument_count, false);
 
         return create_call_expression_value_common(
             is_taking_address_of_array,
             argument_types,
-            left_hand_side.value,
+            llvm_function_callee,
             llvm_function_type,
             llvm_arguments,
             function_pointer_type,
@@ -5355,6 +5537,18 @@ namespace iris::compiler
             };
         }
 
+        // A lambda value instantiates like the { function_pointer, user_data } struct it is.
+        {
+            std::optional<Declaration> const declaration = find_underlying_declaration(declaration_database, type_reference);
+            if (declaration.has_value() && std::holds_alternative<Lambda_declaration const*>(declaration->data))
+            {
+                Lambda_declaration const& lambda_declaration = *std::get<Lambda_declaration const*>(declaration->data);
+                iris::Struct_declaration const struct_declaration = create_lambda_struct_declaration(lambda_declaration);
+
+                return create_instantiate_struct_expression_value(statement, expression, parameters, declaration->module_name, struct_declaration, type_reference);
+            }
+        }
+
         std::optional<Declaration_to_instantiate> const found_instance = get_declaration_type_to_instantiate(
             declaration_database,
             type_reference
@@ -6524,6 +6718,11 @@ namespace iris::compiler
         {
             Instantiate_expression const& data = std::get<Instantiate_expression>(expression.data);
             return create_instantiate_expression_value(data, statement, new_parameters);
+        }
+        else if (std::holds_alternative<Lambda_expression>(expression.data))
+        {
+            Lambda_expression const& data = std::get<Lambda_expression>(expression.data);
+            return create_lambda_expression_value(data, statement, new_parameters);
         }
         else if (std::holds_alternative<Null_pointer_expression>(expression.data))
         {

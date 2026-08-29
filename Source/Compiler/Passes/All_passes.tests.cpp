@@ -2,6 +2,7 @@ import iris.compiler;
 import iris.compiler.all_passes;
 import iris.compiler.clang_code_generation;
 import iris.compiler.clang_data;
+import iris.compiler.lambda_database;
 import iris.compiler.pass_test_helpers;
 import iris.core;
 import iris.core.declarations;
@@ -78,6 +79,8 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> output_allocator;
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
+        Lambda_database lambda_database;
+
         All_passes_parameters const parameters =
         {
             .target_module_name = core_module.name,
@@ -85,6 +88,7 @@ namespace iris::compiler
             .llvm_context = *runtime_context.llvm_data.context,
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
+            .lambda_database = lambda_database,
             .clang_context = *runtime_context.clang_context,
             .dependencies = core_module.dependencies,
             .instanced_declarations = core_module.instanced_declarations,
@@ -132,6 +136,8 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> output_allocator;
         std::pmr::polymorphic_allocator<> temporaries_allocator;
 
+        Lambda_database lambda_database;
+
         All_passes_parameters const parameters =
         {
             .target_module_name = core_module.name,
@@ -139,6 +145,7 @@ namespace iris::compiler
             .llvm_context = *runtime_context.llvm_data.context,
             .llvm_data_layout = runtime_context.llvm_data.data_layout,
             .declaration_database = context.declaration_database,
+            .lambda_database = lambda_database,
             .clang_context = *runtime_context.clang_context,
             .dependencies = core_module.dependencies,
             .instanced_declarations = core_module.instanced_declarations,

@@ -155,6 +155,11 @@ namespace iris::compiler
         std::string_view const member_name
     );
 
+    export void compute_lambda_captures(
+        iris::Lambda_expression& lambda_expression,
+        std::pmr::vector<std::pmr::string> const& enclosing_names
+    );
+
     // Resolves a type reference to the lambda signature it denotes: either an anonymous
     // Lambda_type written inline, or a named lambda reached through a Custom_type_reference.
     export std::optional<iris::Lambda_type> resolve_lambda_type(

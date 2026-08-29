@@ -747,6 +747,11 @@ namespace iris::compiler
 
         add_struct_declarations(clang_module_data, core_module.name, core_module.export_declarations.struct_declarations, llvm_type_map);
         add_struct_declarations(clang_module_data, core_module.name, core_module.internal_declarations.struct_declarations, llvm_type_map);
+
+        std::pmr::vector<Struct_declaration> const export_lambda_structs = create_lambda_struct_declarations(core_module.export_declarations.lambda_declarations);
+        std::pmr::vector<Struct_declaration> const internal_lambda_structs = create_lambda_struct_declarations(core_module.internal_declarations.lambda_declarations);
+        add_struct_declarations(clang_module_data, core_module.name, export_lambda_structs, llvm_type_map);
+        add_struct_declarations(clang_module_data, core_module.name, internal_lambda_structs, llvm_type_map);
         for (iris::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
         {
             std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
@@ -856,6 +861,13 @@ namespace iris::compiler
 
         set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module, core_module.export_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
         set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module, core_module.internal_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
+
+        std::pmr::vector<Struct_declaration> const export_lambda_structs = create_lambda_struct_declarations(core_module.export_declarations.lambda_declarations);
+        std::pmr::vector<Struct_declaration> const internal_lambda_structs = create_lambda_struct_declarations(core_module.internal_declarations.lambda_declarations);
+        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, export_lambda_structs, llvm_debug_type_map);
+        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, internal_lambda_structs, llvm_debug_type_map);
+        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, clang_module_data, core_module, export_lambda_structs, debug_type_database, llvm_type_map, llvm_debug_type_map);
+        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, clang_module_data, core_module, internal_lambda_structs, debug_type_database, llvm_type_map, llvm_debug_type_map);
     }
 
     llvm::DIType* create_void_type(
@@ -1238,6 +1250,47 @@ namespace iris::compiler
         }
     }
 
+    llvm::StructType* create_lambda_llvm_type(
+        llvm::LLVMContext& llvm_context
+    )
+    {
+        llvm::Type* const pointer_type = llvm::PointerType::get(llvm_context, 0);
+        return llvm::StructType::get(llvm_context, { pointer_type, pointer_type });
+    }
+
+    llvm::DIType* lambda_type_to_llvm_debug_type(
+        llvm::DIBuilder& llvm_debug_builder,
+        llvm::DIScope& llvm_debug_scope,
+        llvm::DataLayout const& llvm_data_layout,
+        iris::Module const& core_module,
+        Lambda_type const& type,
+        Debug_type_database const& debug_type_database
+    )
+    {
+        unsigned const pointer_size_in_bits = llvm_data_layout.getPointerSizeInBits();
+        llvm::Align const pointer_alignment = llvm_data_layout.getPointerABIAlignment(0);
+
+        llvm::DIType* const void_pointer_type = llvm_debug_builder.createPointerType(create_void_type(llvm_debug_builder), pointer_size_in_bits);
+
+        std::array<llvm::Metadata*, 2> const elements
+        {
+            llvm_debug_builder.createMemberType(&llvm_debug_scope, "function_pointer", nullptr, 0, pointer_size_in_bits, pointer_alignment.value() * 8, 0, llvm::DINode::FlagZero, void_pointer_type),
+            llvm_debug_builder.createMemberType(&llvm_debug_scope, "user_data", nullptr, 0, pointer_size_in_bits, pointer_alignment.value() * 8, pointer_size_in_bits, llvm::DINode::FlagZero, void_pointer_type),
+        };
+
+        return llvm_debug_builder.createStructType(
+            &llvm_debug_scope,
+            "lambda",
+            nullptr,
+            0,
+            2 * pointer_size_in_bits,
+            pointer_alignment.value() * 8,
+            llvm::DINode::FlagZero,
+            nullptr,
+            llvm_debug_builder.getOrCreateArray(elements)
+        );
+    }
+
     llvm::DIType* function_pointer_type_to_llvm_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
@@ -1423,6 +1476,10 @@ namespace iris::compiler
         {
             return llvm::PointerType::get(llvm_context, 0);
         }
+        else if (std::holds_alternative<Lambda_type>(type_reference.data))
+        {
+            return create_lambda_llvm_type(llvm_context);
+        }
         else if (std::holds_alternative<Integer_type>(type_reference.data))
         {
             Integer_type const& data = std::get<Integer_type>(type_reference.data);
@@ -1509,6 +1566,10 @@ namespace iris::compiler
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
             return llvm::PointerType::get(llvm_context, 0);
+        }
+        else if (std::holds_alternative<Lambda_type>(type_reference.data))
+        {
+            return create_lambda_llvm_type(llvm_context);
         }
         else if (std::holds_alternative<Integer_type>(type_reference.data))
         {
@@ -1643,6 +1704,11 @@ namespace iris::compiler
         {
             Function_pointer_type const& data = std::get<Function_pointer_type>(type_reference.data);
             return function_pointer_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
+        }
+        else if (std::holds_alternative<Lambda_type>(type_reference.data))
+        {
+            Lambda_type const& data = std::get<Lambda_type>(type_reference.data);
+            return lambda_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
         }
         else if (std::holds_alternative<Integer_type>(type_reference.data))
         {

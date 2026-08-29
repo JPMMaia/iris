@@ -16,6 +16,7 @@ import iris.common;
 import iris.common.archive;
 import iris.common.filesystem;
 import iris.common.filesystem_common;
+import iris.compiler.lambda_database;
 import iris.compiler;
 import iris.compiler.analysis;
 import iris.compiler.artifact;
@@ -363,6 +364,7 @@ namespace iris::compiler
             llvm_data,
             all_sorted_modules,
             preprocessed.declaration_database,
+            preprocessed.lambda_database,
             compilation_options,
             false
         );
@@ -389,6 +391,7 @@ namespace iris::compiler
                 llvm_data,
                 preprocessed_test.sorted_modules,
                 preprocessed_test.declaration_database,
+                preprocessed_test.lambda_database,
                 test_compilation_options,
                 true
             );
@@ -1587,6 +1590,7 @@ namespace iris::compiler
         LLVM_data& llvm_data,
         std::span<iris::Module const* const> const all_sorted_modules,
         Declaration_database const& declaration_database,
+        Lambda_database const& lambda_database,
         Compilation_options const& compilation_options,
         bool const is_test_mode
     )
@@ -1619,6 +1623,7 @@ namespace iris::compiler
             all_sorted_modules,
             module_name_to_file_path_map,
             declaration_database,
+            lambda_database,
             compilation_options
         );
 
@@ -1638,6 +1643,7 @@ namespace iris::compiler
         LLVM_data& llvm_data,
         std::span<iris::Module const* const> const all_sorted_modules,
         Declaration_database const& declaration_database,
+        Lambda_database const& lambda_database,
         Compilation_options const& compilation_options,
         bool is_test_mode
     )
@@ -1663,6 +1669,7 @@ namespace iris::compiler
                 llvm_data,
                 all_sorted_modules,
                 declaration_database,
+                lambda_database,
                 compilation_options,
                 is_test_mode
             );

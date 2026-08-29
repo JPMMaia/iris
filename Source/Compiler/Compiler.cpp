@@ -27,6 +27,7 @@ import iris.compiler.debug_info;
 import iris.compiler.diagnostic;
 import iris.compiler.expressions;
 import iris.compiler.all_passes;
+import iris.compiler.lambda_database;
 import iris.compiler.instructions;
 import iris.compiler.test_framework;
 import iris.compiler.types;
@@ -324,6 +325,7 @@ namespace iris::compiler
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         Declaration_database& declaration_database,
+        Lambda_database const& lambda_database,
         Type_database& type_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -343,6 +345,7 @@ namespace iris::compiler
             .core_module = core_module,
             .core_module_dependencies = core_module_dependencies,
             .declaration_database = declaration_database,
+            .lambda_database = lambda_database,
             .type_database = type_database,
             .enum_value_constants = enum_value_constants,
             .blocks = {},
@@ -381,6 +384,7 @@ namespace iris::compiler
         Function_definition function_definition,
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         Declaration_database& declaration_database,
+        Lambda_database const& lambda_database,
         Type_database& type_database,
         Enum_value_constants const& enum_value_constants,
         Debug_info* debug_info,
@@ -492,6 +496,7 @@ namespace iris::compiler
                 .core_module = core_module,
                 .core_module_dependencies = core_module_dependencies,
                 .declaration_database = declaration_database,
+                .lambda_database = lambda_database,
                 .type_database = type_database,
                 .enum_value_constants = enum_value_constants,
                 .blocks = block_infos,
@@ -608,6 +613,7 @@ namespace iris::compiler
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         std::optional<std::span<std::string_view const>> const functions_to_compile,
         Declaration_database& declaration_database,
+        Lambda_database const& lambda_database,
         Type_database& type_database,
         Enum_value_constants const& enum_value_constants,
         Debug_info* const debug_info,
@@ -661,6 +667,7 @@ namespace iris::compiler
                 definition,
                 core_module_dependencies,
                 declaration_database,
+                lambda_database,
                 type_database,
                 enum_value_constants,
                 debug_info,
@@ -824,6 +831,7 @@ namespace iris::compiler
         Enum_value_constants const& enum_value_constants,
         Type_database& type_database,
         Declaration_database& declaration_database,
+        Lambda_database const& lambda_database,
         bool const is_dependency_module,
         bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -917,6 +925,7 @@ namespace iris::compiler
                     .core_module = core_module,
                     .core_module_dependencies = core_module_dependencies,
                     .declaration_database = declaration_database,
+                    .lambda_database = lambda_database,
                     .type_database = type_database,
                     .enum_value_constants = enum_value_constants,
                     .blocks = {},
@@ -969,6 +978,7 @@ namespace iris::compiler
         Clang_module_data const& clang_module_data,
         Type_database& type_database,
         Declaration_database& declaration_database,
+        Lambda_database const& lambda_database,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         Enum_value_constants const& enum_value_constants,
@@ -1003,6 +1013,7 @@ namespace iris::compiler
                     enum_value_constants,
                     type_database,
                     declaration_database,
+                    lambda_database,
                     true,
                     is_test_mode,
                     temporaries_allocator
@@ -1025,6 +1036,7 @@ namespace iris::compiler
                         enum_value_constants,
                         type_database,
                         declaration_database,
+                        lambda_database,
                         true,
                         is_test_mode,
                         temporaries_allocator
@@ -1202,6 +1214,7 @@ namespace iris::compiler
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         std::optional<std::span<std::string_view const>> const functions_to_compile,
         Declaration_database declaration_database, // TODO makes copy
+        Lambda_database const& lambda_database,
         Type_database type_database, // TODO makes copy
         Compilation_options const& compilation_options
     )
@@ -1218,25 +1231,26 @@ namespace iris::compiler
             core_module,
             core_module_dependencies,
             declaration_database,
+            lambda_database,
             type_database,
             {}
         );
 
-        add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, core_module, core_module_dependencies, enum_value_constants, compilation_options.is_test_mode, {});
+        add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, lambda_database, core_module, core_module_dependencies, enum_value_constants, compilation_options.is_test_mode, {});
 
         {
             std::pmr::vector<Function_declaration const*> const function_declarations = get_vector_element_pointers(core_module.export_declarations.function_declarations, {});
-            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
+            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, lambda_database, false, compilation_options.is_test_mode, {});
         }
 
         {
             std::pmr::vector<Function_declaration const*> const function_declarations = get_vector_element_pointers(core_module.internal_declarations.function_declarations, {});
-            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
+            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, lambda_database, false, compilation_options.is_test_mode, {});
         }
 
         {
             std::pmr::vector<Function_declaration const*> const function_declarations = get_deque_element_pointers(core_module.instanced_declarations.function_declarations, {});
-            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, {}, std::nullopt, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
+            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, {}, std::nullopt, enum_value_constants, type_database, declaration_database, lambda_database, false, compilation_options.is_test_mode, {});
         }
 
         if (compilation_options.is_test_mode)
@@ -1263,6 +1277,7 @@ namespace iris::compiler
             core_module_dependencies,
             functions_to_compile,
             declaration_database,
+            lambda_database,
             type_database,
             enum_value_constants,
             debug_info.get(),
@@ -1843,6 +1858,8 @@ namespace iris::compiler
         for (iris::Module const* const header_module : header_modules)
             add_declarations(declaration_database, *header_module);
 
+        Lambda_database lambda_database;
+
         Clang_context_pointer clang_context = create_clang_context(
             *llvm_data.context,
             *llvm_data.clang_data,
@@ -1879,6 +1896,7 @@ namespace iris::compiler
                 .llvm_context = *llvm_data.context,
                 .llvm_data_layout = llvm_data.data_layout,
                 .declaration_database = declaration_database,
+                .lambda_database = lambda_database,
                 .clang_context = *clang_context,
                 .dependencies = modified.dependencies,
                 .instanced_declarations = modified.instanced_declarations,
@@ -1906,6 +1924,7 @@ namespace iris::compiler
             .transformed_core_modules = std::move(transformed_core_modules),
             .sorted_modules = std::move(sorted_so_far),
             .declaration_database = std::move(declaration_database),
+            .lambda_database = std::move(lambda_database),
         };
     }
 
@@ -1915,6 +1934,7 @@ namespace iris::compiler
         std::span<iris::Module const* const> const all_sorted_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         Declaration_database const& declaration_database,
+        Lambda_database const& lambda_database,
         Compilation_options const& compilation_options
     )
     {
@@ -1945,6 +1965,7 @@ namespace iris::compiler
             core_module_dependencies,
             std::nullopt,
             declaration_database,
+            lambda_database,
             compilation_database.type_database,
             compilation_options
         );

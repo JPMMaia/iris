@@ -691,6 +691,25 @@ namespace iris::compiler
             instance_iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
         }
 
+        // A lambda declaration is a { function_pointer, user_data } record; register it through the
+        // same struct path so type conversion, layout and debug info need no lambda-specific cases.
+        std::pmr::vector<iris::Struct_declaration> const lambda_struct_declarations = [&]
+        {
+            std::pmr::vector<iris::Struct_declaration> result = create_lambda_struct_declarations(core_module.export_declarations.lambda_declarations);
+            std::pmr::vector<iris::Struct_declaration> internal = create_lambda_struct_declarations(core_module.internal_declarations.lambda_declarations);
+            result.insert(result.end(), std::make_move_iterator(internal.begin()), std::make_move_iterator(internal.end()));
+            return result;
+        }();
+
+        for (iris::Struct_declaration const& struct_declaration : lambda_struct_declarations)
+        {
+            if (iterator->second.struct_declarations.contains(struct_declaration.name))
+                continue;
+
+            clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, core_module.name, struct_declaration);
+            iterator->second.struct_declarations.emplace(struct_declaration.name, record_declaration);
+        }
+
         for (iris::Union_declaration const& union_declaration : core_module.export_declarations.union_declarations)
             add_clang_union_declaration(iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
 
@@ -731,6 +750,12 @@ namespace iris::compiler
 
             auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
             clang::RecordDecl* const record_declaration = instance_iterator->second.struct_declarations.at(struct_declaration.name);
+            set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
+        }
+
+        for (iris::Struct_declaration const& struct_declaration : lambda_struct_declarations)
+        {
+            clang::RecordDecl* const record_declaration = iterator->second.struct_declarations.at(struct_declaration.name);
             set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration, declaration_database, clang_declaration_database);
         }
 
@@ -2922,6 +2947,15 @@ namespace iris::compiler
                     clang::RecordDecl* const record_declaration = clang_declarations.union_declarations.at(custom_type_reference.name);
 
                     return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
+                }
+                else if (std::holds_alternative<iris::Lambda_declaration const*>(declaration->data))
+                {
+                    Clang_module_declarations const& clang_declarations = clang_declaration_database.map.at(custom_type_reference.module_reference.name);
+                    auto const location = clang_declarations.struct_declarations.find(custom_type_reference.name);
+                    if (location == clang_declarations.struct_declarations.end())
+                        return std::nullopt;
+
+                    return clang_ast_context.getCanonicalTypeDeclType(location->second);
                 }
             }
         }

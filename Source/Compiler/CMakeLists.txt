@@ -39,6 +39,7 @@ target_sources(Iris_compiler
          "Diagnostic.cppm"
          "Expressions.cppm"
          "Instructions.cppm"
+         "Lambda_database.cppm"
          "Linker.cppm"
          "Profiler.cppm"
          "Test_framework.cppm"
@@ -48,6 +49,7 @@ target_sources(Iris_compiler
          "Passes/Compile_time_pass.cppm"
          "Passes/Implicit_function_pass.cppm"
          "Passes/Instantiate_pass.cppm"
+         "Passes/Lambda_pass.cppm"
          "Project/Artifact.cppm"
          "Project/Presets.cppm"
          "Project/Repository.cppm"
@@ -65,6 +67,7 @@ target_sources(Iris_compiler
       "Diagnostic.cpp"
       "Expressions.cpp"
       "Instructions.cpp"
+      "Lambda_database.cpp"
       "Test_framework.cpp"
       "Types.cpp"
       "Validation.cpp"
@@ -72,6 +75,7 @@ target_sources(Iris_compiler
       "Passes/Compile_time_pass.cpp"
       "Passes/Implicit_function_pass.cpp"
       "Passes/Instantiate_pass.cpp"
+      "Passes/Lambda_pass.cpp"
       "Project/Artifact.cpp"
       "Project/Presets.cpp"
       "Project/Repository.cpp"
@@ -138,6 +142,7 @@ if(BUILD_TESTING)
          "Passes/Compile_time_pass.tests.cpp"
          "Passes/Instantiate_pass.tests.cpp"
          "Passes/Implicit_function_pass.tests.cpp"
+         "Passes/Lambda_pass.tests.cpp"
    )
    catch_discover_tests(Iris_passes_tests)
 

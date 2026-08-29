@@ -127,6 +127,11 @@ namespace iris::compiler
         return mangle_name(core_module, declaration_name, unique_name);
     }
 
+    std::pmr::string get_lambda_environment_struct_name(std::string_view const generated_function_name)
+    {
+        return std::pmr::string{ std::format("{}__environment", generated_function_name) };
+    }
+
     std::string mangle_struct_name(
         Module const& core_module,
         std::string_view const declaration_name

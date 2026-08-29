@@ -43,6 +43,18 @@ namespace iris
     export bool is_lambda_type(Type_reference const& type);
     export std::optional<Type_reference> get_lambda_output_type_reference(Lambda_type const& lambda_type);
 
+    // Builds the C-ABI struct that represents a lambda value: a function pointer taking the
+    // lambda's inputs plus a trailing `user_data`, and the `user_data` pointer itself.
+    export Struct_declaration create_lambda_struct_declaration(
+        std::pmr::string name,
+        std::optional<std::pmr::string> unique_name,
+        std::span<Type_reference const> input_parameter_types,
+        std::span<Type_reference const> output_parameter_types,
+        std::span<std::pmr::string const> input_parameter_names
+    );
+    export Struct_declaration create_lambda_struct_declaration(Lambda_declaration const& lambda_declaration);
+    export std::pmr::vector<Struct_declaration> create_lambda_struct_declarations(std::span<Lambda_declaration const> lambda_declarations);
+
     export Type_reference create_fundamental_type_type_reference(Fundamental_type const value);
     export bool is_byte(Type_reference const& type);
     export bool is_floating_point(Type_reference const& type);

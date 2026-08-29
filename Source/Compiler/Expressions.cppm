@@ -8,6 +8,7 @@ import iris.core.declarations;
 import iris.compiler.clang_data;
 import iris.compiler.debug_info;
 import iris.compiler.instructions;
+import iris.compiler.lambda_database;
 import iris.compiler.types;
 
 namespace iris::compiler
@@ -53,6 +54,7 @@ namespace iris::compiler
         Module const& core_module;
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies;
         Declaration_database& declaration_database;
+        Lambda_database const& lambda_database;
         Type_database& type_database;
         Enum_value_constants const& enum_value_constants;
         std::span<Block_info> blocks;

@@ -270,6 +270,7 @@ namespace iris
       preprocessed.sorted_modules,
       module_name_to_file_path_map,
       preprocessed.declaration_database,
+      preprocessed.lambda_database,
       compilation_options
     );
     std::string const llvm_ir = iris::compiler::to_string(*llvm_module);
