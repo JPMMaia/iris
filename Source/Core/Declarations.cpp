@@ -86,6 +86,7 @@ namespace iris
         std::span<iris::Enum_declaration const> const enum_declarations,
         std::span<iris::Forward_declaration const> forward_declarations,
         std::span<iris::Global_variable_declaration const> global_variable_declarations,
+        std::span<iris::Lambda_declaration const> const lambda_declarations,
         std::span<iris::Struct_declaration const> const struct_declarations,
         std::span<iris::Union_declaration const> const union_declarations,
         std::span<iris::Function_declaration const> const function_declarations,
@@ -125,6 +126,11 @@ namespace iris
             map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
         }
 
+        for (Lambda_declaration const& declaration : lambda_declarations)
+        {
+            map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
+        }
+
         for (Struct_declaration const& declaration : struct_declarations)
         {
             map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
@@ -156,6 +162,7 @@ namespace iris
             declarations.enum_declarations,
             declarations.forward_declarations,
             declarations.global_variable_declarations,
+            declarations.lambda_declarations,
             declarations.struct_declarations,
             declarations.union_declarations,
             declarations.function_declarations,

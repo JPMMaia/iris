@@ -2992,6 +2992,7 @@ namespace iris::c
             declarations_with_fixed_width_integers.enum_declarations,
             declarations_with_fixed_width_integers.forward_declarations,
             declarations_with_fixed_width_integers.global_variable_declarations,
+            {},
             declarations_with_fixed_width_integers.struct_declarations,
             declarations_with_fixed_width_integers.union_declarations,
             declarations_with_fixed_width_integers.function_declarations,

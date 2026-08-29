@@ -306,6 +306,11 @@ namespace iris
         return get_value(name, {}, {}, module.definitions.function_definitions);
     }
 
+    std::optional<Lambda_declaration const*> find_lambda_declaration(iris::Module const& module, std::string_view const name)
+    {
+        return get_value(name, module.export_declarations.lambda_declarations, module.internal_declarations.lambda_declarations, {});
+    }
+
     std::optional<Struct_declaration const*> find_struct_declaration(iris::Module const& module, std::string_view const name)
     {
         return get_value(name, module.export_declarations.struct_declarations, module.internal_declarations.struct_declarations, module.instanced_declarations.struct_declarations);

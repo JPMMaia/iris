@@ -155,6 +155,23 @@ namespace iris::compiler
         std::string_view const member_name
     );
 
+    // Resolves a type reference to the lambda signature it denotes: either an anonymous
+    // Lambda_type written inline, or a named lambda reached through a Custom_type_reference.
+    export std::optional<iris::Lambda_type> resolve_lambda_type(
+        iris::Declaration_database const& declaration_database,
+        std::optional<iris::Type_reference> const& type_reference
+    );
+
+    // The signature that a call expression's callee resolves to, whether it is a function,
+    // a function pointer, or a lambda-typed value.
+    export std::optional<iris::Function_type> get_function_type_to_call(
+        std::string_view const module_name,
+        Scope const& scope,
+        iris::Statement const& statement,
+        iris::Expression const& expression,
+        iris::Declaration_database const& declaration_database
+    );
+
     export std::optional<Type_info> get_expression_type_info(
         std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,

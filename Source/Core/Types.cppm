@@ -36,6 +36,13 @@ namespace iris
     export std::optional<Type_reference> get_function_output_type_reference(Type_reference const& type, Module const& core_module);
     export bool is_function_pointer(Type_reference const& type);
 
+    export Type_reference create_lambda_type_type_reference(
+        std::pmr::vector<Type_reference> input_parameter_types,
+        std::pmr::vector<Type_reference> output_parameter_types
+    );
+    export bool is_lambda_type(Type_reference const& type);
+    export std::optional<Type_reference> get_lambda_output_type_reference(Lambda_type const& lambda_type);
+
     export Type_reference create_fundamental_type_type_reference(Fundamental_type const value);
     export bool is_byte(Type_reference const& type);
     export bool is_floating_point(Type_reference const& type);
@@ -178,6 +185,22 @@ namespace iris
         }
         else if (std::holds_alternative<Integer_type>(type_reference.data))
         {
+            return false;
+        }
+        else if (std::holds_alternative<Lambda_type>(type_reference.data))
+        {
+            Lambda_type const& data = std::get<Lambda_type>(type_reference.data);
+            for (Type_reference const& nested_type_reference : data.input_parameter_types)
+            {
+                if (visit_type_references_recursively(nested_type_reference, predicate))
+                    return true;
+            }
+            for (Type_reference const& nested_type_reference : data.output_parameter_types)
+            {
+                if (visit_type_references_recursively(nested_type_reference, predicate))
+                    return true;
+            }
+
             return false;
         }
         else if (std::holds_alternative<Null_pointer_type>(type_reference.data))

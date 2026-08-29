@@ -162,6 +162,11 @@ namespace iris
             Global_variable_declaration const& value = *std::get<Global_variable_declaration const*>(declaration.data);
             return value.comment.has_value() ? std::optional<std::string_view>{value.comment.value()} : std::nullopt;
         }
+        else if (std::holds_alternative<Lambda_declaration const*>(declaration.data))
+        {
+            Lambda_declaration const& value = *std::get<Lambda_declaration const*>(declaration.data);
+            return value.comment.has_value() ? std::optional<std::string_view>{value.comment.value()} : std::nullopt;
+        }
         else if (std::holds_alternative<Struct_declaration const*>(declaration.data))
         {
             Struct_declaration const& value = *std::get<Struct_declaration const*>(declaration.data);
@@ -259,6 +264,10 @@ namespace iris
             {
                 add_format_global_variable_declaration(buffer, *value, options);
             }
+            else if constexpr (std::is_same_v<Declaration_type, Lambda_declaration const*>)
+            {
+                add_format_lambda_declaration(buffer, *value, options);
+            }
             else if constexpr (std::is_same_v<Declaration_type, Struct_declaration const*>)
             {
                 add_format_struct_declaration(buffer, *value, 0, options);
@@ -299,6 +308,13 @@ namespace iris
         String_buffer& buffer,
         Statement const& statement,
         Expression const& expression,
+        std::uint32_t const indentation,
+        Format_options const& options
+    );
+
+    void add_format_expression_lambda(
+        String_buffer& buffer,
+        Lambda_expression const& expression,
         std::uint32_t const indentation,
         Format_options const& options
     );
@@ -474,6 +490,11 @@ namespace iris
         {
             If_expression const& value = std::get<If_expression>(expression.data);
             add_format_expression_if(buffer, statement, value, indentation, options);
+        }
+        else if (std::holds_alternative<Lambda_expression>(expression.data))
+        {
+            Lambda_expression const& value = std::get<Lambda_expression>(expression.data);
+            add_format_expression_lambda(buffer, value, indentation, options);
         }
         else if (std::holds_alternative<Instance_call_expression>(expression.data))
         {
@@ -818,6 +839,45 @@ namespace iris
     )
     {
         add_format_expression_block(buffer, expression.statements, outside_indentation, options);
+    }
+
+    void add_format_expression_lambda(
+        String_buffer& buffer,
+        Lambda_expression const& expression,
+        std::uint32_t const indentation,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "lambda(");
+
+        for (std::size_t i = 0; i < expression.parameter_names.size(); ++i)
+        {
+            if (i > 0)
+                add_text(buffer, ", ");
+
+            add_text(buffer, expression.parameter_names[i]);
+
+            // Inferred parameter types are not written back out.
+            if (i < expression.parameter_types.size() && expression.parameter_types[i].has_value())
+            {
+                add_text(buffer, ": ");
+                add_format_type_name(buffer, expression.parameter_types[i].value(), options);
+            }
+        }
+
+        add_text(buffer, ")");
+
+        // Both `-> Type` and `-> (name: Type)` parse into a single optional type;
+        // the bare form is the canonical one written back out.
+        if (expression.return_type.has_value())
+        {
+            add_text(buffer, " -> ");
+            add_format_type_name(buffer, expression.return_type.value(), options);
+        }
+
+        add_text(buffer, " => ");
+
+        add_format_statement(buffer, expression.body, indentation, options, false);
     }
 
     void add_format_expression_break(
@@ -1713,6 +1773,31 @@ namespace iris
         String_buffer& buffer,
         Type_reference const& type,
         Format_options const& options
+    );
+
+    void add_format_lambda_parameter_types(
+        String_buffer& buffer,
+        std::span<iris::Type_reference const> const parameter_types,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "(");
+
+        for (std::size_t i = 0; i < parameter_types.size(); ++i)
+        {
+            if (i > 0)
+                add_text(buffer, ", ");
+
+            add_format_type_name(buffer, parameter_types[i], options);
+        }
+
+        add_text(buffer, ")");
+    }
+
+    void add_format_type_name(
+        String_buffer& buffer,
+        Type_reference const& type,
+        Format_options const& options
     )
     {
         if (std::holds_alternative<Array_slice_type>(type.data))
@@ -1795,6 +1880,15 @@ namespace iris
         {
             Integer_type const& value = std::get<Integer_type>(type.data);
             add_format_integer_type(buffer, value);
+        }
+        else if (std::holds_alternative<Lambda_type>(type.data))
+        {
+            Lambda_type const& value = std::get<Lambda_type>(type.data);
+            add_text(buffer, "lambda<");
+            add_format_lambda_parameter_types(buffer, value.input_parameter_types, options);
+            add_text(buffer, " -> ");
+            add_format_lambda_parameter_types(buffer, value.output_parameter_types, options);
+            add_text(buffer, ">");
         }
         else if (std::holds_alternative<Null_pointer_type>(type.data))
         {
@@ -2329,6 +2423,60 @@ namespace iris
         add_text(buffer, "}");
     }
 
+    void add_format_lambda_parameters(
+        String_buffer& buffer,
+        std::span<std::pmr::string const> const parameter_names,
+        std::span<iris::Type_reference const> const parameter_types,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "(");
+
+        for (std::size_t i = 0; i < parameter_types.size(); ++i)
+        {
+            if (i > 0)
+                add_text(buffer, ", ");
+
+            if (i < parameter_names.size())
+            {
+                add_text(buffer, parameter_names[i]);
+                add_text(buffer, ": ");
+            }
+
+            add_format_type_name(buffer, parameter_types[i], options);
+        }
+
+        add_text(buffer, ")");
+    }
+
+    void add_format_lambda_declaration(
+        String_buffer& buffer,
+        Lambda_declaration const& lambda_declaration,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "lambda ");
+        add_text(buffer, lambda_declaration.name);
+
+        add_format_lambda_parameters(
+            buffer,
+            lambda_declaration.input_parameter_names,
+            lambda_declaration.input_parameter_types,
+            options
+        );
+
+        add_text(buffer, " -> ");
+
+        add_format_lambda_parameters(
+            buffer,
+            lambda_declaration.output_parameter_names,
+            lambda_declaration.output_parameter_types,
+            options
+        );
+
+        add_text(buffer, ";");
+    }
+
     void add_format_alias_type_declaration(
         String_buffer& buffer,
         Alias_type_declaration const& alias_declaration,
@@ -2406,6 +2554,9 @@ namespace iris
             process(declaration);
 
         for (Global_variable_declaration const& declaration : declarations.global_variable_declarations)
+            process(declaration);
+
+        for (Lambda_declaration const& declaration : declarations.lambda_declarations)
             process(declaration);
 
         for (Struct_declaration const& declaration : declarations.struct_declarations)

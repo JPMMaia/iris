@@ -292,6 +292,38 @@ namespace iris
         return std::holds_alternative<Function_pointer_type>(type.data);
     }
 
+    Type_reference create_lambda_type_type_reference(
+        std::pmr::vector<Type_reference> input_parameter_types,
+        std::pmr::vector<Type_reference> output_parameter_types
+    )
+    {
+        return Type_reference
+        {
+            .data = iris::Lambda_type
+            {
+                .input_parameter_types = std::move(input_parameter_types),
+                .output_parameter_types = std::move(output_parameter_types),
+            }
+        };
+    }
+
+    bool is_lambda_type(Type_reference const& type)
+    {
+        return std::holds_alternative<Lambda_type>(type.data);
+    }
+
+    std::optional<Type_reference> get_lambda_output_type_reference(Lambda_type const& lambda_type)
+    {
+        if (lambda_type.output_parameter_types.empty())
+            return std::nullopt;
+
+        if (lambda_type.output_parameter_types.size() == 1)
+            return lambda_type.output_parameter_types.front();
+
+        // TODO lambda with multiple output arguments
+        return std::nullopt;
+    }
+
 
     Type_reference create_fundamental_type_type_reference(Fundamental_type const value)
     {
@@ -784,6 +816,20 @@ namespace iris
                 Function_pointer_type& function_pointer_type = std::get<Function_pointer_type>(type_reference.data);
                 if (!replace_parameter_types_by_instance_arguments_impl(function_pointer_type.type, constructor_parameters, instance_arguments))
                     return false;
+            }
+            else if (std::holds_alternative<Lambda_type>(type_reference.data))
+            {
+                Lambda_type& lambda_type = std::get<Lambda_type>(type_reference.data);
+                for (Type_reference& input_parameter_type : lambda_type.input_parameter_types)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(input_parameter_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+                for (Type_reference& output_parameter_type : lambda_type.output_parameter_types)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(output_parameter_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
             }
             else if (std::holds_alternative<Pointer_type>(type_reference.data))
             {

@@ -1011,6 +1011,7 @@ namespace iris
     export std::optional<Function_declaration const*> find_function_declaration(Module const& module, std::string_view name);
     export std::optional<Function_definition const*> find_function_definition(Module const& module, std::string_view name);
     export std::optional<Global_variable_declaration const*> find_global_variable_declaration(Module const& module, std::string_view name);
+    export std::optional<Lambda_declaration const*> find_lambda_declaration(Module const& module, std::string_view name);
     export std::optional<Struct_declaration const*> find_struct_declaration(Module const& module, std::string_view name);
     export std::optional<Union_declaration const*> find_union_declaration(Module const& module, std::string_view name);
 
