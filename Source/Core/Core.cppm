@@ -421,6 +421,8 @@ namespace iris
     {
         std::pmr::vector<std::pmr::string> parameter_names;
         std::pmr::vector<std::optional<Type_reference>> parameter_types;  // explicit types; nullopt = inferred
+        std::pmr::vector<Source_position> parameter_source_positions;  // where each parameter name was written
+        std::optional<Source_range> input_parameters_source_range;  // the `(...)` list, so tooling can point just past it
         std::optional<Type_reference> return_type;  // explicit return type; nullopt = inferred
         Statement body;  // either an inline expression or a block
         std::optional<std::pmr::vector<std::pmr::string>> captured_variables;  // variables captured from outer scope

@@ -110,6 +110,33 @@ namespace iris::language_server
         }
     }
 
+    static void add_module_body_keyword_items(
+        std::vector<lsp::CompletionItem>& items
+    )
+    {
+        static constexpr std::array<std::string_view, 9> keywords
+        {
+            "enum",
+            "export",
+            "function",
+            "import",
+            "lambda",
+            "module",
+            "struct",
+            "union",
+            "using",
+        };
+
+        items.reserve(items.size() + keywords.size());
+
+        for (std::string_view const keyword : keywords)
+        {
+            items.push_back(
+                create_completion_item(keyword, lsp::CompletionItemKind::Keyword)
+            );
+        }
+    }
+
     static void add_enum_member_items(
         std::vector<lsp::CompletionItem>& items,
         iris::Enum_declaration const& declaration
@@ -242,6 +269,14 @@ namespace iris::language_server
 
                 items.push_back(
                     create_completion_item(data.name, lsp::CompletionItemKind::Struct)
+                );
+            }
+            else if (std::holds_alternative<iris::Lambda_declaration const*>(declaration.data))
+            {
+                iris::Lambda_declaration const& data = *std::get<iris::Lambda_declaration const*>(declaration.data);
+
+                items.push_back(
+                    create_completion_item(data.name, lsp::CompletionItemKind::Interface)
                 );
             }
             else if (std::holds_alternative<iris::Type_constructor const*>(declaration.data))
@@ -715,6 +750,43 @@ namespace iris::language_server
         return std::nullopt;
     }
 
+    // `var <name>:` with the type still missing or half written. The text is what identifies it:
+    // until the type is there the parser cannot build a variable declaration, so what sits before
+    // the cursor ends up under an ERROR node whose siblings are gone.
+    static bool is_variable_declaration_type_text(std::string_view const text)
+    {
+        std::string_view remainder = text;
+
+        if (remainder.starts_with("mutable "))
+            remainder.remove_prefix(8);
+        else if (remainder.starts_with("var "))
+            remainder.remove_prefix(4);
+        else
+            return false;
+
+        return remainder.find(':') != std::string_view::npos;
+    }
+
+    static bool has_variable_declaration_type_ancestor(
+        iris::parser::Parse_tree const& parse_tree,
+        iris::parser::Parse_node const& node,
+        std::string_view const suffix
+    )
+    {
+        std::optional<iris::parser::Parse_node> ancestor = iris::parser::get_parent_node(node);
+
+        for (std::uint32_t degree = 0; degree < 3 && ancestor.has_value(); ++degree)
+        {
+            std::string_view const text = iris::parser::get_node_value(parse_tree, ancestor.value());
+            if (is_variable_declaration_type_text(text) && text.ends_with(suffix))
+                return true;
+
+            ancestor = iris::parser::get_parent_node(ancestor.value());
+        }
+
+        return false;
+    }
+
     static bool expects_type(
         iris::parser::Parse_tree const& parse_tree,
         iris::parser::Parse_node const& node_before
@@ -735,9 +807,44 @@ namespace iris::language_server
                 if (var_value == "var" || var_value == "mutable")
                     return true;
             }
+
+            return has_variable_declaration_type_ancestor(parse_tree, node_before, "");
         }
 
         return false;
+    }
+
+    // The type name is half written, so the partial identifier is what sits before the cursor.
+    // Returns that prefix, which the completion list is then filtered by.
+    static std::optional<std::string_view> find_partial_type_prefix(
+        iris::parser::Parse_tree const& parse_tree,
+        iris::parser::Parse_node const& node_before
+    )
+    {
+        if (iris::parser::get_node_symbol(node_before) != "Identifier")
+            return std::nullopt;
+
+        std::string_view const prefix = iris::parser::get_node_value(parse_tree, node_before);
+        if (prefix.empty())
+            return std::nullopt;
+
+        if (!has_variable_declaration_type_ancestor(parse_tree, node_before, prefix))
+            return std::nullopt;
+
+        return prefix;
+    }
+
+    static lsp::CompletionList filter_completion_list_by_prefix(
+        lsp::CompletionList completion_list,
+        std::string_view const prefix
+    )
+    {
+        std::erase_if(
+            completion_list.items,
+            [prefix](lsp::CompletionItem const& item) -> bool { return !std::string_view{item.label}.starts_with(prefix); }
+        );
+
+        return completion_list;
     }
 
     static bool expects_access_type(
@@ -1020,9 +1127,21 @@ namespace iris::language_server
         {
             std::vector<lsp::CompletionItem> items = {};
 
+            std::optional<std::string_view> const partial_type_prefix =
+                node_before.has_value() ?
+                find_partial_type_prefix(parse_tree, node_before.value()) :
+                std::nullopt;
+
             if (node_before.has_value() && expects_type(parse_tree, node_before.value()))
             {
                 return create_type_completion_list(declaration_database, core_module);
+            }
+            else if (partial_type_prefix.has_value())
+            {
+                return filter_completion_list_by_prefix(
+                    create_type_completion_list(declaration_database, core_module),
+                    partial_type_prefix.value()
+                );
             }
             else if (access_operator.has_value())
             {
@@ -1077,10 +1196,13 @@ namespace iris::language_server
             }
         }
 
+        std::vector<lsp::CompletionItem> module_body_items = {};
+        add_module_body_keyword_items(module_body_items);
+
         return lsp::CompletionList
         {
             .isIncomplete = false,
-            .items = {},
+            .items = std::move(module_body_items),
             .itemDefaults = std::nullopt,
         };
     }

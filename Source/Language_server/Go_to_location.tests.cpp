@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <optional>
 #include <span>
 #include <string>
@@ -121,12 +122,19 @@ namespace iris::language_server
             std::span<std::string_view const> const dependencies = {}
         )
         {
-            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+            Source_with_cursor const source_with_cursor = extract_cursor_position(std::string{source});
 
             Parse_session session;
+
+            // A result carries the file the declaration lives in, so every module needs a path.
+            std::size_t dependency_index = 0;
             for (std::string_view const dependency : dependencies)
-                session.add_module(dependency);
-            std::optional<std::size_t> const index = session.add_module(source_with_cursor.source);
+            {
+                session.add_module(dependency, std::filesystem::path{std::format("dependency_{}.iris", dependency_index)});
+                dependency_index += 1;
+            }
+
+            std::optional<std::size_t> const index = session.add_module(source_with_cursor.source, std::filesystem::path{"main.iris"});
             REQUIRE(index.has_value());
 
             iris::Declaration_database const declaration_database = create_declaration_database(session.modules);
@@ -146,7 +154,10 @@ namespace iris::language_server
         )
         {
             REQUIRE(!result.isNull());
-            std::vector<lsp::Location>& locations = result.get<std::vector<lsp::Location>>();
+            REQUIRE(std::holds_alternative<lsp::Definition>(*result));
+            lsp::Definition const& definition = result.get<lsp::Definition>();
+            REQUIRE(std::holds_alternative<std::vector<lsp::Location>>(definition));
+            std::vector<lsp::Location> const& locations = std::get<std::vector<lsp::Location>>(definition);
             REQUIRE(locations.size() > 0);
 
             return std::any_of(
@@ -305,7 +316,7 @@ lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
 
 export function main() -> ()
 {
-    var cmp: Comparator = $CURSOR_POSITION(a, b) => a - b;
+    var cmp: Comparator = $CURSOR_POSITIONlambda(a, b) => a - b;
 }
 )";
 
@@ -366,7 +377,7 @@ lambda Mapper(value: Int32) -> (result: Int32);
 
 export function create_mapper() -> (mapper: Mapper$CURSOR_POSITION)
 {
-    return (x) => x * 2;
+    return lambda(x) => x * 2;
 }
 )";
 
@@ -410,3 +421,4 @@ lambda Comparator$CURSOR_POSITION(a: Int32, b: Int32) -> (result: Int32);
         CHECK(find_location_in_result(result, expected_line));
     }
 }
+

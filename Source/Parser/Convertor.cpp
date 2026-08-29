@@ -2873,6 +2873,11 @@ namespace iris::parser
 
         output.parameter_names = std::pmr::vector<std::pmr::string>{output_allocator};
         output.parameter_types = std::pmr::vector<std::optional<Type_reference>>{output_allocator};
+        output.parameter_source_positions = std::pmr::vector<iris::Source_position>{output_allocator};
+
+        std::optional<Parse_node> const input_parameters_node = get_child_node(tree, node, "Lambda_literal_input_parameters");
+        if (input_parameters_node.has_value())
+            output.input_parameters_source_range = get_node_source_range(input_parameters_node.value());
 
         std::pmr::vector<Parse_node> const parameter_nodes = get_child_nodes_of_parent(tree, node, "Lambda_literal_input_parameters", "Lambda_literal_parameter", temporaries_allocator);
         for (Parse_node const& parameter_node : parameter_nodes)
@@ -2882,6 +2887,12 @@ namespace iris::parser
                 parameter_name_node.has_value() ?
                 create_string(get_node_value(tree, parameter_name_node.value()), output_allocator) :
                 create_string("", output_allocator)
+            );
+
+            output.parameter_source_positions.push_back(
+                parameter_name_node.has_value() ?
+                get_node_start_source_position(parameter_name_node.value()) :
+                get_node_start_source_position(parameter_node)
             );
 
             // An omitted parameter type stays nullopt so that type analysis knows to infer it.

@@ -10,6 +10,7 @@ module;
 module iris.language_server.go_to_location;
 
 import iris.compiler.analysis;
+import iris.compiler.validation;
 import iris.core;
 import iris.core.declarations;
 import iris.core.types;
@@ -208,6 +209,18 @@ namespace iris::language_server
             std::visit(process_declaration, declaration_optional->data);
             if (result_optional.has_value())
                 return result_optional.value();
+
+            // The cursor is on the declaration's own name rather than on a type it mentions.
+            std::string_view const declaration_name = get_declaration_name(declaration_optional.value());
+            std::optional<iris::Source_range_location> const declaration_location = get_declaration_source_location(declaration_optional.value());
+            if (declaration_location.has_value())
+            {
+                std::optional<iris::Source_range> const name_range = create_sub_source_range(declaration_location->range, 0, declaration_name.size());
+                if (name_range.has_value() && range_contains_position_inclusive(name_range.value(), source_position))
+                {
+                    return create_result_from_declaration(parse_tree, declaration_optional.value(), client_supports_definition_link);
+                }
+            }
         }
 
         std::optional<iris::Function> const function = find_function_that_contains_source_position(
@@ -404,6 +417,72 @@ namespace iris::language_server
                                             );
                                             return true;
                                         }
+                                    }
+                                }
+                            }
+                        }
+                        else if (std::holds_alternative<iris::Lambda_expression>(expression.data))
+                        {
+                            iris::Lambda_expression const& lambda_expression = std::get<iris::Lambda_expression>(expression.data);
+
+                            // Only the head of the literal --- the `lambda` keyword and its parameter
+                            // list --- stands for the lambda type. Inside the body the cursor is on
+                            // whatever the body itself mentions.
+                            bool const is_in_body =
+                                !lambda_expression.body.expressions.empty() &&
+                                lambda_expression.body.expressions[0].source_range.has_value() &&
+                                range_contains_position_inclusive(lambda_expression.body.expressions[0].source_range.value(), source_position);
+
+                            if (!is_in_body)
+                            {
+                                std::size_t const expression_index = static_cast<std::size_t>(&expression - statement.expressions.data());
+
+                                std::optional<iris::Type_reference> const expected_type = iris::compiler::get_expected_expression_type(
+                                    core_module.name,
+                                    function->declaration,
+                                    scope,
+                                    declaration_database,
+                                    statement,
+                                    std::nullopt,
+                                    expression_index
+                                );
+                                if (expected_type.has_value())
+                                {
+                                    std::optional<Declaration> const declaration = find_declaration(declaration_database, expected_type.value());
+                                    if (declaration.has_value())
+                                    {
+                                        result_optional = create_result_from_declaration(parse_tree, declaration.value(), client_supports_definition_link);
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                        else if (std::holds_alternative<iris::Call_expression>(expression.data))
+                        {
+                            iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
+
+                            iris::Expression const& callee = statement.expressions[call_expression.expression.expression_index];
+
+                            // Calling a lambda-typed value leads to the lambda declaration, the way
+                            // calling a function leads to the function it names.
+                            if (callee.source_range.has_value() && range_contains_position_inclusive(callee.source_range.value(), source_position))
+                            {
+                                std::optional<iris::Type_reference> const callee_type = iris::compiler::get_expression_type(
+                                    core_module.name,
+                                    function->declaration,
+                                    scope,
+                                    statement,
+                                    callee,
+                                    std::nullopt,
+                                    declaration_database
+                                );
+                                if (callee_type.has_value())
+                                {
+                                    std::optional<Declaration> const declaration = find_declaration(declaration_database, callee_type.value());
+                                    if (declaration.has_value() && std::holds_alternative<iris::Lambda_declaration const*>(declaration->data))
+                                    {
+                                        result_optional = create_result_from_declaration(parse_tree, declaration.value(), client_supports_definition_link);
+                                        return true;
                                     }
                                 }
                             }

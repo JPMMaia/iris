@@ -135,6 +135,11 @@ namespace iris::language_server
         lsp::CompletionParams const& parameters
     );
 
+    export lsp::TextDocument_HoverResult compute_text_document_hover(
+        Server& server,
+        lsp::HoverParams const& parameters
+    );
+
     export lsp::TextDocument_DefinitionResult compute_text_document_definition(
         Server& server,
         lsp::DefinitionParams const& parameters,

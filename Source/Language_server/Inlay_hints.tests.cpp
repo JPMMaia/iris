@@ -179,13 +179,58 @@ namespace iris::language_server
             return line;
         }
 
+        static bool is_identifier_character(char const character)
+        {
+            return character == '_' || (std::isalnum(static_cast<unsigned char>(character)) != 0);
+        }
+
+        // The parameter is looked for inside the parameter list of a lambda literal, so that the
+        // identically named parameters of the `lambda` declarations above it are not matched.
+        static std::size_t find_lambda_literal_parameter_index(
+            std::string_view const source,
+            std::string_view const parameter_name
+        )
+        {
+            std::size_t search_index = 0;
+
+            while (true)
+            {
+                std::size_t const literal_index = source.find("lambda(", search_index);
+                if (literal_index == std::string_view::npos)
+                    return std::string_view::npos;
+
+                std::size_t const list_begin = literal_index + 7;
+                std::size_t const list_end = source.find(')', list_begin);
+
+                for (std::size_t index = list_begin; index + parameter_name.size() <= list_end; ++index)
+                {
+                    if (source.compare(index, parameter_name.size(), parameter_name) != 0)
+                        continue;
+
+                    if (index > 0 && is_identifier_character(source[index - 1]))
+                        continue;
+
+                    std::size_t const after = index + parameter_name.size();
+                    if (after < source.size() && is_identifier_character(source[after]))
+                        continue;
+
+                    return index;
+                }
+
+                search_index = list_begin;
+            }
+        }
+
         static lsp::Position find_parameter_position(
             std::string_view const source,
             std::string_view const parameter_name,
             std::uint32_t start_line = 0
         )
         {
-            std::size_t const param_index = source.find(parameter_name);
+            std::size_t const param_index =
+                parameter_name == "=>" ?
+                source.find(parameter_name) :
+                find_lambda_literal_parameter_index(source, parameter_name);
             REQUIRE(param_index != std::string_view::npos);
 
             std::uint32_t line = 0;
@@ -206,13 +251,13 @@ namespace iris::language_server
         }
 
         static bool has_inlay_hint(
-            std::span<std::pmr::vector<lsp::InlayHint> const> const hints,
+            std::span<lsp::InlayHint const> const hints,
             lsp::Position const& position
         )
         {
             return std::any_of(
-                hints->begin(),
-                hints->end(),
+                hints.begin(),
+                hints.end(),
                 [&position](lsp::InlayHint const& hint)
                 {
                     return hint.position.line == position.line && hint.position.character == position.character;
@@ -220,12 +265,24 @@ namespace iris::language_server
             );
         }
 
-        static std::optional<std::string_view> get_inlay_hint_label(
+        // A hint's label is either a plain string or a list of parts; the tests compare it against
+        // the whole rendered label, so the parts are joined back together.
+        static std::optional<std::string> get_inlay_hint_label(
             lsp::InlayHint const& hint
         )
         {
-            if (hint.label.has_str())
-                return hint.label.get_str();
+            if (std::holds_alternative<lsp::String>(hint.label))
+                return std::get<lsp::String>(hint.label);
+
+            if (std::holds_alternative<std::vector<lsp::InlayHintLabelPart>>(hint.label))
+            {
+                std::string label;
+                for (lsp::InlayHintLabelPart const& part : std::get<std::vector<lsp::InlayHintLabelPart>>(hint.label))
+                    label += part.value;
+
+                return label;
+            }
+
             return std::nullopt;
         }
 
@@ -308,7 +365,7 @@ export function main() -> ()
             if (hint.position.line == a_position.line && hint.position.character == a_position.character + 1)
             {
                 found_a = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == ": Int32");
                 std::optional<lsp::InlayHintKind> const kind = get_inlay_hint_kind(hint);
@@ -318,7 +375,7 @@ export function main() -> ()
             else if (hint.position.line == b_position.line && hint.position.character == b_position.character + 1)
             {
                 found_b = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == ": Int32");
                 std::optional<lsp::InlayHintKind> const kind = get_inlay_hint_kind(hint);
@@ -343,7 +400,7 @@ lambda Mapper(value: Int32) -> (result: Int32);
 
 export function main() -> ()
 {
-    var mapper = lambda(x) => x * 2;
+    var mapper: Mapper = lambda(x: Int32) => x * 2;
 }
 )";
 
@@ -363,7 +420,7 @@ export function main() -> ()
             if (hint.position.line == arrow_position.line && hint.position.character < arrow_position.character)
             {
                 found_return_hint = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == "-> Int32");
                 std::optional<lsp::InlayHintKind> const kind = get_inlay_hint_kind(hint);
@@ -409,7 +466,7 @@ export function main() -> ()
             else if (hint.position.line == b_position.line && hint.position.character == b_position.character + 1)
             {
                 found_b_hint = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == ": Int32");
             }
@@ -430,7 +487,7 @@ lambda Mapper(value: Int32) -> (result: Int32);
 
 export function main() -> ()
 {
-    var mapper = lambda(x) -> Int32 => x * 2;
+    var mapper: Mapper = lambda(x: Int32) -> Int32 => x * 2;
 }
 )";
 
@@ -483,14 +540,14 @@ export function main() -> ()
             if (hint.position.line == a_position.line && hint.position.character == a_position.character + 1)
             {
                 found_a = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == ": Int32");
             }
             else if (hint.position.line == b_position.line && hint.position.character == b_position.character + 1)
             {
                 found_b = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == ": Int32");
             }
@@ -536,21 +593,21 @@ export function main() -> ()
             if (hint.position.line == outer_a_position.line && hint.position.character == outer_a_position.character + 1)
             {
                 found_outer_a = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == ": Int32");
             }
             else if (hint.position.line == outer_b_position.line && hint.position.character == outer_b_position.character + 1)
             {
                 found_outer_b = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == ": Int32");
             }
             else if (hint.position.line == inner_x_position.line && hint.position.character == inner_x_position.character + 1)
             {
                 found_inner_x = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == ": Int32");
             }
@@ -590,14 +647,14 @@ export function main() -> ()
             if (hint.position.line == a_position.line && hint.position.character == a_position.character + 1)
             {
                 found_a = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == ": Int32");
             }
             else if (hint.position.line == b_position.line && hint.position.character == b_position.character + 1)
             {
                 found_b = true;
-                std::optional<std::string_view> const label = get_inlay_hint_label(hint);
+                std::optional<std::string> const label = get_inlay_hint_label(hint);
                 CHECK(label.has_value());
                 CHECK(*label == ": Int32");
             }

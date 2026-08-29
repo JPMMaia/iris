@@ -355,6 +355,27 @@ namespace iris
 
     export template <typename Function_t>
         bool visit_type_references(
+            iris::Lambda_declaration const& declaration,
+            Function_t predicate
+        )
+    {
+        for (iris::Type_reference const& type_reference : declaration.input_parameter_types)
+        {
+            if (visit_type_references(type_reference, predicate))
+                return true;
+        }
+
+        for (iris::Type_reference const& type_reference : declaration.output_parameter_types)
+        {
+            if (visit_type_references(type_reference, predicate))
+                return true;
+        }
+
+        return false;
+    }
+
+    export template <typename Function_t>
+        bool visit_type_references(
             iris::Function_constructor const& declaration,
             Function_t predicate
         )
@@ -484,6 +505,21 @@ namespace iris
             {
                 Type_expression const& data = std::get<Type_expression>(expression.data);
                 return visit_type_references(data.type, predicate);
+            }
+            else if (std::holds_alternative<Lambda_expression>(expression.data))
+            {
+                Lambda_expression const& data = std::get<Lambda_expression>(expression.data);
+
+                for (std::optional<Type_reference> const& parameter_type : data.parameter_types)
+                {
+                    if (parameter_type.has_value() && visit_type_references(parameter_type.value(), predicate))
+                        return true;
+                }
+
+                if (data.return_type.has_value() && visit_type_references(data.return_type.value(), predicate))
+                    return true;
+
+                return false;
             }
             else if (std::holds_alternative<Struct_expression>(expression.data))
             {
@@ -882,6 +918,11 @@ namespace iris
         {
             Constant_array_expression const& data = std::get<Constant_array_expression>(expression.data);
             return visit_expressions(data.array_data, predicate);
+        }
+        else if (std::holds_alternative<Lambda_expression>(expression.data))
+        {
+            Lambda_expression const& data = std::get<Lambda_expression>(expression.data);
+            return visit_expressions(data.body, predicate);
         }
         else if (std::holds_alternative<For_loop_expression>(expression.data))
         {

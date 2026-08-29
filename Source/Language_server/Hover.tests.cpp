@@ -121,7 +121,7 @@ namespace iris::language_server
             std::span<std::string_view const> const dependencies = {}
         )
         {
-            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+            Source_with_cursor const source_with_cursor = extract_cursor_position(std::string{source});
 
             Parse_session session;
             for (std::string_view const dependency : dependencies)
@@ -139,7 +139,8 @@ namespace iris::language_server
             );
         }
 
-        static bool has_hover_with_content(
+        // The hover contents are a list of plain strings; a check is "does any of them mention this".
+        static bool hover_contains(
             lsp::TextDocument_HoverResult const& result,
             std::string_view const expected_content
         )
@@ -147,19 +148,31 @@ namespace iris::language_server
             if (result.isNull())
                 return false;
 
-            std::vector<lsp::MarkedString>& contents = result.get<std::vector<lsp::MarkedString>>();
+            lsp::Hover const& hover = *result;
+            if (!std::holds_alternative<std::vector<lsp::MarkedString>>(hover.contents))
+                return false;
+
+            std::vector<lsp::MarkedString> const& contents = std::get<std::vector<lsp::MarkedString>>(hover.contents);
+
             return std::any_of(
                 contents.begin(),
                 contents.end(),
-                [expected_content](lsp::MarkedString const& ms)
+                [expected_content](lsp::MarkedString const& marked_string) -> bool
                 {
-                    if (ms.get_str().has_value())
-                    {
-                        return ms.get_str()->find(expected_content) != std::string_view::npos;
-                    }
-                    return false;
+                    if (!std::holds_alternative<lsp::String>(marked_string))
+                        return false;
+
+                    return std::get<lsp::String>(marked_string).find(expected_content) != std::string::npos;
                 }
             );
+        }
+
+        static bool has_hover_with_content(
+            lsp::TextDocument_HoverResult const& result,
+            std::string_view const expected_content
+        )
+        {
+            return hover_contains(result, expected_content);
         }
 
         static bool has_hover_with_lambda_signature(
@@ -167,23 +180,7 @@ namespace iris::language_server
             std::string_view const lambda_name
         )
         {
-            if (result.isNull())
-                return false;
-
-            std::vector<lsp::MarkedString>& contents = result.get<std::vector<lsp::MarkedString>>();
-            std::string_view const expected_signature = "lambda " + std::string{lambda_name};
-            return std::any_of(
-                contents.begin(),
-                contents.end(),
-                [expected_signature](lsp::MarkedString const& ms)
-                {
-                    if (ms.get_str().has_value())
-                    {
-                        return ms.get_str()->find(expected_signature) != std::string_view::npos;
-                    }
-                    return false;
-                }
-            );
+            return hover_contains(result, "lambda " + std::string{lambda_name});
         }
 
         static bool has_hover_with_capture_info(
@@ -191,22 +188,7 @@ namespace iris::language_server
             std::string_view const variable_name
         )
         {
-            if (result.isNull())
-                return false;
-
-            std::vector<lsp::MarkedString>& contents = result.get<std::vector<lsp::MarkedString>>();
-            return std::any_of(
-                contents.begin(),
-                contents.end(),
-                [variable_name](lsp::MarkedString const& ms)
-                {
-                    if (ms.get_str().has_value())
-                    {
-                        return ms.get_str()->find(variable_name) != std::string_view::npos;
-                    }
-                    return false;
-                }
-            );
+            return hover_contains(result, variable_name);
         }
     }
 
@@ -325,8 +307,8 @@ export function main() -> ()
 
 export function main() -> ()
 {
-    var mapper = lambda(x: Int32) -> Int32 => x * 2;
-    var result = mapper$CURSOR_POSITION(5);
+    var mapper = lambda$CURSOR_POSITION(x: Int32) -> Int32 => x * 2;
+    var result = mapper(5);
 }
 )";
 
@@ -419,7 +401,7 @@ lambda Mapper(value: Int32) -> (result: Int32);
 
 export function create_mapper() -> (mapper: Mapper$CURSOR_POSITION)
 {
-    return (x) => x * 2;
+    return lambda(x) => x * 2;
 }
 )";
 
@@ -567,7 +549,7 @@ lambda Action(x: Int32) -> ();
 export function create_action() -> (result: Action)
 {
     var base: Int32 = 100;
-    return (x) => {};
+    return lambda(x) => {};
 }
 
 export function main() -> ()

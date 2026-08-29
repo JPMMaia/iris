@@ -566,6 +566,8 @@ namespace iris::binary_serializer
     {
         serialize(serializer, value.parameter_names);
         serialize(serializer, value.parameter_types);
+        serialize(serializer, value.parameter_source_positions);
+        serialize(serializer, value.input_parameters_source_range);
         serialize(serializer, value.return_type);
         serialize(serializer, value.body);
         serialize(serializer, value.captured_variables);
@@ -577,6 +579,8 @@ namespace iris::binary_serializer
     {
         deserialize(deserializer, value.parameter_names);
         deserialize(deserializer, value.parameter_types);
+        deserialize(deserializer, value.parameter_source_positions);
+        deserialize(deserializer, value.input_parameters_source_range);
         deserialize(deserializer, value.return_type);
         deserialize(deserializer, value.body);
         deserialize(deserializer, value.captured_variables);

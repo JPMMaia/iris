@@ -866,6 +866,8 @@ namespace iris::json
         JSON data;
         data["parameter_names"] = to_json(value.parameter_names);
         data["parameter_types"] = to_json(value.parameter_types);
+        data["parameter_source_positions"] = to_json(value.parameter_source_positions);
+        if (value.input_parameters_source_range.has_value()) data["input_parameters_source_range"] = to_json(value.input_parameters_source_range);
         if (value.return_type.has_value()) data["return_type"] = to_json(value.return_type);
         data["body"] = to_json(value.body);
         if (value.captured_variables.has_value()) data["captured_variables"] = to_json(value.captured_variables);
@@ -878,6 +880,8 @@ namespace iris::json
     {
         if (data.contains("parameter_names")) from_json(data.at("parameter_names"), value.parameter_names);
         if (data.contains("parameter_types")) from_json(data.at("parameter_types"), value.parameter_types);
+        if (data.contains("parameter_source_positions")) from_json(data.at("parameter_source_positions"), value.parameter_source_positions);
+        if (data.contains("input_parameters_source_range")) from_json(data.at("input_parameters_source_range"), value.input_parameters_source_range);
         if (data.contains("return_type")) from_json(data.at("return_type"), value.return_type);
         from_json(data.at("body"), value.body);
         if (data.contains("captured_variables")) from_json(data.at("captured_variables"), value.captured_variables);

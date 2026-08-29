@@ -138,7 +138,7 @@ namespace iris::language_server
             std::span<std::string_view const> const dependencies = {}
         )
         {
-            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+            Source_with_cursor const source_with_cursor = extract_cursor_position(std::string{source});
 
             Parse_session session;
             for (std::string_view const dependency : dependencies)
@@ -162,7 +162,7 @@ namespace iris::language_server
             std::span<std::string_view const> const dependencies = {}
         )
         {
-            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+            Source_with_cursor const source_with_cursor = extract_cursor_position(std::string{source});
 
             Parse_session session;
             for (std::string_view const dependency : dependencies)
@@ -185,7 +185,7 @@ namespace iris::language_server
             std::span<std::string_view const> const dependencies = {}
         )
         {
-            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+            Source_with_cursor const source_with_cursor = extract_cursor_position(std::string{source});
 
             Parse_session session;
             for (std::string_view const dependency : dependencies)
@@ -208,7 +208,7 @@ namespace iris::language_server
             std::span<std::string_view const> const dependencies = {}
         )
         {
-            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+            Source_with_cursor const source_with_cursor = extract_cursor_position(std::string{source});
 
             Parse_session session;
             for (std::string_view const dependency : dependencies)
@@ -227,11 +227,13 @@ namespace iris::language_server
             std::string_view const expected_label
         )
         {
-            if (result.isNull() || !result->signatures.has_value())
+            if (result.isNull())
                 return false;
+
+            std::vector<lsp::SignatureInformation> const& signatures = result->signatures;
             return std::any_of(
-                result->signatures->begin(),
-                result->signatures->end(),
+                signatures.begin(),
+                signatures.end(),
                 [&expected_label](lsp::SignatureInformation const& sig)
                 {
                     return sig.label == expected_label;
@@ -1987,7 +1989,7 @@ export function apply(cmp: Comparator, x: Int32, y: Int32) -> (result: Int32)
 
 lambda Mapper(value: Int32) -> (result: Int32);
 
-export function apply_mapper(mapper: Mapper, x: Int32) -> Int32
+export function apply_mapper(mapper: Mapper, x: Int32) -> (result: Int32)
 {
     return mapper($CURSOR_POSITIONx);
 }

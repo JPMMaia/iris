@@ -140,7 +140,7 @@ namespace iris::language_server
             std::span<std::string_view const> const dependencies = {}
         )
         {
-            Source_with_cursor const source_with_cursor = extract_cursor_position(source);
+            Source_with_cursor const source_with_cursor = extract_cursor_position(std::string{source});
 
             Parse_session session;
             for (std::string_view const dependency : dependencies)
@@ -286,7 +286,7 @@ lambda Mapper(value: Int32) -> (result: Int32);
 
 export function create_mapper() -> (mapper: $CURSOR_POSITION)
 {
-    return (x) => x * 2;
+    return lambda(x) => x * 2;
 }
 )";
 
@@ -304,7 +304,7 @@ lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
 
 export function main() -> ()
 {
-    var cmp: $CURSOR_POSITION = (a, b) => a - b;
+    var cmp: $CURSOR_POSITION = lambda(a, b) => a - b;
 }
 )";
 
@@ -343,8 +343,8 @@ lambda Outer(a: Int32, b: Int32) -> (result: Int32);
 
 export function main() -> ()
 {
-    var outer: Outer = (a, b) => {
-        var inner: $CURSOR_POSITION = (x) => x + a;
+    var outer: Outer = lambda(a, b) => {
+        var inner: $CURSOR_POSITION = lambda(x) => x + a;
         return inner(b);
     };
 }
@@ -354,3 +354,4 @@ export function main() -> ()
         CHECK(find_completion_item(result, "Inner"));
     }
 }
+
