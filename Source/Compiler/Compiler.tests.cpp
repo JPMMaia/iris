@@ -502,6 +502,56 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile null assigned to Optional pointer", "[LLVM_IR]")
+  {
+    char const* const input_file = "optional_null_codegen.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define ptr @Optional_null_codegen_make_null() #0 {
+entry:
+  ret ptr null
+}
+
+; Function Attrs: convergent
+define void @Optional_null_codegen_take(ptr noundef %"arguments[0].a") #0 {
+entry:
+  %a = alloca ptr, align 8
+  store ptr %"arguments[0].a", ptr %a, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define void @Optional_null_codegen_pass_null() #0 {
+entry:
+  call void @Optional_null_codegen_take(ptr noundef null)
+  ret void
+}
+
+; Function Attrs: convergent
+define i1 @Optional_null_codegen_assign_null(ptr noundef %"arguments[0].a") #0 {
+entry:
+  %a = alloca ptr, align 8
+  %b = alloca ptr, align 8
+  store ptr %"arguments[0].a", ptr %a, align 8
+  %0 = load ptr, ptr %a, align 8
+  store ptr %0, ptr %b, align 8
+  store ptr null, ptr %b, align 8
+  %1 = load ptr, ptr %b, align 8
+  %2 = icmp ne ptr %1, null
+  ret i1 %2
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Array Slices", "[LLVM_IR]")
   {
     char const* const input_file = "array_slices.iris";

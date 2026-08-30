@@ -1,0 +1,23 @@
+module Optional_null_codegen;
+
+export function make_null() -> (result: Optional::<*Int32>)
+{
+    return null;
+}
+
+export function take(a: Optional::<*mutable Int32>) -> ()
+{
+}
+
+export function pass_null() -> ()
+{
+    take(null);
+}
+
+export function assign_null(a: *mutable Int32) -> (result: Bool)
+{
+    mutable b: Optional::<*mutable Int32> = create_optional(a);
+    b = null;
+
+    return b.has_value;
+}

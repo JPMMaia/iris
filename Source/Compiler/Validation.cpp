@@ -163,6 +163,13 @@ namespace iris::compiler
             }
         }
         
+        // Optional::<*T> is represented as a bare pointer, so `null` is one of its values.
+        if (is_optional_represented_as_pointer(first_underlying_type.value()) && is_null_pointer_type(second_underlying_type.value()))
+            return true;
+
+        if (is_null_pointer_type(first_underlying_type.value()) && is_optional_represented_as_pointer(second_underlying_type.value()))
+            return true;
+
         if (is_pointer(first_underlying_type.value()) && is_null_pointer_type(second_underlying_type.value()))
             return true;
 
@@ -224,6 +231,10 @@ namespace iris::compiler
                 }
             }
         }
+
+        // Optional::<*T> is represented as a bare pointer, so `null` is the empty value.
+        if (is_optional_represented_as_pointer(destination_type) && is_null_pointer_type(source_type))
+            return true;
 
         if (is_pointer(destination_type))
         {

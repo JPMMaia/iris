@@ -6211,6 +6211,39 @@ export function foo() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates assigning null to an Optional pointer", "[Validation][Optional]")
+    {
+        std::string_view const input = R"(module Optional_null;
+
+export struct My_struct
+{
+    a: Optional::<*Int32> = null;
+}
+
+export function take(a: Optional::<*Int32>) -> ()
+{
+}
+
+export function make() -> (result: Optional::<*mutable Int32>)
+{
+    return null;
+}
+
+export function foo() -> ()
+{
+    var a: Optional::<*Int32> = null;
+    mutable b: Optional::<*mutable Int32> = null;
+    b = null;
+
+    take(null);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates Optional in a function constructor", "[Validation][Optional]")
     {
         std::string_view const input = R"(module Optional_generic;
