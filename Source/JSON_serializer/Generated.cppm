@@ -419,6 +419,20 @@ namespace iris::json
     }
 
     EXPORT template <>
+    JSON to_json(Optional_type const& value)
+    {
+        JSON data;
+        data["value_type"] = to_json(value.value_type);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Optional_type& value)
+    {
+        if (data.contains("value_type")) from_json(data.at("value_type"), value.value_type);
+    }
+
+    EXPORT template <>
     JSON to_json(Pointer_type const& value)
     {
         JSON data;

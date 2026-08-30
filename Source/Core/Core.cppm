@@ -162,6 +162,13 @@ namespace iris
         friend bool operator==(Null_pointer_type const& lhs, Null_pointer_type const& rhs) = default;
     };
 
+    export struct Optional_type
+    {
+        std::pmr::vector<Type_reference> value_type;
+
+        friend bool operator==(Optional_type const& lhs, Optional_type const& rhs) = default;
+    };
+
     export struct Pointer_type
     {
         std::pmr::vector<Type_reference> element_type;
@@ -245,6 +252,7 @@ namespace iris
             Integer_type,
             Lambda_type,
             Null_pointer_type,
+            Optional_type,
             Parameter_type,
             Pointer_type,
             Soa_array_type,

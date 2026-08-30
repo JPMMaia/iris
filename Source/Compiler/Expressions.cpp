@@ -737,6 +737,12 @@ namespace iris::compiler
         Expression_parameters const& parameters
     );
 
+    static void create_optional_value_check_instructions(
+        llvm::Value* const has_value,
+        std::string_view const error_message,
+        Expression_parameters const& parameters
+    );
+
     Value_and_type create_access_expression_value(
         Access_expression const& expression,
         Statement const& statement,
@@ -838,19 +844,96 @@ namespace iris::compiler
             }
         }
 
-        if (left_hand_side.type.has_value() && iris::is_array_slice_type_reference(left_hand_side.type.value()))
+        if (left_hand_side.type.has_value() && iris::is_optional_type_reference(left_hand_side.type.value()))
         {
-            iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(left_hand_side.type->data);
+            std::optional<iris::Type_reference> const value_type = iris::get_optional_value_type(left_hand_side.type.value());
 
-            iris::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
-
-            return create_access_struct_member(
-                left_hand_side,
-                expression.member_name,
-                "iris.builtin",
-                struct_declaration,
-                parameters
+            std::string const error_message = std::format(
+                "Read '.value' of an empty Optional in '{}.{}'!",
+                parameters.core_module.name,
+                parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?"
             );
+
+            if (iris::is_optional_represented_as_pointer(left_hand_side.type.value()))
+            {
+                // The representation is the pointer itself: .value is the identity, .has_value a null test.
+                Value_and_type const loaded = load_if_needed(left_hand_side, expression.expression.expression_index, statement, parameters);
+                llvm::Value* const null_pointer = llvm::ConstantPointerNull::get(llvm::PointerType::get(parameters.llvm_context, 0));
+
+                if (expression.member_name == "has_value")
+                {
+                    return Value_and_type
+                    {
+                        .name = "",
+                        .value = parameters.llvm_builder.CreateICmpNE(loaded.value, null_pointer),
+                        .type = iris::create_bool_type_reference()
+                    };
+                }
+
+                if (expression.member_name == "value")
+                {
+                    if (parameters.contract_options != Contract_options::Disabled && parameters.llvm_parent_function != nullptr)
+                    {
+                        llvm::Value* const has_value = parameters.llvm_builder.CreateICmpNE(loaded.value, null_pointer);
+                        create_optional_value_check_instructions(has_value, error_message, parameters);
+                    }
+
+                    return Value_and_type
+                    {
+                        .name = "",
+                        .value = loaded.value,
+                        .type = value_type
+                    };
+                }
+            }
+            else
+            {
+                std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(left_hand_side.type.value());
+
+                if (struct_declaration.has_value())
+                {
+                    if (expression.member_name == "value" && parameters.contract_options != Contract_options::Disabled && parameters.llvm_parent_function != nullptr)
+                    {
+                        Value_and_type const has_value_member = create_access_struct_member(
+                            left_hand_side,
+                            "has_value",
+                            "iris.builtin",
+                            struct_declaration.value(),
+                            parameters
+                        );
+
+                        llvm::Type* const has_value_llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, iris::create_bool_type_reference(), parameters.type_database);
+                        llvm::Value* const loaded_has_value = create_load_instruction(parameters.llvm_builder, parameters.llvm_data_layout, has_value_llvm_type, has_value_member.value);
+                        llvm::Value* const has_value = convert_to_boolean(parameters.llvm_context, parameters.llvm_builder, loaded_has_value, iris::create_bool_type_reference());
+
+                        create_optional_value_check_instructions(has_value, error_message, parameters);
+                    }
+
+                    return create_access_struct_member(
+                        left_hand_side,
+                        expression.member_name,
+                        "iris.builtin",
+                        struct_declaration.value(),
+                        parameters
+                    );
+                }
+            }
+        }
+
+        if (left_hand_side.type.has_value())
+        {
+            std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(left_hand_side.type.value());
+
+            if (struct_declaration.has_value())
+            {
+                return create_access_struct_member(
+                    left_hand_side,
+                    expression.member_name,
+                    "iris.builtin",
+                    struct_declaration.value(),
+                    parameters
+                );
+            }
         }
 
         if (left_hand_side.type.has_value() && iris::is_soa_array_type_reference(left_hand_side.type.value()))
@@ -1031,6 +1114,30 @@ namespace iris::compiler
         }
 
         throw std::runtime_error{ format_error("Could not process access expression!", parameters.source_position) };
+    }
+
+    // Aborts when .value is read from an empty Optional. Emitted only when contracts are enabled,
+    // so release builds keep the plain member load.
+    static void create_optional_value_check_instructions(
+        llvm::Value* const has_value,
+        std::string_view const error_message,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::LLVMContext& llvm_context = parameters.llvm_context;
+        llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+
+        llvm::BasicBlock* const pass_block = llvm::BasicBlock::Create(llvm_context, "optional_value_check_pass", parameters.llvm_parent_function);
+        llvm::BasicBlock* const fail_block = llvm::BasicBlock::Create(llvm_context, "optional_value_check_fail", parameters.llvm_parent_function);
+
+        llvm_builder.CreateCondBr(has_value, pass_block, fail_block);
+
+        llvm_builder.SetInsertPoint(fail_block);
+        create_log_error_instruction(llvm_context, parameters.llvm_module, llvm_builder, error_message);
+        create_abort_instruction(llvm_context, parameters.llvm_module, llvm_builder);
+        llvm_builder.CreateUnreachable();
+
+        llvm_builder.SetInsertPoint(pass_block);
     }
 
     static void create_bounds_check_instructions(
@@ -3009,6 +3116,80 @@ namespace iris::compiler
         }
     }
 
+    // Builds an Optional::<T> value. `value` is nullopt for the empty case.
+    Value_and_type instantiate_optional(
+        std::pmr::vector<iris::Type_reference> const& value_type,
+        std::optional<Value_and_type> const& value,
+        Expression_parameters const& parameters
+    )
+    {
+        iris::Type_reference const optional_type_reference = iris::create_optional_type_reference(value_type);
+
+        llvm::Type* const llvm_optional_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, optional_type_reference, parameters.type_database);
+
+        // Optional::<*T> is the bare pointer: present is the pointer, empty is null.
+        if (iris::is_optional_represented_as_pointer(optional_type_reference))
+        {
+            llvm::Value* const pointer_value = value.has_value()
+                ? value->value
+                : llvm::ConstantPointerNull::get(llvm::PointerType::get(parameters.llvm_context, 0));
+
+            return Value_and_type
+            {
+                .name = "",
+                .value = pointer_value,
+                .type = optional_type_reference
+            };
+        }
+
+        llvm::AllocaInst* const struct_alloca = create_alloca_instruction(parameters.llvm_builder, parameters.llvm_data_layout, *parameters.llvm_parent_function, llvm_optional_type, "optional");
+
+        iris::Struct_declaration const struct_declaration = iris::try_get_builtin_struct_declaration(optional_type_reference).value();
+
+        if (value.has_value())
+        {
+            generate_store_struct_member_instructions(
+                parameters.clang_module_data,
+                parameters.llvm_context,
+                parameters.llvm_builder,
+                parameters.llvm_data_layout,
+                struct_alloca,
+                "value",
+                "iris.builtin",
+                struct_declaration,
+                value.value(),
+                parameters.type_database
+            );
+        }
+
+        Value_and_type const has_value_value
+        {
+            .name = "",
+            .value = llvm::ConstantInt::get(llvm::Type::getInt1Ty(parameters.llvm_context), value.has_value() ? 1 : 0),
+            .type = iris::create_bool_type_reference()
+        };
+
+        generate_store_struct_member_instructions(
+            parameters.clang_module_data,
+            parameters.llvm_context,
+            parameters.llvm_builder,
+            parameters.llvm_data_layout,
+            struct_alloca,
+            "has_value",
+            "iris.builtin",
+            struct_declaration,
+            has_value_value,
+            parameters.type_database
+        );
+
+        return Value_and_type
+        {
+            .name = "",
+            .value = struct_alloca,
+            .type = optional_type_reference
+        };
+    }
+
     Value_and_type instantiate_array_slice(
         std::pmr::vector<iris::Type_reference> const& element_type,
         Value_and_type const& data_value,
@@ -3021,7 +3202,7 @@ namespace iris::compiler
 
         llvm::AllocaInst* const struct_alloca = create_alloca_instruction(parameters.llvm_builder, parameters.llvm_data_layout, *parameters.llvm_parent_function, llvm_array_slice_type);
 
-        iris::Struct_declaration const struct_declaration = iris::create_array_slice_type_struct_declaration(element_type);
+        iris::Struct_declaration const struct_declaration = iris::try_get_builtin_struct_declaration(array_slice_type_reference).value();
 
         generate_store_struct_member_instructions(
             parameters.clang_module_data,
@@ -3206,6 +3387,20 @@ namespace iris::compiler
                         parameters
                     );
                 }
+                else if (variable_expression.name == "create_optional")
+                {
+                    Value_and_type const value_type_value = create_statement_value(instance_call_expression.arguments[0], parameters);
+
+                    std::pmr::vector<iris::Type_reference> value_type;
+                    if (value_type_value.type.has_value())
+                        value_type.push_back(value_type_value.type.value());
+
+                    std::optional<Value_and_type> value;
+                    if (expression.arguments.size() == 1)
+                        value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
+
+                    return instantiate_optional(value_type, value, parameters);
+                }
                 else if (variable_expression.name == "reinterpret_as")
                 {
                     Value_and_type const loaded_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
@@ -3379,6 +3574,21 @@ namespace iris::compiler
                 );
 
                 return result;
+            }
+            else if (variable_expression.name == "create_optional")
+            {
+                if (expression.arguments.size() != 1)
+                    throw std::runtime_error{ format_error("create_optional() expects one argument!", parameters.source_position) };
+
+                Value_and_type const value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
+                if (!value.type.has_value())
+                    throw std::runtime_error{ format_error("Cannot deduce argument 0 type of create_optional()", parameters.source_position) };
+
+                return instantiate_optional(
+                    { value.type.value() },
+                    value,
+                    parameters
+                );
             }
             else if (variable_expression.name == "create_array_slice_from_pointer")
             {
@@ -5492,12 +5702,20 @@ namespace iris::compiler
             };
         }
 
-        if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
+        if (iris::is_optional_represented_as_pointer(type_reference))
         {
-            iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(type_reference.data);
-            iris::Struct_declaration const struct_declaration = create_array_slice_type_struct_declaration(array_slice_type.element_type);
+            return instantiate_optional(
+                std::get<iris::Optional_type>(type_reference.data).value_type,
+                std::nullopt,
+                parameters
+            );
+        }
 
-            return create_instantiate_struct_expression_value(statement, expression, parameters, "iris.builtin", struct_declaration, type_reference);
+        {
+            std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(type_reference);
+
+            if (struct_declaration.has_value())
+                return create_instantiate_struct_expression_value(statement, expression, parameters, "iris.builtin", struct_declaration.value(), type_reference);
         }
 
         if (is_primitive_type(type_reference) || is_constant_array_type_reference(type_reference) || is_enum_type(declaration_database, type_reference))

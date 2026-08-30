@@ -28,6 +28,40 @@ namespace iris
         return std::holds_alternative<Array_slice_type>(type.data);
     }
 
+    Type_reference create_optional_type_reference(std::pmr::vector<Type_reference> value_type)
+    {
+        return
+        {
+            .data = iris::Optional_type
+            {
+                .value_type = std::move(value_type),
+            }
+        };
+    }
+
+    bool is_optional_type_reference(Type_reference const& type)
+    {
+        return std::holds_alternative<Optional_type>(type.data);
+    }
+
+    std::optional<Type_reference> get_optional_value_type(Type_reference const& type)
+    {
+        if (!std::holds_alternative<Optional_type>(type.data))
+            return std::nullopt;
+
+        Optional_type const& optional_type = std::get<Optional_type>(type.data);
+        if (optional_type.value_type.empty())
+            return std::nullopt;
+
+        return optional_type.value_type.front();
+    }
+
+    bool is_optional_represented_as_pointer(Type_reference const& type)
+    {
+        std::optional<Type_reference> const value_type = get_optional_value_type(type);
+        return value_type.has_value() && is_pointer(value_type.value());
+    }
+
     Type_reference create_bool_type_reference()
     {
         return create_fundamental_type_type_reference(Fundamental_type::Bool);
@@ -814,6 +848,184 @@ namespace iris
 
     namespace
     {
+        void append_mangled_type_name(std::pmr::string& output, Type_reference const& type)
+        {
+            if (std::holds_alternative<Integer_type>(type.data))
+            {
+                Integer_type const& integer_type = std::get<Integer_type>(type.data);
+                output += integer_type.is_signed ? "Int" : "Uint";
+                output += std::to_string(integer_type.number_of_bits);
+            }
+            else if (std::holds_alternative<Fundamental_type>(type.data))
+            {
+                Fundamental_type const fundamental_type = std::get<Fundamental_type>(type.data);
+
+                switch (fundamental_type)
+                {
+                case Fundamental_type::Bool: output += "Bool"; break;
+                case Fundamental_type::Byte: output += "Byte"; break;
+                case Fundamental_type::Float16: output += "Float16"; break;
+                case Fundamental_type::Float32: output += "Float32"; break;
+                case Fundamental_type::Float64: output += "Float64"; break;
+                case Fundamental_type::String: output += "String"; break;
+                case Fundamental_type::Any_type: output += "Any_type"; break;
+                case Fundamental_type::C_bool: output += "C_bool"; break;
+                case Fundamental_type::C_char: output += "C_char"; break;
+                case Fundamental_type::C_schar: output += "C_schar"; break;
+                case Fundamental_type::C_uchar: output += "C_uchar"; break;
+                case Fundamental_type::C_short: output += "C_short"; break;
+                case Fundamental_type::C_ushort: output += "C_ushort"; break;
+                case Fundamental_type::C_int: output += "C_int"; break;
+                case Fundamental_type::C_uint: output += "C_uint"; break;
+                case Fundamental_type::C_long: output += "C_long"; break;
+                case Fundamental_type::C_ulong: output += "C_ulong"; break;
+                case Fundamental_type::C_longlong: output += "C_longlong"; break;
+                case Fundamental_type::C_ulonglong: output += "C_ulonglong"; break;
+                case Fundamental_type::C_longdouble: output += "C_longdouble"; break;
+                }
+            }
+            else if (std::holds_alternative<Decimal_type>(type.data))
+            {
+                Decimal_type const& decimal_type = std::get<Decimal_type>(type.data);
+                output += "Decimal";
+                output += std::to_string(static_cast<std::uint64_t>(decimal_type.scale));
+            }
+            else if (std::holds_alternative<Custom_type_reference>(type.data))
+            {
+                Custom_type_reference const& custom_type_reference = std::get<Custom_type_reference>(type.data);
+
+                for (char const character : custom_type_reference.module_reference.name)
+                    output += (character == '.') ? '_' : character;
+
+                output += '_';
+                output += custom_type_reference.name;
+            }
+            else if (std::holds_alternative<Pointer_type>(type.data))
+            {
+                Pointer_type const& pointer_type = std::get<Pointer_type>(type.data);
+                output += pointer_type.is_mutable ? "mutable_pointer_to_" : "pointer_to_";
+
+                if (pointer_type.element_type.empty())
+                    output += "void";
+                else
+                    append_mangled_type_name(output, pointer_type.element_type.front());
+            }
+            else if (std::holds_alternative<Array_slice_type>(type.data))
+            {
+                Array_slice_type const& array_slice_type = std::get<Array_slice_type>(type.data);
+                output += "Array_slice_";
+
+                if (array_slice_type.is_mutable)
+                    output += "mutable_";
+
+                if (array_slice_type.element_type.empty())
+                    output += "void";
+                else
+                    append_mangled_type_name(output, array_slice_type.element_type.front());
+            }
+            else if (std::holds_alternative<Constant_array_type>(type.data))
+            {
+                Constant_array_type const& constant_array_type = std::get<Constant_array_type>(type.data);
+                output += "Constant_array_";
+
+                if (constant_array_type.value_type.empty())
+                    output += "void";
+                else
+                    append_mangled_type_name(output, constant_array_type.value_type.front());
+
+                output += '_';
+                output += std::to_string(constant_array_type.size);
+            }
+            else if (std::holds_alternative<Optional_type>(type.data))
+            {
+                Optional_type const& optional_type = std::get<Optional_type>(type.data);
+                output += "Optional_";
+
+                if (optional_type.value_type.empty())
+                    output += "void";
+                else
+                    append_mangled_type_name(output, optional_type.value_type.front());
+            }
+            else
+            {
+                // Anything without a readable spelling still needs a stable name.
+                output += "type_";
+                output += std::to_string(type.data.index());
+            }
+        }
+    }
+
+    std::pmr::string mangle_optional_type_name(std::pmr::vector<Type_reference> const& value_type)
+    {
+        std::pmr::string result = "Optional_";
+
+        if (value_type.empty())
+            result += "void";
+        else
+            append_mangled_type_name(result, value_type.front());
+
+        return result;
+    }
+
+    iris::Struct_declaration create_optional_type_struct_declaration(std::pmr::vector<Type_reference> const& value_type)
+    {
+        return iris::Struct_declaration
+        {
+            .name = mangle_optional_type_name(value_type),
+            .member_types = {
+                value_type.empty() ? iris::create_bool_type_reference() : value_type.front(),
+                iris::create_bool_type_reference()
+            },
+            .member_names = {
+                "value",
+                "has_value"
+            },
+            .member_bit_fields = {
+                std::nullopt,
+                std::nullopt
+            },
+            .member_default_values = {
+                iris::Statement{
+                    .expressions = {
+                        iris::Expression{ .data = iris::Instantiate_expression{} }
+                    }
+                },
+                iris::Statement{
+                    .expressions = {
+                        iris::Expression{
+                            .data = iris::Constant_expression {
+                                .type = iris::create_bool_type_reference(),
+                                .data = "false"
+                            }
+                        }
+                    }
+                }
+            },
+            .is_packed = false,
+            .is_literal = false,
+        };
+    }
+
+    std::optional<iris::Struct_declaration> try_get_builtin_struct_declaration(Type_reference const& type_reference)
+    {
+        if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
+        {
+            iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(type_reference.data);
+            return create_array_slice_type_struct_declaration(array_slice_type.element_type);
+        }
+
+        // Optional of a pointer is represented as a bare pointer, so it has no member record.
+        if (std::holds_alternative<iris::Optional_type>(type_reference.data) && !is_optional_represented_as_pointer(type_reference))
+        {
+            iris::Optional_type const& optional_type = std::get<iris::Optional_type>(type_reference.data);
+            return create_optional_type_struct_declaration(optional_type.value_type);
+        }
+
+        return std::nullopt;
+    }
+
+    namespace
+    {
         template<typename Constructor_parameter_type>
         std::optional<Type_reference> get_instance_argument_type(
             std::span<Constructor_parameter_type const> const constructor_parameters,
@@ -892,6 +1104,15 @@ namespace iris
                 for (Type_reference& element_type : array_slice_type.element_type)
                 {
                     if (!replace_parameter_types_by_instance_arguments_impl(element_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+            }
+            else if (std::holds_alternative<Optional_type>(type_reference.data))
+            {
+                Optional_type& optional_type = std::get<Optional_type>(type_reference.data);
+                for (Type_reference& value_type : optional_type.value_type)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(value_type, constructor_parameters, instance_arguments))
                         return false;
                 }
             }

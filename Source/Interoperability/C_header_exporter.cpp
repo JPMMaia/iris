@@ -59,6 +59,12 @@ namespace iris::c
             if (!constant_array_type.value_type.empty())
                 add_type_reference_declaration(sorted_declarations, core_module, constant_array_type.value_type[0]);
         }
+        else if (std::holds_alternative<iris::Optional_type>(type_reference.data))
+        {
+            iris::Optional_type const& optional_type = std::get<iris::Optional_type>(type_reference.data);
+            if (!optional_type.value_type.empty())
+                add_type_reference_declaration(sorted_declarations, core_module, optional_type.value_type[0]);
+        }
         else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
         {
             iris::Custom_type_reference const& custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.data);
@@ -338,7 +344,8 @@ namespace iris::c
         std::string_view const module_name,
         std::string_view const declaration_name,
         std::string_view const declaration_kind,
-        std::optional<std::string_view> const data = std::nullopt
+        std::optional<std::string_view> const data = std::nullopt,
+        std::span<std::pmr::string const> const raw_pointer_members = {}
     )
     {
         stream << "/** IRIS_META v=1 module=";
@@ -347,6 +354,17 @@ namespace iris::c
         stream << declaration_name;
         stream << " kind=";
         stream << declaration_kind;
+        if (!raw_pointer_members.empty())
+        {
+            stream << " raw_pointer_members=";
+            for (std::size_t index = 0; index < raw_pointer_members.size(); ++index)
+            {
+                if (index > 0)
+                    stream << ' ';
+                stream << raw_pointer_members[index];
+            }
+        }
+        // `data=` stays last: its value may contain spaces.
         if (data.has_value())
         {
             stream << " data=";
@@ -677,6 +695,22 @@ namespace iris::c
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
+        else if (std::holds_alternative<iris::Optional_type>(type_reference.data))
+        {
+            iris::Optional_type const& data = std::get<iris::Optional_type>(type_reference.data);
+
+            // Optional::<*T> is the bare pointer at the ABI level, so it is spelled as the pointer.
+            if (iris::is_optional_represented_as_pointer(type_reference))
+            {
+                write_c_type_name(stream, declaration_database, data.value_type[0], variable_name);
+                return;
+            }
+
+            stream << "struct " << iris::mangle_optional_type_name(data.value_type);
+
+            if (variable_name.has_value())
+                stream << ' ' << variable_name.value();
+        }
         else if (std::holds_alternative<iris::Builtin_type_reference>(type_reference.data))
         {
             iris::Builtin_type_reference const& data = std::get<iris::Builtin_type_reference>(type_reference.data);
@@ -797,6 +831,31 @@ namespace iris::c
         // TODO
     }
 
+    // Emits `struct Optional_<T> { <T> value; bool has_value; };`. Both the member names and their
+    // types come from the same synthetic declaration the compiler lays out, so the exported header
+    // and the compiled type cannot drift apart.
+    void write_c_optional_struct(
+        String_stream& stream,
+        iris::Declaration_database const declaration_database,
+        iris::Type_reference const& optional_type_reference
+    )
+    {
+        std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(optional_type_reference);
+        if (!struct_declaration.has_value())
+            return;
+
+        stream << "struct " << struct_declaration->name << "\n{\n";
+
+        for (std::size_t member_index = 0; member_index < struct_declaration->member_names.size(); ++member_index)
+        {
+            stream << "    ";
+            write_c_type_name(stream, declaration_database, struct_declaration->member_types[member_index], struct_declaration->member_names[member_index]);
+            stream << ";\n";
+        }
+
+        stream << "};\n\n";
+    }
+
     void write_c_array_slice_struct(
         String_stream& stream,
         iris::Declaration_database const declaration_database,
@@ -834,7 +893,14 @@ namespace iris::c
         std::span<std::optional<std::uint32_t> const> const member_bit_fields
     )
     {
-        write_iris_meta_comment(stream, core_module_name, declaration_name, declaration_type);
+        std::pmr::vector<std::pmr::string> raw_pointer_members;
+        for (std::size_t member_index = 0; member_index < member_names.size(); ++member_index)
+        {
+            if (std::holds_alternative<iris::Pointer_type>(member_types[member_index].data))
+                raw_pointer_members.push_back(member_names[member_index]);
+        }
+
+        write_iris_meta_comment(stream, core_module_name, declaration_name, declaration_type, std::nullopt, raw_pointer_members);
         stream << declaration_type << " ";
         write_c_declaration_name(stream, core_module_name, declaration_name, unique_name);
         stream << "\n{\n";
@@ -1069,6 +1135,52 @@ namespace iris::c
         write_header_start(stream, core_module.name, "");
         write_includes(stream, core_module, dependencies_c_file_paths);
         write_extern_c_begin(stream);
+
+        // Every distinct Optional::<T> needs its own C struct, emitted before anything that names one.
+        // Optionals of pointers are skipped: they are spelled as the bare pointer.
+        {
+            std::pmr::vector<iris::Type_reference> optional_type_references{temporaries_allocator};
+
+            iris::visit_type_references(
+                core_module,
+                [&](std::string_view const, iris::Type_reference const& type_reference) -> bool
+                {
+                    iris::visit_type_references_recursively(
+                        type_reference,
+                        [&](iris::Type_reference const& nested_type_reference) -> bool
+                        {
+                            if (!std::holds_alternative<iris::Optional_type>(nested_type_reference.data))
+                                return false;
+
+                            if (iris::is_optional_represented_as_pointer(nested_type_reference))
+                                return false;
+
+                            iris::Optional_type const& optional_type = std::get<iris::Optional_type>(nested_type_reference.data);
+                            std::pmr::string const name = iris::mangle_optional_type_name(optional_type.value_type);
+
+                            bool const already_collected = std::any_of(
+                                optional_type_references.begin(),
+                                optional_type_references.end(),
+                                [&](iris::Type_reference const& existing)
+                                {
+                                    return iris::mangle_optional_type_name(std::get<iris::Optional_type>(existing.data).value_type) == name;
+                                }
+                            );
+
+                            if (!already_collected)
+                                optional_type_references.push_back(nested_type_reference);
+
+                            return false;
+                        }
+                    );
+
+                    return false;
+                }
+            );
+
+            for (iris::Type_reference const& optional_type_reference : optional_type_references)
+                write_c_optional_struct(stream, declaration_database, optional_type_reference);
+        }
 
         for (iris::Declaration const& declaration : declarations)
             write_c_declaration(stream, declaration_database, core_module, declaration);

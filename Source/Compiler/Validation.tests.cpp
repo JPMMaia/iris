@@ -6127,6 +6127,125 @@ export function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates Optional member access", "[Validation][Optional]")
+    {
+        std::string_view const input = R"(module Optional_members;
+
+export function foo(a: Optional::<Int32>, b: Optional::<*mutable Int32>) -> ()
+{
+    var has_value: Bool = a.has_value;
+    var value: Int32 = a.value;
+    var pointer_has_value: Bool = b.has_value;
+    var pointer_value: *mutable Int32 = b.value;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates Optional unknown member access", "[Validation][Optional]")
+    {
+        std::string_view const input = R"(module Optional_unknown_member;
+
+export function foo(a: Optional::<Int32>) -> ()
+{
+    var value = a.data;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 17, 5, 23),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Member 'data' does not exist in the type 'Optional::<Int32>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates Optional zero initialization", "[Validation][Optional]")
+    {
+        std::string_view const input = R"(module Optional_zero_init;
+
+export struct My_struct
+{
+    a: Optional::<Int32> = {};
+    b: Optional::<*Int32> = {};
+}
+
+export function foo() -> ()
+{
+    var a: Optional::<Int32> = {};
+    var b: Optional::<*mutable Int32> = {};
+    var c: My_struct = {};
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates create_optional() function signature", "[Validation][Optional]")
+    {
+        std::string_view const input = R"(module Optional_create;
+
+export function foo() -> ()
+{
+    var a: Optional::<Int32> = create_optional::<Int32>();
+    var b: Optional::<Int32> = create_optional(1);
+    var c: Optional::<Uint32> = create_optional(1u32);
+    var d: Optional::<*mutable Int32> = create_optional::<*mutable Int32>();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates Optional in a function constructor", "[Validation][Optional]")
+    {
+        std::string_view const input = R"(module Optional_generic;
+
+export function_constructor first(value_type: Type)
+{
+    return function (values: Array_slice::<value_type>) -> (result: Optional::<value_type>)
+    {
+        if values.length == 0u64
+        {
+            return create_optional::<value_type>();
+        }
+
+        return create_optional(values[0]);
+    };
+}
+
+export function use(values: Array_slice::<Int32>) -> (result: Int32)
+{
+    var found = first::<Int32>(values);
+
+    if found.has_value
+    {
+        return found.value;
+    }
+
+    return 0;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates create_stack_array_uninitialized() function signature", "[Validation][Array_slices]")
     {
         std::string_view const input = R"(module Stack_array;

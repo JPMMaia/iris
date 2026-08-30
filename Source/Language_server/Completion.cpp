@@ -182,6 +182,20 @@ namespace iris::language_server
         );
     }
 
+    static void add_optional_member_items(
+        std::vector<lsp::CompletionItem>& items,
+        Optional_type const& type
+    )
+    {
+        items.push_back(
+            create_completion_item("value", lsp::CompletionItemKind::Field)
+        );
+
+        items.push_back(
+            create_completion_item("has_value", lsp::CompletionItemKind::Field)
+        );
+    }
+
     static void add_scope_variable_items(
         std::vector<lsp::CompletionItem>& items,
         iris::compiler::Scope const& scope
@@ -524,6 +538,19 @@ namespace iris::language_server
         {
             std::vector<lsp::CompletionItem> items = {};    
             add_array_slice_member_items(items, std::get<Array_slice_type>(expression_type.data));
+
+            return lsp::CompletionList
+            {
+                .isIncomplete = false,
+                .items = std::move(items),
+                .itemDefaults = std::nullopt,
+            };
+        }
+
+        if (is_optional_type_reference(expression_type))
+        {
+            std::vector<lsp::CompletionItem> items = {};
+            add_optional_member_items(items, std::get<Optional_type>(expression_type.data));
 
             return lsp::CompletionList
             {

@@ -2148,6 +2148,26 @@ namespace iris::compiler
                     };
                 }
             }
+            else if (std::holds_alternative<iris::Optional_type>(left_hand_side_type->data))
+            {
+                if (access_expression.member_name != "value" && access_expression.member_name != "has_value")
+                {
+                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format(
+                                "Member '{}' does not exist in the type '{}'.",
+                                access_expression.member_name,
+                                type_full_name
+                            )
+                        )
+                    };
+                }
+            }
             else if (std::holds_alternative<iris::Soa_array_type>(left_hand_side_type->data))
             {
                 if (access_expression.member_name != "data" && access_expression.member_name != "length" && access_expression.member_name != "view")
@@ -2659,6 +2679,10 @@ namespace iris::compiler
                 {
                     return std::pair<std::string_view, iris::Instance_call_expression>{"create_stack_array_uninitialized", instance_call_expression};
                 }
+                else if (variable_expression.name == "create_optional")
+                {
+                    return std::pair<std::string_view, iris::Instance_call_expression>{"create_optional", instance_call_expression};
+                }
                 else if (variable_expression.name == "reinterpret_as")
                 {
                     return std::pair<std::string_view, iris::Instance_call_expression>{"reinterpret_as", instance_call_expression};
@@ -2776,6 +2800,33 @@ namespace iris::compiler
                     .type = std::move(function_type),
                     .input_parameter_names = { "condition" },
                     .output_parameter_names = {}
+                };
+            }
+            else if (builtin_type_reference.value == "create_optional")
+            {
+                std::pmr::vector<iris::Type_reference> value_type;
+
+                if (expression.arguments.size() > 0)
+                {
+                    std::optional<Type_info> const first_argument_type_info = get_expression_type_info(parameters.core_module.name, nullptr, parameters.scope, parameters.statement, parameters.statement.expressions[expression.arguments[0].expression_index], std::nullopt, parameters.declaration_database);
+                    if (first_argument_type_info.has_value())
+                        value_type.push_back(first_argument_type_info->type);
+                }
+
+                iris::Function_type function_type
+                {
+                    .input_parameter_types = value_type,
+                    .output_parameter_types = {
+                        create_optional_type_reference(value_type)
+                    },
+                    .is_variadic = false,
+                };
+
+                return iris::Function_pointer_type
+                {
+                    .type = std::move(function_type),
+                    .input_parameter_names = { "value" },
+                    .output_parameter_names = { "optional" }
                 };
             }
             else if (builtin_type_reference.value == "create_array_slice_from_pointer")
@@ -3738,16 +3789,19 @@ namespace iris::compiler
         std::pmr::vector<iris::Declaration_instance_storage>& temporary_storage
     )
     {
-        if (std::holds_alternative<iris::Array_slice_type>(type_to_instantiate.data))
         {
-            iris::Array_slice_type const& array_slice = std::get<iris::Array_slice_type>(type_to_instantiate.data);
-            temporary_storage.push_back(
-                Declaration_instance_storage
-                {
-                    .data = create_array_slice_type_struct_declaration(array_slice.element_type)
-                }
-            );
-            return Declaration{ .data = &std::get<iris::Struct_declaration>(temporary_storage.back().data), .module_name = "iris.builtin", .is_export = true };
+            std::optional<iris::Struct_declaration> builtin_struct_declaration = iris::try_get_builtin_struct_declaration(type_to_instantiate);
+
+            if (builtin_struct_declaration.has_value())
+            {
+                temporary_storage.push_back(
+                    Declaration_instance_storage
+                    {
+                        .data = std::move(builtin_struct_declaration.value())
+                    }
+                );
+                return Declaration{ .data = &std::get<iris::Struct_declaration>(temporary_storage.back().data), .module_name = "iris.builtin", .is_export = true };
+            }
         }
 
         if (std::holds_alternative<iris::Soa_array_type>(type_to_instantiate.data))
@@ -3877,7 +3931,7 @@ namespace iris::compiler
             };
         }
 
-        if (is_primitive_type(type_to_instantiate.value()) || is_constant_array_type_reference(type_to_instantiate.value()))
+        if (is_primitive_type(type_to_instantiate.value()) || is_constant_array_type_reference(type_to_instantiate.value()) || is_optional_represented_as_pointer(type_to_instantiate.value()))
         {
             if (!expression.members.empty())
             {
@@ -4794,6 +4848,7 @@ namespace iris::compiler
         if (
             std::holds_alternative<iris::Instantiate_expression>(right_hand_side.data) &&
             !std::holds_alternative<iris::Array_slice_type>(type.data) &&
+            !std::holds_alternative<iris::Optional_type>(type.data) &&
             !std::holds_alternative<iris::Soa_array_type>(type.data) &&
             !std::holds_alternative<iris::Soa_array_view_type>(type.data) &&
             !std::holds_alternative<iris::Constant_array_type>(type.data) &&

@@ -70,6 +70,12 @@ namespace iris::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts optional_type.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "optional_type.iris";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts assert_expressions.iris", "[Convertor]")
     {
         std::string_view const input_file = "assert_expressions.iris";

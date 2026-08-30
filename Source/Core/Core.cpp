@@ -640,6 +640,7 @@ namespace iris
     {
         return name == "check" ||
                name == "create_array_slice_from_pointer" ||
+               name == "create_optional" ||
                name == "create_stack_array_uninitialized" ||
                name == "offset_pointer" ||
                name == "reinterpret_as" ||

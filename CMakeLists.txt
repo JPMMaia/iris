@@ -23,6 +23,9 @@ include(CTest)
 
 if (MSVC)
     add_compile_options("/EHsc")
+    # Translation units that switch over Type_reference exceed the default COFF section
+    # limit (C1128); every added variant alternative brings more of them over the line.
+    add_compile_options("/bigobj")
 else ()
     if (CMAKE_DEBUG_TYPE STREQUAL "Debug")
         add_compile_options("-gdwarf-4")

@@ -2176,6 +2176,21 @@
     }
   },
   {
+    "type": "Optional_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "Pointer_type",
     "named": true,
     "fields": {},
@@ -2446,6 +2461,10 @@
         },
         {
           "type": "Module_type",
+          "named": true
+        },
+        {
+          "type": "Optional_type",
           "named": true
         },
         {
@@ -2873,6 +2892,10 @@
   {
     "type": "Number",
     "named": true
+  },
+  {
+    "type": "Optional",
+    "named": false
   },
   {
     "type": "Reflection_identifier",

@@ -332,6 +332,176 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Optional type", "[LLVM_IR]")
+  {
+    char const* const input_file = "optional_type_codegen.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+%struct.iris_builtin_Optional_Int32 = type {{ i32, i8 }}
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
+
+@function_contract_error_string = private unnamed_addr constant [73 x i8] c"Read '.value' of an empty Optional in 'Optional_type_codegen.use_value'!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [75 x i8] c"Read '.value' of an empty Optional in 'Optional_type_codegen.use_generic'!\00"
+
+; Function Attrs: convergent
+define i32 @Optional_type_codegen_use_value(i64 noundef %"arguments[0].a") #0 {{
+entry:
+  %0 = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %1 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 0
+  store i64 %"arguments[0].a", ptr %1, align 4
+  %2 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 1
+  %3 = load i8, ptr %2, align 1
+  %4 = trunc i8 %3 to i1
+  br i1 %4, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  %5 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 1
+  %6 = load i8, ptr %5, align 1
+  %7 = trunc i8 %6 to i1
+  br i1 %7, label %optional_value_check_pass, label %optional_value_check_fail
+
+if_s1_after:                                      ; preds = %entry
+  ret i32 0
+
+optional_value_check_pass:                        ; preds = %if_s0_then
+  %8 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 0
+  %9 = load i32, ptr %8, align 4
+  ret i32 %9
+
+optional_value_check_fail:                        ; preds = %if_s0_then
+  %10 = call i32 @puts(ptr @function_contract_error_string)
+  call void @abort()
+  unreachable
+}}
+
+; Function Attrs: convergent
+define i1 @Optional_type_codegen_use_pointer(ptr noundef %"arguments[0].a") #0 {{
+entry:
+  %a = alloca ptr, align 8
+  store ptr %"arguments[0].a", ptr %a, align 8
+  %0 = load ptr, ptr %a, align 8
+  %1 = icmp ne ptr %0, null
+  ret i1 %1
+}}
+
+; Function Attrs: convergent
+define i64 @Optional_type_codegen_make() #0 {{
+entry:
+  %optional = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %0 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 0
+  store i32 1, ptr %0, align 4
+  %1 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 1
+  store i1 true, ptr %1, align 1
+  %2 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 0
+  %3 = load i64, ptr %2, align 4
+  ret i64 %3
+}}
+
+; Function Attrs: convergent
+define i64 @Optional_type_codegen_make_empty() #0 {{
+entry:
+  %optional = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %0 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 1
+  store i1 false, ptr %0, align 1
+  %1 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 0
+  %2 = load i64, ptr %1, align 4
+  ret i64 %2
+}}
+
+; Function Attrs: convergent
+define i32 @Optional_type_codegen_use_generic(ptr %"arguments[0].values_0", i64 %"arguments[0].values_1") #0 {{
+entry:
+  %values = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %0 = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %found = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 0
+  store ptr %"arguments[0].values_0", ptr %1, align 8
+  %2 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 1
+  store i64 %"arguments[0].values_1", ptr %2, align 8
+  %3 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  %5 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 1
+  %6 = load i64, ptr %5, align 8
+  %7 = call i64 @Optional_type_codegen__at__first__at__9454275149910341776(ptr %4, i64 %6)
+  %8 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 0
+  store i64 %7, ptr %8, align 4
+  %9 = load %struct.iris_builtin_Optional_Int32, ptr %0, align 4
+  store %struct.iris_builtin_Optional_Int32 %9, ptr %found, align 4
+  %10 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 1
+  %11 = load i8, ptr %10, align 1
+  %12 = trunc i8 %11 to i1
+  br i1 %12, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  %13 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 1
+  %14 = load i8, ptr %13, align 1
+  %15 = trunc i8 %14 to i1
+  br i1 %15, label %optional_value_check_pass, label %optional_value_check_fail
+
+if_s1_after:                                      ; preds = %entry
+  ret i32 0
+
+optional_value_check_pass:                        ; preds = %if_s0_then
+  %16 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 0
+  %17 = load i32, ptr %16, align 4
+  ret i32 %17
+
+optional_value_check_fail:                        ; preds = %if_s0_then
+  %18 = call i32 @puts(ptr @function_contract_error_string.1)
+  call void @abort()
+  unreachable
+}}
+
+; Function Attrs: convergent
+define private i64 @Optional_type_codegen__at__first__at__9454275149910341776(ptr %"arguments[0].values_0", i64 %"arguments[0].values_1") #0 {{
+entry:
+  %values = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %optional = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %optional1 = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %0 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 0
+  store ptr %"arguments[0].values_0", ptr %0, align 8
+  %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 1
+  store i64 %"arguments[0].values_1", ptr %1, align 8
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %values, i32 0, i32 1
+  %3 = load i64, ptr %2, align 8
+  %4 = icmp eq i64 %3, 0
+  br i1 %4, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  %5 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 1
+  store i1 false, ptr %5, align 1
+  %6 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 0
+  %7 = load i64, ptr %6, align 4
+  ret i64 %7
+
+if_s1_after:                                      ; preds = %entry
+  %8 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %values, i32 0, i32 0
+  %9 = load ptr, ptr %8, align 8
+  %array_slice_element_pointer = getelementptr i32, ptr %9, i32 0
+  %10 = load i32, ptr %array_slice_element_pointer, align 4
+  %11 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional1, i32 0, i32 0
+  store i32 %10, ptr %11, align 4
+  %12 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional1, i32 0, i32 1
+  store i1 true, ptr %12, align 1
+  %13 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional1, i32 0, i32 0
+  %14 = load i64, ptr %13, align 4
+  ret i64 %14
+}}
+
+declare i32 @puts(ptr)
+
+declare void @abort()
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+)");
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Array Slices", "[LLVM_IR]")
   {
     char const* const input_file = "array_slices.iris";

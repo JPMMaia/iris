@@ -184,6 +184,43 @@ namespace iris::c
         CHECK(exported_cpp_header.content == full_expected_content);
     }
 
+    TEST_CASE("Export Optional type", "[C_header_exporter][Optional]")
+    {
+        std::string_view const source = R"RAW(module my.namespace;
+
+export struct My_struct
+{
+    a: Optional::<Int32> = {};
+    b: Optional::<*Int32> = {};
+    c: *Int32 = null;
+}
+)RAW";
+
+        std::string_view const expected = R"RAW(
+struct Optional_Int32
+{
+    int32_t value;
+    bool has_value;
+};
+
+/** IRIS_META v=1 module=my.namespace name=My_struct kind=struct raw_pointer_members=c */
+struct my_namespace_My_struct
+{
+    struct Optional_Int32 a;
+    int32_t const* b;
+    int32_t const* c;
+};
+
+struct Array_slice_my_namespace_My_struct
+{
+    struct my_namespace_My_struct* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(source, {}, {}, expected);
+    }
+
     TEST_CASE("Export structs")
     {
         std::string_view const input = R"RAW(module my.namespace;
@@ -400,7 +437,7 @@ export struct My_struct_b
 )RAW";
 
         std::string_view const expected = R"RAW(
-/** IRIS_META v=1 module=my.namespace name=My_node kind=struct */
+/** IRIS_META v=1 module=my.namespace name=My_node kind=struct raw_pointer_members=parent */
 struct my_namespace_My_node
 {
     struct my_namespace_My_node const* parent;
@@ -1104,7 +1141,7 @@ struct Array_slice_my_namespace_Comparator
     uint64_t size;
 };
 
-/** IRIS_META v=1 module=my.namespace name=Sorter kind=struct */
+/** IRIS_META v=1 module=my.namespace name=Sorter kind=struct raw_pointer_members=data */
 struct my_namespace_Sorter
 {
     struct my_namespace_Comparator compare;

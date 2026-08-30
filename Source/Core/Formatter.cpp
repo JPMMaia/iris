@@ -1825,6 +1825,13 @@ namespace iris
             add_integer_text(buffer, value.size);
             add_text(buffer, ">");
         }
+        else if (std::holds_alternative<Optional_type>(type.data))
+        {
+            Optional_type const& value = std::get<Optional_type>(type.data);
+            add_text(buffer, "Optional::<");
+            add_format_type_name(buffer, value.value_type, options);
+            add_text(buffer, ">");
+        }
         else if (std::holds_alternative<Custom_type_reference>(type.data))
         {
             Custom_type_reference const& value = std::get<Custom_type_reference>(type.data);

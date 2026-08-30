@@ -79,6 +79,12 @@ namespace iris
     export Type_reference create_null_pointer_type_type_reference();
     export bool is_null_pointer_type(Type_reference const& type);
 
+    export Type_reference create_optional_type_reference(std::pmr::vector<Type_reference> value_type);
+    export bool is_optional_type_reference(Type_reference const& type);
+    export std::optional<Type_reference> get_optional_value_type(Type_reference const& type);
+    // True when Optional::<T> is represented as a bare pointer instead of a { value, has_value } record.
+    export bool is_optional_represented_as_pointer(Type_reference const& type);
+
     export Type_reference create_pointer_type_type_reference(std::pmr::vector<Type_reference> element_type, bool const is_mutable);
     export std::optional<Type_reference> remove_pointer(Type_reference const& type);
     export bool is_pointer(Type_reference const& type);
@@ -90,6 +96,17 @@ namespace iris
     export std::optional<std::string_view> get_type_module_name(Type_reference const& type);
 
     export iris::Struct_declaration create_array_slice_type_struct_declaration(std::pmr::vector<Type_reference> const& element_type);
+    export iris::Struct_declaration create_optional_type_struct_declaration(std::pmr::vector<Type_reference> const& value_type);
+
+    // Stable, C-identifier-safe record name for one Optional::<T> instantiation. The compiler uses it
+    // as the synthetic Clang record name and the C header exporter as the emitted struct name, so the
+    // compiled layout and the exported header describe the same type by construction.
+    export std::pmr::string mangle_optional_type_name(std::pmr::vector<Type_reference> const& value_type);
+
+    // Returns the synthetic struct declaration that describes the members of a builtin
+    // generic type, or nullopt if the type is not one. Member lookup, GEP index computation
+    // and member-access validation are then reused from the ordinary struct machinery.
+    export std::optional<iris::Struct_declaration> try_get_builtin_struct_declaration(Type_reference const& type_reference);
 
     export template <typename Value_t, typename Function_t>
         bool visit_type_references_recursively(
@@ -145,6 +162,17 @@ namespace iris
         {
             Array_slice_type const& data = std::get<Array_slice_type>(type_reference.data);
             for (Type_reference const& nested_type_reference : data.element_type)
+            {
+                if (visit_type_references_recursively(nested_type_reference, predicate))
+                    return true;
+            }
+
+            return false;
+        }
+        else if (std::holds_alternative<Optional_type>(type_reference.data))
+        {
+            Optional_type const& data = std::get<Optional_type>(type_reference.data);
+            for (Type_reference const& nested_type_reference : data.value_type)
             {
                 if (visit_type_references_recursively(nested_type_reference, predicate))
                     return true;

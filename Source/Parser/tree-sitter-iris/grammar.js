@@ -43,6 +43,7 @@ module.exports = grammar({
       $.Soa_array_type,
       $.Soa_array_view_type,
       $.Array_slice_type,
+      $.Optional_type,
       $.Function_pointer_type,
       $.Type_instance_type
     ),
@@ -52,6 +53,7 @@ module.exports = grammar({
     Module_type_type_name: $ => $.Identifier,
     Pointer_type: $ => prec(13, seq("*", optional("mutable"), $.Type)),
     Array_slice_type: $ => seq("Array_slice", "::<", optional("mutable"), $.Type, ">"),
+    Optional_type: $ => seq("Optional", "::<", $.Type, ">"),
     Constant_array_type: $ => seq("Constant_array", "::<", $.Type, ",", $.Constant_array_length, ">"),
     Constant_array_length: $ => $.Number,
     Soa_array_type: $ => seq("Soa_array", "::<", $.Type, ",", $.Soa_array_length, ">"),

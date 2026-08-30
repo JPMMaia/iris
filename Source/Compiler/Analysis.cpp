@@ -1360,6 +1360,32 @@ namespace iris::compiler
 
                 return std::nullopt;
             }
+            else if (std::holds_alternative<iris::Optional_type>(type_reference.value().data))
+            {
+                iris::Optional_type const& optional_type = std::get<iris::Optional_type>(type_reference.value().data);
+
+                if (data.member_name == "value")
+                {
+                    if (optional_type.value_type.empty())
+                        return std::nullopt;
+
+                    return Type_info
+                    {
+                        .type = optional_type.value_type.front(),
+                        .is_mutable = false,
+                    };
+                }
+                else if (data.member_name == "has_value")
+                {
+                    return Type_info
+                    {
+                        .type = iris::create_bool_type_reference(),
+                        .is_mutable = false,
+                    };
+                }
+
+                return std::nullopt;
+            }
             else if (std::holds_alternative<iris::Soa_array_type>(type_reference.value().data))
             {
                 if (data.member_name == "data")
@@ -1756,6 +1782,26 @@ namespace iris::compiler
                         .is_mutable = false,
                     };
                 }
+                else if (builtin_type_reference.value == "create_optional")
+                {
+                    // create_optional(value) deduces Optional::<type_of(value)>.
+                    // create_optional() without a type argument produces a validation error.
+                    std::pmr::vector<iris::Type_reference> value_type;
+
+                    if (data.arguments.size() > 0)
+                    {
+                        std::optional<Type_info> const first_argument_type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
+
+                        if (first_argument_type_info.has_value())
+                            value_type.push_back(first_argument_type_info->type);
+                    }
+
+                    return Type_info
+                    {
+                        .type = create_optional_type_reference(std::move(value_type)),
+                        .is_mutable = false,
+                    };
+                }
                 else if (builtin_type_reference.value == "offset_pointer")
                 {
                     if (data.arguments.size() == 0)
@@ -2085,6 +2131,32 @@ namespace iris::compiler
                             .is_mutable = false,
                         };
                     }
+                    else if (variable_expression.name == "create_optional")
+                    {
+                        std::pmr::vector<iris::Type_reference> value_type;
+                        if (data.arguments.size() > 0)
+                        {
+                            iris::Statement const argument = data.arguments[0];
+                            if (!argument.expressions.empty() && std::holds_alternative<iris::Type_expression>(argument.expressions[0].data))
+                            {
+                                iris::Type_expression const& type_expression = std::get<iris::Type_expression>(argument.expressions[0].data);
+                                value_type.push_back(type_expression.type);
+                            }
+                        }
+
+                        iris::Function_type function_type
+                        {
+                            .input_parameter_types = {},
+                            .output_parameter_types = {create_optional_type_reference(value_type)},
+                            .is_variadic = false,
+                        };
+
+                        return Type_info
+                        {
+                            .type = create_function_type_type_reference(std::move(function_type), {}, {"optional"}),
+                            .is_mutable = false,
+                        };
+                    }
                     else if (variable_expression.name == "reinterpret_as")
                     {
                         std::pmr::vector<iris::Type_reference> element_type;
@@ -2303,6 +2375,15 @@ namespace iris::compiler
                 return std::nullopt;
 
             if (std::holds_alternative<iris::Array_slice_type>(type_to_instantiate->data))
+            {
+                return Type_info
+                {
+                    .type = type_to_instantiate.value(),
+                    .is_mutable = false,
+                };
+            }
+
+            if (std::holds_alternative<iris::Optional_type>(type_to_instantiate->data))
             {
                 return Type_info
                 {

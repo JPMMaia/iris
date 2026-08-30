@@ -1,0 +1,23 @@
+module Optional_type;
+
+export struct My_struct
+{
+    a: Optional::<Int32> = {};
+    b: Optional::<*Int32> = {};
+}
+
+export function take(a: Optional::<Int32>, b: Optional::<*mutable Int32>) -> ()
+{
+    var has_value: Bool = a.has_value;
+    var value: Int32 = a.value;
+}
+
+export function run() -> ()
+{
+    var a: Optional::<Int32> = {};
+    var b = create_optional::<Int32>();
+    var c = create_optional(1);
+    var d: Optional::<*mutable Int32> = {};
+
+    take(a, d);
+}

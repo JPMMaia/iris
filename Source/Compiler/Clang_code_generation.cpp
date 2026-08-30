@@ -560,6 +560,13 @@ namespace iris::compiler
         return clang_function_declaration;
     }
 
+    static void ensure_clang_optional_type_declaration(
+        clang::ASTContext& clang_ast_context,
+        Declaration_database const& declaration_database,
+        Clang_declaration_database& clang_declaration_database,
+        Type_reference const& optional_type_reference
+    );
+
     void add_clang_struct_declaration(
         Clang_declaration_database& clang_declaration_database,
         clang::ASTContext& clang_ast_context,
@@ -724,6 +731,35 @@ namespace iris::compiler
             auto instance_iterator = clang_declaration_database.map.emplace(instance_custom_type_reference->module_reference.name, Clang_module_declarations{}).first;
             add_clang_union_declaration(instance_iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
         }
+
+        // Each distinct Optional::<T> in this module needs its own record, because its layout depends
+        // on T (unlike Array_slice, where one type-erased record serves every T). Mint them before any
+        // struct definition or function signature that might refer to one.
+        visit_type_references(
+            core_module,
+            [&](std::string_view const, iris::Type_reference const& type_reference) -> bool
+            {
+                visit_type_references_recursively(
+                    type_reference,
+                    [&](iris::Type_reference const& nested_type_reference) -> bool
+                    {
+                        if (std::holds_alternative<iris::Optional_type>(nested_type_reference.data))
+                        {
+                            ensure_clang_optional_type_declaration(
+                                clang_ast_context,
+                                declaration_database,
+                                clang_declaration_database,
+                                nested_type_reference
+                            );
+                        }
+
+                        return false;
+                    }
+                );
+
+                return false;
+            }
+        );
 
         for (iris::Alias_type_declaration const& alias_type_declaration : core_module.export_declarations.alias_type_declarations)
             add_clang_alias_type_declaration(iterator->second.alias_type_declarations, clang_ast_context, alias_type_declaration, declaration_database, clang_declaration_database);
@@ -2122,6 +2158,32 @@ namespace iris::compiler
         return record_declaration;
     }
 
+    // Optional::<T> has no user declaration to look up: its record is synthesized per T, because
+    // unlike Array_slice (pointer + length for every T) its layout depends on T.
+    static void ensure_clang_optional_type_declaration(
+        clang::ASTContext& clang_ast_context,
+        Declaration_database const& declaration_database,
+        Clang_declaration_database& clang_declaration_database,
+        Type_reference const& optional_type_reference
+    )
+    {
+        // Optional of a pointer is a bare pointer; only the pointee needs a declaration.
+        if (iris::is_optional_represented_as_pointer(optional_type_reference))
+            return;
+
+        std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(optional_type_reference);
+        if (!struct_declaration.has_value())
+            return;
+
+        auto iterator = clang_declaration_database.map.emplace("iris.builtin", Clang_module_declarations{}).first;
+        if (iterator->second.struct_declarations.contains(struct_declaration->name))
+            return;
+
+        clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, "iris.builtin", struct_declaration.value());
+        iterator->second.struct_declarations.emplace(struct_declaration->name, record_declaration);
+        set_clang_struct_definition(clang_ast_context, *record_declaration, struct_declaration.value(), declaration_database, clang_declaration_database);
+    }
+
     static void ensure_clang_custom_type_declaration(
         clang::ASTContext& clang_ast_context,
         Declaration_database const& declaration_database,
@@ -2162,6 +2224,17 @@ namespace iris::compiler
                     clang_declaration_database,
                     "iris.builtin",
                     "Generic_array_slice"
+                );
+                return false;
+            }
+
+            if (std::holds_alternative<Optional_type>(type_reference.data))
+            {
+                ensure_clang_optional_type_declaration(
+                    clang_ast_context,
+                    declaration_database,
+                    clang_declaration_database,
+                    type_reference
                 );
                 return false;
             }
@@ -2748,6 +2821,37 @@ namespace iris::compiler
                 throw std::runtime_error{"Cannot find Builtin.Generic_array_slice!"};
 
             clang::RecordDecl* const record_declaration = array_slice_type_location->second;
+            return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
+        }
+        else if (std::holds_alternative<iris::Optional_type>(type_reference.data))
+        {
+            iris::Optional_type const& optional_type = std::get<iris::Optional_type>(type_reference.data);
+
+            // Optional::<*T> is represented as the bare pointer itself.
+            if (iris::is_optional_represented_as_pointer(type_reference))
+            {
+                return create_type(
+                    clang_ast_context,
+                    optional_type.value_type.front(),
+                    alloca_type,
+                    declaration_database,
+                    clang_declaration_database
+                );
+            }
+
+            // Every other T gets its own record, because the layout depends on T.
+            std::pmr::string const record_name = iris::mangle_optional_type_name(optional_type.value_type);
+
+            auto const module_declarations_location = clang_declaration_database.map.find("iris.builtin");
+            if (module_declarations_location == clang_declaration_database.map.end())
+                throw std::runtime_error{"Cannot find Builtin module!"};
+            Clang_module_declarations const& module_declarations = module_declarations_location->second;
+
+            auto const optional_type_location = module_declarations.struct_declarations.find(record_name.c_str());
+            if (optional_type_location == module_declarations.struct_declarations.end())
+                throw std::runtime_error{ std::format("Cannot find Builtin.{}!", record_name) };
+
+            clang::RecordDecl* const record_declaration = optional_type_location->second;
             return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
         }
         else if (std::holds_alternative<iris::Builtin_type_reference>(type_reference.data))

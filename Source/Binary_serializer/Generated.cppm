@@ -164,6 +164,18 @@ namespace iris::binary_serializer
     }
 
     template <>
+    void serialize(Serializer& serializer, Optional_type const& value)
+    {
+        serialize(serializer, value.value_type);
+    }
+
+    template <>
+    void deserialize(Deserializer& deserializer, Optional_type& value)
+    {
+        deserialize(deserializer, value.value_type);
+    }
+
+    template <>
     void serialize(Serializer& serializer, Pointer_type const& value)
     {
         serialize(serializer, value.element_type);

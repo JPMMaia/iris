@@ -800,6 +800,30 @@ namespace iris::parser
 
             return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
         }
+        else if (type_choice == "Optional_type")
+        {
+            iris::Optional_type output = {};
+
+            std::optional<Parse_node> const value_type_node = get_child_node(tree, child, 2);
+            if (value_type_node.has_value())
+            {
+                std::optional<iris::Type_reference> value_type = node_to_type_reference(
+                    module_info,
+                    tree,
+                    value_type_node.value(),
+                    output_allocator,
+                    temporaries_allocator
+                );
+
+                if (value_type.has_value())
+                {
+                    output.value_type = std::pmr::vector<iris::Type_reference>{output_allocator};
+                    output.value_type.emplace_back(std::move(value_type.value()));
+                }
+            }
+
+            return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
+        }
         else if (type_choice == "Constant_array_type")
         {
             iris::Constant_array_type output = {};
