@@ -5,6 +5,12 @@ struct My_struct
     a: Constant_array::<Int32, 4> = [0, 2, 4, 6];
 }
 
+mutable g_empty_array: Constant_array::<Int32, 2> = [];
+
+var g_empty_struct_array: Constant_array::<My_struct, 2> = [];
+
+var g_filled_array: Constant_array::<Int32, 3> = [1, 2, 3];
+
 export function foo() -> ()
 {
     var a = [];

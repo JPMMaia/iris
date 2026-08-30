@@ -4440,14 +4440,21 @@ namespace iris::compiler
 
                 llvm::ArrayType* const array_type = llvm::ArrayType::get(llvm_element_type, array_length);
 
+                llvm::Constant* const zero_value = llvm::ConstantAggregateZero::get(array_type);
+                if (parameters.llvm_parent_function == nullptr)
+                {
+                    return Value_and_type
+                    {
+                        .name = "",
+                        .value = zero_value,
+                        .type = create_constant_array_type_reference({element_type}, array_length),
+                    };
+                }
+
                 // The allocated type is already [array_length x element], so the alloca must
                 // reserve a single instance of it. Passing array_length as the array size
                 // operand would reserve array_length * array_length elements.
                 llvm::AllocaInst* const array_alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, array_type, "array");
-
-                // Same form the zero_initialized {} path emits, so that both spellings of a
-                // zeroed constant array produce identical code.
-                llvm::Constant* const zero_value = llvm::ConstantAggregateZero::get(array_type);
                 create_store_instruction(llvm_builder, llvm_data_layout, zero_value, array_alloca);
 
                 return Value_and_type

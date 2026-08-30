@@ -2339,6 +2339,10 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     char const* const expected_llvm_ir = R"(
 %struct.Constant_array_expressions_My_struct = type { [4 x i32] }
 
+@Constant_array_expressions_g_empty_array = global [2 x i32] zeroinitializer
+@Constant_array_expressions_g_empty_struct_array = constant [2 x %struct.Constant_array_expressions_My_struct] zeroinitializer
+@Constant_array_expressions_g_filled_array = constant [3 x i32] [i32 1, i32 2, i32 3]
+
 ; Function Attrs: convergent
 define void @Constant_array_expressions_foo() #0 {
 entry:
