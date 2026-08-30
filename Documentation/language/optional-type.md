@@ -109,4 +109,4 @@ export function_constructor first(value_type: Type)
 
 See [Exporting as a C Header](../interop/exporting-as-c-header.md) and
 [Importing C Libraries](../interop/importing-c.md) for how `Optional::<T>` is spelled in a C header
-and how C pointers are read back as optionals.
+and how C pointer members can be imported as optionals.

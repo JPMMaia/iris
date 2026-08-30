@@ -344,7 +344,7 @@ namespace iris::c
 
         {
             CHECK(actual.member_names[1] == "pNext");
-            CHECK(actual.member_types[1] == iris::create_optional_type_reference({ iris::create_pointer_type_type_reference({}, false) }));
+            CHECK(actual.member_types[1] == iris::create_pointer_type_type_reference({}, false));
             CHECK(actual.member_bit_fields[1].has_value() == false);
         }
 
@@ -700,7 +700,7 @@ namespace iris::c
         CHECK(actual.member_default_values[0] == iris::create_statement(iris::create_enum_value_expressions("VkStructureType", "Application_info")));
 
         CHECK(actual.member_names[1] == "pNext");
-        CHECK(actual.member_types[1] == iris::create_optional_type_reference({ iris::create_pointer_type_type_reference({}, false) }));
+        CHECK(actual.member_types[1] == iris::create_pointer_type_type_reference({}, false));
         CHECK(actual.member_bit_fields[1].has_value() == false);
         CHECK(actual.member_default_values[1] == iris::create_statement({ iris::create_null_pointer_expression() }));
 
@@ -730,7 +730,7 @@ namespace iris::c
         CHECK(actual.member_default_values[6] == iris::create_statement({ iris::create_constant_expression(uint32_type, "0") }));
 
         CHECK(actual.member_names[7] == "pQueueFamilyIndices");
-        CHECK(actual.member_types[7] == iris::create_optional_type_reference({ iris::create_pointer_type_type_reference({ iris::create_integer_type_type_reference(32, false) }, false) }));
+        CHECK(actual.member_types[7] == iris::create_pointer_type_type_reference({ iris::create_integer_type_type_reference(32, false) }, false));
         CHECK(actual.member_bit_fields[7].has_value() == false);
         CHECK(actual.member_default_values[7] == iris::create_statement({ iris::create_null_pointer_expression() }));
     }
@@ -2083,7 +2083,7 @@ typedef My_int My_alias;
         }
     }
 
-    TEST_CASE("C pointer members import as Optional by default", "[C_header_importer][Optional]")
+    TEST_CASE("C pointer members import as plain pointers by default", "[C_header_importer][Optional]")
     {
         std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "optional_default";
         std::filesystem::create_directories(root_directory_path);
@@ -2100,6 +2100,40 @@ struct Node
         iris::common::write_to_file(header_file_path, header_content);
 
         std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.node", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+
+        iris::Struct_declaration const& actual = iris::c::find_struct_declaration(header_module_optional.value(), "Node");
+
+        REQUIRE(actual.member_names.size() == 2);
+        CHECK(actual.member_names[0] == "parent");
+        CHECK(!iris::is_optional_type_reference(actual.member_types[0]));
+        CHECK(iris::is_pointer(actual.member_types[0]));
+
+        // A non-pointer member is untouched.
+        CHECK(actual.member_names[1] == "value");
+        CHECK(!iris::is_optional_type_reference(actual.member_types[1]));
+    }
+
+    TEST_CASE("wrap_pointers_as_optional=true imports pointer members as Optional", "[C_header_importer][Optional]")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "optional_enabled";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+struct Node
+{
+    struct Node* parent;
+    int value;
+};
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "node.h";
+        iris::common::write_to_file(header_file_path, header_content);
+
+        iris::c::Options options = {};
+        options.wrap_pointers_as_optional = true;
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.node", header_file_path, options);
         REQUIRE(header_module_optional.has_value());
 
         iris::Struct_declaration const& actual = iris::c::find_struct_declaration(header_module_optional.value(), "Node");
@@ -2131,7 +2165,10 @@ struct Node
         std::filesystem::path const header_file_path = root_directory_path / "node.h";
         iris::common::write_to_file(header_file_path, header_content);
 
-        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.node", header_file_path, {});
+        iris::c::Options options = {};
+        options.wrap_pointers_as_optional = true;
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.node", header_file_path, options);
         REQUIRE(header_module_optional.has_value());
 
         iris::Struct_declaration const& actual = iris::c::find_struct_declaration(header_module_optional.value(), "Node");

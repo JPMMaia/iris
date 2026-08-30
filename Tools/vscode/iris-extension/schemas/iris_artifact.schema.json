@@ -210,8 +210,8 @@
                       },
                       "wrap_pointers_as_optional": {
                         "type": "boolean",
-                        "default": true,
-                        "description": "When true (the default), pointer members of this header's structs and unions are imported as Optional::<*T>. Set to false to import them as plain *T. Overrides the source group's setting for this header only."
+                        "default": false,
+                        "description": "When true, pointer members of this header's structs and unions are imported as Optional::<*T>. Defaults to false, importing them as plain *T. Overrides the source group's setting for this header only."
                       }
                     }
                   }
@@ -239,8 +239,8 @@
                 },
                 "wrap_pointers_as_optional": {
                   "type": "boolean",
-                  "default": true,
-                  "description": "When true (the default), pointer members of imported structs and unions are imported as Optional::<*T>. Set to false to import them as plain *T for every header in this group. A header's own setting wins over this one."
+                  "default": false,
+                  "description": "When true, pointer members of imported structs and unions are imported as Optional::<*T> for every header in this group. Defaults to false, importing them as plain *T. A header's own setting wins over this one."
                 }
               }
             }

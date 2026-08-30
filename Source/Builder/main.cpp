@@ -84,10 +84,10 @@ argparse::Argument& add_header_remove_prefix_argument(argparse::ArgumentParser& 
         .append();
 }
 
-argparse::Argument& add_no_optional_pointers_argument(argparse::ArgumentParser& command)
+argparse::Argument& add_optional_pointers_argument(argparse::ArgumentParser& command)
 {
-    return command.add_argument("--no-optional-pointers")
-        .help("Import pointer members of C structs and unions as plain '*T' instead of the default 'Optional::<*T>'. The raw_pointer_members= IRIS_META field is unnecessary when this is set.")
+    return command.add_argument("--optional-pointers")
+        .help("Import pointer members of C structs and unions as 'Optional::<*T>' instead of the default plain '*T'. Members named in a raw_pointer_members= IRIS_META field stay '*T' even when this is set.")
         .flag();
 }
 
@@ -533,7 +533,7 @@ int main(int const argc, char const* const* argv)
     add_header_search_path_argument(import_c_header_command);
     add_header_public_prefix_argument(import_c_header_command);
     add_header_remove_prefix_argument(import_c_header_command);
-    add_no_optional_pointers_argument(import_c_header_command);
+    add_optional_pointers_argument(import_c_header_command);
     program.add_subparser(import_c_header_command);
 
     // iris print-struct-layout <file> <struct_name> [--target=<target_triple>]
@@ -780,7 +780,7 @@ int main(int const argc, char const* const* argv)
         std::pmr::vector<std::pmr::string> const public_prefixes = convert_to_vector(subprogram.get<std::vector<std::string>>("--header-public-prefix"));
         std::pmr::vector<std::pmr::string> const remove_prefixes = convert_to_vector(subprogram.get<std::vector<std::string>>("--header-remove-prefix"));
 
-        bool const no_optional_pointers = subprogram.get<bool>("--no-optional-pointers");
+        bool const optional_pointers = subprogram.get<bool>("--optional-pointers");
 
         iris::c::Options const options
         {
@@ -788,7 +788,7 @@ int main(int const argc, char const* const* argv)
             .include_directories = header_search_paths,
             .public_prefixes = public_prefixes,
             .remove_prefixes = remove_prefixes,
-            .wrap_pointers_as_optional = !no_optional_pointers,
+            .wrap_pointers_as_optional = optional_pointers,
         };
 
         std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(module_name, input_file_path, output_file_path, options);

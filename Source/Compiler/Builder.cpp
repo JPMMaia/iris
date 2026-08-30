@@ -715,11 +715,11 @@ namespace iris::compiler
             .public_prefixes = source_group.public_prefixes,
             .remove_prefixes = source_group.remove_prefixes,
             .allow_errors = force_allow_errors ? true : (c_header.allow_errors.has_value() ? c_header.allow_errors.value() : false),
-            // Per-header setting wins over the source group's; the default is to wrap.
+            // Per-header setting wins over the source group's; the default is not to wrap.
             .wrap_pointers_as_optional =
                 c_header.wrap_pointers_as_optional.has_value() ? c_header.wrap_pointers_as_optional.value() :
                 source_group.wrap_pointers_as_optional.has_value() ? source_group.wrap_pointers_as_optional.value() :
-                true,
+                false,
         };
 
         ::printf("Importing c header \"%s\"\n    output is \"%s\"\n", header_path->generic_string().c_str(), output_header_module_path.generic_string().c_str());

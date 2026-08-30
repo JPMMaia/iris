@@ -81,8 +81,10 @@ The struct's members are generated from the same declaration the compiler lays o
 and the compiled type always agree.
 
 Because C cannot distinguish an optional pointer from a plain one, the exporter records which
-members were a plain `*T` in the struct's `IRIS_META` comment as `raw_pointer_members=`, which is
-what makes an export/import round trip lossless. See [Importing C Libraries](./importing-c.md).
+members were a plain `*T` in the struct's `IRIS_META` comment as `raw_pointer_members=`. That is what
+makes an export/import round trip lossless when the import side asks for pointer members to be
+wrapped as optionals — importing does not wrap by default. See
+[Importing C Libraries](./importing-c.md).
 
 ## Limitations
 
