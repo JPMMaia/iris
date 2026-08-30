@@ -131,6 +131,8 @@ namespace iris::c
         std::pmr::string declaration_name;
         std::pmr::string kind;
         std::optional<std::pmr::string> data;
+        // Members that were a plain *T in Iris. Every other pointer member is rebuilt as Optional::<*T>.
+        std::pmr::vector<std::pmr::string> raw_pointer_members;
     };
 
     std::optional<std::string_view> find_iris_meta_field(
@@ -157,6 +159,46 @@ namespace iris::c
             return std::nullopt;
 
         return raw_comment.substr(value_begin, value_end - value_begin);
+    }
+
+    // `raw_pointer_members=` holds a space-separated list, so unlike the single-valued fields it runs
+    // to `data=` (always written last) or to the end of the comment.
+    std::pmr::vector<std::pmr::string> find_iris_meta_raw_pointer_members(
+        std::string_view const raw_comment
+    )
+    {
+        std::pmr::vector<std::pmr::string> result;
+
+        constexpr std::string_view key = "raw_pointer_members=";
+        std::size_t const start = raw_comment.find(key);
+        if (start == std::string_view::npos)
+            return result;
+
+        std::string_view value = raw_comment.substr(start + key.size());
+
+        std::size_t const data_offset = value.find(" data=");
+        if (data_offset != std::string_view::npos)
+            value = value.substr(0, data_offset);
+
+        std::size_t const comment_end = value.rfind("*/");
+        if (comment_end != std::string_view::npos)
+            value = value.substr(0, comment_end);
+
+        std::size_t offset = 0;
+        while (offset < value.size())
+        {
+            while (offset < value.size() && std::isspace(static_cast<unsigned char>(value[offset])))
+                offset += 1;
+
+            std::size_t const name_begin = offset;
+            while (offset < value.size() && !std::isspace(static_cast<unsigned char>(value[offset])))
+                offset += 1;
+
+            if (offset > name_begin)
+                result.push_back(std::pmr::string{value.substr(name_begin, offset - name_begin)});
+        }
+
+        return result;
     }
 
     // `data=` is the last field of the comment and its value contains spaces, so unlike the other
@@ -204,7 +246,8 @@ namespace iris::c
             .module_name = std::pmr::string{*module_name},
             .declaration_name = std::pmr::string{*declaration_name},
             .kind = std::pmr::string{*kind},
-            .data = data.has_value() ? std::optional<std::pmr::string>{std::pmr::string{*data}} : std::nullopt
+            .data = data.has_value() ? std::optional<std::pmr::string>{std::pmr::string{*data}} : std::nullopt,
+            .raw_pointer_members = find_iris_meta_raw_pointer_members(raw_comment)
         };
     }
 
@@ -1695,6 +1738,12 @@ namespace iris::c
 
     iris::Union_declaration create_union_declaration(C_declarations& declarations, CXCursor const cursor);
 
+    void wrap_pointer_members_as_optional(
+        std::span<std::pmr::string const> const member_names,
+        std::span<iris::Type_reference> const member_types,
+        std::span<std::pmr::string const> const raw_pointer_members
+    );
+
     iris::Struct_declaration create_struct_declaration(C_declarations& declarations, CXCursor const cursor)
     {
         struct Client_data
@@ -1861,7 +1910,47 @@ namespace iris::c
         assert(struct_declaration.member_names.size() == struct_declaration.member_types.size());
         assert(struct_declaration.member_names.size() == struct_declaration.member_bit_fields.size());
 
+        if (declarations.wrap_pointers_as_optional)
+        {
+            std::optional<Iris_meta_comment> const meta_comment = parse_iris_meta_comment(cursor);
+            wrap_pointer_members_as_optional(
+                struct_declaration.member_names,
+                struct_declaration.member_types,
+                meta_comment.has_value() ? std::span<std::pmr::string const>{meta_comment->raw_pointer_members} : std::span<std::pmr::string const>{}
+            );
+        }
+
         return struct_declaration;
+    }
+
+    // C spells both a nullable pointer and a never-null one as `T*`. Iris now reads `T*` as
+    // Optional::<*T> by default; a member listed in the header's `raw_pointer_members=` metadata
+    // (written by our own exporter for members that really were a plain *T) keeps its bare pointer.
+    void wrap_pointer_members_as_optional(
+        std::span<std::pmr::string const> const member_names,
+        std::span<iris::Type_reference> const member_types,
+        std::span<std::pmr::string const> const raw_pointer_members
+    )
+    {
+        for (std::size_t member_index = 0; member_index < member_types.size(); ++member_index)
+        {
+            if (!std::holds_alternative<iris::Pointer_type>(member_types[member_index].data))
+                continue;
+
+            if (member_index < member_names.size())
+            {
+                bool const is_raw_pointer = std::find(
+                    raw_pointer_members.begin(),
+                    raw_pointer_members.end(),
+                    member_names[member_index]
+                ) != raw_pointer_members.end();
+
+                if (is_raw_pointer)
+                    continue;
+            }
+
+            member_types[member_index] = iris::create_optional_type_reference({ member_types[member_index] });
+        }
     }
 
     iris::Union_declaration create_union_declaration(C_declarations& declarations, CXCursor const cursor)
@@ -1998,6 +2087,16 @@ namespace iris::c
         );
 
         assert(union_declaration.member_names.size() == union_declaration.member_types.size());
+
+        if (declarations.wrap_pointers_as_optional)
+        {
+            std::optional<Iris_meta_comment> const meta_comment = parse_iris_meta_comment(cursor);
+            wrap_pointer_members_as_optional(
+                union_declaration.member_names,
+                union_declaration.member_types,
+                meta_comment.has_value() ? std::span<std::pmr::string const>{meta_comment->raw_pointer_members} : std::span<std::pmr::string const>{}
+            );
+        }
 
         return union_declaration;
     }
@@ -2161,6 +2260,20 @@ namespace iris::c
             iris::Pointer_type& data = std::get<iris::Pointer_type>(type.data);
 
             for (iris::Type_reference& reference : data.element_type)
+            {
+                convert_typedef_to_integer_type_if_necessary(
+                    reference,
+                    alias_type_declarations,
+                    integer_alias_names,
+                    integer_alias_indices
+                );
+            }
+        }
+        else if (std::holds_alternative<iris::Optional_type>(type.data))
+        {
+            iris::Optional_type& data = std::get<iris::Optional_type>(type.data);
+
+            for (iris::Type_reference& reference : data.value_type)
             {
                 convert_typedef_to_integer_type_if_necessary(
                     reference,
@@ -2436,6 +2549,15 @@ namespace iris::c
         {
             iris::Pointer_type const& pointer_type = std::get<iris::Pointer_type>(value_type.data);
             add_expression(statement, iris::create_null_pointer_expression());
+            return;
+        }
+        else if (std::holds_alternative<iris::Optional_type>(value_type.data))
+        {
+            // An empty Optional: a null pointer for the pointer representation, `{}` otherwise.
+            if (iris::is_optional_represented_as_pointer(value_type))
+                add_expression(statement, iris::create_null_pointer_expression());
+            else
+                add_expression(statement, iris::Expression{ .data = iris::Instantiate_expression{} });
             return;
         }
 
@@ -3193,6 +3315,7 @@ namespace iris::c
 
         C_declarations declarations;
         declarations.module_name = header_name;
+        declarations.wrap_pointers_as_optional = options.wrap_pointers_as_optional;
         Macro_replacement_text_entries_cache macro_replacement_text_entries_cache;
 
         Import_visitor_context visitor_context
@@ -3220,6 +3343,7 @@ namespace iris::c
         remove_redundant_forward_declarations(declarations);
 
         C_declarations declarations_with_fixed_width_integers = convert_fixed_width_integers_typedefs_to_integer_types(declarations);
+        declarations_with_fixed_width_integers.wrap_pointers_as_optional = declarations.wrap_pointers_as_optional;
         transform_names(declarations_with_fixed_width_integers, options.remove_prefixes);
         resolve_declaration_name_collisions(declarations_with_fixed_width_integers);
 

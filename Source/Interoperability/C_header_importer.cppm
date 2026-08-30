@@ -36,6 +36,7 @@ namespace iris::c
         std::pmr::vector<C_macro_declaration> macro_declarations;
         std::pmr::unordered_map<std::pmr::string, Imported_declaration_metadata> metadata_by_c_name;
         std::uint32_t unnamed_count = 0;
+        bool wrap_pointers_as_optional = true;
     };
 
     export struct C_header
@@ -52,6 +53,9 @@ namespace iris::c
         std::span<std::pmr::string const> public_prefixes;
         std::span<std::pmr::string const> remove_prefixes;
         bool allow_errors = true;
+        // When true, a pointer member of an imported struct or union becomes Optional::<*T>,
+        // unless the header names it in a raw_pointer_members= IRIS_META field.
+        bool wrap_pointers_as_optional = true;
     };
 
     export std::optional<iris::Module> import_header(std::string_view const header_name, std::filesystem::path const& header_path, Options const& options);

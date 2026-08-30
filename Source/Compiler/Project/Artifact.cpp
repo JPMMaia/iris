@@ -278,8 +278,12 @@ namespace iris::compiler
                 .dependencies = parse_string_array_at(element, "dependencies"),
             };
 
-            if (json.contains("allow_errors"))
-                header.allow_errors = json.at("allow_errors").get<bool>();
+            // These read `element`, not `json`: `json` is the array of headers.
+            if (element.contains("allow_errors"))
+                header.allow_errors = element.at("allow_errors").get<bool>();
+
+            if (element.contains("wrap_pointers_as_optional"))
+                header.wrap_pointers_as_optional = element.at("wrap_pointers_as_optional").get<bool>();
 
             headers.push_back(std::move(header));
         }
@@ -335,6 +339,9 @@ namespace iris::compiler
 
             if (json.contains("remove_prefixes"))
                 data.remove_prefixes = parse_string_array(json.at("remove_prefixes"));
+
+            if (json.contains("wrap_pointers_as_optional"))
+                data.wrap_pointers_as_optional = json.at("wrap_pointers_as_optional").get<bool>();
 
             return data;
         }
@@ -580,6 +587,9 @@ namespace iris::compiler
                                 if (c_header.allow_errors.has_value())
                                     c_header_json["allow_errors"] = c_header.allow_errors.value();
 
+                                if (c_header.wrap_pointers_as_optional.has_value())
+                                    c_header_json["wrap_pointers_as_optional"] = c_header.wrap_pointers_as_optional.value();
+
                                 if (!c_header.dependencies.empty())
                                     c_header_json["dependencies"] = c_header.dependencies;
 
@@ -597,6 +607,9 @@ namespace iris::compiler
 
                         if (!c_headers_group.remove_prefixes.empty())
                             group_json["remove_prefixes"] = c_headers_group.remove_prefixes;
+
+                        if (c_headers_group.wrap_pointers_as_optional.has_value())
+                            group_json["wrap_pointers_as_optional"] = c_headers_group.wrap_pointers_as_optional.value();
                     }
                 }
 
