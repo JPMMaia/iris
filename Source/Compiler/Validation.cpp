@@ -232,9 +232,16 @@ namespace iris::compiler
             }
         }
 
-        // Optional::<*T> is represented as a bare pointer, so `null` is the empty value.
-        if (is_optional_represented_as_pointer(destination_type) && is_null_pointer_type(source_type))
-            return true;
+        // Optional::<*T> is represented as a bare pointer, so `null` is the empty value and any
+        // pointer that could be assigned to *T is the present one.
+        if (is_optional_represented_as_pointer(destination_type))
+        {
+            if (is_null_pointer_type(source_type))
+                return true;
+
+            if (is_pointer(source_type))
+                return can_assign_type(declaration_database, get_optional_value_type(destination_type), source_type);
+        }
 
         if (is_pointer(destination_type))
         {

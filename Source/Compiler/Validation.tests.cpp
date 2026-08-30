@@ -6244,6 +6244,91 @@ export function foo() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates assigning a pointer to an Optional pointer", "[Validation][Optional]")
+    {
+        std::string_view const input = R"(module Optional_from_pointer;
+
+export struct My_struct
+{
+    a: Optional::<*Int32> = null;
+}
+
+export function take(a: Optional::<*Int32>) -> ()
+{
+}
+
+export function make(p: *Int32) -> (result: Optional::<*Int32>)
+{
+    return p;
+}
+
+export function foo(p: *Int32, q: *mutable Int32) -> ()
+{
+    var a: Optional::<*Int32> = p;
+    mutable b: Optional::<*Int32> = null;
+    b = p;
+
+    // A mutable pointer narrows to an immutable one, just like *mutable Int32 -> *Int32.
+    var c: Optional::<*Int32> = q;
+    var d: Optional::<*mutable Int32> = q;
+
+    var e: My_struct = { a: p };
+
+    take(p);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates assigning an incompatible pointer to an Optional pointer", "[Validation][Optional]")
+    {
+        std::string_view const input = R"(module Optional_from_wrong_pointer;
+
+export function foo(p: *Int32, q: *Float32) -> ()
+{
+    var a: Optional::<*mutable Int32> = p;
+    var b: Optional::<*Int32> = q;
+    var c: Optional::<Int32> = p;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 41, 5, 42),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Expression type '*Int32' does not match expected type 'Optional::<*mutable Int32>'.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 33, 6, 34),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Expression type '*Float32' does not match expected type 'Optional::<*Int32>'.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(7, 32, 7, 33),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Expression type '*Int32' does not match expected type 'Optional::<Int32>'.",
+                .related_information = {},
+            },
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates Optional in a function constructor", "[Validation][Optional]")
     {
         std::string_view const input = R"(module Optional_generic;

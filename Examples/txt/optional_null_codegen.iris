@@ -21,3 +21,18 @@ export function assign_null(a: *mutable Int32) -> (result: Bool)
 
     return b.has_value;
 }
+
+export struct My_struct
+{
+    a: Optional::<*Int32> = null;
+}
+
+export function from_pointer(p: *mutable Int32) -> (result: Optional::<*Int32>)
+{
+    var a: Optional::<*Int32> = p;
+    var b: My_struct = { a: p };
+
+    take(p);
+
+    return a;
+}

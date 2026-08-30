@@ -502,7 +502,7 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
-  TEST_CASE("Compile null assigned to Optional pointer", "[LLVM_IR]")
+  TEST_CASE("Compile Optional pointer assigned from null and from pointers", "[LLVM_IR]")
   {
     char const* const input_file = "optional_null_codegen.iris";
 
@@ -511,6 +511,8 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
     };
 
     char const* const expected_llvm_ir = R"(
+%struct.Optional_null_codegen_My_struct = type { ptr }
+
 ; Function Attrs: convergent
 define ptr @Optional_null_codegen_make_null() #0 {
 entry:
@@ -544,6 +546,24 @@ entry:
   %1 = load ptr, ptr %b, align 8
   %2 = icmp ne ptr %1, null
   ret i1 %2
+}
+
+; Function Attrs: convergent
+define ptr @Optional_null_codegen_from_pointer(ptr noundef %"arguments[0].p") #0 {
+entry:
+  %p = alloca ptr, align 8
+  %a = alloca ptr, align 8
+  %b = alloca %struct.Optional_null_codegen_My_struct, align 8
+  store ptr %"arguments[0].p", ptr %p, align 8
+  %0 = load ptr, ptr %p, align 8
+  store ptr %0, ptr %a, align 8
+  %1 = load ptr, ptr %p, align 8
+  %2 = getelementptr inbounds %struct.Optional_null_codegen_My_struct, ptr %b, i32 0, i32 0
+  store ptr %1, ptr %2, align 8
+  %3 = load ptr, ptr %p, align 8
+  call void @Optional_null_codegen_take(ptr noundef %3)
+  %4 = load ptr, ptr %a, align 8
+  ret ptr %4
 }
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }

@@ -52,6 +52,18 @@ var empty_1 = create_optional::<Int32>();          // empty, type given explicit
 var present = create_optional(1);                  // present, type deduced from the argument
 ```
 
+An `Optional::<*T>` is the bare pointer, so it converts directly from pointers: `null` is the empty
+value and any pointer assignable to `*T` is the present one. No `create_optional` call is needed.
+
+```iris
+var no_pointer: Optional::<*Int32> = null;   // empty, same as {}
+var some_pointer: Optional::<*Int32> = p;    // present, from a *Int32 or a *mutable Int32
+```
+
+The pointer's own assignment rules still apply: a `*mutable T` narrows to an `Optional::<*T>`, but a
+`*T` does not widen to an `Optional::<*mutable T>`. This is what lets a C API whose pointer members
+are imported as optionals keep taking plain pointers.
+
 `{}` is the same empty value a struct member gets by default:
 
 ```iris
