@@ -1949,6 +1949,76 @@ union Value
         }
     }
 
+    TEST_CASE("Include debug information of structs and unions with anonymous members")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "debug_information_anonymous_members";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+struct Storage_pair
+{
+    unsigned int key;
+    union
+    {
+        int val_i;
+        float val_f;
+    };
+};
+
+union Storage_value
+{
+    int type;
+    struct
+    {
+        int v1;
+        int v2;
+    };
+};
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "storage.h";
+        iris::common::write_to_file(header_file_path, header_content);
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.storage", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        iris::Module const& header_module = header_module_optional.value();
+
+        {
+            iris::Struct_declaration const& declaration = header_module.export_declarations.struct_declarations[0];
+            CHECK(declaration.name == "Storage_pair");
+
+            // Anonymous members also push a member name, so they must push a source
+            // position as well: a shorter positions vector is read out of range when
+            // debug information is generated for the struct.
+            REQUIRE(declaration.member_source_positions.has_value());
+            CHECK(declaration.member_source_positions.value().size() == declaration.member_names.size());
+
+            std::pmr::vector<iris::Source_position> const expected_member_source_positions
+            {
+                {.line = 4, .column = 18},
+                {.line = 5, .column = 5},
+            };
+
+            CHECK(declaration.member_source_positions == expected_member_source_positions);
+        }
+
+        {
+            iris::Union_declaration const& declaration = header_module.export_declarations.union_declarations[0];
+            CHECK(declaration.name == "Storage_value");
+
+            REQUIRE(declaration.member_source_positions.has_value());
+            CHECK(declaration.member_source_positions.value().size() == declaration.member_names.size());
+
+            std::pmr::vector<iris::Source_position> const expected_member_source_positions
+            {
+                {.line = 14, .column = 9},
+                {.line = 15, .column = 5},
+            };
+
+            CHECK(declaration.member_source_positions == expected_member_source_positions);
+        }
+    }
+
     TEST_CASE("Include debug information of enums")
     {
         std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "debug_information_enums";

@@ -1781,6 +1781,9 @@ namespace iris::c
                 {
                     std::pmr::string member_name = create_member_name_that_has_unnamed_type(current_cursor, parent, data->struct_declaration->member_names);
                     data->struct_declaration->member_names.push_back(std::move(member_name));
+
+                    Header_source_location const nested_cursor_location = get_cursor_source_location(current_cursor);
+                    data->struct_declaration->member_source_positions->push_back(get_source_position(nested_cursor_location));
                 }
 
                 iris::Custom_type_reference reference
@@ -1804,6 +1807,9 @@ namespace iris::c
                 {
                     std::pmr::string member_name = create_member_name_that_has_unnamed_type(current_cursor, parent, data->struct_declaration->member_names);
                     data->struct_declaration->member_names.push_back(std::move(member_name));
+
+                    Header_source_location const nested_cursor_location = get_cursor_source_location(current_cursor);
+                    data->struct_declaration->member_source_positions->push_back(get_source_position(nested_cursor_location));
                 }
 
                 iris::Custom_type_reference reference
@@ -1917,6 +1923,12 @@ namespace iris::c
                 {
                     std::pmr::string member_name = create_member_name_that_has_unnamed_type(current_cursor, parent, data->union_declaration->member_names);
                     data->union_declaration->member_names.push_back(std::move(member_name));
+
+                    // This member name is pushed here instead of in the FieldDecl branch, so its
+                    // source position has to be pushed here too: otherwise
+                    // member_source_positions ends up shorter than member_names.
+                    Header_source_location const nested_cursor_location = get_cursor_source_location(current_cursor);
+                    data->union_declaration->member_source_positions->push_back(get_source_position(nested_cursor_location));
                 }
 
                 iris::Custom_type_reference reference
@@ -1939,6 +1951,9 @@ namespace iris::c
                 {
                     std::pmr::string member_name = create_member_name_that_has_unnamed_type(current_cursor, parent, data->union_declaration->member_names);
                     data->union_declaration->member_names.push_back(std::move(member_name));
+
+                    Header_source_location const nested_cursor_location = get_cursor_source_location(current_cursor);
+                    data->union_declaration->member_source_positions->push_back(get_source_position(nested_cursor_location));
                 }
                 
                 iris::Custom_type_reference reference
