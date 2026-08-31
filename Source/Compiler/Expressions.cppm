@@ -67,12 +67,20 @@ namespace iris::compiler
         Contract_options contract_options;
         bool enable_bounds_checks = false;
         std::optional<Source_position> source_position;
+        std::span<Global_variable_declaration const* const> globals_being_folded;
         std::pmr::polymorphic_allocator<> const& temporaries_allocator;
     };
 
     export llvm::Constant* fold_constant(
         llvm::Value* value,
-        llvm::DataLayout const& llvm_data_layout
+        Expression_parameters const& parameters,
+        std::optional<Source_position> const& source_position
+    );
+
+    export llvm::Constant* fold_global_variable_initial_value(
+        iris::Module const& global_variable_module,
+        iris::Global_variable_declaration const& global_variable_declaration,
+        Expression_parameters const& parameters
     );
 
     export llvm::Constant* fold_statement_constant(

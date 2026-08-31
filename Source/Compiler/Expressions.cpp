@@ -92,6 +92,7 @@ namespace iris::compiler
             .contract_options = parameters.contract_options,
             .enable_bounds_checks = parameters.enable_bounds_checks,
             .source_position = parameters.source_position,
+            .globals_being_folded = parameters.globals_being_folded,
             .temporaries_allocator = parameters.temporaries_allocator,
         };
     }
@@ -114,7 +115,7 @@ namespace iris::compiler
         return location->module_name;
     }
 
-    llvm::Constant* fold_constant(llvm::Value* value, llvm::DataLayout const& llvm_data_layout, std::optional<Source_position> const& source_position);
+    llvm::Constant* fold_constant(llvm::Value* value, Expression_parameters const& parameters, std::optional<Source_position> const& source_position);
 
     std::optional<Value_and_type> get_global_variable_value_and_type(
         iris::Module const& global_variable_module,
@@ -134,7 +135,7 @@ namespace iris::compiler
 
             if (parameters.llvm_parent_function == nullptr)
             {
-                llvm::Constant* const constant = fold_constant(value.value, parameters.llvm_data_layout, parameters.source_position);
+                llvm::Constant* const constant = fold_constant(value.value, parameters, parameters.source_position);
 
                 return Value_and_type
                 {
@@ -146,7 +147,7 @@ namespace iris::compiler
 
             llvm::Value* folded_or_runtime_value = value.value;
             if (llvm::BinaryOperator::classof(value.value) || llvm::Constant::classof(value.value))
-                folded_or_runtime_value = fold_constant(value.value, parameters.llvm_data_layout, parameters.source_position);
+                folded_or_runtime_value = fold_constant(value.value, parameters, parameters.source_position);
 
             return Value_and_type
             {
@@ -158,12 +159,10 @@ namespace iris::compiler
         else
         {
             std::string const mangled_name = mangle_name(global_variable_module, global_variable_declaration.name, global_variable_declaration.unique_name);
-            llvm::GlobalValue* const llvm_global_value = parameters.llvm_module.getNamedValue(mangled_name);
-            if (llvm_global_value == nullptr) {
-                return std::nullopt;
-            }
+            llvm::GlobalValue* llvm_global_value = parameters.llvm_module.getNamedValue(mangled_name);
 
             iris::compiler::Scope scope{};
+
             std::optional<iris::Type_reference> type = get_expression_type(
                 global_variable_module.name,
                 parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
@@ -172,6 +171,28 @@ namespace iris::compiler
                 global_variable_declaration.type,
                 parameters.declaration_database
             );
+
+            if (llvm_global_value == nullptr)
+            {
+                if (!type.has_value())
+                    return std::nullopt;
+
+                llvm::Type* const llvm_type = type_reference_to_llvm_type(
+                    parameters.llvm_context,
+                    parameters.llvm_data_layout,
+                    type.value(),
+                    parameters.type_database
+                );
+
+                llvm_global_value = new llvm::GlobalVariable(
+                    parameters.llvm_module,
+                    llvm_type,
+                    global_variable_declaration.global_type == Global_variable_type::Constant,
+                    llvm::GlobalValue::ExternalLinkage,
+                    nullptr,
+                    mangled_name
+                );
+            }
 
             return Value_and_type
             {
@@ -365,18 +386,198 @@ namespace iris::compiler
         return scope;
     }
 
-    llvm::Constant* fold_constant(
-        llvm::Value* const value,
-        llvm::DataLayout const& llvm_data_layout,
+    static void delete_temporary_instructions(
+        llvm::Value* const root,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        std::pmr::vector<llvm::Instruction*> instructions{ temporaries_allocator };
+
+        auto const add_instruction = [&](llvm::Value* const value) -> void
+        {
+            if (!llvm::Instruction::classof(value))
+                return;
+
+            llvm::Instruction* const instruction = static_cast<llvm::Instruction*>(value);
+            if (instruction->getParent() != nullptr)
+                return;
+
+            if (std::find(instructions.begin(), instructions.end(), instruction) == instructions.end())
+                instructions.push_back(instruction);
+        };
+
+        add_instruction(root);
+
+        for (std::size_t index = 0; index < instructions.size(); ++index)
+        {
+            llvm::Instruction* const instruction = instructions[index];
+
+            for (llvm::Use& operand : instruction->operands())
+                add_instruction(operand.get());
+        }
+
+        for (llvm::Instruction* const instruction : instructions)
+            instruction->dropAllReferences();
+
+        for (llvm::Instruction* const instruction : instructions)
+            instruction->deleteValue();
+    }
+
+    struct Temporary_instructions_scope
+    {
+        llvm::Value* root;
+        std::pmr::polymorphic_allocator<> temporaries_allocator;
+
+        Temporary_instructions_scope(
+            llvm::Value* const root,
+            std::pmr::polymorphic_allocator<> const& temporaries_allocator
+        ) :
+            root{ root },
+            temporaries_allocator{ temporaries_allocator }
+        {
+        }
+
+        Temporary_instructions_scope(Temporary_instructions_scope const&) = delete;
+        Temporary_instructions_scope& operator=(Temporary_instructions_scope const&) = delete;
+
+        ~Temporary_instructions_scope()
+        {
+            delete_temporary_instructions(root, temporaries_allocator);
+        }
+    };
+
+    static bool is_being_folded(
+        Expression_parameters const& parameters,
+        iris::Global_variable_declaration const& global_variable_declaration
+    )
+    {
+        std::span<Global_variable_declaration const* const> const globals_being_folded = parameters.globals_being_folded;
+        return std::find(globals_being_folded.begin(), globals_being_folded.end(), &global_variable_declaration) != globals_being_folded.end();
+    }
+
+    static llvm::Constant* fold_global_variable_declaration_constant(
+        iris::Module const& global_variable_module,
+        iris::Global_variable_declaration const& global_variable_declaration,
+        Expression_parameters const& parameters,
         std::optional<Source_position> const& source_position
     )
     {
+        if (is_being_folded(parameters, global_variable_declaration))
+            throw std::runtime_error{ format_error(std::format("The initializer of global variable '{}.{}' depends on itself.", global_variable_module.name, global_variable_declaration.name), source_position) };
+
+        std::pmr::vector<Global_variable_declaration const*> globals_being_folded{
+            parameters.globals_being_folded.begin(),
+            parameters.globals_being_folded.end(),
+            parameters.temporaries_allocator
+        };
+        globals_being_folded.push_back(&global_variable_declaration);
+
+        Expression_parameters new_parameters = set_core_module(parameters, global_variable_module);
+        new_parameters.expression_type = global_variable_declaration.type;
+        new_parameters.globals_being_folded = globals_being_folded;
+
+        Value_and_type const value = create_loaded_statement_value(
+            global_variable_declaration.initial_value,
+            new_parameters
+        );
+
+        if (value.value == nullptr)
+            throw std::runtime_error{ format_error(std::format("Could not fold the initializer of global variable '{}.{}'.", global_variable_module.name, global_variable_declaration.name), source_position) };
+
+        Temporary_instructions_scope const temporary_instructions_scope{ value.value, parameters.temporaries_allocator };
+
+        return fold_constant(value.value, new_parameters, source_position);
+    }
+
+    static std::optional<std::pair<iris::Module const*, Global_variable_declaration const*>> find_global_variable_declaration_of(
+        llvm::GlobalVariable const& global_variable,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::StringRef const global_variable_name = global_variable.getName();
+
+        auto const search_in_module = [&](iris::Module const& core_module) -> Global_variable_declaration const*
+        {
+            auto const search_in_declarations = [&](std::pmr::vector<Global_variable_declaration> const& declarations) -> Global_variable_declaration const*
+            {
+                for (Global_variable_declaration const& declaration : declarations)
+                {
+                    std::string const mangled_name = mangle_name(core_module, declaration.name, declaration.unique_name);
+                    if (global_variable_name == mangled_name)
+                        return &declaration;
+                }
+
+                return nullptr;
+            };
+
+            Global_variable_declaration const* const exported_declaration = search_in_declarations(core_module.export_declarations.global_variable_declarations);
+            if (exported_declaration != nullptr)
+                return exported_declaration;
+
+            return search_in_declarations(core_module.internal_declarations.global_variable_declarations);
+        };
+
+        {
+            Global_variable_declaration const* const declaration = search_in_module(parameters.core_module);
+            if (declaration != nullptr)
+                return std::make_pair(&parameters.core_module, declaration);
+        }
+
+        for (std::pair<std::pmr::string const, Module const*> const& pair : parameters.core_module_dependencies)
+        {
+            iris::Module const& core_module_dependency = *pair.second;
+
+            Global_variable_declaration const* const declaration = search_in_module(core_module_dependency);
+            if (declaration != nullptr)
+                return std::make_pair(&core_module_dependency, declaration);
+        }
+
+        return std::nullopt;
+    }
+
+    static llvm::Constant* fold_global_variable_reference(
+        llvm::GlobalVariable& global_variable,
+        Expression_parameters const& parameters,
+        std::optional<Source_position> const& source_position
+    )
+    {
+        std::optional<std::pair<iris::Module const*, Global_variable_declaration const*>> const declaration =
+            find_global_variable_declaration_of(global_variable, parameters);
+
+        if (!global_variable.isConstant())
+        {
+            std::string const name =
+                declaration.has_value() ?
+                std::format("{}.{}", declaration->first->name, declaration->second->name) :
+                global_variable.getName().str();
+
+            throw std::runtime_error{ format_error(std::format("Cannot use mutable global variable '{}' in a compile-time constant expression.", name), source_position) };
+        }
+
+        // Globals of the module being compiled already carry their folded initializer.
+        if (global_variable.hasInitializer())
+            return global_variable.getInitializer();
+
+        if (!declaration.has_value())
+            throw std::runtime_error{ format_error(std::format("Could not find the initializer of global variable '{}'.", global_variable.getName().str()), source_position) };
+
+        return fold_global_variable_declaration_constant(*declaration->first, *declaration->second, parameters, source_position);
+    }
+
+    llvm::Constant* fold_constant(
+        llvm::Value* const value,
+        Expression_parameters const& parameters,
+        std::optional<Source_position> const& source_position
+    )
+    {
+        llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
+
         if (llvm::BinaryOperator::classof(value))
         {
             llvm::BinaryOperator* const binary_operator = static_cast<llvm::BinaryOperator*>(value);
 
-            llvm::Constant* const left_hand_side = fold_constant(binary_operator->getOperand(0), llvm_data_layout, source_position);
-            llvm::Constant* const right_hand_side = fold_constant(binary_operator->getOperand(1), llvm_data_layout, source_position);
+            llvm::Constant* const left_hand_side = fold_constant(binary_operator->getOperand(0), parameters, source_position);
+            llvm::Constant* const right_hand_side = fold_constant(binary_operator->getOperand(1), parameters, source_position);
 
             llvm::Constant* const folded_constant = llvm::ConstantFoldBinaryOpOperands(
                 binary_operator->getOpcode(),
@@ -390,6 +591,52 @@ namespace iris::compiler
 
             return folded_constant;
         }
+        else if (llvm::UnaryOperator::classof(value))
+        {
+            llvm::UnaryOperator* const unary_operator = static_cast<llvm::UnaryOperator*>(value);
+
+            llvm::Constant* const operand = fold_constant(unary_operator->getOperand(0), parameters, source_position);
+
+            llvm::Constant* const folded_constant = llvm::ConstantFoldUnaryOpOperand(
+                unary_operator->getOpcode(),
+                operand,
+                llvm_data_layout
+            );
+
+            if (folded_constant == nullptr)
+                throw std::runtime_error{ format_error("Could not unfold unary operation constant!", source_position) };
+
+            return folded_constant;
+        }
+        else if (llvm::CastInst::classof(value))
+        {
+            llvm::CastInst* const cast_instruction = static_cast<llvm::CastInst*>(value);
+
+            llvm::Constant* const operand = fold_constant(cast_instruction->getOperand(0), parameters, source_position);
+
+            llvm::Constant* const folded_constant = llvm::ConstantFoldCastOperand(
+                cast_instruction->getOpcode(),
+                operand,
+                cast_instruction->getDestTy(),
+                llvm_data_layout
+            );
+
+            if (folded_constant == nullptr)
+                throw std::runtime_error{ format_error("Could not unfold cast constant!", source_position) };
+
+            return folded_constant;
+        }
+        else if (llvm::LoadInst::classof(value))
+        {
+            // A reference to a module-level constant arrives here as a load of an llvm global.
+            llvm::LoadInst* const load_instruction = static_cast<llvm::LoadInst*>(value);
+            llvm::Value* const pointer = load_instruction->getPointerOperand();
+
+            if (!llvm::GlobalVariable::classof(pointer))
+                throw std::runtime_error{ format_error("Could not unfold constant!", source_position) };
+
+            return fold_global_variable_reference(*static_cast<llvm::GlobalVariable*>(pointer), parameters, source_position);
+        }
         else if (llvm::Constant::classof(value))
         {
             return static_cast<llvm::Constant*>(value);
@@ -400,12 +647,26 @@ namespace iris::compiler
         }
     }
 
+    llvm::Constant* fold_global_variable_initial_value(
+        iris::Module const& global_variable_module,
+        iris::Global_variable_declaration const& global_variable_declaration,
+        Expression_parameters const& parameters
+    )
+    {
+        return fold_global_variable_declaration_constant(
+            global_variable_module,
+            global_variable_declaration,
+            parameters,
+            parameters.source_position
+        );
+    }
+
     llvm::Constant* fold_statement_constant(
         Statement const& statement,
         Expression_parameters const& parameters
     )
     {
-        Value_and_type const statement_value = create_statement_value(
+        Value_and_type const statement_value = create_loaded_statement_value(
             statement,
             parameters
         );
@@ -413,7 +674,9 @@ namespace iris::compiler
         if (statement_value.value == nullptr)
             throw std::runtime_error{ format_error("Could not fold constant!", parameters.source_position) };
 
-        return fold_constant(statement_value.value, parameters.llvm_data_layout, parameters.source_position);
+        Temporary_instructions_scope const temporary_instructions_scope{ statement_value.value, parameters.temporaries_allocator };
+
+        return fold_constant(statement_value.value, parameters, parameters.source_position);
     }
 
 

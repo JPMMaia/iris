@@ -8427,6 +8427,68 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Derived Global Constants", "[LLVM_IR]")
+  {
+    char const* const input_file = "derived_global_constants.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+        { "Derived_global_constants_provider", parse_and_get_file_path(g_test_source_files_path / "derived_global_constants_provider.iris") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+@Derived_global_constants_provider_meters_per_foot = external constant float
+@Derived_global_constants_provider_feet_per_mile = external constant i32
+@Derived_global_constants_meters_per_foot = constant float 0x3FD381D7E0000000
+@Derived_global_constants_seconds_per_round = constant float 6.000000e+00
+@Derived_global_constants_five_feet_in_meters = constant float 0x3FF8624DE0000000
+@Derived_global_constants_speed_30_meters_per_second = constant float 0x3FF8624DE0000000
+@Derived_global_constants_meters_per_round = constant float 0x4019381D80000000
+@Derived_global_constants_negative_meters_per_foot = constant float 0xBFD381D7E0000000
+@Derived_global_constants_rounds_per_minute = constant i32 10
+@Derived_global_constants_rounds_per_two_minutes = constant i32 20
+@Derived_global_constants_half_a_mile_in_feet = constant i32 2640
+@Derived_global_constants_ten_feet_in_meters = constant float 0x4008624DE0000000
+@Derived_global_constants_alias_of_five_feet = constant float 0x3FF8624DE0000000
+@Derived_global_constants_imported_meters_per_foot = constant float 0x3FD381D7E0000000
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Indirect Global Constant", "[LLVM_IR]")
+  {
+    char const* const input_file = "indirect_global_constant.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+        { "Indirect_global_constant_holder", parse_and_get_file_path(g_test_source_files_path / "indirect_global_constant_holder.iris") },
+        { "Indirect_global_constant_provider", parse_and_get_file_path(g_test_source_files_path / "indirect_global_constant_provider.iris") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Indirect_global_constant_holder_Unit = type { float }
+
+@Indirect_global_constant_provider_speed_30_meters_per_second = external constant float
+
+; Function Attrs: convergent
+define float @Indirect_global_constant_use_default() #0 {
+entry:
+  %unit = alloca %struct.Indirect_global_constant_holder_Unit, align 4
+  %0 = load float, ptr @Indirect_global_constant_provider_speed_30_meters_per_second, align 4
+  %1 = getelementptr inbounds %struct.Indirect_global_constant_holder_Unit, ptr %unit, i32 0, i32 0
+  store float %0, ptr %1, align 4
+  %2 = getelementptr inbounds %struct.Indirect_global_constant_holder_Unit, ptr %unit, i32 0, i32 0
+  %3 = load float, ptr %2, align 4
+  ret float %3
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Using Structs", "[LLVM_IR]")
   {
     char const* const input_file = "using_structs.iris";

@@ -913,7 +913,12 @@ namespace iris::compiler
                 }
 
                 std::string const mangled_name = mangle_name(core_module, global_variable_declaration.name, global_variable_declaration.unique_name);
-        
+
+                std::optional<Source_position> const source_position =
+                    global_variable_declaration.source_location.has_value() ?
+                    std::optional<Source_position>{ global_variable_declaration.source_location->range.start } :
+                    std::optional<Source_position>{ std::nullopt };
+
                 Expression_parameters const expression_parameters
                 {
                     .llvm_context = llvm_context,
@@ -937,11 +942,11 @@ namespace iris::compiler
                     .debug_info = nullptr,
                     .contract_options = Contract_options::Disabled,
                     .enable_bounds_checks = false,
-                    .source_position = {},
+                    .source_position = source_position,
                     .temporaries_allocator = temporaries_allocator,
                 };
 
-                llvm::Constant* const initial_value = !is_dependency_module ? fold_statement_constant(global_variable_declaration.initial_value, expression_parameters) : nullptr;
+                llvm::Constant* const initial_value = !is_dependency_module ? fold_global_variable_initial_value(core_module, global_variable_declaration, expression_parameters) : nullptr;
         
                 Scope const scope;
                 std::optional<Type_reference> const type =
