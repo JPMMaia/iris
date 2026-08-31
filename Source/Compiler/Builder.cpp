@@ -183,6 +183,11 @@ namespace iris::compiler
         if (!std::filesystem::exists(output_file_path))
             return false;
 
+        std::error_code error_code;
+        std::uintmax_t const output_file_size = std::filesystem::file_size(output_file_path, error_code);
+        if (error_code || output_file_size == 0)
+            return false;
+
         return std::filesystem::last_write_time(output_file_path) > get_newest_input_time(input_times, module_name);
     }
 

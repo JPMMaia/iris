@@ -1762,23 +1762,88 @@ namespace iris::compiler
         return output;
     }
 
+    // Writes are done to a temporary file which is then renamed into place. This guarantees that an
+    // interrupted or failed write never leaves a truncated output file behind, which the incremental
+    // build would otherwise consider up to date and feed to the linker.
+    static std::filesystem::path get_temporary_output_file_path(
+        std::filesystem::path const& output_file_path
+    )
+    {
+        std::filesystem::path temporary_file_path = output_file_path;
+        temporary_file_path += ".tmp";
+        return temporary_file_path;
+    }
+
+    static void commit_temporary_output_file(
+        std::filesystem::path const& temporary_file_path,
+        std::filesystem::path const& output_file_path
+    )
+    {
+        std::error_code error_code;
+        std::filesystem::rename(temporary_file_path, output_file_path, error_code);
+
+        if (error_code)
+        {
+            std::error_code ignored_error_code;
+            std::filesystem::remove(temporary_file_path, ignored_error_code);
+
+            std::string const error_message = error_code.message();
+            llvm::errs() << "Could not write file '" << output_file_path.generic_string() << "': " << error_message;
+            throw std::runtime_error{ error_message };
+        }
+    }
+
+    struct Output_file_stream
+    {
+        explicit Output_file_stream(std::filesystem::path const& file_path) :
+            error_code{},
+            stream{ file_path.generic_string(), error_code, llvm::sys::fs::OF_None }
+        {
+            if (error_code)
+            {
+                std::string const error_message = error_code.message();
+                llvm::errs() << "Could not open file: " << error_message;
+                throw std::runtime_error{ error_message };
+            }
+        }
+
+        std::error_code error_code;
+        llvm::raw_fd_ostream stream;
+    };
+
+    static void close_output_stream(
+        llvm::raw_fd_ostream& output_stream,
+        std::filesystem::path const& file_path
+    )
+    {
+        output_stream.close();
+
+        if (output_stream.has_error())
+        {
+            std::string const error_message = output_stream.error().message();
+            llvm::errs() << "Could not write to file '" << file_path.generic_string() << "': " << error_message;
+            output_stream.clear_error();
+            throw std::runtime_error{ error_message };
+        }
+    }
+
     void write_bitcode_to_file(
         LLVM_data const& llvm_data,
         llvm::Module& llvm_module,
         std::filesystem::path const& output_file_path
     )
     {
-        std::error_code error_code;
-        llvm::raw_fd_ostream output_stream(output_file_path.generic_string(), error_code, llvm::sys::fs::OF_None);
+        std::filesystem::path const temporary_file_path = get_temporary_output_file_path(output_file_path);
 
-        if (error_code)
         {
-            std::string const error_message = error_code.message();
-            llvm::errs() << "Could not open file: " << error_message;
-            throw std::runtime_error{ error_message };
+            Output_file_stream output_file{ temporary_file_path };
+
+            llvm::WriteBitcodeToFile(llvm_module, output_file.stream);
+
+            close_output_stream(output_file.stream, temporary_file_path);
         }
 
-        llvm::WriteBitcodeToFile(llvm_module, output_stream);
+        commit_temporary_output_file(temporary_file_path, output_file_path);
     }
 
     void write_llvm_ir_to_file(
@@ -1786,17 +1851,17 @@ namespace iris::compiler
         std::filesystem::path const& output_file_path
     )
     {
-        std::error_code error_code;
-        llvm::raw_fd_ostream output_stream(output_file_path.generic_string(), error_code, llvm::sys::fs::OF_None);
+        std::filesystem::path const temporary_file_path = get_temporary_output_file_path(output_file_path);
 
-        if (error_code)
         {
-            std::string const error_message = error_code.message();
-            llvm::errs() << "Could not open file: " << error_message;
-            throw std::runtime_error{ error_message };
+            Output_file_stream output_file{ temporary_file_path };
+
+            llvm_module.print(output_file.stream, nullptr);
+
+            close_output_stream(output_file.stream, temporary_file_path);
         }
 
-        llvm_module.print(output_stream, nullptr);
+        commit_temporary_output_file(temporary_file_path, output_file_path);
     }
 
     void write_object_file(
@@ -1805,25 +1870,25 @@ namespace iris::compiler
         std::filesystem::path const& output_file_path
     )
     {
-        std::error_code error_code;
-        llvm::raw_fd_ostream output_stream(output_file_path.generic_string(), error_code, llvm::sys::fs::OF_None);
+        std::filesystem::path const temporary_file_path = get_temporary_output_file_path(output_file_path);
 
-        if (error_code)
         {
-            std::string const error_message = error_code.message();
-            llvm::errs() << "Could not open file: " << error_message;
-            throw std::runtime_error{ error_message };
+            Output_file_stream output_file{ temporary_file_path };
+
+            llvm::legacy::PassManager pass_manager;
+            if (llvm_data.target_machine->addPassesToEmitFile(pass_manager, output_file.stream, nullptr, llvm::CodeGenFileType::ObjectFile))
+            {
+                std::string const error_message = "target_machine can't emit an object file";
+                llvm::errs() << "Could not emit object file: " << error_message;
+                throw std::runtime_error{ error_message };
+            }
+
+            pass_manager.run(llvm_module);
+
+            close_output_stream(output_file.stream, temporary_file_path);
         }
 
-        llvm::legacy::PassManager pass_manager;
-        if (llvm_data.target_machine->addPassesToEmitFile(pass_manager, output_stream, nullptr, llvm::CodeGenFileType::ObjectFile))
-        {
-            std::string const error_message = error_code.message();
-            llvm::errs() << "Could not emit object file: " << error_message;
-            throw std::runtime_error{ error_message };
-        }
-
-        pass_manager.run(llvm_module);
+        commit_temporary_output_file(temporary_file_path, output_file_path);
     }
 
     void add_builtin_module(
