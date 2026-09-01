@@ -166,6 +166,7 @@ namespace iris
     std::string_view target_triple = "x86_64-pc-linux-gnu";
     iris::compiler::Contract_options contract_options = iris::compiler::Contract_options::Log_error_and_abort;
     bool enable_bounds_checks = false;
+    bool enable_decimal_overflow_checks = false;
     bool is_test_mode = false;
   };
 
@@ -216,6 +217,7 @@ namespace iris
       .debug = test_options.debug,
       .contract_options = test_options.contract_options,
       .enable_bounds_checks = test_options.enable_bounds_checks,
+      .enable_decimal_overflow_checks = test_options.enable_decimal_overflow_checks,
       .is_test_mode = test_options.is_test_mode,
     };
 
@@ -374,6 +376,7 @@ optional_value_check_pass:                        ; preds = %if_s0_then
 
 optional_value_check_fail:                        ; preds = %if_s0_then
   %10 = call i32 @puts(ptr @function_contract_error_string)
+  %11 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }}
@@ -452,6 +455,7 @@ optional_value_check_pass:                        ; preds = %if_s0_then
 
 optional_value_check_fail:                        ; preds = %if_s0_then
   %18 = call i32 @puts(ptr @function_contract_error_string.1)
+  %19 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }}
@@ -493,6 +497,8 @@ if_s1_after:                                      ; preds = %entry
 }}
 
 declare i32 @puts(ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -914,6 +920,7 @@ condition_success:                                ; preds = %entry
 
 condition_fail:                                   ; preds = %entry
   %4 = call i32 @puts(ptr @function_contract_error_string)
+  %5 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
@@ -921,12 +928,15 @@ condition_success1:                               ; preds = %condition_success
   ret void
 
 condition_fail2:                                  ; preds = %condition_success
-  %5 = call i32 @puts(ptr @function_contract_error_string.1)
+  %6 = call i32 @puts(ptr @function_contract_error_string.1)
+  %7 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
 declare i32 @puts(ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -2195,6 +2205,7 @@ bounds_check_pass:                                ; preds = %entry
 
 bounds_check_fail:                                ; preds = %entry
   %8 = call i32 @puts(ptr @function_contract_error_string)
+  %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -2225,11 +2236,14 @@ bounds_check_pass:                                ; preds = %entry
 
 bounds_check_fail:                                ; preds = %entry
   %2 = call i32 @puts(ptr @function_contract_error_string.1)
+  %3 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
 declare i32 @puts(ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -2314,6 +2328,7 @@ bounds_check_pass:                                ; preds = %entry
 
 bounds_check_fail:                                ; preds = %entry
   %10 = call i32 @puts(ptr @function_contract_error_string)
+  %11 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -2367,6 +2382,7 @@ bounds_check_pass:                                ; preds = %entry
 
 bounds_check_fail:                                ; preds = %entry
   %5 = call i32 @puts(ptr @function_contract_error_string.1)
+  %6 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -2420,11 +2436,14 @@ bounds_check_pass:                                ; preds = %entry
 
 bounds_check_fail:                                ; preds = %entry
   %5 = call i32 @puts(ptr @function_contract_error_string.2)
+  %6 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
 declare i32 @puts(ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -2490,6 +2509,7 @@ bounds_check_pass:                                ; preds = %entry
 
 bounds_check_fail:                                ; preds = %entry
   %13 = call i32 @puts(ptr @function_contract_error_string)
+  %14 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -2520,6 +2540,7 @@ bounds_check_pass:                                ; preds = %entry
 
 bounds_check_fail:                                ; preds = %entry
   %8 = call i32 @puts(ptr @function_contract_error_string.1)
+  %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -2554,11 +2575,14 @@ bounds_check_pass:                                ; preds = %entry
 
 bounds_check_fail:                                ; preds = %entry
   %8 = call i32 @puts(ptr @function_contract_error_string.2)
+  %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
 declare i32 @puts(ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -4322,6 +4346,300 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Decimal Overflow Checks Disabled", "[LLVM_IR]")
+  {
+    char const* const input_file = "decimal_overflow_checks.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_multiply(i32 noundef %"arguments[0].x", i32 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i32, align 4
+  %y = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store i32 %"arguments[1].y", ptr %y, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = load i32, ptr %y, align 4
+  %2 = sext i32 %0 to i64
+  %3 = sext i32 %1 to i64
+  %4 = mul i64 %2, %3
+  %5 = sdiv i64 %4, 10000
+  %6 = trunc i64 %5 to i32
+  ret i32 %6
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_checked_divide(i64 noundef %"arguments[0].x", i64 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i64, align 8
+  %y = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  store i64 %"arguments[1].y", ptr %y, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = load i64, ptr %y, align 8
+  %2 = sext i64 %0 to i128
+  %3 = sext i64 %1 to i128
+  %4 = mul i128 %2, 10000000
+  %5 = sdiv i128 %4, %3
+  %6 = trunc i128 %5 to i64
+  ret i64 %6
+}
+
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_decimal_narrowing_cast(i64 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = sext i64 %0 to i128
+  %2 = sdiv i128 %1, 1000
+  %3 = trunc i128 %2 to i32
+  ret i32 %3
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_checked_decimal_widening_cast(i32 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = sext i32 %0 to i128
+  %2 = mul i128 %1, 1000
+  %3 = trunc i128 %2 to i64
+  ret i64 %3
+}
+
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_integer_cast(i64 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = sext i64 %0 to i128
+  %2 = icmp sge i128 %1, 0
+  %3 = select i1 %2, i128 5000000, i128 -5000000
+  %4 = add i128 %1, %3
+  %5 = sdiv i128 %4, 10000000
+  %6 = trunc i128 %5 to i32
+  ret i32 %6
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_unchecked_integer_cast(i32 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = sext i32 %0 to i64
+  %2 = icmp sge i64 %1, 0
+  %3 = select i1 %2, i64 5000, i64 -5000
+  %4 = add i64 %1, %3
+  %5 = sdiv i64 %4, 10000
+  ret i64 %5
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Decimal Overflow Checks Enabled", "[LLVM_IR]")
+  {
+    char const* const input_file = "decimal_overflow_checks.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+@function_contract_error_string = private unnamed_addr constant [98 x i8] c"Decimal overflow in decimal multiplication in 'Decimal_overflow_checks.checked_multiply' at 5:12!\00"
+@function_contract_error_string.1 = private unnamed_addr constant [91 x i8] c"Decimal overflow in decimal division in 'Decimal_overflow_checks.checked_divide' at 10:12!\00"
+@function_contract_error_string.2 = private unnamed_addr constant [120 x i8] c"Decimal overflow in decimal to decimal conversion in 'Decimal_overflow_checks.checked_decimal_narrowing_cast' at 15:12!\00"
+@function_contract_error_string.3 = private unnamed_addr constant [119 x i8] c"Decimal overflow in decimal to decimal conversion in 'Decimal_overflow_checks.checked_decimal_widening_cast' at 20:12!\00"
+@function_contract_error_string.4 = private unnamed_addr constant [110 x i8] c"Decimal overflow in decimal to integer conversion in 'Decimal_overflow_checks.checked_integer_cast' at 25:12!\00"
+
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_multiply(i32 noundef %"arguments[0].x", i32 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i32, align 4
+  %y = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store i32 %"arguments[1].y", ptr %y, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = load i32, ptr %y, align 4
+  %2 = sext i32 %0 to i64
+  %3 = sext i32 %1 to i64
+  %4 = mul i64 %2, %3
+  %5 = sdiv i64 %4, 10000
+  %decimal_overflow_check_at_least_minimum = icmp sge i64 %5, -2147483648
+  %decimal_overflow_check_at_most_maximum = icmp sle i64 %5, 2147483647
+  %decimal_overflow_check_in_range = and i1 %decimal_overflow_check_at_least_minimum, %decimal_overflow_check_at_most_maximum
+  br i1 %decimal_overflow_check_in_range, label %decimal_overflow_check_pass, label %decimal_overflow_check_fail
+
+decimal_overflow_check_pass:                      ; preds = %entry
+  %6 = trunc i64 %5 to i32
+  ret i32 %6
+
+decimal_overflow_check_fail:                      ; preds = %entry
+  %7 = call i32 @puts(ptr @function_contract_error_string)
+  %8 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_checked_divide(i64 noundef %"arguments[0].x", i64 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i64, align 8
+  %y = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  store i64 %"arguments[1].y", ptr %y, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = load i64, ptr %y, align 8
+  %2 = sext i64 %0 to i128
+  %3 = sext i64 %1 to i128
+  %4 = mul i128 %2, 10000000
+  %5 = sdiv i128 %4, %3
+  %decimal_overflow_check_at_least_minimum = icmp sge i128 %5, -9223372036854775808
+  %decimal_overflow_check_at_most_maximum = icmp sle i128 %5, 9223372036854775807
+  %decimal_overflow_check_in_range = and i1 %decimal_overflow_check_at_least_minimum, %decimal_overflow_check_at_most_maximum
+  br i1 %decimal_overflow_check_in_range, label %decimal_overflow_check_pass, label %decimal_overflow_check_fail
+
+decimal_overflow_check_pass:                      ; preds = %entry
+  %6 = trunc i128 %5 to i64
+  ret i64 %6
+
+decimal_overflow_check_fail:                      ; preds = %entry
+  %7 = call i32 @puts(ptr @function_contract_error_string.1)
+  %8 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_decimal_narrowing_cast(i64 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = sext i64 %0 to i128
+  %2 = sdiv i128 %1, 1000
+  %decimal_overflow_check_at_least_minimum = icmp sge i128 %2, -2147483648
+  %decimal_overflow_check_at_most_maximum = icmp sle i128 %2, 2147483647
+  %decimal_overflow_check_in_range = and i1 %decimal_overflow_check_at_least_minimum, %decimal_overflow_check_at_most_maximum
+  br i1 %decimal_overflow_check_in_range, label %decimal_overflow_check_pass, label %decimal_overflow_check_fail
+
+decimal_overflow_check_pass:                      ; preds = %entry
+  %3 = trunc i128 %2 to i32
+  ret i32 %3
+
+decimal_overflow_check_fail:                      ; preds = %entry
+  %4 = call i32 @puts(ptr @function_contract_error_string.2)
+  %5 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_checked_decimal_widening_cast(i32 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = sext i32 %0 to i128
+  %2 = mul i128 %1, 1000
+  %decimal_overflow_check_at_least_minimum = icmp sge i128 %2, -9223372036854775808
+  %decimal_overflow_check_at_most_maximum = icmp sle i128 %2, 9223372036854775807
+  %decimal_overflow_check_in_range = and i1 %decimal_overflow_check_at_least_minimum, %decimal_overflow_check_at_most_maximum
+  br i1 %decimal_overflow_check_in_range, label %decimal_overflow_check_pass, label %decimal_overflow_check_fail
+
+decimal_overflow_check_pass:                      ; preds = %entry
+  %3 = trunc i128 %2 to i64
+  ret i64 %3
+
+decimal_overflow_check_fail:                      ; preds = %entry
+  %4 = call i32 @puts(ptr @function_contract_error_string.3)
+  %5 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_integer_cast(i64 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = sext i64 %0 to i128
+  %2 = icmp sge i128 %1, 0
+  %3 = select i1 %2, i128 5000000, i128 -5000000
+  %4 = add i128 %1, %3
+  %5 = sdiv i128 %4, 10000000
+  %decimal_overflow_check_at_least_minimum = icmp sge i128 %5, -2147483648
+  %decimal_overflow_check_at_most_maximum = icmp sle i128 %5, 2147483647
+  %decimal_overflow_check_in_range = and i1 %decimal_overflow_check_at_least_minimum, %decimal_overflow_check_at_most_maximum
+  br i1 %decimal_overflow_check_in_range, label %decimal_overflow_check_pass, label %decimal_overflow_check_fail
+
+decimal_overflow_check_pass:                      ; preds = %entry
+  %6 = trunc i128 %5 to i32
+  ret i32 %6
+
+decimal_overflow_check_fail:                      ; preds = %entry
+  %7 = call i32 @puts(ptr @function_contract_error_string.4)
+  %8 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_unchecked_integer_cast(i32 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = sext i32 %0 to i64
+  %2 = icmp sge i64 %1, 0
+  %3 = select i1 %2, i64 5000, i64 -5000
+  %4 = add i64 %1, %3
+  %5 = sdiv i64 %4, 10000
+  ret i64 %5
+}
+
+declare i32 @puts(ptr)
+
+declare i32 @fflush(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_decimal_overflow_checks = true });
+  }
+
+  // The runtime check cannot catch a folded constant -- there is nothing left to branch on -- so an
+  // out-of-range constant result is rejected at compile time, in every configuration and regardless
+  // of enable_decimal_overflow_checks. Note this test leaves that flag off.
+  TEST_CASE("Compile Decimal Constant Overflow Is An Error", "[LLVM_IR]")
+  {
+    char const* const input_file = "decimal_constant_overflow.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    CHECK_THROWS_WITH(
+      test_create_llvm_module(input_file, module_name_to_file_path_map, ""),
+      Catch::Matchers::ContainsSubstring("Result of decimal division does not fit the 32-bit backing integer")
+        && Catch::Matchers::ContainsSubstring("4500000000")
+    );
+  }
+
   TEST_CASE("Compile Decimal Comparisons", "[LLVM_IR]")
   {
     char const* const input_file = "decimal_expressions.iris";
@@ -5171,24 +5489,26 @@ condition_success:                                ; preds = %entry
 
 condition_fail:                                   ; preds = %entry
   %9 = call i32 @puts(ptr @function_contract_error_string)
+  %10 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 condition_success1:                               ; preds = %condition_success
-  %10 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 0
-  store ptr null, ptr %10, align 8
-  %11 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 1
-  store i64 0, ptr %11, align 8
-  %12 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 2
+  %11 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 0
+  store ptr null, ptr %11, align 8
+  %12 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 1
   store i64 0, ptr %12, align 8
-  %13 = load %struct.dynamic_array_Allocator, ptr %allocator, align 8
-  %14 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 3
-  store %struct.dynamic_array_Allocator %13, ptr %14, align 8
+  %13 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 2
+  store i64 0, ptr %13, align 8
+  %14 = load %struct.dynamic_array_Allocator, ptr %allocator, align 8
+  %15 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 3
+  store %struct.dynamic_array_Allocator %14, ptr %15, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return.instance, ptr align 8 %0, i64 40, i1 false)
   ret void
 
 condition_fail2:                                  ; preds = %condition_success
-  %15 = call i32 @puts(ptr @function_contract_error_string.1)
+  %16 = call i32 @puts(ptr @function_contract_error_string.1)
+  %17 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -5220,64 +5540,66 @@ condition_success:                                ; preds = %entry
 
 condition_fail:                                   ; preds = %entry
   %9 = call i32 @puts(ptr @function_contract_error_string.2)
+  %10 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 if_s0_then:                                       ; preds = %condition_success
-  %10 = load ptr, ptr %instance, align 8
-  %11 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %10, i32 0, i32 2
-  %12 = load i64, ptr %11, align 8
-  %13 = add i64 %12, 1
-  %14 = mul i64 2, %13
-  store i64 %14, ptr %new_capacity, align 8
-  %15 = load i64, ptr %new_capacity, align 8
-  %16 = mul i64 %15, 4
-  store i64 %16, ptr %allocation_size_in_bytes, align 8
-  %17 = load ptr, ptr %instance, align 8
-  %18 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %17, i32 0, i32 3
-  %19 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %18, i32 0, i32 0
-  %20 = load ptr, ptr %19, align 8
-  %21 = load i64, ptr %allocation_size_in_bytes, align 8
-  %22 = call ptr %20(i64 noundef %21, i64 noundef 4)
-  store ptr %22, ptr %allocation, align 8
-  %23 = load ptr, ptr %allocation, align 8
-  %24 = icmp ne ptr %23, null
-  br i1 %24, label %condition_success1, label %condition_fail2
+  %11 = load ptr, ptr %instance, align 8
+  %12 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %11, i32 0, i32 2
+  %13 = load i64, ptr %12, align 8
+  %14 = add i64 %13, 1
+  %15 = mul i64 2, %14
+  store i64 %15, ptr %new_capacity, align 8
+  %16 = load i64, ptr %new_capacity, align 8
+  %17 = mul i64 %16, 4
+  store i64 %17, ptr %allocation_size_in_bytes, align 8
+  %18 = load ptr, ptr %instance, align 8
+  %19 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %18, i32 0, i32 3
+  %20 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %19, i32 0, i32 0
+  %21 = load ptr, ptr %20, align 8
+  %22 = load i64, ptr %allocation_size_in_bytes, align 8
+  %23 = call ptr %21(i64 noundef %22, i64 noundef 4)
+  store ptr %23, ptr %allocation, align 8
+  %24 = load ptr, ptr %allocation, align 8
+  %25 = icmp ne ptr %24, null
+  br i1 %25, label %condition_success1, label %condition_fail2
 
 if_s1_after:                                      ; preds = %condition_success1, %condition_success
-  %25 = load ptr, ptr %instance, align 8
-  %26 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %25, i32 0, i32 1
-  %27 = load i64, ptr %26, align 8
-  store i64 %27, ptr %index, align 8
-  %28 = load i64, ptr %index, align 8
-  %29 = load ptr, ptr %instance, align 8
-  %30 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %29, i32 0, i32 0
-  %31 = load ptr, ptr %30, align 8
-  %array_element_pointer = getelementptr i32, ptr %31, i64 %28
-  %32 = load i32, ptr %element, align 4
-  store i32 %32, ptr %array_element_pointer, align 4
-  %33 = load ptr, ptr %instance, align 8
-  %34 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %33, i32 0, i32 1
-  %35 = load ptr, ptr %instance, align 8
-  %36 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %35, i32 0, i32 1
-  %37 = load i64, ptr %36, align 8
-  %38 = add i64 %37, 1
-  store i64 %38, ptr %34, align 8
+  %26 = load ptr, ptr %instance, align 8
+  %27 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %26, i32 0, i32 1
+  %28 = load i64, ptr %27, align 8
+  store i64 %28, ptr %index, align 8
+  %29 = load i64, ptr %index, align 8
+  %30 = load ptr, ptr %instance, align 8
+  %31 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %30, i32 0, i32 0
+  %32 = load ptr, ptr %31, align 8
+  %array_element_pointer = getelementptr i32, ptr %32, i64 %29
+  %33 = load i32, ptr %element, align 4
+  store i32 %33, ptr %array_element_pointer, align 4
+  %34 = load ptr, ptr %instance, align 8
+  %35 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %34, i32 0, i32 1
+  %36 = load ptr, ptr %instance, align 8
+  %37 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %36, i32 0, i32 1
+  %38 = load i64, ptr %37, align 8
+  %39 = add i64 %38, 1
+  store i64 %39, ptr %35, align 8
   ret void
 
 condition_success1:                               ; preds = %if_s0_then
-  %39 = load ptr, ptr %instance, align 8
-  %40 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %39, i32 0, i32 0
-  %41 = load ptr, ptr %allocation, align 8
-  store ptr %41, ptr %40, align 8
-  %42 = load ptr, ptr %instance, align 8
-  %43 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %42, i32 0, i32 2
-  %44 = load i64, ptr %new_capacity, align 8
-  store i64 %44, ptr %43, align 8
+  %40 = load ptr, ptr %instance, align 8
+  %41 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %40, i32 0, i32 0
+  %42 = load ptr, ptr %allocation, align 8
+  store ptr %42, ptr %41, align 8
+  %43 = load ptr, ptr %instance, align 8
+  %44 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %43, i32 0, i32 2
+  %45 = load i64, ptr %new_capacity, align 8
+  store i64 %45, ptr %44, align 8
   br label %if_s1_after
 
 condition_fail2:                                  ; preds = %if_s0_then
-  %45 = call i32 @puts(ptr @function_contract_error_string.3)
+  %46 = call i32 @puts(ptr @function_contract_error_string.3)
+  %47 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -5303,25 +5625,29 @@ condition_success:                                ; preds = %entry
 
 condition_fail:                                   ; preds = %entry
   %7 = call i32 @puts(ptr @function_contract_error_string.4)
+  %8 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 condition_success1:                               ; preds = %condition_success
-  %8 = load i64, ptr %index, align 8
-  %9 = load ptr, ptr %instance, align 8
-  %10 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %9, i32 0, i32 0
-  %11 = load ptr, ptr %10, align 8
-  %array_element_pointer = getelementptr i32, ptr %11, i64 %8
-  %12 = load i32, ptr %array_element_pointer, align 4
-  ret i32 %12
+  %9 = load i64, ptr %index, align 8
+  %10 = load ptr, ptr %instance, align 8
+  %11 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %10, i32 0, i32 0
+  %12 = load ptr, ptr %11, align 8
+  %array_element_pointer = getelementptr i32, ptr %12, i64 %9
+  %13 = load i32, ptr %array_element_pointer, align 4
+  ret i32 %13
 
 condition_fail2:                                  ; preds = %condition_success
-  %13 = call i32 @puts(ptr @function_contract_error_string.5)
+  %14 = call i32 @puts(ptr @function_contract_error_string.5)
+  %15 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
 declare i32 @puts(ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -5837,23 +6163,27 @@ bounds_check_pass:                                ; preds = %if_s0_then
 
 bounds_check_fail:                                ; preds = %if_s0_then
   %13 = call i32 @puts(ptr @function_contract_error_string)
+  %14 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 bounds_check_pass2:                               ; preds = %if_s1_else
-  %14 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %7, i32 0, i32 0
-  %15 = load ptr, ptr %14, align 8
-  %array_slice_element_pointer4 = getelementptr i64, ptr %15, i64 1
-  %16 = load i64, ptr %array_slice_element_pointer4, align 8
-  ret i64 %16
+  %15 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %7, i32 0, i32 0
+  %16 = load ptr, ptr %15, align 8
+  %array_slice_element_pointer4 = getelementptr i64, ptr %16, i64 1
+  %17 = load i64, ptr %array_slice_element_pointer4, align 8
+  ret i64 %17
 
 bounds_check_fail3:                               ; preds = %if_s1_else
-  %17 = call i32 @puts(ptr @function_contract_error_string.1)
+  %18 = call i32 @puts(ptr @function_contract_error_string.1)
+  %19 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
 declare i32 @puts(ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -9089,16 +9419,18 @@ condition_success:                                ; preds = %entry
 
 condition_fail:                                   ; preds = %entry
   %4 = call i32 @puts(ptr @function_contract_error_string)
+  %5 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 condition_success1:                               ; preds = %condition_success
-  %5 = load i32, ptr %x, align 4
-  %6 = icmp eq i32 %5, 8
-  br i1 %6, label %if_s0_then, label %if_s1_after
+  %6 = load i32, ptr %x, align 4
+  %7 = icmp eq i32 %6, 8
+  br i1 %7, label %if_s0_then, label %if_s1_after
 
 condition_fail2:                                  ; preds = %condition_success
-  %7 = call i32 @puts(ptr @function_contract_error_string.1)
+  %8 = call i32 @puts(ptr @function_contract_error_string.1)
+  %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
@@ -9106,17 +9438,18 @@ if_s0_then:                                       ; preds = %condition_success1
   br i1 true, label %condition_success3, label %condition_fail4
 
 if_s1_after:                                      ; preds = %condition_success1
-  %8 = load i32, ptr %x, align 4
-  %9 = load i32, ptr %x, align 4
-  %10 = mul i32 %8, %9
-  %11 = icmp sge i32 %10, 0
-  br i1 %11, label %condition_success7, label %condition_fail8
+  %10 = load i32, ptr %x, align 4
+  %11 = load i32, ptr %x, align 4
+  %12 = mul i32 %10, %11
+  %13 = icmp sge i32 %12, 0
+  br i1 %13, label %condition_success7, label %condition_fail8
 
 condition_success3:                               ; preds = %if_s0_then
   br i1 true, label %condition_success5, label %condition_fail6
 
 condition_fail4:                                  ; preds = %if_s0_then
-  %12 = call i32 @puts(ptr @function_contract_error_string.2)
+  %14 = call i32 @puts(ptr @function_contract_error_string.2)
+  %15 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
@@ -9124,29 +9457,34 @@ condition_success5:                               ; preds = %condition_success3
   ret i32 64
 
 condition_fail6:                                  ; preds = %condition_success3
-  %13 = call i32 @puts(ptr @function_contract_error_string.3)
+  %16 = call i32 @puts(ptr @function_contract_error_string.3)
+  %17 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 condition_success7:                               ; preds = %if_s1_after
-  %14 = icmp sle i32 %10, 64
-  br i1 %14, label %condition_success9, label %condition_fail10
+  %18 = icmp sle i32 %12, 64
+  br i1 %18, label %condition_success9, label %condition_fail10
 
 condition_fail8:                                  ; preds = %if_s1_after
-  %15 = call i32 @puts(ptr @function_contract_error_string.4)
+  %19 = call i32 @puts(ptr @function_contract_error_string.4)
+  %20 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 condition_success9:                               ; preds = %condition_success7
-  ret i32 %10
+  ret i32 %12
 
 condition_fail10:                                 ; preds = %condition_success7
-  %16 = call i32 @puts(ptr @function_contract_error_string.5)
+  %21 = call i32 @puts(ptr @function_contract_error_string.5)
+  %22 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
 declare i32 @puts(ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 

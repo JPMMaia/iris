@@ -246,7 +246,21 @@ namespace iris::compiler
             message
         );
 
-        return llvm_builder.CreateCall(puts_function, {message_value});
+        llvm_builder.CreateCall(puts_function, {message_value});
+
+        llvm::Function* flush_function = llvm_module.getFunction("fflush");
+        if (!flush_function)
+        {
+            llvm::FunctionType* const flush_function_type = llvm::FunctionType::get(
+                llvm::Type::getInt32Ty(llvm_context),
+                llvm::PointerType::get(llvm_context, 0),
+                false
+            );
+
+            flush_function = llvm::Function::Create(flush_function_type, llvm::Function::ExternalLinkage, "fflush", llvm_module);
+        }
+
+        return llvm_builder.CreateCall(flush_function, { llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm_context, 0)) });
     }
 
     llvm::Value* create_abort_instruction(

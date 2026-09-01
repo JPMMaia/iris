@@ -70,7 +70,8 @@ namespace iris::compiler
         std::span<std::filesystem::path const> const additional_repository_paths,
         std::span<std::filesystem::path const> const expected_output_paths,
         std::optional<std::string_view> const temporary_directory_name = std::nullopt,
-        iris::compiler::Builder_options const builder_options = {}
+        iris::compiler::Builder_options const builder_options = {},
+        iris::compiler::Compilation_options const compilation_options = {}
     )
     {
         std::filesystem::path const temporary_directory_path = std::filesystem::temp_directory_path();
@@ -87,10 +88,6 @@ namespace iris::compiler
         repository_paths.insert(repository_paths.end(), additional_repository_paths.begin(), additional_repository_paths.end());
 
         std::filesystem::remove_all(build_directory_path);
-
-        iris::compiler::Compilation_options const compilation_options
-        {
-        };
 
         Builder builder = create_builder(
             target,
@@ -124,7 +121,8 @@ namespace iris::compiler
         std::span<std::filesystem::path const> const additional_repository_paths,
         std::span<std::filesystem::path const> const expected_output_paths,
         std::string_view const test_executable_name,
-        std::optional<std::string_view> const temporary_directory_name = std::nullopt
+        std::optional<std::string_view> const temporary_directory_name = std::nullopt,
+        iris::compiler::Compilation_options const compilation_options = {}
     )
     {
         std::filesystem::path const build_directory_path = test_builder(
@@ -134,7 +132,8 @@ namespace iris::compiler
             additional_repository_paths,
             expected_output_paths,
             temporary_directory_name,
-            {.is_test_mode = true}
+            {.is_test_mode = true},
+            compilation_options
         );
 
         std::filesystem::path const test_executable_path =
@@ -491,6 +490,80 @@ namespace iris::compiler
             expected_output_paths,
             "decimal_app.iris.test"
         );
+    }
+
+    TEST_CASE("Build and run Decimal_arithmetic decimal_app with decimal overflow checks", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Decimal_arithmetic" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("decimal_app.iris.test", target)
+        };
+
+        test_builder_and_run(
+            "Decimal_arithmetic",
+            {"decimal_app/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "decimal_app.iris.test",
+            "Decimal_arithmetic_overflow_checks",
+            {.enable_decimal_overflow_checks = true}
+        );
+    }
+
+    TEST_CASE("Build and run Decimal_arithmetic decimal_overflow_app", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Decimal_arithmetic" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("decimal_overflow_app", target)
+        };
+
+        auto const build_and_run = [&](std::string_view const directory_name, bool const enable_checks) -> int
+        {
+            std::filesystem::path const build_directory_path = test_builder(
+                "Decimal_arithmetic",
+                {"decimal_overflow_app/iris_artifact.json"},
+                target,
+                repository_paths,
+                expected_output_paths,
+                directory_name,
+                {},
+                // Built without debug information on purpose: the check ends in the CRT's abort(),
+                // and the debug CRT turns that into a modal "Debug Error!" box that blocks forever
+                // when nobody is there to dismiss it.
+                {.debug = false, .enable_decimal_overflow_checks = enable_checks}
+            );
+
+            std::filesystem::path const executable_path =
+                build_directory_path / "bin" / get_binary_name("decimal_overflow_app", target);
+
+            REQUIRE(std::filesystem::exists(executable_path));
+
+            std::string const command = std::format("\"{}\"", executable_path.generic_string());
+            return std::system(command.c_str());
+        };
+
+        // Without the checks the overflow is silent. main returns the result as an Int32, so the
+        // exit code is the truncated answer: 4_500_000_000 wraps to 205_032_704, which as a
+        // Decimal6 is 205.032704 and rounds to 205 instead of 4500.
+        CHECK(build_and_run("Decimal_arithmetic_overflow_unchecked", false) == 205);
+
+        // With them it aborts.
+        CHECK(build_and_run("Decimal_arithmetic_overflow_checked", true) != 0);
     }
 
     TEST_CASE("Build Copy_files", "[Builder]")

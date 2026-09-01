@@ -1469,7 +1469,7 @@ namespace iris::compiler
         Decimal_type const type
     )
     {
-        static llvm::DINamespace* scope = llvm_debug_builder.createNameSpace(nullptr, "h", false);
+        llvm::DINamespace* const scope = llvm_debug_builder.createNameSpace(nullptr, "h", false);
 
         std::uint32_t const bits = type.scale <= 6 ? 32 : 64;
         std::string const name = std::format("iris::Decimal{}", type.scale);

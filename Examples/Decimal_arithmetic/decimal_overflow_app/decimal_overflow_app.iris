@@ -1,0 +1,27 @@
+module decimal_overflow_app;
+
+import c.stdlib as c_stdlib;
+
+// The second defect from Plans/bug_decimal64_arithmetic_needs_divti3.md: 90 / 0.02 is 4500, whose
+// scaled Decimal6 representation is 4_500_000_000 and does not fit the Int32 backing. Without
+// --decimal-overflow-checks the final trunc silently returns 205_032_704.
+//
+// The operands go through atoi for the same reason as in decimal_app: with literals the whole
+// expression folds to a constant, which is rejected at compile time instead and never reaches a
+// runtime check. This program is built by Builder.tests.cpp, which expects a non-zero exit.
+
+function opaque_int32(text: *C_char) -> (result: Int32)
+{
+    return c_stdlib.atoi(text) as Int32;
+}
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    var ninety: Decimal6 = opaque_int32("90"c) as Decimal6;
+    var fiftieth: Decimal6 = opaque_int32("1"c) as Decimal6 / opaque_int32("50"c) as Decimal6;
+
+    var steps: Decimal6 = ninety / fiftieth;
+
+    return steps as Int32;
+}

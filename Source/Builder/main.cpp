@@ -121,6 +121,28 @@ argparse::Argument& add_no_bounds_checks_argument(argparse::ArgumentParser& comm
         .flag();
 }
 
+argparse::Argument& add_decimal_overflow_checks_arguments(argparse::ArgumentParser& command)
+{
+    command.add_argument("--decimal-overflow-checks")
+        .help("Enable decimal overflow checks (the default in debug builds)")
+        .flag();
+
+    return command.add_argument("--no-decimal-overflow-checks")
+        .help("Disable decimal overflow checks")
+        .flag();
+}
+
+std::optional<bool> get_decimal_overflow_checks(argparse::ArgumentParser const& command)
+{
+    if (command.get<bool>("--no-decimal-overflow-checks"))
+        return false;
+
+    if (command.get<bool>("--decimal-overflow-checks"))
+        return true;
+
+    return std::nullopt;
+}
+
 argparse::Argument& add_output_llvm_ir_argument(argparse::ArgumentParser& command)
 {
     return command.add_argument("--output-llvm-ir")
@@ -322,7 +344,8 @@ iris::compiler::Compilation_options create_compilation_options(
     iris::compiler::Target const& target,
     bool const no_debug,
     iris::compiler::Contract_options const contract_options,
-    bool const no_bounds_checks
+    bool const no_bounds_checks,
+    std::optional<bool> const decimal_overflow_checks
 )
 {
     bool const output_debug_code_view = !no_debug && target.operating_system == "windows";
@@ -335,6 +358,7 @@ iris::compiler::Compilation_options create_compilation_options(
         .output_debug_code_view = output_debug_code_view,
         .contract_options = contract_options,
         .enable_bounds_checks = !no_bounds_checks,
+        .enable_decimal_overflow_checks = decimal_overflow_checks.value_or(!no_debug),
     };
 
     return compilation_options;
@@ -480,6 +504,7 @@ int main(int const argc, char const* const* argv)
     add_repository_argument(build_command);
     add_no_debug_argument(build_command);
     add_no_bounds_checks_argument(build_command);
+    add_decimal_overflow_checks_arguments(build_command);
     add_output_llvm_ir_argument(build_command);
     add_function_contract_options_argument(build_command);
     program.add_subparser(build_command);
@@ -495,6 +520,7 @@ int main(int const argc, char const* const* argv)
     add_repository_argument(build_tests_command);
     add_no_debug_argument(build_tests_command);
     add_no_bounds_checks_argument(build_tests_command);
+    add_decimal_overflow_checks_arguments(build_tests_command);
     add_output_llvm_ir_argument(build_tests_command);
     add_function_contract_options_argument(build_tests_command);
     program.add_subparser(build_tests_command);
@@ -510,6 +536,7 @@ int main(int const argc, char const* const* argv)
     add_repository_argument(test_command);
     add_no_debug_argument(test_command);
     add_no_bounds_checks_argument(test_command);
+    add_decimal_overflow_checks_arguments(test_command);
     add_output_llvm_ir_argument(test_command);
     add_function_contract_options_argument(test_command);
     program.add_subparser(test_command);
@@ -610,7 +637,8 @@ int main(int const argc, char const* const* argv)
         iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks);
+        std::optional<bool> const decimal_overflow_checks = get_decimal_overflow_checks(subprogram);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks, decimal_overflow_checks);
 
         iris::compiler::Builder_options const builder_options =
         {
@@ -656,7 +684,8 @@ int main(int const argc, char const* const* argv)
         iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks);
+        std::optional<bool> const decimal_overflow_checks = get_decimal_overflow_checks(subprogram);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks, decimal_overflow_checks);
 
         iris::compiler::Builder_options const builder_options =
         {
@@ -703,7 +732,8 @@ int main(int const argc, char const* const* argv)
         iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks);
+        std::optional<bool> const decimal_overflow_checks = get_decimal_overflow_checks(subprogram);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks, decimal_overflow_checks);
 
         iris::compiler::Builder_options const builder_options =
         {
@@ -822,7 +852,7 @@ int main(int const argc, char const* const* argv)
         std::pmr::vector<std::filesystem::path> const repository_paths = get_effective_repository_paths_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, false, iris::compiler::Contract_options::Log_error_and_abort, false);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, false, iris::compiler::Contract_options::Log_error_and_abort, false, std::nullopt);
 
         iris::compiler::Builder_options const builder_options =
         {

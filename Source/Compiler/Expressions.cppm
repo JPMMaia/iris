@@ -66,6 +66,7 @@ namespace iris::compiler
         Debug_info* debug_info;
         Contract_options contract_options;
         bool enable_bounds_checks = false;
+        bool enable_decimal_overflow_checks = false;
         std::optional<Source_position> source_position;
         std::span<Global_variable_declaration const* const> globals_being_folded;
         std::pmr::polymorphic_allocator<> const& temporaries_allocator;

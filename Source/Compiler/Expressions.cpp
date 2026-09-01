@@ -91,6 +91,7 @@ namespace iris::compiler
             .debug_info = parameters.debug_info,
             .contract_options = parameters.contract_options,
             .enable_bounds_checks = parameters.enable_bounds_checks,
+            .enable_decimal_overflow_checks = parameters.enable_decimal_overflow_checks,
             .source_position = parameters.source_position,
             .globals_being_folded = parameters.globals_being_folded,
             .temporaries_allocator = parameters.temporaries_allocator,
@@ -1435,6 +1436,123 @@ namespace iris::compiler
         llvm_builder.SetInsertPoint(pass_block);
     }
 
+    static void create_decimal_range_check_instructions(
+        llvm::Value* const wide_value,
+        std::uint32_t const backing_bits,
+        bool const backing_is_signed,
+        std::string_view const error_message,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::LLVMContext& llvm_context = parameters.llvm_context;
+        llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+
+        llvm::IntegerType* const wide_type = llvm::cast<llvm::IntegerType>(wide_value->getType());
+        std::uint32_t const wide_bits = wide_type->getBitWidth();
+
+        // The narrowing is a no-op when the destination is as wide as the intermediate, so there is
+        // nothing to check and the comparison would be a tautology.
+        if (backing_is_signed && backing_bits >= wide_bits)
+            return;
+
+        llvm::APInt const minimum_ap =
+            backing_is_signed ?
+            llvm::APInt::getSignedMinValue(backing_bits).sext(wide_bits) :
+            llvm::APInt::getZero(wide_bits);
+        llvm::APInt const maximum_ap =
+            backing_is_signed ?
+            llvm::APInt::getSignedMaxValue(backing_bits).sext(wide_bits) :
+            llvm::APInt::getMaxValue(backing_bits).zext(wide_bits);
+
+        llvm::Value* const minimum = llvm::ConstantInt::get(wide_type, minimum_ap);
+        llvm::Value* const maximum = llvm::ConstantInt::get(wide_type, maximum_ap);
+
+        llvm::Value* const at_least_minimum = llvm_builder.CreateICmpSGE(wide_value, minimum, "decimal_overflow_check_at_least_minimum");
+        llvm::Value* const at_most_maximum = llvm_builder.CreateICmpSLE(wide_value, maximum, "decimal_overflow_check_at_most_maximum");
+        llvm::Value* const in_range = llvm_builder.CreateAnd(at_least_minimum, at_most_maximum, "decimal_overflow_check_in_range");
+
+        llvm::BasicBlock* const pass_block = llvm::BasicBlock::Create(llvm_context, "decimal_overflow_check_pass", parameters.llvm_parent_function);
+        llvm::BasicBlock* const fail_block = llvm::BasicBlock::Create(llvm_context, "decimal_overflow_check_fail", parameters.llvm_parent_function);
+
+        llvm_builder.CreateCondBr(in_range, pass_block, fail_block);
+
+        llvm_builder.SetInsertPoint(fail_block);
+        create_log_error_instruction(llvm_context, parameters.llvm_module, llvm_builder, error_message);
+        create_abort_instruction(llvm_context, parameters.llvm_module, llvm_builder);
+        llvm_builder.CreateUnreachable();
+
+        llvm_builder.SetInsertPoint(pass_block);
+    }
+
+    static void check_decimal_constant_range(
+        llvm::Value* const wide_value,
+        std::uint32_t const backing_bits,
+        bool const backing_is_signed,
+        std::string_view const operation_description,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::ConstantInt const* const constant = llvm::dyn_cast<llvm::ConstantInt>(wide_value);
+        if (constant == nullptr)
+            return;
+
+        llvm::APInt const& value = constant->getValue();
+
+        bool const in_range =
+            backing_is_signed ?
+            value.getSignificantBits() <= backing_bits :
+            (!value.isNegative() && value.getActiveBits() <= backing_bits);
+
+        if (in_range)
+            return;
+
+        throw std::runtime_error
+        {
+            format_error(
+                std::format(
+                    "Result of {} does not fit the {}-bit backing integer (scaled value {} is out of range [{}, {}]).",
+                    operation_description,
+                    backing_bits,
+                    llvm::toString(value, 10, backing_is_signed),
+                    llvm::toString(backing_is_signed ? llvm::APInt::getSignedMinValue(backing_bits) : llvm::APInt::getZero(backing_bits), 10, backing_is_signed),
+                    llvm::toString(backing_is_signed ? llvm::APInt::getSignedMaxValue(backing_bits) : llvm::APInt::getMaxValue(backing_bits), 10, backing_is_signed)
+                ),
+                parameters.source_position
+            )
+        };
+    }
+
+    // Names the operation and its source position so the abort message points at the culprit.
+    static std::string create_decimal_overflow_error_message(
+        std::string_view const operation_description,
+        Expression_parameters const& parameters
+    )
+    {
+        std::string_view const function_name =
+            parameters.function_declaration.has_value() && *parameters.function_declaration ?
+            std::string_view{ (*parameters.function_declaration)->name } :
+            std::string_view{ "?" };
+
+        if (parameters.source_position.has_value())
+        {
+            return std::format(
+                "Decimal overflow in {} in '{}.{}' at {}:{}!",
+                operation_description,
+                parameters.core_module.name,
+                function_name,
+                parameters.source_position->line,
+                parameters.source_position->column
+            );
+        }
+
+        return std::format(
+            "Decimal overflow in {} in '{}.{}'!",
+            operation_description,
+            parameters.core_module.name,
+            function_name
+        );
+    }
+
     Value_and_type create_access_array_expression_value(
         Access_array_expression const& expression,
         Statement const& statement,
@@ -1768,7 +1886,8 @@ namespace iris::compiler
         Binary_operation operation,
         iris::Module const& core_module,
         Declaration_database const& declaration_database,
-        std::optional<Source_position> const& source_position
+        std::optional<Source_position> const& source_position,
+        Expression_parameters const& parameters
     );
 
     Value_and_type create_assignment_additional_operation_instruction(
@@ -1792,7 +1911,7 @@ namespace iris::compiler
             right_hand_side_parameters.expression_type = left_hand_side_value.type;
             Value_and_type const right_hand_side_value = create_loaded_expression_value(right_hand_side.expression_index, statement, right_hand_side_parameters);
 
-            Value_and_type const result = create_binary_operation_instruction(llvm_builder, left_hand_side_value, right_hand_side_value, operation, parameters.core_module, parameters.declaration_database, parameters.source_position);
+            Value_and_type const result = create_binary_operation_instruction(llvm_builder, left_hand_side_value, right_hand_side_value, operation, parameters.core_module, parameters.declaration_database, parameters.source_position, parameters);
 
             return result;
         }
@@ -2128,7 +2247,8 @@ namespace iris::compiler
         Binary_operation const operation,
         iris::Module const& core_module,
         Declaration_database const& declaration_database,
-        std::optional<Source_position> const& source_position
+        std::optional<Source_position> const& source_position,
+        Expression_parameters const& parameters
     )
     {
         if (!left_hand_side.type.has_value() || !right_hand_side.type.has_value())
@@ -2262,7 +2382,15 @@ namespace iris::compiler
                 llvm::APInt const scale_ap{ wide_bits, static_cast<std::uint64_t>(scale_value), true };
                 llvm::Value* const scale_const = llvm::ConstantInt::get(wide_type, scale_ap);
                 llvm::Value* const divided = llvm_builder.CreateSDiv(product, scale_const);
-                
+
+                check_decimal_constant_range(divided, backing_bits, true, "decimal multiplication", parameters);
+
+                if (parameters.enable_decimal_overflow_checks)
+                {
+                    std::string const error_message = create_decimal_overflow_error_message("decimal multiplication", parameters);
+                    create_decimal_range_check_instructions(divided, backing_bits, true, error_message, parameters);
+                }
+
                 // Truncate
                 llvm::Value* const result = llvm_builder.CreateTrunc(divided, backing_type);
                 
@@ -2324,7 +2452,15 @@ namespace iris::compiler
                 
                 // Divide by rhs
                 llvm::Value* const divided = llvm_builder.CreateSDiv(lhs_scaled, rhs_wide);
-                
+
+                check_decimal_constant_range(divided, backing_bits, true, "decimal division", parameters);
+
+                if (parameters.enable_decimal_overflow_checks)
+                {
+                    std::string const error_message = create_decimal_overflow_error_message("decimal division", parameters);
+                    create_decimal_range_check_instructions(divided, backing_bits, true, error_message, parameters);
+                }
+
                 // Truncate
                 llvm::Value* const result = llvm_builder.CreateTrunc(divided, backing_type);
                 
@@ -2794,7 +2930,7 @@ namespace iris::compiler
                 source_position = left_hand_side_expression.source_range->start;
         }
 
-        Value_and_type value = create_binary_operation_instruction(llvm_builder, left_hand_side, right_hand_side, operation, parameters.core_module, parameters.declaration_database, source_position);
+        Value_and_type value = create_binary_operation_instruction(llvm_builder, left_hand_side, right_hand_side, operation, parameters.core_module, parameters.declaration_database, source_position, parameters);
         return value;
     }
 
@@ -4311,7 +4447,8 @@ namespace iris::compiler
         Type_reference const& destination_type,
         llvm::Type* const source_llvm_type,
         llvm::Type* const destination_llvm_type,
-        std::optional<Source_position> const& source_position
+        std::optional<Source_position> const& source_position,
+        Expression_parameters const& parameters
     )
     {
         bool const source_is_decimal = is_decimal(source_type);
@@ -4347,6 +4484,14 @@ namespace iris::compiler
                 result_wide = llvm_builder.CreateSDiv(src_wide, ratio_const);
             }
 
+            check_decimal_constant_range(result_wide, destination_bits, true, "decimal to decimal conversion", parameters);
+
+            if (parameters.enable_decimal_overflow_checks)
+            {
+                std::string const error_message = create_decimal_overflow_error_message("decimal to decimal conversion", parameters);
+                create_decimal_range_check_instructions(result_wide, destination_bits, true, error_message, parameters);
+            }
+
             llvm::Type* const destination_llvm = llvm::Type::getIntNTy(llvm_context, destination_bits);
             llvm::Value* const result = llvm_builder.CreateTrunc(result_wide, destination_llvm);
             return { .name = "", .value = result, .type = destination_type };
@@ -4380,6 +4525,14 @@ namespace iris::compiler
                 llvm::APInt const scale_ap{ wide_bits, static_cast<std::uint64_t>(scale_val), true };
                 llvm::Value* const scale_const = llvm::ConstantInt::get(wide_type, scale_ap);
                 llvm::Value* const divided = llvm_builder.CreateSDiv(adjusted, scale_const);
+
+                check_decimal_constant_range(divided, destination_llvm_type->getIntegerBitWidth(), is_signed_integer(destination_type), "decimal to integer conversion", parameters);
+
+                if (parameters.enable_decimal_overflow_checks)
+                {
+                    std::string const error_message = create_decimal_overflow_error_message("decimal to integer conversion", parameters);
+                    create_decimal_range_check_instructions(divided, destination_llvm_type->getIntegerBitWidth(), is_signed_integer(destination_type), error_message, parameters);
+                }
 
                 // Cast to destination integer size
                 llvm::Value* const result = llvm_builder.CreateTrunc(divided, destination_llvm_type);
@@ -4479,7 +4632,8 @@ namespace iris::compiler
                 destination_type.value(),
                 source_llvm_type,
                 destination_llvm_type,
-                parameters.source_position
+                parameters.source_position,
+                parameters
             );
         }
 
@@ -5163,7 +5317,7 @@ namespace iris::compiler
             };
 
             Binary_operation const compare_operation = expression.range_comparison_operation;
-            Value_and_type const condition_value = create_binary_operation_instruction(llvm_builder, loaded_variable_value, range_end_value, compare_operation, parameters.core_module, parameters.declaration_database, parameters.source_position);
+            Value_and_type const condition_value = create_binary_operation_instruction(llvm_builder, loaded_variable_value, range_end_value, compare_operation, parameters.core_module, parameters.declaration_database, parameters.source_position, parameters);
 
             llvm_builder.CreateCondBr(condition_value.value, then_block, after_block);
         }

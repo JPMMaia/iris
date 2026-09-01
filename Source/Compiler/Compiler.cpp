@@ -508,6 +508,7 @@ namespace iris::compiler
                 .debug_info = debug_info,
                 .contract_options = compilation_options.contract_options,
                 .enable_bounds_checks = compilation_options.enable_bounds_checks,
+                .enable_decimal_overflow_checks = compilation_options.enable_decimal_overflow_checks,
                 .source_position = std::nullopt,
                 .temporaries_allocator = temporaries_allocator,
             };
