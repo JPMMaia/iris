@@ -1,0 +1,9 @@
+{
+    "name": "Decimal_arithmetic",
+    "artifacts": [
+        {
+            "name": "decimal_app",
+            "location": "decimal_app/iris_artifact.json"
+        }
+    ]
+}

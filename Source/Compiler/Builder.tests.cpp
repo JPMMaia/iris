@@ -7,9 +7,12 @@ import iris.compiler.compile_commands_generator;
 import iris.compiler.target;
 
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <span>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -60,7 +63,7 @@ namespace iris::compiler
         return std::pmr::string{name} + ".o";
     }
 
-    void test_builder(
+    std::filesystem::path test_builder(
         std::string_view const project_name,
         std::pmr::vector<std::filesystem::path> const& artifact_paths,
         iris::compiler::Target const& target,
@@ -106,6 +109,42 @@ namespace iris::compiler
             std::filesystem::path const output_path = build_directory_path / expected_output_path;
             CHECK(std::filesystem::exists(output_path));
         }
+
+        return build_directory_path;
+    }
+
+    // Builds like test_builder, then actually executes the generated test executable and requires
+    // it to succeed. Checking that an output file exists only proves the artifact linked; it does
+    // not prove the program computes the right answer, and for a long time nothing in this repo
+    // ran generated code at all. See Plans/bug_decimal64_arithmetic_needs_divti3.md.
+    void test_builder_and_run(
+        std::string_view const project_name,
+        std::pmr::vector<std::filesystem::path> const& artifact_paths,
+        iris::compiler::Target const& target,
+        std::span<std::filesystem::path const> const additional_repository_paths,
+        std::span<std::filesystem::path const> const expected_output_paths,
+        std::string_view const test_executable_name,
+        std::optional<std::string_view> const temporary_directory_name = std::nullopt
+    )
+    {
+        std::filesystem::path const build_directory_path = test_builder(
+            project_name,
+            artifact_paths,
+            target,
+            additional_repository_paths,
+            expected_output_paths,
+            temporary_directory_name,
+            {.is_test_mode = true}
+        );
+
+        std::filesystem::path const test_executable_path =
+            build_directory_path / "bin" / get_binary_name(test_executable_name, target);
+
+        REQUIRE(std::filesystem::exists(test_executable_path));
+
+        std::string const command = std::format("\"{}\"", test_executable_path.generic_string());
+        int const exit_code = std::system(command.c_str());
+        CHECK(exit_code == 0);
     }
 
     void test_compile_commands(
@@ -421,6 +460,37 @@ namespace iris::compiler
         };
 
         test_builder("Test_framework", {"empty_app/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_3", {.is_test_mode = true});
+    }
+
+    // Guards Plans/bug_decimal64_arithmetic_needs_divti3.md: multiply, divide and narrowing casts
+    // of an Int64-backed decimal emit 'sdiv i128', which lowers to a call to compiler-rt's
+    // __divti3. Without the builtins archive on the link line this fails with
+    // "undefined symbol: __divti3". This test links and runs, so it catches both the missing
+    // symbol and a wrong result.
+    TEST_CASE("Build and run Decimal_arithmetic decimal_app in test mode", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Decimal_arithmetic" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "decimal_app.test.bc",
+            std::filesystem::path{"artifacts"} / "decimal_app.generated_tests_information.test.bc",
+            std::filesystem::path{"bin"} / get_binary_name("decimal_app.iris.test", target)
+        };
+
+        test_builder_and_run(
+            "Decimal_arithmetic",
+            {"decimal_app/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "decimal_app.iris.test"
+        );
     }
 
     TEST_CASE("Build Copy_files", "[Builder]")

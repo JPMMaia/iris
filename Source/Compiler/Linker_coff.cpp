@@ -61,6 +61,22 @@ namespace iris::compiler
         // Provides mainCRTStartup
         arguments_storage.push_back(options.debug ? "/defaultlib:msvcrtd.lib" : "/defaultlib:msvcrt.lib");
 
+        // Provides __divti3/__udivti3 and the other 128-bit integer helpers that Int64-backed
+        // decimal arithmetic lowers to. MSVC's CRT does not supply them. Passed as an absolute
+        // path because the library is shipped in share/iris/lib, which is not on the /libpath: list.
+        {
+            std::filesystem::path const builtins_library_path = iris::common::get_builtins_library_directory() / "iris_builtins.lib";
+
+            if (std::filesystem::exists(builtins_library_path))
+            {
+                arguments_storage.push_back(builtins_library_path.generic_string());
+            }
+            else
+            {
+                llvm::errs() << "Warning: could not find '" << builtins_library_path.generic_string() << "'. Arithmetic on Decimal7-Decimal18 will fail to link with undefined symbol '__divti3'.\n";
+            }
+        }
+
         for (std::string_view const library : libraries)
         {
             std::filesystem::path library_path = library;

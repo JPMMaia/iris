@@ -18,6 +18,7 @@ include(InstallRequiredSystemLibraries)
 include("Scripts/compile_cxx_header_unit.cmake")
 include("Scripts/compile_cpp_std_module.cmake")
 include("Scripts/module_exports.cmake")
+include("Scripts/compiler_rt_builtins.cmake")
 
 include(CTest)
 
@@ -49,3 +50,7 @@ add_custom_target(
 )
 
 install(DIRECTORY "share/iris" TYPE DATA CONFIGURATIONS Debug Release)
+
+# Builds share/iris/lib/iris_builtins.lib, the 128-bit integer helpers (__divti3 and
+# friends) that Decimal7-Decimal18 arithmetic lowers to. Windows only.
+iris_add_compiler_rt_builtins_library()
