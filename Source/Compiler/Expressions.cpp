@@ -17,6 +17,7 @@ import iris.compiler.clang_data;
 import iris.compiler.clang_code_generation;
 import iris.compiler.common;
 import iris.compiler.debug_info;
+import iris.compiler.diagnostic;
 import iris.compiler.instructions;
 import iris.compiler.lambda_database;
 import iris.compiler.test_framework;
@@ -30,21 +31,13 @@ namespace iris::compiler
         return size_t(&(object.*member)) - size_t(&object);
     }
 
-    static std::string format_error(std::string_view const message, std::optional<Source_position> const& source_position)
-    {
-        if (!source_position.has_value())
-            return std::format("{} (location unknown)", message);
-        return std::format("{} (at line {}, column {})", message, source_position->line, source_position->column);
-    }
-
     // Type mismatches reaching code generation are always worth naming: validation has already
     // approved the expression, so the message is the only clue about which rule the two disagree on.
     static std::string format_type_mismatch_error(
         std::string_view const message,
         iris::Module const& core_module,
         std::optional<Type_reference> const& left_hand_side_type,
-        std::optional<Type_reference> const& right_hand_side_type,
-        std::optional<Source_position> const& source_position
+        std::optional<Type_reference> const& right_hand_side_type
     )
     {
         std::pmr::polymorphic_allocator<> allocator{};
@@ -52,14 +45,11 @@ namespace iris::compiler
         std::pmr::string const left_hand_side_type_name = iris::format_type_reference(core_module.dependencies, left_hand_side_type, allocator, allocator);
         std::pmr::string const right_hand_side_type_name = iris::format_type_reference(core_module.dependencies, right_hand_side_type, allocator, allocator);
 
-        return format_error(
-            std::format(
-                "{} Left side type is '{}' but right side type is '{}'.",
-                message,
-                std::string_view{ left_hand_side_type_name },
-                std::string_view{ right_hand_side_type_name }
-            ),
-            source_position
+        return std::format(
+            "{} Left side type is '{}' but right side type is '{}'.",
+            message,
+            std::string_view{ left_hand_side_type_name },
+            std::string_view{ right_hand_side_type_name }
         );
     }
 
@@ -246,7 +236,7 @@ namespace iris::compiler
             }
         }
 
-        throw std::runtime_error{ format_error("Could not find block to break!", source_position) };
+        throw Compile_error{ "Could not find block to break!", source_position };
     }
 
     static void create_local_variable_debug_description(
@@ -464,7 +454,7 @@ namespace iris::compiler
     )
     {
         if (is_being_folded(parameters, global_variable_declaration))
-            throw std::runtime_error{ format_error(std::format("The initializer of global variable '{}.{}' depends on itself.", global_variable_module.name, global_variable_declaration.name), source_position) };
+            throw Compile_error{ std::format("The initializer of global variable '{}.{}' depends on itself.", global_variable_module.name, global_variable_declaration.name), source_position };
 
         std::pmr::vector<Global_variable_declaration const*> globals_being_folded{
             parameters.globals_being_folded.begin(),
@@ -483,7 +473,7 @@ namespace iris::compiler
         );
 
         if (value.value == nullptr)
-            throw std::runtime_error{ format_error(std::format("Could not fold the initializer of global variable '{}.{}'.", global_variable_module.name, global_variable_declaration.name), source_position) };
+            throw Compile_error{ std::format("Could not fold the initializer of global variable '{}.{}'.", global_variable_module.name, global_variable_declaration.name), source_position };
 
         Temporary_instructions_scope const temporary_instructions_scope{ value.value, parameters.temporaries_allocator };
 
@@ -552,7 +542,7 @@ namespace iris::compiler
                 std::format("{}.{}", declaration->first->name, declaration->second->name) :
                 global_variable.getName().str();
 
-            throw std::runtime_error{ format_error(std::format("Cannot use mutable global variable '{}' in a compile-time constant expression.", name), source_position) };
+            throw Compile_error{ std::format("Cannot use mutable global variable '{}' in a compile-time constant expression.", name), source_position };
         }
 
         // Globals of the module being compiled already carry their folded initializer.
@@ -560,7 +550,7 @@ namespace iris::compiler
             return global_variable.getInitializer();
 
         if (!declaration.has_value())
-            throw std::runtime_error{ format_error(std::format("Could not find the initializer of global variable '{}'.", global_variable.getName().str()), source_position) };
+            throw Compile_error{ std::format("Could not find the initializer of global variable '{}'.", global_variable.getName().str()), source_position };
 
         return fold_global_variable_declaration_constant(*declaration->first, *declaration->second, parameters, source_position);
     }
@@ -588,7 +578,7 @@ namespace iris::compiler
             );
 
             if (folded_constant == nullptr)
-                throw std::runtime_error{ format_error("Could not unfold binary operation constant!", source_position) };
+                throw Compile_error{ "Could not unfold binary operation constant!", source_position };
 
             return folded_constant;
         }
@@ -605,7 +595,7 @@ namespace iris::compiler
             );
 
             if (folded_constant == nullptr)
-                throw std::runtime_error{ format_error("Could not unfold unary operation constant!", source_position) };
+                throw Compile_error{ "Could not unfold unary operation constant!", source_position };
 
             return folded_constant;
         }
@@ -623,7 +613,7 @@ namespace iris::compiler
             );
 
             if (folded_constant == nullptr)
-                throw std::runtime_error{ format_error("Could not unfold cast constant!", source_position) };
+                throw Compile_error{ "Could not unfold cast constant!", source_position };
 
             return folded_constant;
         }
@@ -634,7 +624,7 @@ namespace iris::compiler
             llvm::Value* const pointer = load_instruction->getPointerOperand();
 
             if (!llvm::GlobalVariable::classof(pointer))
-                throw std::runtime_error{ format_error("Could not unfold constant!", source_position) };
+                throw Compile_error{ "Could not unfold constant!", source_position };
 
             return fold_global_variable_reference(*static_cast<llvm::GlobalVariable*>(pointer), parameters, source_position);
         }
@@ -644,7 +634,7 @@ namespace iris::compiler
         }
         else
         {
-            throw std::runtime_error{ format_error("Could not unfold constant!", source_position) };
+            throw Compile_error{ "Could not unfold constant!", source_position };
         }
     }
 
@@ -673,7 +663,7 @@ namespace iris::compiler
         );
 
         if (statement_value.value == nullptr)
-            throw std::runtime_error{ format_error("Could not fold constant!", parameters.source_position) };
+            throw Compile_error{ "Could not fold constant!", parameters.source_position };
 
         Temporary_instructions_scope const temporary_instructions_scope{ statement_value.value, parameters.temporaries_allocator };
 
@@ -720,14 +710,15 @@ namespace iris::compiler
         std::string_view const module_name,
         Enum_declaration const& declaration,
         std::string_view const enum_value_name,
-        Enum_value_constants const& enum_value_constants
+        Enum_value_constants const& enum_value_constants,
+        std::optional<Source_position> const& source_position
     )
     {
         auto const is_enum_value = [enum_value_name](Enum_value const& value) -> bool { return value.name == enum_value_name; };
 
         auto const enum_value_location = std::find_if(declaration.values.begin(), declaration.values.end(), is_enum_value);
         if (enum_value_location == declaration.values.end())
-            throw std::runtime_error{ format_error(std::format("Unknown enum value '{}.{}' referenced.", declaration.name, enum_value_name), std::nullopt) };
+            throw Compile_error{ std::format("Unknown enum value '{}.{}' referenced.", declaration.name, enum_value_name), source_position };
 
         auto const enum_value_index = std::distance(declaration.values.begin(), enum_value_location);
 
@@ -837,7 +828,7 @@ namespace iris::compiler
     )
     {
         if (left_hand_side.value == nullptr)
-            throw std::runtime_error{ format_error("create_access_struct_member(): left_hand_side.value == nullptr", parameters.source_position) };
+            throw Compile_error{ "create_access_struct_member(): left_hand_side.value == nullptr", parameters.source_position };
 
         Value_and_type value = generate_load_struct_member_instructions(
             parameters.clang_module_data,
@@ -863,7 +854,7 @@ namespace iris::compiler
     )
     {
         if (left_hand_side.value == nullptr)
-            throw std::runtime_error{ format_error("create_access_union_member(): left_hand_side.value == nullptr", parameters.source_position) };
+            throw Compile_error{ "create_access_union_member(): left_hand_side.value == nullptr", parameters.source_position };
 
         llvm::Type* const union_llvm_type = type_reference_to_llvm_type(
             parameters.llvm_context,
@@ -874,7 +865,7 @@ namespace iris::compiler
 
         auto const member_location = std::find(union_declaration.member_names.begin(), union_declaration.member_names.end(), access_member_name);
         if (member_location == union_declaration.member_names.end())
-            throw std::runtime_error{ format_error(std::format("'{}' does not exist in union type '{}'.", access_member_name, union_declaration.name), parameters.source_position) };
+            throw Compile_error{ std::format("'{}' does not exist in union type '{}'.", access_member_name, union_declaration.name), parameters.source_position };
 
         unsigned const member_index = static_cast<unsigned>(std::distance(union_declaration.member_names.begin(), member_location));
 
@@ -1031,7 +1022,7 @@ namespace iris::compiler
                 std::string_view const declaration_name = expression.member_name;
                 std::optional<Declaration> const declaration_optional = find_declaration(declaration_database, external_module.name, declaration_name);
                 if (!declaration_optional.has_value())
-                    throw std::runtime_error{ format_error(std::format("Could not find declaration '{}.{}' referenced.", external_module.name, declaration_name), parameters.source_position) };
+                    throw Compile_error{ std::format("Could not find declaration '{}.{}' referenced.", external_module.name, declaration_name), parameters.source_position };
 
                 Declaration const& declaration = declaration_optional.value();
 
@@ -1069,7 +1060,7 @@ namespace iris::compiler
                         parameters
                     );
                     if (!value_and_type.has_value())
-                        throw std::runtime_error{ format_error(std::format("Internal error while trying to find global variable '{}.{}'", external_module.name, declaration_name), parameters.source_position) };
+                        throw Compile_error{ std::format("Internal error while trying to find global variable '{}.{}'", external_module.name, declaration_name), parameters.source_position };
 
                     return *value_and_type;
                 }
@@ -1084,7 +1075,7 @@ namespace iris::compiler
                         expression.member_name
                     );
                     if (!llvm_function)
-                        throw std::runtime_error{ format_error(std::format("Unknown function '{}.{}' referenced.", external_module.name, expression.member_name), parameters.source_position) };
+                        throw Compile_error{ std::format("Unknown function '{}.{}' referenced.", external_module.name, expression.member_name), parameters.source_position };
 
                     return Value_and_type
                     {
@@ -1291,7 +1282,8 @@ namespace iris::compiler
                                     module_name,
                                     enum_declaration,
                                     expression.member_name,
-                                    enum_value_constants
+                                    enum_value_constants,
+                                    parameters.source_position
                                 );
                             }
                             else if (std::holds_alternative<Struct_declaration const*>(underlying_declaration.value().data))
@@ -1318,7 +1310,8 @@ namespace iris::compiler
                             module_name,
                             enum_declaration,
                             expression.member_name,
-                            enum_value_constants
+                            enum_value_constants,
+                            parameters.source_position
                         );
                     }
                     else if (std::holds_alternative<Struct_declaration const*>(declaration_value.data))
@@ -1377,7 +1370,7 @@ namespace iris::compiler
             }
         }
 
-        throw std::runtime_error{ format_error("Could not process access expression!", parameters.source_position) };
+        throw Compile_error{ "Could not process access expression!", parameters.source_position };
     }
 
     // Aborts when .value is read from an empty Optional. Emitted only when contracts are enabled,
@@ -1506,19 +1499,17 @@ namespace iris::compiler
         if (in_range)
             return;
 
-        throw std::runtime_error
+        throw Compile_error
         {
-            format_error(
-                std::format(
-                    "Result of {} does not fit the {}-bit backing integer (scaled value {} is out of range [{}, {}]).",
-                    operation_description,
-                    backing_bits,
-                    llvm::toString(value, 10, backing_is_signed),
-                    llvm::toString(backing_is_signed ? llvm::APInt::getSignedMinValue(backing_bits) : llvm::APInt::getZero(backing_bits), 10, backing_is_signed),
-                    llvm::toString(backing_is_signed ? llvm::APInt::getSignedMaxValue(backing_bits) : llvm::APInt::getMaxValue(backing_bits), 10, backing_is_signed)
-                ),
-                parameters.source_position
-            )
+            std::format(
+                "Result of {} does not fit the {}-bit backing integer (scaled value {} is out of range [{}, {}]).",
+                operation_description,
+                backing_bits,
+                llvm::toString(value, 10, backing_is_signed),
+                llvm::toString(backing_is_signed ? llvm::APInt::getSignedMinValue(backing_bits) : llvm::APInt::getZero(backing_bits), 10, backing_is_signed),
+                llvm::toString(backing_is_signed ? llvm::APInt::getSignedMaxValue(backing_bits) : llvm::APInt::getMaxValue(backing_bits), 10, backing_is_signed)
+            ),
+            parameters.source_position
         };
     }
 
@@ -1584,7 +1575,7 @@ namespace iris::compiler
                     access_expression.member_name
                 );
                 if (member_location == soa_info.struct_declaration->member_names.end())
-                    throw std::runtime_error{ format_error(std::format("'{}' does not exist in struct type '{}'.", access_expression.member_name, soa_info.struct_declaration->name), parameters.source_position) };
+                    throw Compile_error{ std::format("'{}' does not exist in struct type '{}'.", access_expression.member_name, soa_info.struct_declaration->name), parameters.source_position };
 
                 std::size_t const member_index = static_cast<std::size_t>(std::distance(soa_info.struct_declaration->member_names.begin(), member_location));
                 Type_reference const& member_type = soa_info.struct_declaration->member_types[member_index];
@@ -1624,7 +1615,7 @@ namespace iris::compiler
                     access_expression.member_name
                 );
                 if (member_location == soa_info.struct_declaration->member_names.end())
-                    throw std::runtime_error{ format_error(std::format("'{}' does not exist in struct type '{}'.", access_expression.member_name, soa_info.struct_declaration->name), parameters.source_position) };
+                    throw Compile_error{ std::format("'{}' does not exist in struct type '{}'.", access_expression.member_name, soa_info.struct_declaration->name), parameters.source_position };
 
                 std::size_t const member_index = static_cast<std::size_t>(std::distance(soa_info.struct_declaration->member_names.begin(), member_location));
                 Type_reference const& member_type = soa_info.struct_declaration->member_types[member_index];
@@ -1661,7 +1652,7 @@ namespace iris::compiler
 
         Value_and_type const left_hand_side_expression_value = create_expression_value(expression.expression.expression_index, statement, parameters);
         if (!left_hand_side_expression_value.type.has_value())
-            throw std::runtime_error{ format_error("Could not deduce type of left hand side.", parameters.source_position) };
+            throw Compile_error{ "Could not deduce type of left hand side.", parameters.source_position };
 
         if (std::holds_alternative<Soa_array_type>(left_hand_side_expression_value.type->data))
         {
@@ -1805,7 +1796,7 @@ namespace iris::compiler
 
         std::optional<Type_reference> element_type = get_element_or_pointee_type(*left_hand_side_expression_value.type);
         if (!element_type.has_value())
-            throw std::runtime_error{ format_error("Cannot find element type of array access.", parameters.source_position) };
+            throw Compile_error{ "Cannot find element type of array access.", parameters.source_position };
         
         if (is_array_slice_type_reference(*left_hand_side_expression_value.type))
         {
@@ -2252,10 +2243,10 @@ namespace iris::compiler
     )
     {
         if (!left_hand_side.type.has_value() || !right_hand_side.type.has_value())
-            throw std::runtime_error{ format_error("Left or right side type is null!", source_position) };
+            throw Compile_error{ "Left or right side type is null!", source_position };
 
         if (!are_types_compatible(declaration_database, *left_hand_side.type, *right_hand_side.type))
-            throw std::runtime_error{ format_type_mismatch_error("Left and right side types do not match!", core_module, left_hand_side.type, right_hand_side.type, source_position) };
+            throw Compile_error{ format_type_mismatch_error("Left and right side types do not match!", core_module, left_hand_side.type, right_hand_side.type), source_position };
 
         std::optional<Type_reference> const underling_type = get_underlying_type(declaration_database, left_hand_side.type.value());
         Type_reference const& type = underling_type.has_value() ? underling_type.value() : left_hand_side.type.value();
@@ -2827,7 +2818,7 @@ namespace iris::compiler
         }
         }
 
-        throw std::runtime_error{ format_error(std::format("Binary operation '{}' not implemented!", static_cast<std::uint32_t>(operation)), source_position) };
+        throw Compile_error{ std::format("Binary operation '{}' not implemented!", static_cast<std::uint32_t>(operation)), source_position };
     }
 
     // `a && b` and `a || b` must not evaluate `b` when `a` already decides the result. This is
@@ -2876,10 +2867,10 @@ namespace iris::compiler
         Value_and_type const right_hand_side = create_loaded_expression_value(expression.right_hand_side.expression_index, statement, parameters);
 
         if (!left_hand_side.type.has_value() || !right_hand_side.type.has_value())
-            throw std::runtime_error{ format_error("Left or right side type is null!", parameters.source_position) };
+            throw Compile_error{ "Left or right side type is null!", parameters.source_position };
 
         if (!are_types_compatible(parameters.declaration_database, *left_hand_side.type, *right_hand_side.type))
-            throw std::runtime_error{ format_type_mismatch_error("Left and right side types do not match!", parameters.core_module, left_hand_side.type, right_hand_side.type, parameters.source_position) };
+            throw Compile_error{ format_type_mismatch_error("Left and right side types do not match!", parameters.core_module, left_hand_side.type, right_hand_side.type), parameters.source_position };
 
         llvm::Value* const right_bool_value = create_bool_value(right_hand_side);
         llvm_builder.CreateBr(end_block);
@@ -2921,7 +2912,7 @@ namespace iris::compiler
         Binary_operation const operation = expression.operation;
 
         // Debug info is what normally supplies the position, so without it an error here would have
-        // nothing but "location unknown" to offer. The operands carry their own ranges either way.
+        // no location to report. The operands carry their own ranges either way.
         std::optional<Source_position> source_position = parameters.source_position;
         if (!source_position.has_value())
         {
@@ -3065,16 +3056,16 @@ namespace iris::compiler
     )
     {
         if (!std::holds_alternative<Soa_array_type>(type_reference.data))
-            throw std::runtime_error{ format_error("Expected Soa_array type.", parameters.source_position) };
+            throw Compile_error{ "Expected Soa_array type.", parameters.source_position };
 
         Soa_array_type const& soa_array_type = std::get<Soa_array_type>(type_reference.data);
         if (soa_array_type.value_type.empty())
-            throw std::runtime_error{ format_error("Soa_array value_type is not specified.", parameters.source_position) };
+            throw Compile_error{ "Soa_array value_type is not specified.", parameters.source_position };
 
         Type_reference const& element_type = soa_array_type.value_type.front();
         Custom_type_reference const* const custom_type_reference = std::get_if<Custom_type_reference>(&element_type.data);
         if (custom_type_reference == nullptr)
-            throw std::runtime_error{ format_error("Soa_array element type must be a struct type.", parameters.source_position) };
+            throw Compile_error{ "Soa_array element type must be a struct type.", parameters.source_position };
 
         std::optional<Declaration> const declaration = find_declaration(
             parameters.declaration_database,
@@ -3082,7 +3073,7 @@ namespace iris::compiler
             custom_type_reference->name
         );
         if (!declaration.has_value() || !std::holds_alternative<Struct_declaration const*>(declaration->data))
-            throw std::runtime_error{ format_error("Soa_array element type must resolve to a struct declaration.", parameters.source_position) };
+            throw Compile_error{ "Soa_array element type must resolve to a struct declaration.", parameters.source_position };
 
         Struct_declaration const& struct_declaration = *std::get<Struct_declaration const*>(declaration->data);
 
@@ -3108,16 +3099,16 @@ namespace iris::compiler
     )
     {
         if (!std::holds_alternative<Soa_array_view_type>(type_reference.data))
-            throw std::runtime_error{ format_error("Expected Soa_array_view type.", parameters.source_position) };
+            throw Compile_error{ "Expected Soa_array_view type.", parameters.source_position };
 
         Soa_array_view_type const& soa_array_view_type = std::get<Soa_array_view_type>(type_reference.data);
         if (soa_array_view_type.value_type.empty())
-            throw std::runtime_error{ format_error("Soa_array_view value_type is not specified.", parameters.source_position) };
+            throw Compile_error{ "Soa_array_view value_type is not specified.", parameters.source_position };
 
         Type_reference const& element_type = soa_array_view_type.value_type.front();
         Custom_type_reference const* const custom_type_reference = std::get_if<Custom_type_reference>(&element_type.data);
         if (custom_type_reference == nullptr)
-            throw std::runtime_error{ format_error("Soa_array_view element type must be a struct type.", parameters.source_position) };
+            throw Compile_error{ "Soa_array_view element type must be a struct type.", parameters.source_position };
 
         std::optional<Declaration> const declaration = find_declaration(
             parameters.declaration_database,
@@ -3125,7 +3116,7 @@ namespace iris::compiler
             custom_type_reference->name
         );
         if (!declaration.has_value() || !std::holds_alternative<Struct_declaration const*>(declaration->data))
-            throw std::runtime_error{ format_error("Soa_array_view element type must resolve to a struct declaration.", parameters.source_position) };
+            throw Compile_error{ "Soa_array_view element type must resolve to a struct declaration.", parameters.source_position };
 
         Struct_declaration const& struct_declaration = *std::get<Struct_declaration const*>(declaration->data);
 
@@ -3153,7 +3144,7 @@ namespace iris::compiler
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{ format_error("Soa_array local storage requires a parent function.", parameters.source_position) };
+            throw Compile_error{ "Soa_array local storage requires a parent function.", parameters.source_position };
 
         llvm::Type* const soa_llvm_type = type_reference_to_llvm_type(
             parameters.llvm_context,
@@ -3262,7 +3253,7 @@ namespace iris::compiler
     )
     {
         if (member_index >= member_layouts.size())
-            throw std::runtime_error{ format_error("Soa_array_view member index out of bounds.", parameters.source_position) };
+            throw Compile_error{ "Soa_array_view member index out of bounds.", parameters.source_position };
 
         llvm::Value* block_offset = parameters.llvm_builder.getInt64(0);
         for (std::size_t previous_member_index = 0; previous_member_index < member_index; ++previous_member_index)
@@ -3307,7 +3298,7 @@ namespace iris::compiler
     )
     {
         if (!soa_value.type.has_value() || soa_value.value == nullptr)
-            throw std::runtime_error{ format_error("Cannot load Soa_array data pointer.", parameters.source_position) };
+            throw Compile_error{ "Cannot load Soa_array data pointer.", parameters.source_position };
 
         llvm::Type* const soa_llvm_type = type_reference_to_llvm_type(
             parameters.llvm_context,
@@ -3333,7 +3324,7 @@ namespace iris::compiler
     )
     {
         if (!soa_value.type.has_value() || soa_value.value == nullptr)
-            throw std::runtime_error{ format_error("Cannot load Soa_array_view field.", parameters.source_position) };
+            throw Compile_error{ "Cannot load Soa_array_view field.", parameters.source_position };
 
         llvm::Type* const soa_llvm_type = type_reference_to_llvm_type(
             parameters.llvm_context,
@@ -3682,22 +3673,22 @@ namespace iris::compiler
             if (access_expression.member_name == "view")
             {
                 if (expression.arguments.size() != 0 && expression.arguments.size() != 2)
-                    throw std::runtime_error{ format_error("Soa_array.view() expects 0 or 2 arguments.", parameters.source_position) };
+                    throw Compile_error{ "Soa_array.view() expects 0 or 2 arguments.", parameters.source_position };
 
                 Value_and_type const soa_value = create_expression_value(access_expression.expression.expression_index, statement, parameters);
                 if (!soa_value.type.has_value())
-                    throw std::runtime_error{ format_error("Cannot deduce Soa_array receiver type for view().", parameters.source_position) };
+                    throw Compile_error{ "Cannot deduce Soa_array receiver type for view().", parameters.source_position };
 
                 std::optional<Type_reference> const underlying_receiver_type = get_underlying_type(
                     parameters.declaration_database,
                     soa_value.type.value()
                 );
                 if (!underlying_receiver_type.has_value() || !std::holds_alternative<Soa_array_type>(underlying_receiver_type->data))
-                    throw std::runtime_error{ format_error("view() receiver must be Soa_array.", parameters.source_position) };
+                    throw Compile_error{ "view() receiver must be Soa_array.", parameters.source_position };
 
                 Soa_array_type const& soa_array_type = std::get<Soa_array_type>(underlying_receiver_type->data);
                 if (soa_array_type.value_type.empty())
-                    throw std::runtime_error{ format_error("Soa_array value_type is not specified for view().", parameters.source_position) };
+                    throw Compile_error{ "Soa_array value_type is not specified for view().", parameters.source_position };
 
                 bool is_view_mutable = false;
                 if (parameters.expression_type.has_value() && std::holds_alternative<Soa_array_view_type>(parameters.expression_type->data))
@@ -3720,7 +3711,7 @@ namespace iris::compiler
                 );
 
                 if (parameters.llvm_parent_function == nullptr)
-                    throw std::runtime_error{ format_error("Soa_array.view() requires a parent function.", parameters.source_position) };
+                    throw Compile_error{ "Soa_array.view() requires a parent function.", parameters.source_position };
                 llvm::AllocaInst* const soa_view_alloca = create_alloca_instruction(
                     parameters.llvm_builder,
                     parameters.llvm_data_layout,
@@ -3815,7 +3806,7 @@ namespace iris::compiler
                 else if (variable_expression.name == "create_soa_array_view_from_pointer")
                 {
                     if (expression.arguments.size() != 2)
-                        throw std::runtime_error{ format_error("create_soa_array_view_from_pointer() expects two arguments!", parameters.source_position) };
+                        throw Compile_error{ "create_soa_array_view_from_pointer() expects two arguments!", parameters.source_position };
 
                     Value_and_type const element_type_value = create_statement_value(instance_call_expression.arguments[0], parameters);
 
@@ -3872,14 +3863,14 @@ namespace iris::compiler
                 else if (variable_expression.name == "calculate_soa_array_size_bytes")
                 {
                     if (expression.arguments.size() != 1)
-                        throw std::runtime_error{ format_error("calculate_soa_array_size_bytes() expects one argument!", parameters.source_position) };
+                        throw Compile_error{ "calculate_soa_array_size_bytes() expects one argument!", parameters.source_position };
 
                     Value_and_type const element_type_value = create_statement_value(instance_call_expression.arguments[0], parameters);
 
                     iris::Type_reference const& element_type = element_type_value.type.value();
                     iris::Custom_type_reference const* const custom_type_reference = std::get_if<iris::Custom_type_reference>(&element_type.data);
                     if (custom_type_reference == nullptr)
-                        throw std::runtime_error{ format_error("calculate_soa_array_size_bytes() element type must be a struct type.", parameters.source_position) };
+                        throw Compile_error{ "calculate_soa_array_size_bytes() element type must be a struct type.", parameters.source_position };
 
                     Soa_layout const layout = calculate_soa_layout(
                         parameters.llvm_data_layout,
@@ -3919,7 +3910,7 @@ namespace iris::compiler
             if (variable_expression.name == "check")
             {
                 if (expression.arguments.size() != 1)
-                    throw std::runtime_error{ format_error("check() expects one argument!", parameters.source_position) };
+                    throw Compile_error{ "check() expects one argument!", parameters.source_position };
 
                 std::pmr::string const source_file_path =
                     parameters.core_module.source_file_path.has_value() ? 
@@ -3977,11 +3968,11 @@ namespace iris::compiler
             else if (variable_expression.name == "create_optional")
             {
                 if (expression.arguments.size() != 1)
-                    throw std::runtime_error{ format_error("create_optional() expects one argument!", parameters.source_position) };
+                    throw Compile_error{ "create_optional() expects one argument!", parameters.source_position };
 
                 Value_and_type const value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
                 if (!value.type.has_value())
-                    throw std::runtime_error{ format_error("Cannot deduce argument 0 type of create_optional()", parameters.source_position) };
+                    throw Compile_error{ "Cannot deduce argument 0 type of create_optional()", parameters.source_position };
 
                 return instantiate_optional(
                     { value.type.value() },
@@ -3992,11 +3983,11 @@ namespace iris::compiler
             else if (variable_expression.name == "create_array_slice_from_pointer")
             {
                 if (expression.arguments.size() != 2)
-                    throw std::runtime_error{ format_error("create_array_slice_from_pointer() expects two arguments!", parameters.source_position) };
+                    throw Compile_error{ "create_array_slice_from_pointer() expects two arguments!", parameters.source_position };
 
                 Value_and_type const data_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
                 if (!data_value.type.has_value())
-                    throw std::runtime_error{ format_error("Cannot find deduce argument 0 type of create_array_slice_from_pointer()", parameters.source_position) };
+                    throw Compile_error{ "Cannot find deduce argument 0 type of create_array_slice_from_pointer()", parameters.source_position };
 
                 std::optional<iris::Type_reference> element_type_optional = remove_pointer(data_value.type.value());
                 std::pmr::vector<iris::Type_reference> const element_type = element_type_optional.has_value() ? std::pmr::vector<iris::Type_reference>{element_type_optional.value()} : std::pmr::vector<iris::Type_reference>{};
@@ -4013,14 +4004,14 @@ namespace iris::compiler
             else if (variable_expression.name == "offset_pointer")
             {
                 if (expression.arguments.size() != 2)
-                    throw std::runtime_error{ format_error("offset_pointer() expects two arguments!", parameters.source_position) };
+                    throw Compile_error{ "offset_pointer() expects two arguments!", parameters.source_position };
 
                 Value_and_type const pointer_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
                 if (!pointer_value.type.has_value())
-                    throw std::runtime_error{ format_error("Cannot find deduce argument 0 type of offset_pointer()", parameters.source_position) };
+                    throw Compile_error{ "Cannot find deduce argument 0 type of offset_pointer()", parameters.source_position };
 
                 if (!iris::is_pointer(pointer_value.type.value()))
-                    throw std::runtime_error{ format_error("Argument 0 type of offset_pointer() must be a pointer!", parameters.source_position) };
+                    throw Compile_error{ "Argument 0 type of offset_pointer() must be a pointer!", parameters.source_position };
 
                 auto const get_type_alloc_size = [&]() -> std::uint64_t
                 {
@@ -4112,10 +4103,10 @@ namespace iris::compiler
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{ format_error("Can only create lambdas inside functions!", parameters.source_position) };
+            throw Compile_error{ "Can only create lambdas inside functions!", parameters.source_position };
 
         if (!parameters.function_declaration.has_value())
-            throw std::runtime_error{ format_error("Can only create lambdas inside functions!", parameters.source_position) };
+            throw Compile_error{ "Can only create lambdas inside functions!", parameters.source_position };
 
         std::pmr::string const lambda_key = create_lambda_key(
             parameters.core_module.name,
@@ -4125,7 +4116,7 @@ namespace iris::compiler
 
         std::optional<std::string_view> const generated_function_name_optional = find_generated_lambda_function_name(parameters.lambda_database, lambda_key);
         if (!generated_function_name_optional.has_value())
-            throw std::runtime_error{ format_error("Lambda expression was not lowered by the lambda pass!", parameters.source_position) };
+            throw Compile_error{ "Lambda expression was not lowered by the lambda pass!", parameters.source_position };
 
         std::string_view const generated_function_name = generated_function_name_optional.value();
 
@@ -4139,11 +4130,11 @@ namespace iris::compiler
             generated_function_name
         );
         if (llvm_lambda_function == nullptr)
-            throw std::runtime_error{ format_error(std::format("Could not find generated lambda function '{}'!", generated_function_name), parameters.source_position) };
+            throw Compile_error{ std::format("Could not find generated lambda function '{}'!", generated_function_name), parameters.source_position };
 
         std::optional<Function_declaration const*> const lambda_function_declaration = find_function_declaration(parameters.core_module, generated_function_name);
         if (!lambda_function_declaration.has_value())
-            throw std::runtime_error{ format_error(std::format("Could not find declaration of generated lambda function '{}'!", generated_function_name), parameters.source_position) };
+            throw Compile_error{ std::format("Could not find declaration of generated lambda function '{}'!", generated_function_name), parameters.source_position };
 
         std::span<std::pmr::string const> const captured_names =
             expression.captured_variables.has_value() ?
@@ -4185,7 +4176,7 @@ namespace iris::compiler
                     parameters.local_variables
                 );
                 if (!captured_variable.has_value())
-                    throw std::runtime_error{ format_error(std::format("Could not find captured variable '{}'!", captured_name), parameters.source_position) };
+                    throw Compile_error{ std::format("Could not find captured variable '{}'!", captured_name), parameters.source_position };
 
                 llvm::Type* const llvm_member_type = static_cast<llvm::StructType*>(llvm_environment_type)->getElementType(static_cast<unsigned>(index));
 
@@ -4283,7 +4274,7 @@ namespace iris::compiler
             (left_hand_side.type.has_value() ? get_underlying_type(parameters.declaration_database, left_hand_side.type.value()) : std::nullopt);
 
         if (!called_lambda_type.has_value() && (!resolved_lhs_type.has_value() || !std::holds_alternative<Function_pointer_type>(resolved_lhs_type.value().data)))
-            throw std::runtime_error{ format_error(std::format("Left hand side of call expression is not a function!"), parameters.source_position) };
+            throw Compile_error{ std::format("Left hand side of call expression is not a function!"), parameters.source_position };
 
         Type_reference const lambda_function_pointer_type_reference = called_lambda_type.has_value() ?
             [&]
@@ -4436,7 +4427,7 @@ namespace iris::compiler
             return std::nullopt;
         }
 
-        throw std::runtime_error{ format_error("Invalid cast!", source_position) };
+        throw Compile_error{ "Invalid cast!", source_position };
     }
 
     static Value_and_type create_decimal_cast_expression_value(
@@ -4582,7 +4573,7 @@ namespace iris::compiler
             }
         }
 
-        throw std::runtime_error{ format_error("Decimal cast not fully implemented for requested type combination.", source_position) };
+        throw Compile_error{ "Decimal cast not fully implemented for requested type combination.", source_position };
     }
 
     Value_and_type create_cast_expression_value(
@@ -4598,13 +4589,13 @@ namespace iris::compiler
 
         Value_and_type const source = create_loaded_expression_value(expression.source.expression_index, statement, parameters);
         if (!source.type.has_value())
-            throw std::runtime_error{ format_error("Source type is void!", parameters.source_position) };
+            throw Compile_error{ "Source type is void!", parameters.source_position };
 
         std::optional<Type_reference> const source_type = get_underlying_type(parameters.declaration_database, source.type.value());
         std::optional<Type_reference> const destination_type = get_underlying_type(parameters.declaration_database, expression.destination_type);
 
         if (!source_type.has_value() || !destination_type.has_value())
-            throw std::runtime_error{ format_error("Could not find underlyng source and/or destination types!", parameters.source_position) };
+            throw Compile_error{ "Could not find underlyng source and/or destination types!", parameters.source_position };
         if (source_type == destination_type)
         {
             return
@@ -4697,7 +4688,7 @@ namespace iris::compiler
     {
         std::optional<Type_reference> const underlying_type_optional = get_underlying_type(declaration_database, expression.type);
         if (!underlying_type_optional.has_value())
-            throw std::runtime_error{ format_error("Could not find underlying constant type!", source_position) };
+            throw Compile_error{ "Could not find underlying constant type!", source_position };
 
         Type_reference const& type = underlying_type_optional.value();
 
@@ -4878,10 +4869,10 @@ namespace iris::compiler
                 ? (std::int64_t(1) << (bits - 1)) - 1
                 : std::numeric_limits<std::int64_t>::max();
             if (scaled < static_cast<double>(min_value) || scaled > static_cast<double>(max_value))
-                throw std::runtime_error{ format_error(
+                throw Compile_error{
                     std::format("Decimal literal '{}' overflows the {}-bit backing integer (scaled value {:.0f} is out of range [{}, {}])",
                         expression.data, bits, scaled, min_value, max_value),
-                    source_position) };
+                    source_position };
 
             std::int64_t const integer_value =
                 scaled >= 0.0 ?
@@ -4911,7 +4902,7 @@ namespace iris::compiler
             };
         }
 
-        throw std::runtime_error{ format_error("Constant expression not handled!", source_position) };
+        throw Compile_error{ "Constant expression not handled!", source_position };
     }
 
     static std::optional<Value_and_type> create_constant_array_with_constant_elements(
@@ -4956,10 +4947,10 @@ namespace iris::compiler
         {
             Soa_array_type_info const soa_info = get_soa_array_type_info(parameters.expression_type.value(), parameters);
             if (parameters.llvm_parent_function == nullptr)
-                throw std::runtime_error{ format_error("Soa_array global initialization is not implemented yet.", parameters.source_position) };
+                throw Compile_error{ "Soa_array global initialization is not implemented yet.", parameters.source_position };
 
             if (soa_info.soa_array_type->size != expression.array_data.size() && !expression.array_data.empty())
-                throw std::runtime_error{ format_error(std::format("Expected initializer list with size {} but got {} elements.", soa_info.soa_array_type->size, expression.array_data.size()), parameters.source_position) };
+                throw Compile_error{ std::format("Expected initializer list with size {} but got {} elements.", soa_info.soa_array_type->size, expression.array_data.size()), parameters.source_position };
 
             auto const [soa_alloca, data_pointer] = create_soa_array_storage(
                 parameters.expression_type.value(),
@@ -4988,7 +4979,7 @@ namespace iris::compiler
                     );
 
                     if (!element_values[index].type.has_value() || element_values[index].type.value() != *soa_info.element_type)
-                        throw std::runtime_error{ format_error("Type mismatch between Soa_array initializer element and Soa_array element type.", parameters.source_position) };
+                        throw Compile_error{ "Type mismatch between Soa_array initializer element and Soa_array element type.", parameters.source_position };
                 }
 
                 initialize_soa_array_storage_from_values(data_pointer, element_values, soa_info, parameters);
@@ -5005,7 +4996,7 @@ namespace iris::compiler
         if (parameters.expression_type.has_value() && std::holds_alternative<Soa_array_view_type>(parameters.expression_type->data))
         {
             if (parameters.llvm_parent_function == nullptr)
-                throw std::runtime_error{ format_error("Soa_array_view global initialization is not implemented yet.", parameters.source_position) };
+                throw Compile_error{ "Soa_array_view global initialization is not implemented yet.", parameters.source_position };
 
             llvm::Type* const soa_view_llvm_type = type_reference_to_llvm_type(
                 llvm_context,
@@ -5045,18 +5036,18 @@ namespace iris::compiler
         }
 
         if (!array_data_values.empty() && !array_data_values[0].type.has_value())
-            throw std::runtime_error{ format_error("Could not deduce element type of initializer list.", parameters.source_position) };
+            throw Compile_error{ "Could not deduce element type of initializer list.", parameters.source_position };
 
         for (std::size_t index = 1; index < array_data_values.size(); ++index)
         {
             if (array_data_values[0].type != array_data_values[index].type)
-                throw std::runtime_error{ format_error("Type mismatch between elements of the initializer list.", parameters.source_position) };
+                throw Compile_error{ "Type mismatch between elements of the initializer list.", parameters.source_position };
         }
 
         if (parameters.expression_type.has_value() && !is_array_slice_type_reference(parameters.expression_type.value()))
         {
             if (!std::holds_alternative<Constant_array_type>(parameters.expression_type->data))
-                throw std::runtime_error{ format_error("Cannot assign initializer list to type.", parameters.source_position) };
+                throw Compile_error{ "Cannot assign initializer list to type.", parameters.source_position };
 
             Constant_array_type const& requested_array_type = std::get<Constant_array_type>(parameters.expression_type->data);
             if (requested_array_type.size > 0 && expression.array_data.size() == 0 && !requested_array_type.value_type.empty())
@@ -5093,7 +5084,7 @@ namespace iris::compiler
             }
 
             if (requested_array_type.size != expression.array_data.size())
-                throw std::runtime_error{ format_error(std::format("Expected initializer list with size {} but got {} elements.", requested_array_type.size, expression.array_data.size()), parameters.source_position) };
+                throw Compile_error{ std::format("Expected initializer list with size {} but got {} elements.", requested_array_type.size, expression.array_data.size()), parameters.source_position };
         }
         
         if (expression.array_data.empty())
@@ -5251,7 +5242,7 @@ namespace iris::compiler
             }
         }
 
-        throw std::runtime_error{ format_error("Could not create dereference and access expression value!", parameters.source_position) };
+        throw Compile_error{ "Could not create dereference and access expression value!", parameters.source_position };
     }
 
     Value_and_type create_for_loop_expression_value(
@@ -5261,7 +5252,7 @@ namespace iris::compiler
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{ format_error("Can only create for loops inside functions!", parameters.source_position) };
+            throw Compile_error{ "Can only create for loops inside functions!", parameters.source_position };
 
         llvm::LLVMContext& llvm_context = parameters.llvm_context;
         llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
@@ -5732,12 +5723,12 @@ namespace iris::compiler
                 Type_reference const& member_type = struct_declaration.member_types[member_index];
 
                 if (member_index >= expression.members.size())
-                    throw std::runtime_error{ format_error(std::format("The struct member '{}' of struct '{}.{}' is not explicitly initialized!", member_name, module_name, struct_declaration.name), parameters.source_position) };
+                    throw Compile_error{ std::format("The struct member '{}' of struct '{}.{}' is not explicitly initialized!", member_name, module_name, struct_declaration.name), parameters.source_position };
 
                 Instantiate_member_value_pair const& pair = expression.members[member_index];
 
                 if (pair.member_name != member_name)
-                    throw std::runtime_error{ format_error(std::format("Expected struct member '{}' of struct '{}.{}' instead of '{}' while instantiating struct!", member_name, module_name, struct_declaration.name, pair.member_name), parameters.source_position) };
+                    throw Compile_error{ std::format("Expected struct member '{}' of struct '{}.{}' instead of '{}' while instantiating struct!", member_name, module_name, struct_declaration.name, pair.member_name), parameters.source_position };
 
                 Expression_parameters new_parameters = parameters;
                 new_parameters.expression_type = member_type;
@@ -5789,7 +5780,7 @@ namespace iris::compiler
         }
         else
         {
-            throw std::runtime_error{ format_error("Instantiate_expression_type not handled!", parameters.source_position) };
+            throw Compile_error{ "Instantiate_expression_type not handled!", parameters.source_position };
         }
     }
 
@@ -5817,7 +5808,7 @@ namespace iris::compiler
             [&member_value_pair](std::pmr::string const& member_name) { return member_name == member_value_pair.member_name; }
         );
         if (member_name_location == union_declaration.member_names.end())
-            throw std::runtime_error{ format_error(std::format("Could not find member '{}' while instantiating union ''!", member_value_pair.member_name, union_declaration.name), parameters.source_position) };
+            throw Compile_error{ std::format("Could not find member '{}' while instantiating union ''!", member_value_pair.member_name, union_declaration.name), parameters.source_position };
 
         auto const member_index = std::distance(union_declaration.member_names.begin(), member_name_location);
         Type_reference const& member_type = union_declaration.member_types[member_index];
@@ -5859,7 +5850,7 @@ namespace iris::compiler
 
         llvm::Type* const llvm_union_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, union_type_reference, type_database);
         if (!llvm::StructType::classof(llvm_union_type))
-            throw std::runtime_error{ format_error("llvm_union_type must be a StructType!", parameters.source_position) };
+            throw Compile_error{ "llvm_union_type must be a StructType!", parameters.source_position };
 
         if (parameters.llvm_parent_function == nullptr)
         {
@@ -5882,10 +5873,10 @@ namespace iris::compiler
         }
 
         if (expression.type != Instantiate_expression_type::Default)
-            throw std::runtime_error{ format_error("Unions only support default Instantiate_expression_type!", parameters.source_position) };
+            throw Compile_error{ "Unions only support default Instantiate_expression_type!", parameters.source_position };
 
         if (expression.members.size() > 1)
-            throw std::runtime_error{ format_error("Instantiating a union requires specifying either zero or one member!", parameters.source_position) };
+            throw Compile_error{ "Instantiating a union requires specifying either zero or one member!", parameters.source_position };
 
         if (expression.members.empty())
         {
@@ -5907,7 +5898,7 @@ namespace iris::compiler
 
         auto const member_name_location = std::find_if(union_declaration.member_names.begin(), union_declaration.member_names.end(), [&member_value_pair](std::pmr::string const& member_name) { return member_name == member_value_pair.member_name; });
         if (member_name_location == union_declaration.member_names.end())
-            throw std::runtime_error{ format_error(std::format("Could not find member '{}' while instantiating union ''!", member_value_pair.member_name, union_declaration.name), parameters.source_position) };
+            throw Compile_error{ std::format("Could not find member '{}' while instantiating union ''!", member_value_pair.member_name, union_declaration.name), parameters.source_position };
 
         auto const member_index = std::distance(union_declaration.member_names.begin(), member_name_location);
         Type_reference const& member_type = union_declaration.member_types[member_index];
@@ -5936,7 +5927,7 @@ namespace iris::compiler
     {
         Value_and_type const left_hand_side_value = create_expression_value(expression.left_hand_side.expression_index, statement, parameters);
         if (!left_hand_side_value.type.has_value() || !std::holds_alternative<Custom_type_reference>(left_hand_side_value.type.value().data))
-            throw std::runtime_error{ format_error("Left hand side of instance call is not a custom type reference!", parameters.source_position) };
+            throw Compile_error{ "Left hand side of instance call is not a custom type reference!", parameters.source_position };
 
         Custom_type_reference const& custom_type_reference = std::get<Custom_type_reference>(left_hand_side_value.type.value().data);
 
@@ -5945,7 +5936,7 @@ namespace iris::compiler
             custom_type_reference
         );
         if (function_constructor == nullptr)
-            throw std::runtime_error{ format_error("Could not find function constructor!", parameters.source_position) };
+            throw Compile_error{ "Could not find function constructor!", parameters.source_position };
 
         std::pmr::polymorphic_allocator<> allocator = {}; // TODO
 
@@ -5958,7 +5949,7 @@ namespace iris::compiler
         std::string const mangled_name = mangle_instance_call_name(key);
         llvm::Function* const llvm_function = get_llvm_function(key.module_name, parameters.llvm_module, mangled_name, std::nullopt);
         if (llvm_function == nullptr)
-            throw std::runtime_error{ format_error(std::format("Could not find function '{}'", mangled_name), parameters.source_position) };
+            throw Compile_error{ std::format("Could not find function '{}'", mangled_name), parameters.source_position };
 
         std::optional<Function_expression> const function_expression = get_instance_call_function_expression(
             parameters.declaration_database,
@@ -5966,7 +5957,7 @@ namespace iris::compiler
             key
         );
         if (!function_expression.has_value())
-            throw std::runtime_error{ format_error("Could not find function expression!", parameters.source_position) };
+            throw Compile_error{ "Could not find function expression!", parameters.source_position };
 
         Function_declaration const& function_declaration = function_expression->declaration;
         Type_reference type_reference = create_function_type_type_reference(
@@ -6033,11 +6024,11 @@ namespace iris::compiler
         Declaration_database const& declaration_database = parameters.declaration_database;
 
         if (!parameters.expression_type.has_value())
-            throw std::runtime_error{ format_error("Could not infer type while trying to instantiate!", parameters.source_position) };
+            throw Compile_error{ "Could not infer type while trying to instantiate!", parameters.source_position };
 
         std::optional<Type_reference> const type_reference_optional = get_underlying_type(parameters.declaration_database, parameters.expression_type.value());
         if (!type_reference_optional.has_value())
-            throw std::runtime_error{ format_error("Could not find type to instantiate!", parameters.source_position) };
+            throw Compile_error{ "Could not find type to instantiate!", parameters.source_position };
         Type_reference const& type_reference = type_reference_optional.value();
 
         if (std::holds_alternative<iris::Soa_array_type>(type_reference.data))
@@ -6061,11 +6052,11 @@ namespace iris::compiler
             }
             else if (expression.type == Instantiate_expression_type::Explicit)
             {
-                throw std::runtime_error{ format_error("Explicit Soa_array brace initialization is not implemented. Use [ ... ] initializer syntax.", parameters.source_position) };
+                throw Compile_error{ "Explicit Soa_array brace initialization is not implemented. Use [ ... ] initializer syntax.", parameters.source_position };
             }
             else if (expression.type != Instantiate_expression_type::Uninitialized)
             {
-                throw std::runtime_error{ format_error("Instantiate_expression_type not handled for Soa_array.", parameters.source_position) };
+                throw Compile_error{ "Instantiate_expression_type not handled for Soa_array.", parameters.source_position };
             }
 
             return Value_and_type
@@ -6079,7 +6070,7 @@ namespace iris::compiler
         if (std::holds_alternative<iris::Soa_array_view_type>(type_reference.data))
         {
             if (parameters.llvm_parent_function == nullptr)
-                throw std::runtime_error{ format_error("Soa_array_view local storage requires a parent function.", parameters.source_position) };
+                throw Compile_error{ "Soa_array_view local storage requires a parent function.", parameters.source_position };
 
             llvm::Type* const soa_view_llvm_type = type_reference_to_llvm_type(
                 parameters.llvm_context,
@@ -6104,11 +6095,11 @@ namespace iris::compiler
             }
             else if (expression.type == Instantiate_expression_type::Explicit)
             {
-                throw std::runtime_error{ format_error("Explicit Soa_array_view brace initialization is not implemented.", parameters.source_position) };
+                throw Compile_error{ "Explicit Soa_array_view brace initialization is not implemented.", parameters.source_position };
             }
             else if (expression.type != Instantiate_expression_type::Uninitialized)
             {
-                throw std::runtime_error{ format_error("Instantiate_expression_type not handled for Soa_array_view.", parameters.source_position) };
+                throw Compile_error{ "Instantiate_expression_type not handled for Soa_array_view.", parameters.source_position };
             }
 
             return Value_and_type
@@ -6138,7 +6129,7 @@ namespace iris::compiler
         if (is_primitive_type(type_reference) || is_constant_array_type_reference(type_reference) || is_enum_type(declaration_database, type_reference))
         {
             if (parameters.llvm_parent_function == nullptr)
-                throw std::runtime_error{ format_error("Primitive instantiate expression is not supported as a global constant!", parameters.source_position) };
+                throw Compile_error{ "Primitive instantiate expression is not supported as a global constant!", parameters.source_position };
 
             llvm::LLVMContext& llvm_context = parameters.llvm_context;
             llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
@@ -6196,7 +6187,7 @@ namespace iris::compiler
             type_reference
         );
         if (!found_instance.has_value())
-            throw std::runtime_error{ format_error("Could not instantiate type!", parameters.source_position) };
+            throw Compile_error{ "Could not instantiate type!", parameters.source_position };
         
         Custom_type_reference const* custom_type_reference = found_instance->type_reference;
         std::string_view const declaration_module_name = custom_type_reference->module_reference.name;
@@ -6214,7 +6205,7 @@ namespace iris::compiler
             return create_instantiate_union_expression_value(statement, expression, parameters, declaration_module_name, union_declaration, type_reference);
         }
 
-        throw std::runtime_error{ format_error(std::format("Instantiate_expression can only be used to instantiate either structs or unions! Tried to instantiate '{}.{}'", declaration_module_name, custom_type_reference->name), parameters.source_position) };
+        throw Compile_error{ std::format("Instantiate_expression can only be used to instantiate either structs or unions! Tried to instantiate '{}.{}'", declaration_module_name, custom_type_reference->name), parameters.source_position };
     }
 
     Value_and_type create_null_pointer_expression_value(
@@ -6285,7 +6276,7 @@ namespace iris::compiler
             if (!function_declaration.output_parameter_names.empty())
             {
                 if (function_declaration.output_parameter_names.size() > 1)
-                    throw std::runtime_error{ format_error("Postconditions do not support multiple return types yet! Not implemented!", parameters.source_position) };
+                    throw Compile_error{ "Postconditions do not support multiple return types yet! Not implemented!", parameters.source_position };
 
                 Value_and_type return_value = temporary;
                 return_value.name = function_declaration.output_parameter_names[0];
@@ -6481,7 +6472,7 @@ namespace iris::compiler
         llvm::BasicBlock* const else_end_block = llvm_builder.GetInsertBlock();
 
         if (then_value.type.has_value() && else_value.type.has_value() && then_value.type.value() != else_value.type.value())
-            throw std::runtime_error{ format_error("Ternary condition then and else statements must have the same type!", parameters.source_position) };
+            throw Compile_error{ "Ternary condition then and else statements must have the same type!", parameters.source_position };
 
         // End:
         llvm_builder.SetInsertPoint(end_block);
@@ -6674,7 +6665,7 @@ namespace iris::compiler
                         if (global_variable.has_value())
                         {
                             if (!global_variable->type.has_value())
-                                throw std::runtime_error{ format_error(std::format("Could not deduce type of global variable '{}'", global_variable_declaration.name), parameters.source_position) };
+                                throw Compile_error{ std::format("Could not deduce type of global variable '{}'", global_variable_declaration.name), parameters.source_position };
                             
                             return Value_and_type
                             {
@@ -6708,7 +6699,7 @@ namespace iris::compiler
         }
         }
 
-        throw std::runtime_error{ format_error(std::format("Unary operation '{}' not implemented!", static_cast<std::uint32_t>(operation)), parameters.source_position) };
+        throw Compile_error{ std::format("Unary operation '{}' not implemented!", static_cast<std::uint32_t>(operation)), parameters.source_position };
     }
 
     Value_and_type create_variable_declaration_expression_value(
@@ -6718,7 +6709,7 @@ namespace iris::compiler
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{ format_error("Can only create variables inside functions!", parameters.source_position) };
+            throw Compile_error{ "Can only create variables inside functions!", parameters.source_position };
 
         llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
         llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
@@ -6760,7 +6751,7 @@ namespace iris::compiler
     )
     {
         if (parameters.llvm_parent_function == nullptr)
-            throw std::runtime_error{ format_error("Can only create variables inside functions!", parameters.source_position) };
+            throw Compile_error{ "Can only create variables inside functions!", parameters.source_position };
 
         llvm::LLVMContext& llvm_context = parameters.llvm_context;
         llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
@@ -6769,7 +6760,7 @@ namespace iris::compiler
 
         std::optional<Type_reference> const core_type_optional = iris::get_variable_declaration_with_type_expression_type(statement, expression);
         if (!core_type_optional.has_value())
-            throw std::runtime_error{ format_error("Variable declaration with type has invalid type expression!", parameters.source_position) };
+            throw Compile_error{ "Variable declaration with type has invalid type expression!", parameters.source_position };
 
         Type_reference const& core_type = core_type_optional.value();
 
@@ -7095,7 +7086,7 @@ namespace iris::compiler
             }
         }
 
-        throw std::runtime_error{ format_error(std::format("Undefined variable '{}'", variable_name), parameters.source_position) };
+        throw Compile_error{ std::format("Undefined variable '{}'", variable_name), parameters.source_position };
     }
 
     bool is_true_constant(iris::Statement const& statement)
@@ -7330,7 +7321,7 @@ namespace iris::compiler
         else if (std::holds_alternative<Defer_expression>(expression.data))
         {
             if (parameters.defer_expressions_per_block.empty())
-                throw std::runtime_error{ format_error("Can only have defer expressions inside function blocks!", parameters.source_position) };
+                throw Compile_error{ "Can only have defer expressions inside function blocks!", parameters.source_position };
 
             std::pmr::vector<Statement>& current_block_defer_expressions = parameters.defer_expressions_per_block.back();
             current_block_defer_expressions.push_back(statement);
@@ -7377,7 +7368,7 @@ namespace iris::compiler
         }
         else if (std::holds_alternative<Reflection_expression>(expression.data))
         {
-            throw std::runtime_error{ format_error("Reflection_expression should have been handled in the Compile_time_pass!", parameters.source_position) };
+            throw Compile_error{ "Reflection_expression should have been handled in the Compile_time_pass!", parameters.source_position };
         }
         else if (std::holds_alternative<Return_expression>(expression.data))
         {
@@ -7427,7 +7418,7 @@ namespace iris::compiler
         else
         {
             //static_assert(always_false_v<Expression_type>, "non-exhaustive visitor!");
-            throw std::runtime_error{ format_error("Did not handle expression type!", parameters.source_position) };
+            throw Compile_error{ "Did not handle expression type!", parameters.source_position };
         }
     }
 
@@ -7557,6 +7548,13 @@ namespace iris::compiler
             if (!is_comment(statement) && !statement.expressions.empty())
             {
                 new_parameters.local_variables = all_local_variables;
+
+                // Expressions synthesized by a pass carry no range of their own. Anchoring to the
+                // statement means an error from one of them still points at a line instead of
+                // reporting no location at all.
+                std::optional<Source_position> const statement_source_position = get_statement_source_position(statement);
+                new_parameters.source_position =
+                    statement_source_position.has_value() ? statement_source_position : parameters.source_position;
 
                 Value_and_type statement_value = create_statement_value(
                     statement,
@@ -7689,7 +7687,7 @@ namespace iris::compiler
 
         bool const is_boolean_expression = condition_value.type.has_value() && (is_bool(*condition_value.type) || is_c_bool(*condition_value.type));
         if (!is_boolean_expression)
-            throw std::runtime_error{ format_error(std::format("In function '{}', condition '{}', expression does not evaluate to a boolean value.", function_declaration.name, function_condition.description), expression_parameters.source_position) };
+            throw Compile_error{ std::format("In function '{}', condition '{}', expression does not evaluate to a boolean value.", function_declaration.name, function_condition.description), expression_parameters.source_position };
         
         llvm::BasicBlock* const success_block = llvm::BasicBlock::Create(llvm_context, "condition_success", &llvm_function);
         llvm::BasicBlock* const fail_block = llvm::BasicBlock::Create(llvm_context, "condition_fail", &llvm_function);

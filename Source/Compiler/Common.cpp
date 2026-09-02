@@ -6,22 +6,13 @@ import llvm;
 import iris.core;
 import iris.core.declarations;
 import iris.core.hash;
+import iris.compiler.diagnostic;
 
 namespace iris::compiler
 {
     std::string_view to_string_view(llvm::StringRef const string)
     {
         return std::string_view{ string.data(), string.size() };
-    }
-
-    static std::string format_escape_error(
-        std::string_view const message,
-        std::optional<Source_position> const& source_position
-    )
-    {
-        if (!source_position.has_value())
-            return std::format("{} (location unknown)", message);
-        return std::format("{} (at line {}, column {})", message, source_position->line, source_position->column);
     }
 
     std::pmr::string unescape_string_literal(
@@ -46,7 +37,7 @@ namespace iris::compiler
             }
 
             if (index + 1 == value.size())
-                throw std::runtime_error{ format_escape_error("String literal ends with an incomplete escape sequence.", source_position) };
+                throw Compile_error{ "String literal ends with an incomplete escape sequence.", source_position };
 
             char const escaped = value[index + 1];
             ++index;
@@ -61,11 +52,9 @@ namespace iris::compiler
             case 'r': output.push_back('\r'); break;
             case '0': output.push_back('\0'); break;
             default:
-                throw std::runtime_error{
-                    format_escape_error(
-                        std::format("Unknown escape sequence '\\{}' in string literal.", escaped),
-                        source_position
-                    )
+                throw Compile_error{
+                    std::format("Unknown escape sequence '\\{}' in string literal.", escaped),
+                    source_position
                 };
             }
         }

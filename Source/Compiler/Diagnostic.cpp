@@ -8,9 +8,202 @@ import std;
 
 import iris.core;
 import iris.json_serializer;
+import iris.parser.parse_tree;
 
 namespace iris::compiler
 {
+    Compile_error::Compile_error(
+        std::string_view const message,
+        std::optional<Source_position> const source_position,
+        std::source_location const throw_site
+    ) :
+        std::runtime_error{ std::string{message} },
+        source_position{ source_position },
+        throw_site{ throw_site }
+    {
+    }
+
+    namespace
+    {
+        struct Compilation_breadcrumb
+        {
+            std::string kind;
+            std::string name;
+        };
+
+        std::vector<Compilation_breadcrumb>& get_compilation_breadcrumbs()
+        {
+            static thread_local std::vector<Compilation_breadcrumb> breadcrumbs;
+            return breadcrumbs;
+        }
+
+        // Set while an exception is unwinding through the scopes. The trail is what the top-level
+        // handler needs, and it would otherwise be popped away before that handler ever sees it.
+        thread_local bool g_breadcrumbs_frozen = false;
+    }
+
+    Compilation_scope::Compilation_scope(std::string_view const kind, std::string_view const name)
+    {
+        if (g_breadcrumbs_frozen && std::uncaught_exceptions() == 0)
+        {
+            // Someone caught and handled the exception; the frozen trail is stale.
+            g_breadcrumbs_frozen = false;
+            get_compilation_breadcrumbs().clear();
+        }
+
+        get_compilation_breadcrumbs().push_back(Compilation_breadcrumb{ .kind = std::string{kind}, .name = std::string{name} });
+    }
+
+    Compilation_scope::~Compilation_scope()
+    {
+        if (std::uncaught_exceptions() > 0)
+        {
+            g_breadcrumbs_frozen = true;
+            return;
+        }
+
+        if (g_breadcrumbs_frozen)
+            return;
+
+        std::vector<Compilation_breadcrumb>& breadcrumbs = get_compilation_breadcrumbs();
+        if (!breadcrumbs.empty())
+            breadcrumbs.pop_back();
+    }
+
+    std::pmr::string format_compilation_context(
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::string output{output_allocator};
+
+        // Innermost first: the last thing the compiler started is the most likely culprit.
+        std::vector<Compilation_breadcrumb> const& breadcrumbs = get_compilation_breadcrumbs();
+        for (auto iterator = breadcrumbs.rbegin(); iterator != breadcrumbs.rend(); ++iterator)
+        {
+            output += std::format("  while {} '{}'\n", iterator->kind, iterator->name);
+        }
+
+        return output;
+    }
+
+    Diagnostic create_error_diagnostic(
+        std::optional<std::filesystem::path> const source_file_path,
+        std::optional<Source_range> const range,
+        std::string_view const message
+    )
+    {
+        return Diagnostic
+        {
+            .file_path = source_file_path,
+            .range = range.has_value() ? range.value() : Source_range{},
+            .source = Diagnostic_source::Compiler,
+            .severity = Diagnostic_severity::Error,
+            .message = std::pmr::string{message},
+            .related_information = {},
+        };
+    }
+
+    Diagnostic create_error_diagnostic_with_code(
+        std::optional<std::filesystem::path> const source_file_path,
+        std::optional<Source_range> const range,
+        std::string_view const message,
+        Diagnostic_code const code,
+        Diagnostic_data data
+    )
+    {
+        return Diagnostic
+        {
+            .file_path = source_file_path,
+            .range = range.has_value() ? range.value() : Source_range{},
+            .source = Diagnostic_source::Compiler,
+            .severity = Diagnostic_severity::Error,
+            .code = code,
+            .message = std::pmr::string{message},
+            .related_information = {},
+            .data = std::move(data),
+        };
+    }
+
+    Diagnostic create_warning_diagnostic(
+        std::optional<std::filesystem::path> const source_file_path,
+        std::optional<Source_range> const range,
+        std::string_view const message
+    )
+    {
+        return Diagnostic
+        {
+            .file_path = source_file_path,
+            .range = range.has_value() ? range.value() : Source_range{},
+            .source = Diagnostic_source::Compiler,
+            .severity = Diagnostic_severity::Warning,
+            .message = std::pmr::string{message},
+            .related_information = {},
+        };
+    }
+
+    static std::pmr::string create_parser_diagnostic_message(
+        iris::parser::Parse_tree const& tree,
+        iris::parser::Parse_node const& node,
+        iris::Source_range const& range,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        if (iris::parser::is_error_node(node))
+        {
+            return std::pmr::string{"Unexpected token.", output_allocator};
+        }
+        else
+        {
+            std::string_view const node_value = iris::parser::get_node_value(tree, node);
+            return std::pmr::string{
+                std::format("Missing '{}'.", node_value),
+                output_allocator
+            };
+        }
+    }
+
+    std::pmr::vector<Diagnostic> create_parser_diagnostics(
+        std::filesystem::path const& source_file_path,
+        iris::parser::Parse_tree const& parse_tree,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        iris::parser::Parse_node const& root_node = iris::parser::get_root_node(parse_tree);
+
+        if (!iris::parser::has_errors(root_node))
+            return std::pmr::vector<Diagnostic>{output_allocator};
+
+        std::pmr::vector<iris::parser::Parse_node> const error_or_missing_nodes = iris::parser::get_error_or_missing_nodes(
+            root_node,
+            temporaries_allocator,
+            temporaries_allocator
+        );
+
+        std::pmr::vector<Diagnostic> diagnostics{output_allocator};
+        diagnostics.reserve(error_or_missing_nodes.size());
+
+        for (iris::parser::Parse_node const& node : error_or_missing_nodes)
+        {
+            iris::Source_range const range = iris::parser::get_node_source_range(node);
+            std::pmr::string message = create_parser_diagnostic_message(parse_tree, node, range, output_allocator);
+
+            Diagnostic diagnostic
+            {
+                .file_path = source_file_path,
+                .range = range,
+                .source = Diagnostic_source::Parser,
+                .severity = Diagnostic_severity::Error,
+                .message = std::move(message),
+                .related_information = {},
+            };
+
+            diagnostics.push_back(std::move(diagnostic));
+        }
+
+        return diagnostics;
+    }
+
     std::pmr::string diagnostic_to_string(
         Diagnostic const& diagnostic,
         std::pmr::polymorphic_allocator<> const& output_allocator,

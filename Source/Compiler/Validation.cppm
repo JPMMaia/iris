@@ -54,6 +54,13 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
+    export std::pmr::vector<iris::compiler::Diagnostic> validate_alias_type_declaration(
+        iris::Module const& core_module,
+        iris::Alias_type_declaration const& declaration,
+        Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     export std::pmr::vector<iris::compiler::Diagnostic> validate_enum_declaration(
         iris::Module const& core_module,
         iris::Enum_declaration const& declaration,

@@ -24,6 +24,7 @@ import iris.compiler.clang_code_generation;
 import iris.compiler.clang_compiler;
 import iris.compiler.clang_data;
 import iris.compiler.compile_commands_generator;
+import iris.compiler.diagnostic;
 import iris.compiler.linker;
 import iris.compiler.profiler;
 import iris.compiler.project;
@@ -1127,6 +1128,7 @@ namespace iris::compiler
         // TODO can be done in parallel but declaration_database.call_instances needs to be guarded...
         for (Module& core_module : core_modules)
         {
+            Compilation_scope const module_scope{"processing module", core_module.name};
             process_module(core_module, declaration_database, {.validate=false}, temporaries_allocator);
         }
 
@@ -1145,15 +1147,24 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
+        std::pmr::vector<iris::compiler::Diagnostic> all_diagnostics{temporaries_allocator};
+
         for (Module& core_module : core_modules)
         {
+            Compilation_scope const module_scope{"validating module", core_module.name};
+
             Analysis_result result = process_module(core_module, declaration_database, {.validate=true}, temporaries_allocator);
 
-            if (!result.diagnostics.empty())
-            {
-                print_diagnostics_and_exit_if_needed(result.diagnostics, temporaries_allocator);
-            }
+            all_diagnostics.insert(
+                all_diagnostics.end(),
+                std::make_move_iterator(result.diagnostics.begin()),
+                std::make_move_iterator(result.diagnostics.end())
+            );
         }
+
+        sort_diagnostics(all_diagnostics);
+
+        print_diagnostics_and_exit_if_needed(all_diagnostics, temporaries_allocator);
     }
 
     static bool is_compiled_cpp_up_to_date(std::filesystem::path const& output_dependency_file)
@@ -1386,6 +1397,8 @@ namespace iris::compiler
 
         iris::parser::Parser parser = iris::parser::create_parser();
 
+        std::pmr::vector<iris::compiler::Diagnostic> parser_diagnostics{temporaries_allocator};
+
         for (std::size_t index = 0; index < source_files_paths.size(); ++index)
         {
             std::filesystem::path const& source_file_path = source_files_paths[index];
@@ -1419,7 +1432,29 @@ namespace iris::compiler
             iris::parser::Parse_tree parse_tree = iris::parser::parse(parser, std::move(utf_8_source_content));
 
             iris::parser::Parse_node const root = get_root_node(parse_tree);
-    
+
+            {
+                std::pmr::vector<iris::compiler::Diagnostic> file_diagnostics = create_parser_diagnostics(
+                    source_file_path,
+                    parse_tree,
+                    temporaries_allocator,
+                    temporaries_allocator
+                );
+
+                if (!file_diagnostics.empty())
+                {
+                    parser_diagnostics.insert(
+                        parser_diagnostics.end(),
+                        std::make_move_iterator(file_diagnostics.begin()),
+                        std::make_move_iterator(file_diagnostics.end())
+                    );
+
+                    // Nothing is written to the cache for a file that did not parse.
+                    iris::parser::destroy_tree(std::move(parse_tree));
+                    continue;
+                }
+            }
+
             std::optional<iris::Module> core_module = iris::parser::parse_node_to_module(
                 parse_tree,
                 root,
@@ -1445,6 +1480,12 @@ namespace iris::compiler
         }
 
         iris::parser::destroy_parser(std::move(parser));
+
+        if (!parser_diagnostics.empty())
+        {
+            sort_diagnostics(parser_diagnostics);
+            print_diagnostics_and_exit_if_needed(parser_diagnostics, temporaries_allocator, "Parsing failed.");
+        }
 
         for (iris::Module& core_module : core_modules)
         {
@@ -1627,15 +1668,29 @@ namespace iris::compiler
             ::printf("    output llvm IR is \"%s\"\n", output_llvm_ir_file.generic_string().c_str());
         ::printf("    output is \"%s\"\n", output_assembly_file.generic_string().c_str());
 
-        std::unique_ptr<llvm::Module> llvm_module = create_llvm_module(
-            llvm_data,
-            core_module,
-            all_sorted_modules,
-            module_name_to_file_path_map,
-            declaration_database,
-            lambda_database,
-            compilation_options
-        );
+        Compilation_scope const module_scope{"compiling module", core_module.name};
+
+        std::unique_ptr<llvm::Module> llvm_module = [&]() -> std::unique_ptr<llvm::Module>
+        {
+            try
+            {
+                return create_llvm_module(
+                    llvm_data,
+                    core_module,
+                    all_sorted_modules,
+                    module_name_to_file_path_map,
+                    declaration_database,
+                    lambda_database,
+                    compilation_options
+                );
+            }
+            catch (Compile_error& error)
+            {
+                if (!error.file_path.has_value())
+                    error.file_path = core_module.source_file_path;
+                throw;
+            }
+        }();
 
         if (builder.output_llvm_ir)
             iris::compiler::write_llvm_ir_to_file(*llvm_module, output_llvm_ir_file);

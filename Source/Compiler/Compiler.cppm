@@ -119,7 +119,8 @@ namespace iris::compiler
 
     export void print_diagnostics_and_exit_if_needed(
         std::span<iris::compiler::Diagnostic const> const diagnostics,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator,
+        std::string_view const failure_summary = "Validation failed."
     );
 
     export struct Compilation_database

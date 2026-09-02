@@ -17,61 +17,6 @@ namespace iris::compiler
         std::pmr::vector<iris::Declaration_instance_storage>& temporary_storage
     );
 
-    iris::compiler::Diagnostic create_error_diagnostic(
-        std::optional<std::filesystem::path> const source_file_path,
-        std::optional<Source_range> const range,
-        std::string_view const message
-    )
-    {
-        return iris::compiler::Diagnostic
-        {
-            .file_path = source_file_path,
-            .range = range.has_value() ? range.value() : Source_range{},
-            .source = Diagnostic_source::Compiler,
-            .severity = Diagnostic_severity::Error,
-            .message = std::pmr::string{message},
-            .related_information = {},
-        };
-    }
-
-    iris::compiler::Diagnostic create_error_diagnostic_with_code(
-        std::optional<std::filesystem::path> const source_file_path,
-        std::optional<Source_range> const range,
-        std::string_view const message,
-        Diagnostic_code const code,
-        Diagnostic_data data
-    )
-    {
-        return iris::compiler::Diagnostic
-        {
-            .file_path = source_file_path,
-            .range = range.has_value() ? range.value() : Source_range{},
-            .source = Diagnostic_source::Compiler,
-            .severity = Diagnostic_severity::Error,
-            .code = code,
-            .message = std::pmr::string{message},
-            .related_information = {},
-            .data = std::move(data),
-        };
-    }
-
-    iris::compiler::Diagnostic create_warning_diagnostic(
-        std::optional<std::filesystem::path> const source_file_path,
-        std::optional<Source_range> const range,
-        std::string_view const message
-    )
-    {
-        return iris::compiler::Diagnostic
-        {
-            .file_path = source_file_path,
-            .range = range.has_value() ? range.value() : Source_range{},
-            .source = Diagnostic_source::Compiler,
-            .severity = Diagnostic_severity::Warning,
-            .message = std::pmr::string{message},
-            .related_information = {},
-        };
-    }
-
     std::optional<std::string_view> find_type_unique_name(
         Declaration_database const& declaration_database,
         iris::Type_reference const& type
@@ -742,14 +687,29 @@ namespace iris::compiler
             }
         };
 
-        for (Alias_type_declaration const& declaration : core_module.export_declarations.alias_type_declarations)
+        auto const process_alias_declaration = [&](Alias_type_declaration const& declaration) -> void
         {
             process_declaration_name(declaration.name, declaration.source_location);
+
+            std::pmr::vector<iris::compiler::Diagnostic> declaration_diagnostics = validate_alias_type_declaration(
+                core_module,
+                declaration,
+                declaration_database,
+                temporaries_allocator
+            );
+
+            if (!declaration_diagnostics.empty())
+                diagnostics.insert(diagnostics.end(), declaration_diagnostics.begin(), declaration_diagnostics.end());
+        };
+
+        for (Alias_type_declaration const& declaration : core_module.export_declarations.alias_type_declarations)
+        {
+            process_alias_declaration(declaration);
         }
 
         for (Alias_type_declaration const& declaration : core_module.internal_declarations.alias_type_declarations)
         {
-            process_declaration_name(declaration.name, declaration.source_location);
+            process_alias_declaration(declaration);
         }
 
         for (Enum_declaration const& declaration : core_module.export_declarations.enum_declarations)
@@ -939,6 +899,66 @@ namespace iris::compiler
         }
 
         sort_diagnostics(diagnostics);
+        return diagnostics;
+    }
+
+    std::pmr::vector<iris::compiler::Diagnostic> validate_alias_type_declaration(
+        iris::Module const& core_module,
+        iris::Alias_type_declaration const& declaration,
+        Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
+
+        if (declaration.type.empty())
+            return diagnostics;
+
+        // Walk the chain by hand so that the alias the cycle closes on can be named.
+        std::pmr::vector<Alias_type_declaration const*> visited{temporaries_allocator};
+        visited.push_back(&declaration);
+
+        std::optional<Type_reference> current = declaration.type[0];
+
+        while (current.has_value() && std::holds_alternative<Custom_type_reference>(current->data))
+        {
+            Custom_type_reference const& custom_type = std::get<Custom_type_reference>(current->data);
+
+            std::optional<Declaration> const next_declaration = find_declaration(
+                declaration_database,
+                custom_type.module_reference.name,
+                custom_type.name
+            );
+
+            if (!next_declaration.has_value())
+                break;
+
+            if (!std::holds_alternative<Alias_type_declaration const*>(next_declaration->data))
+                break;
+
+            Alias_type_declaration const* const next_alias = std::get<Alias_type_declaration const*>(next_declaration->data);
+
+            auto const location = std::find(visited.begin(), visited.end(), next_alias);
+            if (location != visited.end())
+            {
+                diagnostics.push_back(
+                    create_error_diagnostic(
+                        core_module.source_file_path,
+                        create_source_range_from_source_location(declaration.source_location, declaration.name.size()),
+                        std::format("Alias '{}' is defined in terms of itself.", declaration.name)
+                    )
+                );
+                break;
+            }
+
+            visited.push_back(next_alias);
+
+            if (next_alias->type.empty())
+                break;
+
+            current = next_alias->type[0];
+        }
+
         return diagnostics;
     }
 

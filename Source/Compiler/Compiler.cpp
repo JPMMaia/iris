@@ -649,6 +649,8 @@ namespace iris::compiler
             if (!should_compile(declaration))
                 continue;
 
+            Compilation_scope const function_scope{"generating function", definition.name};
+
             llvm::Function* const llvm_function = get_llvm_function(core_module, llvm_module, definition.name);
             if (!llvm_function)
             {
@@ -912,6 +914,8 @@ namespace iris::compiler
                     if (location == globals_to_add->end())
                         continue;
                 }
+
+                Compilation_scope const global_scope{"generating global variable", global_variable_declaration.name};
 
                 std::string const mangled_name = mangle_name(core_module, global_variable_declaration.name, global_variable_declaration.unique_name);
 
@@ -1660,7 +1664,8 @@ namespace iris::compiler
     
     void print_diagnostics_and_exit_if_needed(
         std::span<iris::compiler::Diagnostic const> const diagnostics,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator,
+        std::string_view const failure_summary
     )
     {
         if (!diagnostics.empty())
@@ -1691,7 +1696,7 @@ namespace iris::compiler
             );
 
             if (contains_errors)
-                iris::common::print_message_and_exit("Validation failed.");
+                iris::common::print_message_and_exit(std::string{failure_summary});
         }
     }
 

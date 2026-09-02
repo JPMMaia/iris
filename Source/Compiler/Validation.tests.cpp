@@ -21,6 +21,7 @@ import iris.core;
 import iris.core.declarations;
 import iris.core.types;
 import iris.parser.convertor;
+import iris.parser.parse_tree;
 import iris.parser.parser;
 
 namespace iris::compiler
@@ -35,6 +36,28 @@ namespace iris::compiler
             std::fprintf(stderr, index + 1 == diagnostics.size() ? ",\n" : "\n");
         }
         std::fprintf(stderr, "]\n");
+    }
+
+    std::pmr::vector<Diagnostic> parse_and_collect_parser_diagnostics(std::string_view const input_text)
+    {
+        iris::parser::Parser parser = iris::parser::create_parser();
+
+        iris::parser::Parse_tree parse_tree = iris::parser::parse(
+            parser,
+            std::pmr::u8string{ reinterpret_cast<char8_t const*>(input_text.data()), input_text.size() }
+        );
+
+        std::pmr::vector<Diagnostic> diagnostics = create_parser_diagnostics(
+            std::filesystem::path{"test.iris"},
+            parse_tree,
+            {},
+            {}
+        );
+
+        iris::parser::destroy_tree(std::move(parse_tree));
+        iris::parser::destroy_parser(std::move(parser));
+
+        return diagnostics;
     }
 
     void test_validate_module(
@@ -174,6 +197,103 @@ import my.module_a as my_module;
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+
+    TEST_CASE("Validates that an alias is not defined in terms of itself", "[Validation][Alias]")
+    {
+        std::string_view const input = R"(module Test;
+
+using X = X;
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            {
+                .range = create_source_range(3, 7, 3, 8),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Alias 'X' is defined in terms of itself.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that two aliases are not defined in terms of each other", "[Validation][Alias]")
+    {
+        std::string_view const input = R"(module Test;
+
+using A = B;
+using B = A;
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            {
+                .range = create_source_range(3, 7, 3, 8),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Alias 'A' is defined in terms of itself.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(4, 7, 4, 8),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Alias 'B' is defined in terms of itself.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Allows an alias chain that is not a cycle", "[Validation][Alias]")
+    {
+        std::string_view const input = R"(module Test;
+
+using A = Int32;
+using B = A;
+using C = B;
+)";
+
+        test_validate_module(input, {}, {});
+    }
+
+    TEST_CASE("Reports a syntax error at the token that caused it", "[Validation][Parser]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function f() -> (result: Int32)
+{
+    return 1
+}
+)";
+
+        std::pmr::vector<Diagnostic> const diagnostics = parse_and_collect_parser_diagnostics(input);
+
+        REQUIRE(diagnostics.size() == 1);
+        CHECK(diagnostics[0].source == Diagnostic_source::Parser);
+        CHECK(diagnostics[0].severity == Diagnostic_severity::Error);
+        CHECK(diagnostics[0].file_path == std::filesystem::path{"test.iris"});
+        CHECK(diagnostics[0].range.start.line == 5);
+        CHECK(diagnostics[0].message == "Unexpected token.");
+    }
+
+    TEST_CASE("Reports no parser diagnostics for a file that parses", "[Validation][Parser]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function f() -> (result: Int32)
+{
+    return 1;
+}
+)";
+
+        std::pmr::vector<Diagnostic> const diagnostics = parse_and_collect_parser_diagnostics(input);
+
+        CHECK(diagnostics.empty());
+    }
 
     TEST_CASE("Validates that a declaration name is not a duplicate", "[Validation][Declaration]")
     {

@@ -7,6 +7,7 @@ module;
 
 #if _WIN32
 #include <crtdbg.h>
+#include <windows.h>
 #endif
 
 module iris.common;
@@ -18,15 +19,14 @@ namespace iris::common
 {
     void print_message_and_exit(std::string const& message)
     {
-        std::puts(message.c_str());
-        std::fflush(stdout);
-        std::exit(-1);
+        print_message_and_exit(message.c_str());
     }
 
     void print_message_and_exit(char const* const message)
     {
-        std::puts(message);
         std::fflush(stdout);
+        std::fprintf(stderr, "%s\n", message);
+        std::fflush(stderr);
         std::exit(-1);
     }
 
@@ -197,10 +197,52 @@ namespace iris::common
 
     static void signal_handler(int const signal)
     {
+        std::fflush(stdout);
         std::fprintf(stderr, "Abort signal: %d\n", signal);
         print_stacktrace();
+        std::fflush(stderr);
         std::exit(-1);
     }
+
+#if _WIN32
+    static char const* describe_seh_exception_code(DWORD const code)
+    {
+        switch (code)
+        {
+        case EXCEPTION_STACK_OVERFLOW: return "stack overflow";
+        case EXCEPTION_ACCESS_VIOLATION: return "access violation";
+        case EXCEPTION_ILLEGAL_INSTRUCTION: return "illegal instruction";
+        case EXCEPTION_INT_DIVIDE_BY_ZERO: return "integer divide by zero";
+        case EXCEPTION_PRIV_INSTRUCTION: return "privileged instruction";
+        case EXCEPTION_IN_PAGE_ERROR: return "in-page error";
+        default: return "unknown";
+        }
+    }
+
+    static LONG WINAPI unhandled_exception_filter(EXCEPTION_POINTERS* const exception_pointers)
+    {
+        DWORD const code =
+            exception_pointers != nullptr && exception_pointers->ExceptionRecord != nullptr ?
+            exception_pointers->ExceptionRecord->ExceptionCode :
+            0;
+
+        std::fflush(stdout);
+        std::fprintf(
+            stderr,
+            "internal compiler error: the compiler crashed (%s, code 0x%08lX).\n",
+            describe_seh_exception_code(code),
+            static_cast<unsigned long>(code)
+        );
+
+        if (code == EXCEPTION_STACK_OVERFLOW)
+            std::fprintf(stderr, "This is usually a cycle the compiler failed to detect.\n");
+
+        std::fprintf(stderr, "This is a bug in the iris compiler. Please report it.\n");
+        std::fflush(stderr);
+
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+#endif
 
     static void invalid_parameter_handler(
         wchar_t const* const expression,
@@ -216,12 +258,43 @@ namespace iris::common
     void install_abort_handlers()
     {
         std::signal(SIGABRT, signal_handler);
-        std::set_terminate([]() {
-            std::fprintf(stderr, "Unhandled exception!\n");
+
+        std::set_terminate([]()
+        {
+            std::fflush(stdout);
+
+            std::exception_ptr const exception = std::current_exception();
+            if (exception)
+            {
+                try
+                {
+                    std::rethrow_exception(exception);
+                }
+                catch (std::exception const& error)
+                {
+                    std::fprintf(stderr, "Unhandled exception: %s\n", error.what());
+                }
+                catch (...)
+                {
+                    std::fprintf(stderr, "Unhandled exception of unknown type!\n");
+                }
+            }
+            else
+            {
+                std::fprintf(stderr, "Terminate called without an active exception!\n");
+            }
+
             print_stacktrace();
+            std::fflush(stderr);
+            std::_Exit(3);
         });
 
         #if _WIN32
+        ULONG stack_reserve_bytes = 64 * 1024;
+        SetThreadStackGuarantee(&stack_reserve_bytes);
+
+        SetUnhandledExceptionFilter(unhandled_exception_filter);
+
         _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
         _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
         _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
