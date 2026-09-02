@@ -307,7 +307,7 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
-    iris::Comment_expression node_to_expression_comment(
+    iris::Statement comment_node_to_statement(
         Parse_tree const& tree,
         Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator,

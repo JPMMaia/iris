@@ -170,20 +170,42 @@ namespace iris::parser
         return std::pmr::string{std::move(buffer), output_allocator};
     }
 
-    static std::optional<std::pmr::string> extract_comments_from_node(
+    static std::pmr::string encode_comment_nodes(
+        Parse_tree const& tree,
+        std::span<Parse_node const> const comment_nodes,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        std::pmr::string joined{temporaries_allocator};
+
+        for (Parse_node const& comment_node : comment_nodes)
+        {
+            if (!joined.empty())
+                joined += "\n";
+
+            joined += get_node_value(tree, comment_node);
+        }
+
+        return encode_comment(joined, output_allocator, temporaries_allocator);
+    }
+
+    static std::optional<std::pmr::string> extract_leading_comment(
         Parse_tree const& tree,
         Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::string_view const comment = get_node_value(tree, node);
-        if (comment.empty())
+        std::pmr::vector<Parse_node> const comment_nodes = get_preceding_comment_nodes(
+            tree,
+            node,
+            temporaries_allocator
+        );
+        if (comment_nodes.empty())
             return std::nullopt;
-        
-        std::pmr::string const encoded_comment = encode_comment(comment, output_allocator, temporaries_allocator);
-        
-        return encoded_comment;
+
+        return encode_comment_nodes(tree, comment_nodes, output_allocator, temporaries_allocator);
     }
 
     static std::optional<std::string_view> get_module_name(
@@ -301,11 +323,7 @@ namespace iris::parser
         output.name = module_name.value();
         output.source_file_path = source_file_path;
 
-        std::optional<Parse_node> const comment_node = get_child_node(tree, module_declaration_node.value(), "Comment");
-        if (comment_node.has_value())
-        {
-            output.comment = extract_comments_from_node(tree, comment_node.value(), output_allocator, temporaries_allocator);
-        }
+        output.comment = extract_leading_comment(tree, module_declaration_node.value(), output_allocator, temporaries_allocator);
 
         output.dependencies.alias_imports = create_import_modules(
             tree,
@@ -371,12 +389,7 @@ namespace iris::parser
         std::string_view const import_name = get_node_value(tree, import_name_node.value());
         std::string_view const import_alias = get_node_value(tree, import_alias_node.value());
 
-        std::optional<std::pmr::string> comment;
-        std::optional<Parse_node> const comment_node = get_child_node(tree, node, "Comment");
-        if (comment_node.has_value())
-        {
-            comment = extract_comments_from_node(tree, comment_node.value(), output_allocator, temporaries_allocator);
-        }
+        std::optional<std::pmr::string> comment = extract_leading_comment(tree, node, output_allocator, temporaries_allocator);
 
         Source_range const source_range = get_node_source_range(node);
 
@@ -459,12 +472,7 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::optional<Parse_node> const comment_node = get_child_node(tree, node, "Comment");
-        std::optional<std::pmr::string> comment = std::nullopt;
-        if (comment_node.has_value())
-        {
-            comment = extract_comments_from_node(tree, comment_node.value(), temporaries_allocator, temporaries_allocator);
-        }
+        std::optional<std::pmr::string> const comment = extract_leading_comment(tree, node, temporaries_allocator, temporaries_allocator);
 
         Declaration_attributes const declaration_attributes = get_declaration_attributes(tree, node, temporaries_allocator);
 
@@ -1115,20 +1123,15 @@ namespace iris::parser
                     enum_value.value = node_to_statement(module_info, tree, value_value_node.value(), output_allocator, temporaries_allocator);
                 }
 
-                std::optional<Parse_node> const comment_node = get_child_node(tree, value_node, "Comment");
-                if (comment_node.has_value())
+                std::optional<std::pmr::string> const comment = extract_leading_comment(
+                    tree,
+                    value_node,
+                    output_allocator,
+                    temporaries_allocator
+                );
+                if (comment.has_value())
                 {
-                    std::optional<std::pmr::string> comment = extract_comments_from_node(
-                        tree,
-                        comment_node.value(),
-                        output_allocator,
-                        temporaries_allocator
-                    );
-        
-                    if (comment.has_value())
-                    {
-                        enum_value.comment = comment.value();
-                    }
+                    enum_value.comment = comment.value();
                 }
 
                 output.values[index - 2] = std::move(enum_value);
@@ -1556,20 +1559,19 @@ namespace iris::parser
                         output.member_default_values[member_index] = node_to_statement(module_info, tree, default_value_node.value(), output_allocator, temporaries_allocator);
                     }
 
-                    std::optional<Parse_node> const member_comment_node = get_child_node(tree, member_node, "Comment");
-                    if (member_comment_node.has_value())
+                    std::optional<std::pmr::string> member_comment = extract_leading_comment(
+                        tree,
+                        member_node,
+                        output_allocator,
+                        temporaries_allocator
+                    );
+                    if (member_comment.has_value())
                     {
-                        std::pmr::string comments = encode_comment(
-                            get_node_value(tree, member_comment_node.value()),
-                            output_allocator,
-                            temporaries_allocator
-                        );
-
                         member_comments.push_back(
                             Indexed_comment
                             {
                                 .index = member_index,
-                                .comment = std::move(comments)
+                                .comment = std::move(member_comment.value())
                             }
                         );
                     }
@@ -1812,20 +1814,19 @@ namespace iris::parser
                         }
                     }
 
-                    std::optional<Parse_node> const member_comment_node = get_child_node(tree, member_node, "Comment");
-                    if (member_comment_node.has_value())
+                    std::optional<std::pmr::string> member_comment = extract_leading_comment(
+                        tree,
+                        member_node,
+                        output_allocator,
+                        temporaries_allocator
+                    );
+                    if (member_comment.has_value())
                     {
-                        std::pmr::string comments = encode_comment(
-                            get_node_value(tree, member_comment_node.value()),
-                            output_allocator,
-                            temporaries_allocator
-                        );
-
                         member_comments.push_back(
                             Indexed_comment
                             {
                                 .index = member_index,
-                                .comment = std::move(comments)
+                                .comment = std::move(member_comment.value())
                             }
                         );
                     }
@@ -1948,10 +1949,6 @@ namespace iris::parser
         else if (expression_type == "Expression_cast")
         {
             expression.data = node_to_expression_cast(statement, module_info, tree, expression_node, output_allocator, temporaries_allocator);
-        }
-        else if (expression_type == "Expression_comment")
-        {
-            expression.data = node_to_expression_comment(tree, expression_node, output_allocator, temporaries_allocator);
         }
         else if (expression_type == "Expression_compile_time")
         {
@@ -2127,19 +2124,19 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::size_t const statement_count = statement_nodes.size();
-        
         std::pmr::vector<iris::Statement> output{output_allocator};
-        output.resize(statement_count);
+        output.reserve(statement_nodes.size());
 
-        for (std::size_t statement_index = 0; statement_index < statement_count; ++statement_index)
+        for (Parse_node const& statement_node : statement_nodes)
         {
-            Parse_node const& statement_node = statement_nodes[statement_index];
+            Statement statement =
+                get_node_symbol(statement_node) == "Comment" ?
+                comment_node_to_statement(tree, statement_node, output_allocator, temporaries_allocator) :
+                node_to_statement(module_info, tree, statement_node, output_allocator, temporaries_allocator);
 
-            Statement statement = node_to_statement(module_info, tree, statement_node, output_allocator, temporaries_allocator);
-            output[statement_index] = std::move(statement);
+            output.push_back(std::move(statement));
         }
-        
+
         return output;
     }
 
@@ -2151,9 +2148,11 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        std::pmr::vector<iris::Statement> output;
-
-        std::pmr::vector<Parse_node> const child_nodes = get_named_child_nodes(tree, node, temporaries_allocator);
+        std::pmr::vector<Parse_node> const child_nodes = get_named_child_nodes_with_comments(
+            tree,
+            node,
+            temporaries_allocator
+        );
 
         return node_to_block(
             module_info,
@@ -2417,31 +2416,31 @@ namespace iris::parser
         return output;
     }
 
-    iris::Comment_expression node_to_expression_comment(
+    iris::Statement comment_node_to_statement(
         Parse_tree const& tree,
         Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        iris::Comment_expression output;
-        
-        std::optional<Parse_node> const comment_node = get_child_node(tree, node, 0);
-        if (comment_node.has_value())
-        {
-            std::optional<std::pmr::string> comment = extract_comments_from_node(
-                tree,
-                comment_node.value(),
-                output_allocator,
-                temporaries_allocator
-            );
+        Parse_node const comment_nodes[] = { node };
 
-            if (comment.has_value())
-            {
-                output.comment = std::move(comment.value());
-            }
-        }
-        
+        iris::Comment_expression comment_expression;
+        comment_expression.comment = encode_comment_nodes(
+            tree,
+            comment_nodes,
+            output_allocator,
+            temporaries_allocator
+        );
+
+        iris::Expression expression;
+        expression.source_range = get_node_source_range(node);
+        expression.data = std::move(comment_expression);
+
+        iris::Statement output;
+        output.expressions = std::pmr::vector<iris::Expression>{output_allocator};
+        output.expressions.push_back(std::move(expression));
+
         return output;
     }
 
@@ -3282,21 +3281,35 @@ namespace iris::parser
             }
         }
 
-        std::pmr::vector<Parse_node> const child_nodes = get_child_nodes(tree, node, temporaries_allocator);
-        std::span<Parse_node const> const statement_nodes = 
-            case_value.has_value() ?
-            std::span<Parse_node const>{child_nodes.begin() + 3, child_nodes.end()} :
-            std::span<Parse_node const>{child_nodes.begin() + 2, child_nodes.end()};
+        // The case body is every Statement after the ':', plus the comment extras
+        // interleaved with them. Selecting by symbol rather than by a fixed offset
+        // past 'case'/value/':' keeps this correct now that a comment can sit
+        // between any two tokens.
+        std::pmr::vector<Parse_node> const child_nodes = get_named_child_nodes_with_comments(
+            tree,
+            node,
+            temporaries_allocator
+        );
+
+        std::pmr::vector<Parse_node> statement_nodes{temporaries_allocator};
+        statement_nodes.reserve(child_nodes.size());
+
+        for (Parse_node const& child_node : child_nodes)
+        {
+            std::string_view const symbol = get_node_symbol(child_node);
+            if (symbol == "Statement" || symbol == "Comment")
+                statement_nodes.push_back(child_node);
+        }
 
         if (!statement_nodes.empty())
         {
-            output.statements = std::pmr::vector<iris::Statement>{output_allocator};
-            output.statements.resize(statement_nodes.size(), iris::Statement{});
-
-            for (std::size_t index = 0; index < statement_nodes.size(); ++index)
-            {
-                output.statements[index] = node_to_statement(module_info, tree, statement_nodes[index], output_allocator, temporaries_allocator);
-            }
+            output.statements = node_to_block(
+                module_info,
+                tree,
+                statement_nodes,
+                output_allocator,
+                temporaries_allocator
+            );
         }
 
         return output;
