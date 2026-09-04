@@ -457,6 +457,21 @@ namespace iris
         }
     }
 
+    std::uint64_t hash_bytes(
+        std::span<std::byte const> const bytes
+    )
+    {
+        XXH64_hash_t const seed = 0;
+        return XXH64(bytes.data(), bytes.size(), seed);
+    }
+
+    std::uint64_t hash_string(
+        std::string_view const value
+    )
+    {
+        return hash_bytes(std::as_bytes(std::span{value.data(), value.size()}));
+    }
+
     XXH64_hash_t hash_alias_type_declaration(
         XXH64_state_t* const state,
         iris::Alias_type_declaration const& declaration

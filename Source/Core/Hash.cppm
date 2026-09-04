@@ -93,6 +93,14 @@ namespace iris
         Type_instance const& type_instance
     );
 
+    export std::uint64_t hash_bytes(
+        std::span<std::byte const> const bytes
+    );
+
+    export std::uint64_t hash_string(
+        std::string_view const value
+    );
+
     export XXH64_hash_t hash_alias_type_declaration(
         XXH64_state_t* const state,
         iris::Alias_type_declaration const& declaration
