@@ -2690,6 +2690,66 @@ namespace iris::c
         return unit;
     }
 
+    struct Inclusion_visitor_data
+    {
+        std::pmr::vector<std::filesystem::path>* included_files;
+    };
+
+    static std::filesystem::path normalize_included_file_path(
+        std::filesystem::path const& path
+    )
+    {
+        std::error_code error_code;
+        std::filesystem::path const absolute_path = std::filesystem::absolute(path, error_code);
+        if (error_code)
+            return path.lexically_normal();
+
+        return absolute_path.lexically_normal();
+    }
+
+    static void visit_inclusion(
+        CXFile const included_file,
+        CXSourceLocation* const,
+        unsigned const,
+        CXClientData const client_data
+    )
+    {
+        Inclusion_visitor_data const* const data = static_cast<Inclusion_visitor_data const*>(client_data);
+
+        std::optional<String> file_name = clang_File_tryGetRealPathName(included_file);
+        if (!file_name.has_value() || file_name->string_view().empty())
+            file_name = clang_getFileName(included_file);
+
+        std::string_view const file_name_view = file_name->string_view();
+        if (file_name_view.empty())
+            return;
+
+        data->included_files->push_back(normalize_included_file_path(std::filesystem::path{file_name_view}));
+    }
+
+    static std::pmr::vector<std::filesystem::path> collect_included_files(
+        CXTranslationUnit const unit,
+        std::filesystem::path const& header_path,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::vector<std::filesystem::path> included_files{output_allocator};
+
+        Inclusion_visitor_data data
+        {
+            .included_files = &included_files,
+        };
+
+        clang_getInclusions(unit, visit_inclusion, &data);
+
+        included_files.push_back(normalize_included_file_path(header_path));
+
+        std::sort(included_files.begin(), included_files.end());
+        included_files.erase(std::unique(included_files.begin(), included_files.end()), included_files.end());
+
+        return included_files;
+    }
+
     bool is_public_declaration(std::string_view const declaration_name, std::span<std::pmr::string const> const public_prefixes)
     {
         if (public_prefixes.empty())
@@ -3410,23 +3470,46 @@ namespace iris::c
         return header_module;
     }
 
+    std::optional<Imported_header> import_header_with_includes(
+        std::string_view const header_name,
+        std::filesystem::path const& header_path,
+        Options const& options,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        CXIndex index = clang_createIndex(0, 0);
+        std::optional<CXTranslationUnit> unit = create_translation_unit(index, header_path, true, options);
+        if (!unit.has_value())
+        {
+            clang_disposeIndex(index);
+            return std::nullopt;
+        }
+
+        iris::Module header_module = import_header(header_name, header_path, options, index, *unit);
+
+        std::pmr::vector<std::filesystem::path> included_files = collect_included_files(*unit, header_path, output_allocator);
+
+        clang_disposeTranslationUnit(*unit);
+        clang_disposeIndex(index);
+
+        return Imported_header
+        {
+            .core_module = std::move(header_module),
+            .included_files = std::move(included_files),
+        };
+    }
+
     std::optional<iris::Module> import_header(
         std::string_view const header_name,
         std::filesystem::path const& header_path,
         Options const& options
     )
     {
-        CXIndex index = clang_createIndex(0, 0);
-        std::optional<CXTranslationUnit> unit = create_translation_unit(index, header_path, true, options);
-        if (!unit.has_value())
+        std::optional<Imported_header> imported_header = import_header_with_includes(header_name, header_path, options, {});
+        if (!imported_header.has_value())
             return std::nullopt;
 
-        iris::Module header_module = import_header(header_name, header_path, options, index, *unit);
-
-        clang_disposeTranslationUnit(*unit);
-        clang_disposeIndex(index);
-
-        return header_module;
+        return std::move(imported_header->core_module);
     }
 
     std::optional<iris::Module> import_header_and_write_to_file(std::string_view const header_name, std::filesystem::path const& header_path, std::filesystem::path const& output_path, Options const& options)

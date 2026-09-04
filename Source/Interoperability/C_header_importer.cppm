@@ -58,6 +58,19 @@ namespace iris::c
         bool wrap_pointers_as_optional = false;
     };
 
+    export struct Imported_header
+    {
+        iris::Module core_module;
+        std::pmr::vector<std::filesystem::path> included_files;
+    };
+
+    export std::optional<Imported_header> import_header_with_includes(
+        std::string_view const header_name,
+        std::filesystem::path const& header_path,
+        Options const& options,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    );
+
     export std::optional<iris::Module> import_header(std::string_view const header_name, std::filesystem::path const& header_path, Options const& options);
 
     export std::optional<iris::Module> import_header_and_write_to_file(std::string_view const header_name, std::filesystem::path const& header_path, std::filesystem::path const& output_path, Options const& options);
