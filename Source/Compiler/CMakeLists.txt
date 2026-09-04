@@ -23,6 +23,8 @@ endif()
 find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(Iris_compiler PRIVATE nlohmann_json::nlohmann_json)
 
+target_compile_definitions(Iris_compiler PRIVATE IRIS_BUILD_ID="${IRIS_BUILD_ID}")
+
 target_sources(Iris_compiler
    PUBLIC FILE_SET modules TYPE CXX_MODULES
       FILES
@@ -122,6 +124,7 @@ if(BUILD_TESTING)
    add_executable(Iris_builder_tests)
    target_link_libraries(Iris_builder_tests PRIVATE ${iris_test_link_libraries})
    target_compile_definitions(Iris_builder_tests PRIVATE ${iris_test_compile_definitions})
+   target_link_libraries(Iris_builder_tests PRIVATE nlohmann_json::nlohmann_json)
    target_sources(Iris_builder_tests PRIVATE
       "main.tests.cpp"
       "Builder.tests.cpp"

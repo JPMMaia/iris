@@ -22,6 +22,23 @@ include("Scripts/compiler_rt_builtins.cmake")
 
 include(CTest)
 
+find_package(Git QUIET)
+if (GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" describe --always --dirty --abbrev=12
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_VARIABLE IRIS_BUILD_ID
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+endif ()
+
+if (NOT IRIS_BUILD_ID)
+    set(IRIS_BUILD_ID "${PROJECT_VERSION}-unknown")
+endif ()
+
+message(STATUS "Iris build id: ${IRIS_BUILD_ID}")
+
 if (MSVC)
     add_compile_options("/EHsc")
     # Translation units that switch over Type_reference exceed the default COFF section

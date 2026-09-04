@@ -19,7 +19,16 @@ namespace iris::compiler
     {
         bool output_llvm_ir = false;
         bool is_test_mode = false;
+        bool track_compiler_binary_identity = true;
         Environment_variables environment_variables = {};
+    };
+
+    export struct Build_identity
+    {
+        std::uint64_t parse_identity = 0;
+        std::uint64_t codegen_identity = 0;
+        std::filesystem::file_time_type parse_floor = std::filesystem::file_time_type::min();
+        std::filesystem::file_time_type codegen_floor = std::filesystem::file_time_type::min();
     };
 
     export struct Builder
@@ -37,6 +46,8 @@ namespace iris::compiler
         Environment_variables environment_variables = {};
         std::optional<std::filesystem::path> dependencies_project_path;
         std::pmr::vector<Project_dependency> dependencies;
+        bool track_compiler_binary_identity = true;
+        Build_identity build_identity = {};
     };
 
     export Builder create_builder(
