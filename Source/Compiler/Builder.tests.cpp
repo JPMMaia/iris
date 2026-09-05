@@ -10,7 +10,9 @@ import iris.compiler.target;
 #include <cstdlib>
 #include <filesystem>
 #include <format>
+#include <cstdint>
 #include <fstream>
+#include <iterator>
 #include <span>
 #include <string>
 #include <string_view>
@@ -146,6 +148,82 @@ namespace iris::compiler
         std::string const command = std::format("\"{}\"", test_executable_path.generic_string());
         int const exit_code = std::system(command.c_str());
         CHECK(exit_code == 0);
+    }
+
+    struct Test_run_output
+    {
+        int exit_code = 0;
+        std::string output;
+    };
+
+    // Like test_builder_and_run, but captures the runner's own transcript instead of only looking
+    // at the exit code.
+    Test_run_output test_builder_and_capture_run(
+        std::string_view const project_name,
+        std::pmr::vector<std::filesystem::path> const& artifact_paths,
+        iris::compiler::Target const& target,
+        std::span<std::filesystem::path const> const additional_repository_paths,
+        std::span<std::filesystem::path const> const expected_output_paths,
+        std::string_view const test_executable_name,
+        std::optional<std::string_view> const temporary_directory_name = std::nullopt,
+        std::string_view const test_executable_arguments = {}
+    )
+    {
+        std::filesystem::path const build_directory_path = test_builder(
+            project_name,
+            artifact_paths,
+            target,
+            additional_repository_paths,
+            expected_output_paths,
+            temporary_directory_name,
+            {.is_test_mode = true},
+            {}
+        );
+
+        std::filesystem::path const test_executable_path =
+            build_directory_path / "bin" / get_binary_name(test_executable_name, target);
+
+        REQUIRE(std::filesystem::exists(test_executable_path));
+
+        std::filesystem::path const output_file_path = build_directory_path / "test_run_output.txt";
+
+#if defined(_WIN32)
+        // 'cmd /c' removes the first and last quote character of the whole string, which would
+        // unbalance the quotes around the executable and the redirection target and yield "The
+        // filename, directory name, or volume label syntax is incorrect". An extra outer pair
+        // absorbs that.
+        std::string const command = std::format(
+            "\"\"{}\"{} > \"{}\" 2>&1\"",
+            test_executable_path.generic_string(),
+            test_executable_arguments,
+            output_file_path.generic_string()
+        );
+#else
+        std::string const command = std::format(
+            "\"{}\"{} > \"{}\" 2>&1",
+            test_executable_path.generic_string(),
+            test_executable_arguments,
+            output_file_path.generic_string()
+        );
+#endif
+
+        Test_run_output result;
+        result.exit_code = std::system(command.c_str());
+
+        std::ifstream output_stream{ output_file_path };
+        result.output = std::string{ std::istreambuf_iterator<char>{output_stream}, std::istreambuf_iterator<char>{} };
+
+        return result;
+    }
+
+    static std::uint64_t count_occurrences(std::string_view const haystack, std::string_view const needle)
+    {
+        std::uint64_t count = 0;
+
+        for (std::size_t position = haystack.find(needle); position != std::string_view::npos; position = haystack.find(needle, position + needle.size()))
+            count += 1;
+
+        return count;
     }
 
     void test_compile_commands(
@@ -461,6 +539,136 @@ namespace iris::compiler
         };
 
         test_builder("Test_framework", {"empty_app/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_3", {.is_test_mode = true});
+    }
+
+    TEST_CASE("Test runner always prints a summary line even when everything passes", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("my_library.iris.test", target)
+        };
+
+        Test_run_output const result = test_builder_and_capture_run(
+            "Test_framework",
+            {"my_library/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "my_library.iris.test",
+            "Test_framework_summary"
+        );
+
+        CHECK(result.exit_code == 0);
+        CHECK(result.output.find("1 tests selected, 1 run, 1 passed, 0 failed (0 crashed), 0 not run") != std::string::npos);
+        CHECK(count_occurrences(result.output, "[ RUN      ]") == 1);
+    }
+
+    TEST_CASE("A crashing test is named and the rest of the suite still runs", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework_crash" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("crashrepro.iris.test", target)
+        };
+
+        Test_run_output const result = test_builder_and_capture_run(
+            "Test_framework_crash",
+            {"crashrepro/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "crashrepro.iris.test",
+            "Test_framework_crash_0"
+        );
+
+        // The crashing test is named, rather than being identifiable only by the last RUN line.
+        CHECK(result.output.find("CRASH") != std::string::npos);
+        CHECK(result.output.find("crashrepro.b_crash.test_b_crashes") != std::string::npos);
+
+        // The run continued past the crash: both modules ordered after it were executed.
+        CHECK(result.output.find("crashrepro.c_last.test_c_never_runs_one") != std::string::npos);
+        CHECK(result.output.find("crashrepro.c_last.test_c_never_runs_two") != std::string::npos);
+        CHECK(count_occurrences(result.output, "[ RUN      ]") == 5);
+
+        // The summary reconciles, and the run is reported as complete rather than truncated.
+        CHECK(result.output.find("5 tests selected, 5 run, 4 passed, 1 failed (1 crashed), 0 not run") != std::string::npos);
+        CHECK(result.exit_code != 0);
+    }
+
+    TEST_CASE("Stopping on a crash reports which tests were not executed", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework_crash" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("crashrepro.iris.test", target)
+        };
+
+        Test_run_output const result = test_builder_and_capture_run(
+            "Test_framework_crash",
+            {"crashrepro/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "crashrepro.iris.test",
+            "Test_framework_crash_1",
+            " --stop-on-crash"
+        );
+
+        CHECK(result.output.find("5 tests selected, 3 run, 2 passed, 1 failed (1 crashed), 2 not run") != std::string::npos);
+        CHECK(result.output.find("2 tests were not executed:") != std::string::npos);
+        CHECK(result.output.find("crashrepro.c_last.test_c_never_runs_one") != std::string::npos);
+
+        // Exit code 2 means "the run is incomplete", which the driver reports differently from a
+        // run that completed with failing tests.
+        CHECK(result.exit_code == 2);
+    }
+
+    TEST_CASE("An unmatched test name argument is an error rather than an empty successful run", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("my_library.iris.test", target)
+        };
+
+        Test_run_output const result = test_builder_and_capture_run(
+            "Test_framework",
+            {"my_library/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "my_library.iris.test",
+            "Test_framework_unknown_test_name",
+            " --test-name=my_library.no_such_test"
+        );
+
+        CHECK(result.exit_code == 2);
+        CHECK(result.output.find("no test named 'my_library.no_such_test'") != std::string::npos);
     }
 
     // Guards Plans/bug_decimal64_arithmetic_needs_divti3.md: multiply, divide and narrowing casts
