@@ -1,0 +1,12 @@
+// Deliberately dereferences a null pointer. Guards Plans/bug_test_runner_silent_test_skips.md: a
+// faulting test used to kill the process mid-loop, so every test after it silently never ran.
+// Alphabetical module names pin the link order so the crash lands in the middle of the suite.
+module crashrepro.b_crash;
+
+@test
+function test_b_crashes() -> ()
+{
+    mutable p: *mutable Uint32 = null;
+    p[0] = 7u32;
+    check(p[0] == 7u32);
+}
