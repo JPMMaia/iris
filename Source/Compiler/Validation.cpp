@@ -17,61 +17,6 @@ namespace iris::compiler
         std::pmr::vector<iris::Declaration_instance_storage>& temporary_storage
     );
 
-    iris::compiler::Diagnostic create_error_diagnostic(
-        std::optional<std::filesystem::path> const source_file_path,
-        std::optional<Source_range> const range,
-        std::string_view const message
-    )
-    {
-        return iris::compiler::Diagnostic
-        {
-            .file_path = source_file_path,
-            .range = range.has_value() ? range.value() : Source_range{},
-            .source = Diagnostic_source::Compiler,
-            .severity = Diagnostic_severity::Error,
-            .message = std::pmr::string{message},
-            .related_information = {},
-        };
-    }
-
-    iris::compiler::Diagnostic create_error_diagnostic_with_code(
-        std::optional<std::filesystem::path> const source_file_path,
-        std::optional<Source_range> const range,
-        std::string_view const message,
-        Diagnostic_code const code,
-        Diagnostic_data data
-    )
-    {
-        return iris::compiler::Diagnostic
-        {
-            .file_path = source_file_path,
-            .range = range.has_value() ? range.value() : Source_range{},
-            .source = Diagnostic_source::Compiler,
-            .severity = Diagnostic_severity::Error,
-            .code = code,
-            .message = std::pmr::string{message},
-            .related_information = {},
-            .data = std::move(data),
-        };
-    }
-
-    iris::compiler::Diagnostic create_warning_diagnostic(
-        std::optional<std::filesystem::path> const source_file_path,
-        std::optional<Source_range> const range,
-        std::string_view const message
-    )
-    {
-        return iris::compiler::Diagnostic
-        {
-            .file_path = source_file_path,
-            .range = range.has_value() ? range.value() : Source_range{},
-            .source = Diagnostic_source::Compiler,
-            .severity = Diagnostic_severity::Warning,
-            .message = std::pmr::string{message},
-            .related_information = {},
-        };
-    }
-
     std::optional<std::string_view> find_type_unique_name(
         Declaration_database const& declaration_database,
         iris::Type_reference const& type
@@ -134,6 +79,15 @@ namespace iris::compiler
         if (!first.has_value() || !second.has_value())
             return false;
 
+        // A lambda literal has an anonymous Lambda_type, while the place it is assigned to
+        // usually names a lambda declaration. Compare the signatures rather than the spelling.
+        {
+            std::optional<iris::Lambda_type> const first_lambda_type = resolve_lambda_type(declaration_database, first);
+            std::optional<iris::Lambda_type> const second_lambda_type = resolve_lambda_type(declaration_database, second);
+            if (first_lambda_type.has_value() && second_lambda_type.has_value())
+                return first_lambda_type.value() == second_lambda_type.value();
+        }
+
         std::optional<iris::Type_reference> const first_underlying_type = get_underlying_type(declaration_database, first.value());
         if (!first_underlying_type.has_value())
             return false;
@@ -154,6 +108,13 @@ namespace iris::compiler
             }
         }
         
+        // Optional::<*T> is represented as a bare pointer, so `null` is one of its values.
+        if (is_optional_represented_as_pointer(first_underlying_type.value()) && is_null_pointer_type(second_underlying_type.value()))
+            return true;
+
+        if (is_null_pointer_type(first_underlying_type.value()) && is_optional_represented_as_pointer(second_underlying_type.value()))
+            return true;
+
         if (is_pointer(first_underlying_type.value()) && is_null_pointer_type(second_underlying_type.value()))
             return true;
 
@@ -185,6 +146,15 @@ namespace iris::compiler
         if (!destination.has_value() || !source.has_value())
             return false;
 
+        // A lambda literal has an anonymous Lambda_type, while the destination usually names
+        // a lambda declaration. Compare the signatures rather than the spelling.
+        {
+            std::optional<iris::Lambda_type> const destination_lambda_type = resolve_lambda_type(declaration_database, destination);
+            std::optional<iris::Lambda_type> const source_lambda_type = resolve_lambda_type(declaration_database, source);
+            if (destination_lambda_type.has_value() && source_lambda_type.has_value())
+                return destination_lambda_type.value() == source_lambda_type.value();
+        }
+
         std::optional<iris::Type_reference> const destination_underlying_type = get_underlying_type(declaration_database, destination.value());
         if (!destination_underlying_type.has_value())
             return false;
@@ -205,6 +175,17 @@ namespace iris::compiler
                     return destination_unique_name.value() == source_unique_name.value();
                 }
             }
+        }
+
+        // Optional::<*T> is represented as a bare pointer, so `null` is the empty value and any
+        // pointer that could be assigned to *T is the present one.
+        if (is_optional_represented_as_pointer(destination_type))
+        {
+            if (is_null_pointer_type(source_type))
+                return true;
+
+            if (is_pointer(source_type))
+                return can_assign_type(declaration_database, get_optional_value_type(destination_type), source_type);
         }
 
         if (is_pointer(destination_type))
@@ -706,14 +687,29 @@ namespace iris::compiler
             }
         };
 
-        for (Alias_type_declaration const& declaration : core_module.export_declarations.alias_type_declarations)
+        auto const process_alias_declaration = [&](Alias_type_declaration const& declaration) -> void
         {
             process_declaration_name(declaration.name, declaration.source_location);
+
+            std::pmr::vector<iris::compiler::Diagnostic> declaration_diagnostics = validate_alias_type_declaration(
+                core_module,
+                declaration,
+                declaration_database,
+                temporaries_allocator
+            );
+
+            if (!declaration_diagnostics.empty())
+                diagnostics.insert(diagnostics.end(), declaration_diagnostics.begin(), declaration_diagnostics.end());
+        };
+
+        for (Alias_type_declaration const& declaration : core_module.export_declarations.alias_type_declarations)
+        {
+            process_alias_declaration(declaration);
         }
 
         for (Alias_type_declaration const& declaration : core_module.internal_declarations.alias_type_declarations)
         {
-            process_declaration_name(declaration.name, declaration.source_location);
+            process_alias_declaration(declaration);
         }
 
         for (Enum_declaration const& declaration : core_module.export_declarations.enum_declarations)
@@ -774,6 +770,16 @@ namespace iris::compiler
             
             if (!declaration_diagnostics.empty())
                 diagnostics.insert(diagnostics.end(), declaration_diagnostics.begin(), declaration_diagnostics.end());
+        }
+
+        for (Lambda_declaration const& declaration : core_module.export_declarations.lambda_declarations)
+        {
+            process_declaration_name(declaration.name, declaration.source_location);
+        }
+
+        for (Lambda_declaration const& declaration : core_module.internal_declarations.lambda_declarations)
+        {
+            process_declaration_name(declaration.name, declaration.source_location);
         }
 
         for (Struct_declaration const& declaration : core_module.export_declarations.struct_declarations)
@@ -893,6 +899,66 @@ namespace iris::compiler
         }
 
         sort_diagnostics(diagnostics);
+        return diagnostics;
+    }
+
+    std::pmr::vector<iris::compiler::Diagnostic> validate_alias_type_declaration(
+        iris::Module const& core_module,
+        iris::Alias_type_declaration const& declaration,
+        Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        std::pmr::vector<iris::compiler::Diagnostic> diagnostics{temporaries_allocator};
+
+        if (declaration.type.empty())
+            return diagnostics;
+
+        // Walk the chain by hand so that the alias the cycle closes on can be named.
+        std::pmr::vector<Alias_type_declaration const*> visited{temporaries_allocator};
+        visited.push_back(&declaration);
+
+        std::optional<Type_reference> current = declaration.type[0];
+
+        while (current.has_value() && std::holds_alternative<Custom_type_reference>(current->data))
+        {
+            Custom_type_reference const& custom_type = std::get<Custom_type_reference>(current->data);
+
+            std::optional<Declaration> const next_declaration = find_declaration(
+                declaration_database,
+                custom_type.module_reference.name,
+                custom_type.name
+            );
+
+            if (!next_declaration.has_value())
+                break;
+
+            if (!std::holds_alternative<Alias_type_declaration const*>(next_declaration->data))
+                break;
+
+            Alias_type_declaration const* const next_alias = std::get<Alias_type_declaration const*>(next_declaration->data);
+
+            auto const location = std::find(visited.begin(), visited.end(), next_alias);
+            if (location != visited.end())
+            {
+                diagnostics.push_back(
+                    create_error_diagnostic(
+                        core_module.source_file_path,
+                        create_source_range_from_source_location(declaration.source_location, declaration.name.size()),
+                        std::format("Alias '{}' is defined in terms of itself.", declaration.name)
+                    )
+                );
+                break;
+            }
+
+            visited.push_back(next_alias);
+
+            if (next_alias->type.empty())
+                break;
+
+            current = next_alias->type[0];
+        }
+
         return diagnostics;
     }
 
@@ -1592,6 +1658,310 @@ namespace iris::compiler
         return {};
     }
 
+    std::optional<iris::Type_reference> get_expected_expression_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope const& scope,
+        Declaration_database const& declaration_database,
+        iris::Statement const& statement,
+        std::optional<iris::Type_reference> const expected_statement_type,
+        std::size_t const expression_index
+    );
+
+    // True when the expression at `expression_index` is what a `return` in this statement returns.
+    static bool is_returned_expression(
+        iris::Statement const& statement,
+        std::size_t const expression_index
+    )
+    {
+        for (iris::Expression const& expression : statement.expressions)
+        {
+            if (!std::holds_alternative<iris::Return_expression>(expression.data))
+                continue;
+
+            iris::Return_expression const& return_expression = std::get<iris::Return_expression>(expression.data);
+            if (!return_expression.expression.has_value())
+                continue;
+
+            std::size_t current_index = return_expression.expression->expression_index;
+
+            // Follow parentheses, so that `return (lambda ...)` reads the same as `return lambda ...`.
+            while (current_index < statement.expressions.size())
+            {
+                if (current_index == expression_index)
+                    return true;
+
+                if (!std::holds_alternative<iris::Parenthesis_expression>(statement.expressions[current_index].data))
+                    break;
+
+                current_index = std::get<iris::Parenthesis_expression>(statement.expressions[current_index].data).expression.expression_index;
+            }
+        }
+
+        return false;
+    }
+
+    static std::pmr::vector<std::pmr::string> get_lambda_captures(
+        iris::Lambda_expression const& lambda_expression,
+        Scope const& scope
+    )
+    {
+        if (lambda_expression.captured_variables.has_value())
+            return lambda_expression.captured_variables.value();
+
+        std::pmr::vector<std::pmr::string> enclosing_names;
+        enclosing_names.reserve(scope.variables.size());
+        for (Variable const& variable : scope.variables)
+            enclosing_names.push_back(variable.name);
+
+        iris::Lambda_expression lambda_expression_copy = lambda_expression;
+        compute_lambda_captures(lambda_expression_copy, enclosing_names);
+
+        if (!lambda_expression_copy.captured_variables.has_value())
+            return {};
+
+        return lambda_expression_copy.captured_variables.value();
+    }
+
+    std::pmr::vector<iris::compiler::Diagnostic> validate_lambda_expression(
+        Validate_expression_parameters const& parameters,
+        iris::Lambda_expression const& lambda_expression,
+        std::optional<iris::Source_range> const& source_range
+    )
+    {
+        // The type the literal is being used as, which supplies whatever it left unwritten.
+        std::optional<iris::Type_reference> const expected_type = get_expected_expression_type(
+            parameters.core_module.name,
+            parameters.function_declaration,
+            parameters.scope,
+            parameters.declaration_database,
+            parameters.statement,
+            parameters.expected_statement_type,
+            parameters.expression_index
+        );
+
+        std::optional<iris::Lambda_type> const expected_lambda_type = resolve_lambda_type(
+            parameters.declaration_database,
+            expected_type
+        );
+
+        // A wrong parameter count is reported on its own. It is also the reason inference
+        // fails when there are too many parameters, so it has to be checked first.
+        if (expected_lambda_type.has_value()
+            && expected_lambda_type->input_parameter_types.size() != lambda_expression.parameter_names.size())
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format(
+                        "Lambda parameter count mismatch: expected {} parameters, but {} were provided.",
+                        expected_lambda_type->input_parameter_types.size(),
+                        lambda_expression.parameter_names.size()
+                    )
+                )
+            };
+        }
+
+        // An explicitly written parameter type has to agree with the expected one. Checking it
+        // here reports the parameter itself, rather than letting the mismatch surface later as
+        // an error about whatever the body does with that parameter.
+        if (expected_lambda_type.has_value())
+        {
+            for (std::size_t index = 0; index < lambda_expression.parameter_types.size(); ++index)
+            {
+                if (!lambda_expression.parameter_types[index].has_value())
+                    continue;
+
+                if (index >= expected_lambda_type->input_parameter_types.size())
+                    break;
+
+                iris::Type_reference const& written_type = lambda_expression.parameter_types[index].value();
+                iris::Type_reference const& expected_parameter_type = expected_lambda_type->input_parameter_types[index];
+
+                if (are_compatible_types(parameters.declaration_database, expected_parameter_type, written_type))
+                    continue;
+
+                std::pmr::string const written_type_name = iris::format_type_reference(parameters.core_module.dependencies, written_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, expected_parameter_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format(
+                            "Lambda parameter '{}' type mismatch: expected '{}', but got '{}'.",
+                            lambda_expression.parameter_names[index],
+                            expected_type_name,
+                            written_type_name
+                        )
+                    )
+                };
+            }
+        }
+
+        // A lambda literal may leave its parameter and return types unwritten, in which case
+        // they come from the type the literal is being used as. With neither source of
+        // information there is nothing to resolve the signature from.
+        std::optional<Type_info> const& lambda_type_info = parameters.expression_types[parameters.expression_index];
+        if (!lambda_type_info.has_value())
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    "Cannot infer lambda type — no expected type available."
+                )
+            };
+        }
+
+        std::optional<iris::Lambda_type> const lambda_type = resolve_lambda_type(
+            parameters.declaration_database,
+            lambda_type_info->type
+        );
+        if (!lambda_type.has_value())
+            return {};
+
+        // The captured values live in an environment allocated in the frame of the function the
+        // lambda was written in, and the lambda holds a pointer to it. Returning the lambda would
+        // outlive that frame and leave the pointer dangling, so it is rejected here rather than
+        // miscompiled. A lambda that captures nothing carries a null environment and is free to
+        // travel anywhere.
+        if (is_returned_expression(parameters.statement, parameters.expression_index))
+        {
+            std::pmr::vector<std::pmr::string> const captured_variables = get_lambda_captures(lambda_expression, parameters.scope);
+
+            if (!captured_variables.empty())
+            {
+                std::string captured_names;
+                for (std::size_t index = 0; index < captured_variables.size(); ++index)
+                {
+                    if (index > 0)
+                        captured_names += "', '";
+
+                    captured_names += std::string_view{captured_variables[index]};
+                }
+
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format(
+                            "Lambda captures '{}' from the enclosing function and cannot be returned from it.",
+                            captured_names
+                        )
+                    )
+                };
+            }
+        }
+
+        // Validate the body itself, with the lambda parameters in scope. Without this, names
+        // used only inside the body are never checked.
+        Scope body_scope = parameters.scope;
+        for (std::size_t index = 0; index < lambda_expression.parameter_names.size(); ++index)
+        {
+            if (index >= lambda_type->input_parameter_types.size())
+                break;
+
+            body_scope.variables.push_back(
+                create_variable(
+                    lambda_expression.parameter_names[index],
+                    lambda_type->input_parameter_types[index],
+                    false,
+                    false,
+                    std::optional<iris::Source_position>{std::nullopt}
+                )
+            );
+        }
+
+        std::optional<iris::Type_reference> const expected_return_type_optional =
+            !lambda_type->output_parameter_types.empty() ?
+            std::optional<iris::Type_reference>{lambda_type->output_parameter_types[0]} :
+            std::optional<iris::Type_reference>{std::nullopt};
+
+        // A `return` inside the body returns from the lambda, not from the enclosing function,
+        // so the body is validated against a declaration standing in for the lambda itself.
+        iris::Function_declaration const lambda_function_declaration
+        {
+            .name = "lambda",
+            .type = iris::Function_type
+            {
+                .input_parameter_types = lambda_type->input_parameter_types,
+                .output_parameter_types = lambda_type->output_parameter_types,
+                .is_variadic = false,
+            },
+            .input_parameter_names = lambda_expression.parameter_names,
+        };
+
+        // A block body is a sequence of statements rather than a value, so only an inline
+        // expression body is checked against the return type here.
+        bool const has_block_body =
+            !lambda_expression.body.expressions.empty() &&
+            std::holds_alternative<iris::Block_expression>(lambda_expression.body.expressions[0].data);
+
+        {
+            std::pmr::vector<iris::compiler::Diagnostic> body_diagnostics = validate_statement(
+                parameters.core_module,
+                &lambda_function_declaration,
+                body_scope,
+                lambda_expression.body,
+                has_block_body ? std::optional<iris::Type_reference>{std::nullopt} : expected_return_type_optional,
+                parameters.declaration_database,
+                parameters.temporaries_allocator
+            );
+            if (!body_diagnostics.empty())
+                return body_diagnostics;
+        }
+
+        if (has_block_body)
+            return {};
+
+        if (!expected_return_type_optional.has_value())
+            return {};
+
+        iris::Type_reference const& expected_return_type = expected_return_type_optional.value();
+
+        // Compute the body's own type rather than passing the expected one in, so that a
+        // mismatch is not masked by the body adopting the type it is being checked against.
+        std::optional<iris::Type_reference> const body_type = get_expression_type(
+            parameters.core_module.name,
+            parameters.function_declaration,
+            body_scope,
+            lambda_expression.body,
+            std::nullopt,
+            parameters.declaration_database
+        );
+
+        // A block body returns through `return` statements, which are validated separately;
+        // only an inline expression body is compared here.
+        if (!body_type.has_value())
+            return {};
+
+        // The body value is assigned into the return slot, so the assignment rules apply
+        // rather than strict type equality.
+        if (!can_assign_type(parameters.declaration_database, expected_return_type, body_type))
+        {
+            std::pmr::string const body_type_name = iris::format_type_reference(parameters.core_module.dependencies, body_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, expected_return_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format("Type mismatch: expected '{}', but got '{}'.", expected_type_name, body_type_name)
+                )
+            };
+        }
+
+        return {};
+    }
+
+
     std::pmr::vector<iris::compiler::Diagnostic> validate_expression(
         Validate_expression_parameters const& parameters
     )
@@ -1662,6 +2032,11 @@ namespace iris::compiler
         {
             iris::Instantiate_expression const& value = std::get<iris::Instantiate_expression>(expression.data);
             return validate_instantiate_expression(parameters, value, expression.source_range);
+        }
+        else if (std::holds_alternative<iris::Lambda_expression>(expression.data))
+        {
+            iris::Lambda_expression const& value = std::get<iris::Lambda_expression>(expression.data);
+            return validate_lambda_expression(parameters, value, expression.source_range);
         }
         else if (std::holds_alternative<iris::Reflection_expression>(expression.data))
         {
@@ -1794,6 +2169,26 @@ namespace iris::compiler
             if (std::holds_alternative<iris::Array_slice_type>(left_hand_side_type->data))
             {
                 if (access_expression.member_name != "data" && access_expression.member_name != "length")
+                {
+                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format(
+                                "Member '{}' does not exist in the type '{}'.",
+                                access_expression.member_name,
+                                type_full_name
+                            )
+                        )
+                    };
+                }
+            }
+            else if (std::holds_alternative<iris::Optional_type>(left_hand_side_type->data))
+            {
+                if (access_expression.member_name != "value" && access_expression.member_name != "has_value")
                 {
                     std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
@@ -2322,6 +2717,10 @@ namespace iris::compiler
                 {
                     return std::pair<std::string_view, iris::Instance_call_expression>{"create_stack_array_uninitialized", instance_call_expression};
                 }
+                else if (variable_expression.name == "create_optional")
+                {
+                    return std::pair<std::string_view, iris::Instance_call_expression>{"create_optional", instance_call_expression};
+                }
                 else if (variable_expression.name == "reinterpret_as")
                 {
                     return std::pair<std::string_view, iris::Instance_call_expression>{"reinterpret_as", instance_call_expression};
@@ -2407,6 +2806,21 @@ namespace iris::compiler
         if (is_function_pointer(callable_type.value()))
             return std::get<iris::Function_pointer_type>(callable_type->data);
 
+        if (std::optional<iris::Lambda_type> const lambda_type = resolve_lambda_type(parameters.declaration_database, callable_type); lambda_type.has_value())
+        {
+            return iris::Function_pointer_type
+            {
+                .type = iris::Function_type
+                {
+                    .input_parameter_types = lambda_type->input_parameter_types,
+                    .output_parameter_types = lambda_type->output_parameter_types,
+                    .is_variadic = false,
+                },
+                .input_parameter_names = {},
+                .output_parameter_names = {},
+            };
+        }
+
         if (is_builtin_type_reference(callable_type.value()))
         {
             iris::Builtin_type_reference const& builtin_type_reference = std::get<iris::Builtin_type_reference>(callable_type->data);
@@ -2424,6 +2838,33 @@ namespace iris::compiler
                     .type = std::move(function_type),
                     .input_parameter_names = { "condition" },
                     .output_parameter_names = {}
+                };
+            }
+            else if (builtin_type_reference.value == "create_optional")
+            {
+                std::pmr::vector<iris::Type_reference> value_type;
+
+                if (expression.arguments.size() > 0)
+                {
+                    std::optional<Type_info> const first_argument_type_info = get_expression_type_info(parameters.core_module.name, nullptr, parameters.scope, parameters.statement, parameters.statement.expressions[expression.arguments[0].expression_index], std::nullopt, parameters.declaration_database);
+                    if (first_argument_type_info.has_value())
+                        value_type.push_back(first_argument_type_info->type);
+                }
+
+                iris::Function_type function_type
+                {
+                    .input_parameter_types = value_type,
+                    .output_parameter_types = {
+                        create_optional_type_reference(value_type)
+                    },
+                    .is_variadic = false,
+                };
+
+                return iris::Function_pointer_type
+                {
+                    .type = std::move(function_type),
+                    .input_parameter_names = { "value" },
+                    .output_parameter_names = { "optional" }
                 };
             }
             else if (builtin_type_reference.value == "create_array_slice_from_pointer")
@@ -3386,16 +3827,19 @@ namespace iris::compiler
         std::pmr::vector<iris::Declaration_instance_storage>& temporary_storage
     )
     {
-        if (std::holds_alternative<iris::Array_slice_type>(type_to_instantiate.data))
         {
-            iris::Array_slice_type const& array_slice = std::get<iris::Array_slice_type>(type_to_instantiate.data);
-            temporary_storage.push_back(
-                Declaration_instance_storage
-                {
-                    .data = create_array_slice_type_struct_declaration(array_slice.element_type)
-                }
-            );
-            return Declaration{ .data = &std::get<iris::Struct_declaration>(temporary_storage.back().data), .module_name = "iris.builtin", .is_export = true };
+            std::optional<iris::Struct_declaration> builtin_struct_declaration = iris::try_get_builtin_struct_declaration(type_to_instantiate);
+
+            if (builtin_struct_declaration.has_value())
+            {
+                temporary_storage.push_back(
+                    Declaration_instance_storage
+                    {
+                        .data = std::move(builtin_struct_declaration.value())
+                    }
+                );
+                return Declaration{ .data = &std::get<iris::Struct_declaration>(temporary_storage.back().data), .module_name = "iris.builtin", .is_export = true };
+            }
         }
 
         if (std::holds_alternative<iris::Soa_array_type>(type_to_instantiate.data))
@@ -3525,7 +3969,7 @@ namespace iris::compiler
             };
         }
 
-        if (is_primitive_type(type_to_instantiate.value()) || is_constant_array_type_reference(type_to_instantiate.value()))
+        if (is_primitive_type(type_to_instantiate.value()) || is_constant_array_type_reference(type_to_instantiate.value()) || is_optional_represented_as_pointer(type_to_instantiate.value()))
         {
             if (!expression.members.empty())
             {
@@ -4442,6 +4886,7 @@ namespace iris::compiler
         if (
             std::holds_alternative<iris::Instantiate_expression>(right_hand_side.data) &&
             !std::holds_alternative<iris::Array_slice_type>(type.data) &&
+            !std::holds_alternative<iris::Optional_type>(type.data) &&
             !std::holds_alternative<iris::Soa_array_type>(type.data) &&
             !std::holds_alternative<iris::Soa_array_view_type>(type.data) &&
             !std::holds_alternative<iris::Constant_array_type>(type.data) &&
@@ -4613,7 +5058,11 @@ namespace iris::compiler
         return {};
     }
 
-    static std::optional<iris::Type_reference> get_expected_expression_type(
+    std::optional<iris::Type_reference> get_expected_expression_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope const& scope,
+        Declaration_database const& declaration_database,
         iris::Statement const& statement,
         std::optional<iris::Type_reference> const expected_statement_type,
         std::size_t const expression_index
@@ -4632,6 +5081,56 @@ namespace iris::compiler
             {
                 iris::Variable_declaration_with_type_expression const& data = std::get<iris::Variable_declaration_with_type_expression>(expression.data);
                 return iris::get_variable_declaration_with_type_expression_type(statement, data);
+            }
+        }
+
+        if (!std::holds_alternative<iris::Lambda_expression>(statement.expressions[expression_index].data))
+            return std::nullopt;
+
+        for (iris::Expression const& expression : statement.expressions)
+        {
+            // var x: T = <lambda>: the declared type. The right hand side is not always at
+            // index 1, so the rule above does not always reach it.
+            if (std::holds_alternative<iris::Variable_declaration_with_type_expression>(expression.data))
+            {
+                iris::Variable_declaration_with_type_expression const& data = std::get<iris::Variable_declaration_with_type_expression>(expression.data);
+                if (data.right_hand_side.expression_index == expression_index)
+                    return iris::get_variable_declaration_with_type_expression_type(statement, data);
+            }
+
+            // return <lambda>: the enclosing function's first output type.
+            if (function_declaration != nullptr && std::holds_alternative<iris::Return_expression>(expression.data))
+            {
+                iris::Return_expression const& data = std::get<iris::Return_expression>(expression.data);
+                if (data.expression.has_value()
+                    && data.expression->expression_index == expression_index
+                    && !function_declaration->type.output_parameter_types.empty())
+                {
+                    return function_declaration->type.output_parameter_types[0];
+                }
+            }
+
+            // f(..., <lambda>, ...): the matching input parameter type of the callee.
+            if (std::holds_alternative<iris::Call_expression>(expression.data))
+            {
+                iris::Call_expression const& data = std::get<iris::Call_expression>(expression.data);
+
+                for (std::size_t argument_index = 0; argument_index < data.arguments.size(); ++argument_index)
+                {
+                    if (data.arguments[argument_index].expression_index != expression_index)
+                        continue;
+
+                    std::optional<iris::Function_type> const function_type = get_function_type_to_call(
+                        module_name,
+                        scope,
+                        statement,
+                        statement.expressions[data.expression.expression_index],
+                        declaration_database
+                    );
+
+                    if (function_type.has_value() && argument_index < function_type->input_parameter_types.size())
+                        return function_type->input_parameter_types[argument_index];
+                }
             }
         }
 
@@ -4654,7 +5153,15 @@ namespace iris::compiler
         for (std::size_t expression_index = 0; expression_index < statement.expressions.size(); ++expression_index)
         {
             iris::Expression const& expression = statement.expressions[expression_index];
-            std::optional<iris::Type_reference> const expected_expression_type = get_expected_expression_type(statement, expected_statement_type, expression_index);
+            std::optional<iris::Type_reference> const expected_expression_type = get_expected_expression_type(
+                module_name,
+                function_declaration,
+                scope,
+                declaration_database,
+                statement,
+                expected_statement_type,
+                expression_index
+            );
             
             expression_types[expression_index] = get_expression_type_info(
                 module_name,

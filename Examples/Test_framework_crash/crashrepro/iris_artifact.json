@@ -1,0 +1,13 @@
+{
+    "name": "crashrepro",
+    "version": "0.1.0",
+    "type": "library",
+    "sources": [
+        {
+            "type": "iris",
+            "include": [
+                "./**/*.iris"
+            ]
+        }
+    ]
+}

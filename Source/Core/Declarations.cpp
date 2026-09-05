@@ -86,6 +86,7 @@ namespace iris
         std::span<iris::Enum_declaration const> const enum_declarations,
         std::span<iris::Forward_declaration const> forward_declarations,
         std::span<iris::Global_variable_declaration const> global_variable_declarations,
+        std::span<iris::Lambda_declaration const> const lambda_declarations,
         std::span<iris::Struct_declaration const> const struct_declarations,
         std::span<iris::Union_declaration const> const union_declarations,
         std::span<iris::Function_declaration const> const function_declarations,
@@ -125,6 +126,11 @@ namespace iris
             map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
         }
 
+        for (Lambda_declaration const& declaration : lambda_declarations)
+        {
+            map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
+        }
+
         for (Struct_declaration const& declaration : struct_declarations)
         {
             map.insert_or_assign(declaration.name, Declaration{ .data = &declaration, .module_name = std::pmr::string{ module_name }, .is_export = are_export});
@@ -156,6 +162,7 @@ namespace iris
             declarations.enum_declarations,
             declarations.forward_declarations,
             declarations.global_variable_declarations,
+            declarations.lambda_declarations,
             declarations.struct_declarations,
             declarations.union_declarations,
             declarations.function_declarations,
@@ -385,9 +392,48 @@ namespace iris
         return std::nullopt;
     }
 
-    std::optional<Type_reference> get_underlying_type(
+    namespace
+    {
+        struct Alias_visit_frame
+        {
+            Alias_type_declaration const* alias = nullptr;
+            Alias_visit_frame const* previous = nullptr;
+        };
+
+        bool was_alias_visited(Alias_visit_frame const* frame, Alias_type_declaration const* const alias)
+        {
+            for (; frame != nullptr; frame = frame->previous)
+            {
+                if (frame->alias == alias)
+                    return true;
+            }
+
+            return false;
+        }
+    }
+
+    static std::optional<Type_reference> get_underlying_type(
         Declaration_database const& declaration_database,
-        Type_reference const& type_reference
+        Type_reference const& type_reference,
+        Alias_visit_frame const* const visited
+    );
+
+    static std::optional<Type_reference> get_underlying_type(
+        Declaration_database const& declaration_database,
+        Alias_type_declaration const& declaration,
+        Alias_visit_frame const* const visited
+    )
+    {
+        if (declaration.type.empty())
+            return std::nullopt;
+
+        return get_underlying_type(declaration_database, declaration.type[0], visited);
+    }
+
+    static std::optional<Type_reference> get_underlying_type(
+        Declaration_database const& declaration_database,
+        Type_reference const& type_reference,
+        Alias_visit_frame const* const visited
     )
     {
         if (std::holds_alternative<Custom_type_reference>(type_reference.data))
@@ -401,7 +447,13 @@ namespace iris
             {
                 Alias_type_declaration const* alias_declaration = std::get<Alias_type_declaration const*>(declaration->data);
 
-                std::optional<Type_reference> alias_type = get_underlying_type(declaration_database, *alias_declaration);
+                // A cycle has no underlying type. Validation reports it against the alias itself.
+                if (was_alias_visited(visited, alias_declaration))
+                    return std::nullopt;
+
+                Alias_visit_frame const frame{ .alias = alias_declaration, .previous = visited };
+
+                std::optional<Type_reference> alias_type = get_underlying_type(declaration_database, *alias_declaration, &frame);
                 return alias_type;
             }
             else
@@ -415,7 +467,7 @@ namespace iris
             if (data.element_type.empty())
                 return type_reference;
 
-            std::optional<Type_reference> const underlying_element_type = get_underlying_type(declaration_database, data.element_type[0]);
+            std::optional<Type_reference> const underlying_element_type = get_underlying_type(declaration_database, data.element_type[0], visited);
             if (!underlying_element_type.has_value())
                 return create_pointer_type_type_reference({}, data.is_mutable);
 
@@ -429,13 +481,21 @@ namespace iris
 
     std::optional<Type_reference> get_underlying_type(
         Declaration_database const& declaration_database,
+        Type_reference const& type_reference
+    )
+    {
+        return get_underlying_type(declaration_database, type_reference, nullptr);
+    }
+
+    std::optional<Type_reference> get_underlying_type(
+        Declaration_database const& declaration_database,
         std::optional<Type_reference> const& type_reference
     )
     {
         if (!type_reference.has_value())
             return std::nullopt;
 
-        return get_underlying_type(declaration_database, type_reference.value());
+        return get_underlying_type(declaration_database, type_reference.value(), nullptr);
     }
 
     std::optional<Type_reference> get_underlying_type(
@@ -443,37 +503,22 @@ namespace iris
         Alias_type_declaration const& declaration
     )
     {
-        if (declaration.type.empty())
+        Alias_visit_frame const frame{ .alias = &declaration, .previous = nullptr };
+        return get_underlying_type(declaration_database, declaration, &frame);
+    }
+
+    static std::optional<Declaration> get_underlying_declaration(
+        Declaration_database const& declaration_database,
+        Alias_type_declaration const& declaration,
+        Alias_visit_frame const* const visited
+    )
+    {
+        if (was_alias_visited(visited, &declaration))
             return std::nullopt;
 
-        return get_underlying_type(declaration_database, declaration.type[0]);
-    }
+        Alias_visit_frame const frame{ .alias = &declaration, .previous = visited };
 
-    std::optional<Declaration> get_underlying_declaration(
-        Declaration_database const& declaration_database,
-        Declaration const& declaration
-    )
-    {
-        if (std::holds_alternative<Alias_type_declaration const*>(declaration.data))
-        {
-            Alias_type_declaration const& alias_type_declaration = *std::get<Alias_type_declaration const*>(declaration.data);
-            return get_underlying_declaration(
-                declaration_database,
-                alias_type_declaration
-            );
-        }
-        else
-        {
-            return declaration;
-        }
-    }
-
-    std::optional<Declaration> get_underlying_declaration(
-        Declaration_database const& declaration_database,
-        Alias_type_declaration const& declaration
-    )
-    {
-        std::optional<Type_reference> const type_reference = get_underlying_type(declaration_database, declaration);
+        std::optional<Type_reference> const type_reference = get_underlying_type(declaration_database, declaration, &frame);
         if (type_reference.has_value())
         {
             if (std::holds_alternative<Custom_type_reference>(type_reference.value().data))
@@ -488,7 +533,7 @@ namespace iris
                     if (std::holds_alternative<Alias_type_declaration const*>(underlying_declaration_value.data))
                     {
                         Alias_type_declaration const* underlying_alias = std::get<Alias_type_declaration const*>(underlying_declaration_value.data);
-                        return get_underlying_declaration(declaration_database, *underlying_alias);
+                        return get_underlying_declaration(declaration_database, *underlying_alias, &frame);
                     }
                     else
                     {
@@ -504,6 +549,34 @@ namespace iris
         }
 
         return std::nullopt;
+    }
+
+    std::optional<Declaration> get_underlying_declaration(
+        Declaration_database const& declaration_database,
+        Declaration const& declaration
+    )
+    {
+        if (std::holds_alternative<Alias_type_declaration const*>(declaration.data))
+        {
+            Alias_type_declaration const& alias_type_declaration = *std::get<Alias_type_declaration const*>(declaration.data);
+            return get_underlying_declaration(
+                declaration_database,
+                alias_type_declaration,
+                nullptr
+            );
+        }
+        else
+        {
+            return declaration;
+        }
+    }
+
+    std::optional<Declaration> get_underlying_declaration(
+        Declaration_database const& declaration_database,
+        Alias_type_declaration const& declaration
+    )
+    {
+        return get_underlying_declaration(declaration_database, declaration, nullptr);
     }
 
     Declaration_instance_storage instantiate_type_instance(

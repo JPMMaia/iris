@@ -32,6 +32,7 @@ namespace iris::compiler
         std::pmr::string header;
         std::pmr::vector<std::pmr::string> dependencies;
         std::optional<bool> allow_errors;
+        std::optional<bool> wrap_pointers_as_optional;
     };
 
     export struct Export_c_header_source_group
@@ -45,6 +46,7 @@ namespace iris::compiler
         std::pmr::vector<std::filesystem::path> search_paths;
         std::pmr::vector<std::pmr::string> public_prefixes;
         std::pmr::vector<std::pmr::string> remove_prefixes;
+        std::optional<bool> wrap_pointers_as_optional;
     };
 
 

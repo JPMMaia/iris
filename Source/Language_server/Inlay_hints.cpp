@@ -10,14 +10,132 @@ module;
 module iris.language_server.inlay_hints;
 
 import iris.compiler.analysis;
+import iris.compiler.validation;
 import iris.core;
 import iris.core.declarations;
 import iris.core.formatter;
 import iris.core.types;
 import iris.language_server.core;
+import iris.language_server.location;
 
 namespace iris::language_server
 {
+    // A lambda literal writes the types it wants to leave out: a parameter without an annotation and
+    // an omitted return type both get a hint showing what they were resolved to.
+    static void add_lambda_inlay_hints(
+        std::pmr::vector<lsp::InlayHint>& output,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Declaration_database const& declaration_database,
+        iris::compiler::Scope const& scope,
+        iris::Statement const& statement,
+        std::size_t const expression_index,
+        iris::Lambda_expression const& lambda_expression,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        std::optional<iris::Type_reference> const expected_type = iris::compiler::get_expected_expression_type(
+            core_module.name,
+            &function_declaration,
+            scope,
+            declaration_database,
+            statement,
+            std::nullopt,
+            expression_index
+        );
+
+        std::optional<iris::compiler::Type_info> const type_info = iris::compiler::get_expression_type_info(
+            core_module.name,
+            &function_declaration,
+            scope,
+            statement,
+            statement.expressions[expression_index],
+            expected_type,
+            declaration_database
+        );
+        if (!type_info.has_value())
+            return;
+
+        std::optional<iris::Lambda_type> const lambda_type = iris::compiler::resolve_lambda_type(declaration_database, type_info->type);
+        if (!lambda_type.has_value())
+            return;
+
+        if (lambda_type->input_parameter_types.size() != lambda_expression.parameter_names.size())
+            return;
+
+        if (lambda_expression.parameter_source_positions.size() == lambda_expression.parameter_names.size())
+        {
+            for (std::size_t index = 0; index < lambda_expression.parameter_names.size(); ++index)
+            {
+                if (index < lambda_expression.parameter_types.size() && lambda_expression.parameter_types[index].has_value())
+                    continue;
+
+                iris::Source_position const& parameter_position = lambda_expression.parameter_source_positions[index];
+
+                lsp::Position const position
+                {
+                    .line = parameter_position.line - 1,
+                    .character = parameter_position.column - 1 + static_cast<std::uint32_t>(lambda_expression.parameter_names[index].size()),
+                };
+
+                std::vector<lsp::InlayHintLabelPart> label = create_inlay_hint_variable_type_label(
+                    core_module,
+                    declaration_database,
+                    lambda_type->input_parameter_types[index],
+                    temporaries_allocator
+                );
+
+                output.push_back(
+                    lsp::InlayHint
+                    {
+                        .position = position,
+                        .label = std::move(label),
+                        .kind = lsp::InlayHintKind::Type,
+                        .textEdits = std::nullopt,
+                        .tooltip = std::nullopt,
+                    }
+                );
+            }
+        }
+
+        if (lambda_expression.return_type.has_value() ||
+            !lambda_expression.input_parameters_source_range.has_value() ||
+            lambda_type->output_parameter_types.size() != 1)
+        {
+            return;
+        }
+
+        iris::Source_position const& parameters_end = lambda_expression.input_parameters_source_range->end;
+
+        lsp::Position const position
+        {
+            .line = parameters_end.line - 1,
+            .character = parameters_end.column - 1,
+        };
+
+        std::vector<lsp::InlayHintLabelPart> label;
+        label.push_back(lsp::InlayHintLabelPart{ .value = "-> " });
+
+        create_inlay_hint_variable_type_label_aux(
+            label,
+            core_module,
+            declaration_database,
+            lambda_type->output_parameter_types[0],
+            temporaries_allocator
+        );
+
+        output.push_back(
+            lsp::InlayHint
+            {
+                .position = position,
+                .label = std::move(label),
+                .kind = lsp::InlayHintKind::Type,
+                .textEdits = std::nullopt,
+                .tooltip = std::nullopt,
+            }
+        );
+    }
+
     std::pmr::vector<lsp::InlayHint> create_function_inlay_hints(
         iris::Module const& core_module,
         iris::Function_declaration const& function_declaration,
@@ -45,6 +163,24 @@ namespace iris::language_server
         {
             if (statement.expressions.empty())
                 return;
+
+            for (std::size_t index = 0; index < statement.expressions.size(); ++index)
+            {
+                if (!std::holds_alternative<iris::Lambda_expression>(statement.expressions[index].data))
+                    continue;
+
+                add_lambda_inlay_hints(
+                    output,
+                    core_module,
+                    function_declaration,
+                    declaration_database,
+                    scope,
+                    statement,
+                    index,
+                    std::get<iris::Lambda_expression>(statement.expressions[index].data),
+                    temporaries_allocator
+                );
+            }
 
             iris::Expression const& expression = statement.expressions[0];
 
@@ -98,12 +234,12 @@ namespace iris::language_server
             }
         };
 
-        iris::compiler::visit_statements_using_scope(
-            core_module.name,
+        visit_statements_using_scope_including_lambda_bodies(
+            declaration_database,
+            core_module,
             &function_declaration,
             scope,
             function_definition.statements,
-            declaration_database,
             process_statement
         );
 

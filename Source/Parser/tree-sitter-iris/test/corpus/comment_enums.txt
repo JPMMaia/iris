@@ -22,19 +22,14 @@ enum My_enum
     (Module_name
       (Identifier_with_dots
         (Identifier))))
+  (Comment)
+  (Comment)
   (Declaration
-    (Comment)
     (Enum
       (Enum_name
         (Identifier))
       (Enum_values
-        (Enum_value
-          (Comment)
-          (Enum_value_name
-            (Identifier))
-          (Generic_expression
-            (Expression_constant
-              (Number))))
+        (Comment)
         (Enum_value
           (Enum_value_name
             (Identifier))
@@ -42,7 +37,13 @@ enum My_enum
             (Expression_constant
               (Number))))
         (Enum_value
-          (Comment)
+          (Enum_value_name
+            (Identifier))
+          (Generic_expression
+            (Expression_constant
+              (Number))))
+        (Comment)
+        (Enum_value
           (Enum_value_name
             (Identifier))
           (Generic_expression

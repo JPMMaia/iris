@@ -732,6 +732,47 @@ namespace iris::compiler
         };
     }
 
+    // Collects the synthetic struct declaration of every distinct Optional::<T> used in a module.
+    // Optionals of pointers are skipped: they are represented as the bare pointer and have no record.
+    std::pmr::vector<Struct_declaration> collect_optional_struct_declarations(
+        Module const& core_module
+    )
+    {
+        std::pmr::vector<Struct_declaration> result;
+
+        visit_type_references(
+            core_module,
+            [&](std::string_view const, Type_reference const& type_reference) -> bool
+            {
+                visit_type_references_recursively(
+                    type_reference,
+                    [&](Type_reference const& nested_type_reference) -> bool
+                    {
+                        std::optional<Struct_declaration> struct_declaration = iris::try_get_builtin_struct_declaration(nested_type_reference);
+
+                        if (struct_declaration.has_value() && std::holds_alternative<Optional_type>(nested_type_reference.data))
+                        {
+                            bool const already_collected = std::any_of(
+                                result.begin(),
+                                result.end(),
+                                [&](Struct_declaration const& existing) { return existing.name == struct_declaration->name; }
+                            );
+
+                            if (!already_collected)
+                                result.push_back(std::move(struct_declaration.value()));
+                        }
+
+                        return false;
+                    }
+                );
+
+                return false;
+            }
+        );
+
+        return result;
+    }
+
     void add_module_types(
         Type_database& type_database,
         llvm::LLVMContext& llvm_context,
@@ -742,11 +783,22 @@ namespace iris::compiler
     {
         LLVM_type_map& llvm_type_map = type_database.name_to_llvm_type[core_module.name];
 
+        {
+            std::pmr::vector<Struct_declaration> const optional_struct_declarations = collect_optional_struct_declarations(core_module);
+            LLVM_type_map& builtin_llvm_type_map = type_database.name_to_llvm_type["iris.builtin"];
+            add_struct_declarations(clang_module_data, "iris.builtin", optional_struct_declarations, builtin_llvm_type_map);
+        }
+
         add_enum_types(llvm_context, core_module.export_declarations.enum_declarations, llvm_type_map);
         add_enum_types(llvm_context, core_module.internal_declarations.enum_declarations, llvm_type_map);
 
         add_struct_declarations(clang_module_data, core_module.name, core_module.export_declarations.struct_declarations, llvm_type_map);
         add_struct_declarations(clang_module_data, core_module.name, core_module.internal_declarations.struct_declarations, llvm_type_map);
+
+        std::pmr::vector<Struct_declaration> const export_lambda_structs = create_lambda_struct_declarations(core_module.export_declarations.lambda_declarations);
+        std::pmr::vector<Struct_declaration> const internal_lambda_structs = create_lambda_struct_declarations(core_module.internal_declarations.lambda_declarations);
+        add_struct_declarations(clang_module_data, core_module.name, export_lambda_structs, llvm_type_map);
+        add_struct_declarations(clang_module_data, core_module.name, internal_lambda_structs, llvm_type_map);
         for (iris::Struct_declaration const& struct_declaration : core_module.instanced_declarations.struct_declarations)
         {
             std::optional<iris::Custom_type_reference> const instance_custom_type_reference = unmangle_type_instance_name(struct_declaration.name);
@@ -856,6 +908,13 @@ namespace iris::compiler
 
         set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module, core_module.export_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
         set_union_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, core_module, core_module.internal_declarations.union_declarations, debug_type_database, llvm_type_map, llvm_debug_type_map);
+
+        std::pmr::vector<Struct_declaration> const export_lambda_structs = create_lambda_struct_declarations(core_module.export_declarations.lambda_declarations);
+        std::pmr::vector<Struct_declaration> const internal_lambda_structs = create_lambda_struct_declarations(core_module.internal_declarations.lambda_declarations);
+        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, export_lambda_structs, llvm_debug_type_map);
+        add_struct_debug_declarations(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, requested_debug_types, core_module, internal_lambda_structs, llvm_debug_type_map);
+        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, clang_module_data, core_module, export_lambda_structs, debug_type_database, llvm_type_map, llvm_debug_type_map);
+        set_struct_debug_definitions(llvm_debug_builder, llvm_debug_scope, llvm_debug_file, llvm_debug_files, llvm_data_layout, requested_debug_types, clang_module_data, core_module, internal_lambda_structs, debug_type_database, llvm_type_map, llvm_debug_type_map);
     }
 
     llvm::DIType* create_void_type(
@@ -865,6 +924,71 @@ namespace iris::compiler
         return llvm_debug_builder.createBasicType("void", 0, llvm::dwarf::DW_ATE_unsigned);
     }
     
+
+    llvm::DIType* optional_type_to_llvm_debug_type(
+        llvm::DIBuilder& llvm_debug_builder,
+        llvm::DIScope& llvm_debug_scope,
+        llvm::DataLayout const& llvm_data_layout,
+        iris::Module const& core_module,
+        Optional_type const& type,
+        Debug_type_database const& debug_type_database
+    )
+    {
+        llvm::DIType* const value_type =
+            !type.value_type.empty() ?
+            type_reference_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, type.value_type[0], debug_type_database) :
+            llvm_debug_builder.createUnspecifiedParameter();
+
+        // Optional::<*T> is the bare pointer, so it debugs as the pointer.
+        if (!type.value_type.empty() && iris::is_pointer(type.value_type[0]))
+            return value_type;
+
+        llvm::DIType* const bool_type = llvm_debug_builder.createBasicType("Bool", 8, llvm::dwarf::DW_ATE_boolean);
+
+        std::uint64_t const value_size_in_bits = value_type->getSizeInBits();
+        std::uint32_t const value_alignment_in_bits = value_type->getAlignInBits();
+        std::uint32_t const alignment_in_bits = std::max(value_alignment_in_bits, 8u);
+        std::uint64_t const has_value_offset_in_bits = ((value_size_in_bits + 7) / 8) * 8;
+        std::uint64_t const size_in_bits = ((has_value_offset_in_bits + 8 + alignment_in_bits - 1) / alignment_in_bits) * alignment_in_bits;
+
+        std::array<llvm::Metadata*, 2> const elements
+        {
+            llvm_debug_builder.createMemberType(
+                &llvm_debug_scope,
+                "value",
+                nullptr,
+                0,
+                value_size_in_bits,
+                value_alignment_in_bits,
+                0,
+                llvm::DINode::DIFlags::FlagZero,
+                value_type
+            ),
+            llvm_debug_builder.createMemberType(
+                &llvm_debug_scope,
+                "has_value",
+                nullptr,
+                0,
+                8,
+                8,
+                has_value_offset_in_bits,
+                llvm::DINode::DIFlags::FlagZero,
+                bool_type
+            )
+        };
+
+        return llvm_debug_builder.createStructType(
+            &llvm_debug_scope,
+            iris::mangle_optional_type_name(type.value_type).c_str(),
+            nullptr,
+            0,
+            size_in_bits,
+            alignment_in_bits,
+            llvm::DINode::DIFlags::FlagZero,
+            nullptr,
+            llvm_debug_builder.getOrCreateArray(elements)
+        );
+    }
 
     llvm::DIType* array_slice_type_to_llvm_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
@@ -1238,6 +1362,47 @@ namespace iris::compiler
         }
     }
 
+    llvm::StructType* create_lambda_llvm_type(
+        llvm::LLVMContext& llvm_context
+    )
+    {
+        llvm::Type* const pointer_type = llvm::PointerType::get(llvm_context, 0);
+        return llvm::StructType::get(llvm_context, { pointer_type, pointer_type });
+    }
+
+    llvm::DIType* lambda_type_to_llvm_debug_type(
+        llvm::DIBuilder& llvm_debug_builder,
+        llvm::DIScope& llvm_debug_scope,
+        llvm::DataLayout const& llvm_data_layout,
+        iris::Module const& core_module,
+        Lambda_type const& type,
+        Debug_type_database const& debug_type_database
+    )
+    {
+        unsigned const pointer_size_in_bits = llvm_data_layout.getPointerSizeInBits();
+        llvm::Align const pointer_alignment = llvm_data_layout.getPointerABIAlignment(0);
+
+        llvm::DIType* const void_pointer_type = llvm_debug_builder.createPointerType(create_void_type(llvm_debug_builder), pointer_size_in_bits);
+
+        std::array<llvm::Metadata*, 2> const elements
+        {
+            llvm_debug_builder.createMemberType(&llvm_debug_scope, "function_pointer", nullptr, 0, pointer_size_in_bits, pointer_alignment.value() * 8, 0, llvm::DINode::FlagZero, void_pointer_type),
+            llvm_debug_builder.createMemberType(&llvm_debug_scope, "user_data", nullptr, 0, pointer_size_in_bits, pointer_alignment.value() * 8, pointer_size_in_bits, llvm::DINode::FlagZero, void_pointer_type),
+        };
+
+        return llvm_debug_builder.createStructType(
+            &llvm_debug_scope,
+            "lambda",
+            nullptr,
+            0,
+            2 * pointer_size_in_bits,
+            pointer_alignment.value() * 8,
+            llvm::DINode::FlagZero,
+            nullptr,
+            llvm_debug_builder.getOrCreateArray(elements)
+        );
+    }
+
     llvm::DIType* function_pointer_type_to_llvm_debug_type(
         llvm::DIBuilder& llvm_debug_builder,
         llvm::DIScope& llvm_debug_scope,
@@ -1304,7 +1469,7 @@ namespace iris::compiler
         Decimal_type const type
     )
     {
-        static llvm::DINamespace* scope = llvm_debug_builder.createNameSpace(nullptr, "h", false);
+        llvm::DINamespace* const scope = llvm_debug_builder.createNameSpace(nullptr, "h", false);
 
         std::uint32_t const bits = type.scale <= 6 ? 32 : 64;
         std::string const name = std::format("iris::Decimal{}", type.scale);
@@ -1381,6 +1546,22 @@ namespace iris::compiler
             llvm::Type* const llvm_type = location->second;
             return llvm_type;
         }
+        else if (std::holds_alternative<Optional_type>(type_reference.data))
+        {
+            Optional_type const& data = std::get<Optional_type>(type_reference.data);
+
+            if (iris::is_optional_represented_as_pointer(type_reference))
+                return llvm::PointerType::get(llvm_context, 0);
+
+            std::pmr::string const record_name = iris::mangle_optional_type_name(data.value_type);
+
+            LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at("iris.builtin");
+            auto const location = llvm_type_map.find(record_name);
+            if (location == llvm_type_map.end())
+                throw std::runtime_error{ std::format("Could not find {} LLVM type!{}", record_name, format_source_location(type_reference.source_range)) };
+
+            return location->second;
+        }
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             // Builtin_type_reference const& data = std::get<Builtin_type_reference>(type_reference.data);
@@ -1422,6 +1603,10 @@ namespace iris::compiler
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
             return llvm::PointerType::get(llvm_context, 0);
+        }
+        else if (std::holds_alternative<Lambda_type>(type_reference.data))
+        {
+            return create_lambda_llvm_type(llvm_context);
         }
         else if (std::holds_alternative<Integer_type>(type_reference.data))
         {
@@ -1476,6 +1661,19 @@ namespace iris::compiler
             llvm::Type* const uint64_type = llvm::Type::getInt64Ty(llvm_context);
             return llvm::StructType::create({ byte_pointer_type, uint64_type }, "__hl_array_slice");
         }
+        else if (std::holds_alternative<Optional_type>(type_reference.data))
+        {
+            Optional_type const& data = std::get<Optional_type>(type_reference.data);
+
+            if (iris::is_optional_represented_as_pointer(type_reference))
+                return llvm::PointerType::get(llvm_context, 0);
+
+            llvm::Type* const value_llvm_type = !data.value_type.empty()
+                ? type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, data.value_type[0], declaration_database, clang_context)
+                : llvm::Type::getInt1Ty(llvm_context);
+
+            return llvm::StructType::create({ value_llvm_type, llvm::Type::getInt1Ty(llvm_context) }, "__hl_optional");
+        }
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             throw std::runtime_error{ std::format("Builtin_type_reference on-demand conversion is not implemented.{}", format_source_location(type_reference.source_range)) };
@@ -1509,6 +1707,10 @@ namespace iris::compiler
         else if (std::holds_alternative<Function_pointer_type>(type_reference.data))
         {
             return llvm::PointerType::get(llvm_context, 0);
+        }
+        else if (std::holds_alternative<Lambda_type>(type_reference.data))
+        {
+            return create_lambda_llvm_type(llvm_context);
         }
         else if (std::holds_alternative<Integer_type>(type_reference.data))
         {
@@ -1601,6 +1803,11 @@ namespace iris::compiler
             Array_slice_type const& data = std::get<Array_slice_type>(type_reference.data);
             return array_slice_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
         }
+        if (std::holds_alternative<Optional_type>(type_reference.data))
+        {
+            Optional_type const& data = std::get<Optional_type>(type_reference.data);
+            return optional_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
+        }
         if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             // Builtin_type_reference const& data = std::get<Builtin_type_reference>(type_reference.data);
@@ -1643,6 +1850,11 @@ namespace iris::compiler
         {
             Function_pointer_type const& data = std::get<Function_pointer_type>(type_reference.data);
             return function_pointer_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
+        }
+        else if (std::holds_alternative<Lambda_type>(type_reference.data))
+        {
+            Lambda_type const& data = std::get<Lambda_type>(type_reference.data);
+            return lambda_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
         }
         else if (std::holds_alternative<Integer_type>(type_reference.data))
         {

@@ -44,6 +44,29 @@ Intermediate multiplication and division use a wider integer to reduce overflow 
 - `Int32`-backed (N is 6 or less): intermediate uses `Int64`.
 - `Int64`-backed (N is 7 or greater): intermediate uses `Int128`.
 
+### Overflow
+
+The wide intermediate only protects the *computation*. The result is narrowed back to the backing
+type at the end, and a result that does not fit is a genuine overflow. For example `90.0d6 / 0.02d6`
+is `4500`, whose scaled `Decimal6` representation is `4_500_000_000` — past `Int32`. `Decimal2` or `Decimal7` hold the
+same value comfortably.
+
+How an overflow is reported depends on when it is detectable:
+
+- **Both operands constant** — a compile error, in every configuration. There is no way to ask for
+  the truncated value.
+- **Otherwise** — checked at runtime *if* decimal overflow checks are enabled. The program prints a
+  message naming the operation and its source position, then aborts. With the checks disabled the
+  result is silently truncated (`90.0d6 / 0.02d6` yields `205.032704d6`).
+
+`iris build` enables the checks in debug builds and disables them in release builds (`--no-debug`),
+because they cost a compare and a branch on every decimal multiply, divide and narrowing cast.
+Override with `--decimal-overflow-checks` or `--no-decimal-overflow-checks`.
+
+The checks apply to decimal multiplication, division, decimal-to-decimal conversion and
+decimal-to-integer conversion. Addition and subtraction are performed directly in the backing type
+and are not checked.
+
 Arithmetic between different scales is not allowed; cast to a common scale first:
 
 ```iris

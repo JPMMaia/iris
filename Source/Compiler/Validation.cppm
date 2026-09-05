@@ -54,6 +54,13 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
+    export std::pmr::vector<iris::compiler::Diagnostic> validate_alias_type_declaration(
+        iris::Module const& core_module,
+        iris::Alias_type_declaration const& declaration,
+        Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     export std::pmr::vector<iris::compiler::Diagnostic> validate_enum_declaration(
         iris::Module const& core_module,
         iris::Enum_declaration const& declaration,
@@ -106,6 +113,19 @@ namespace iris::compiler
         std::span<iris::Statement const> const statements,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    // The type an expression is expected to produce from where it sits in the statement:
+    // the declared type of the variable it initializes, the enclosing function's output type
+    // when it is returned, or the callee's parameter type when it is an argument.
+    export std::optional<iris::Type_reference> get_expected_expression_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope const& scope,
+        Declaration_database const& declaration_database,
+        iris::Statement const& statement,
+        std::optional<iris::Type_reference> const expected_statement_type,
+        std::size_t const expression_index
     );
 
     export std::pmr::vector<iris::compiler::Diagnostic> validate_statement(

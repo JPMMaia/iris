@@ -27,6 +27,7 @@ import iris.compiler.debug_info;
 import iris.compiler.diagnostic;
 import iris.compiler.expressions;
 import iris.compiler.all_passes;
+import iris.compiler.lambda_database;
 import iris.compiler.instructions;
 import iris.compiler.test_framework;
 import iris.compiler.types;
@@ -324,6 +325,7 @@ namespace iris::compiler
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         Declaration_database& declaration_database,
+        Lambda_database const& lambda_database,
         Type_database& type_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
@@ -343,6 +345,7 @@ namespace iris::compiler
             .core_module = core_module,
             .core_module_dependencies = core_module_dependencies,
             .declaration_database = declaration_database,
+            .lambda_database = lambda_database,
             .type_database = type_database,
             .enum_value_constants = enum_value_constants,
             .blocks = {},
@@ -381,6 +384,7 @@ namespace iris::compiler
         Function_definition function_definition,
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         Declaration_database& declaration_database,
+        Lambda_database const& lambda_database,
         Type_database& type_database,
         Enum_value_constants const& enum_value_constants,
         Debug_info* debug_info,
@@ -492,6 +496,7 @@ namespace iris::compiler
                 .core_module = core_module,
                 .core_module_dependencies = core_module_dependencies,
                 .declaration_database = declaration_database,
+                .lambda_database = lambda_database,
                 .type_database = type_database,
                 .enum_value_constants = enum_value_constants,
                 .blocks = block_infos,
@@ -503,6 +508,7 @@ namespace iris::compiler
                 .debug_info = debug_info,
                 .contract_options = compilation_options.contract_options,
                 .enable_bounds_checks = compilation_options.enable_bounds_checks,
+                .enable_decimal_overflow_checks = compilation_options.enable_decimal_overflow_checks,
                 .source_position = std::nullopt,
                 .temporaries_allocator = temporaries_allocator,
             };
@@ -608,6 +614,7 @@ namespace iris::compiler
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         std::optional<std::span<std::string_view const>> const functions_to_compile,
         Declaration_database& declaration_database,
+        Lambda_database const& lambda_database,
         Type_database& type_database,
         Enum_value_constants const& enum_value_constants,
         Debug_info* const debug_info,
@@ -642,6 +649,8 @@ namespace iris::compiler
             if (!should_compile(declaration))
                 continue;
 
+            Compilation_scope const function_scope{"generating function", definition.name};
+
             llvm::Function* const llvm_function = get_llvm_function(core_module, llvm_module, definition.name);
             if (!llvm_function)
             {
@@ -661,6 +670,7 @@ namespace iris::compiler
                 definition,
                 core_module_dependencies,
                 declaration_database,
+                lambda_database,
                 type_database,
                 enum_value_constants,
                 debug_info,
@@ -824,6 +834,7 @@ namespace iris::compiler
         Enum_value_constants const& enum_value_constants,
         Type_database& type_database,
         Declaration_database& declaration_database,
+        Lambda_database const& lambda_database,
         bool const is_dependency_module,
         bool const is_test_mode,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
@@ -904,8 +915,15 @@ namespace iris::compiler
                         continue;
                 }
 
+                Compilation_scope const global_scope{"generating global variable", global_variable_declaration.name};
+
                 std::string const mangled_name = mangle_name(core_module, global_variable_declaration.name, global_variable_declaration.unique_name);
-        
+
+                std::optional<Source_position> const source_position =
+                    global_variable_declaration.source_location.has_value() ?
+                    std::optional<Source_position>{ global_variable_declaration.source_location->range.start } :
+                    std::optional<Source_position>{ std::nullopt };
+
                 Expression_parameters const expression_parameters
                 {
                     .llvm_context = llvm_context,
@@ -917,6 +935,7 @@ namespace iris::compiler
                     .core_module = core_module,
                     .core_module_dependencies = core_module_dependencies,
                     .declaration_database = declaration_database,
+                    .lambda_database = lambda_database,
                     .type_database = type_database,
                     .enum_value_constants = enum_value_constants,
                     .blocks = {},
@@ -928,11 +947,11 @@ namespace iris::compiler
                     .debug_info = nullptr,
                     .contract_options = Contract_options::Disabled,
                     .enable_bounds_checks = false,
-                    .source_position = {},
+                    .source_position = source_position,
                     .temporaries_allocator = temporaries_allocator,
                 };
 
-                llvm::Constant* const initial_value = !is_dependency_module ? fold_statement_constant(global_variable_declaration.initial_value, expression_parameters) : nullptr;
+                llvm::Constant* const initial_value = !is_dependency_module ? fold_global_variable_initial_value(core_module, global_variable_declaration, expression_parameters) : nullptr;
         
                 Scope const scope;
                 std::optional<Type_reference> const type =
@@ -969,6 +988,7 @@ namespace iris::compiler
         Clang_module_data const& clang_module_data,
         Type_database& type_database,
         Declaration_database& declaration_database,
+        Lambda_database const& lambda_database,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         Enum_value_constants const& enum_value_constants,
@@ -1003,6 +1023,7 @@ namespace iris::compiler
                     enum_value_constants,
                     type_database,
                     declaration_database,
+                    lambda_database,
                     true,
                     is_test_mode,
                     temporaries_allocator
@@ -1025,6 +1046,7 @@ namespace iris::compiler
                         enum_value_constants,
                         type_database,
                         declaration_database,
+                        lambda_database,
                         true,
                         is_test_mode,
                         temporaries_allocator
@@ -1202,6 +1224,7 @@ namespace iris::compiler
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
         std::optional<std::span<std::string_view const>> const functions_to_compile,
         Declaration_database declaration_database, // TODO makes copy
+        Lambda_database const& lambda_database,
         Type_database type_database, // TODO makes copy
         Compilation_options const& compilation_options
     )
@@ -1218,25 +1241,26 @@ namespace iris::compiler
             core_module,
             core_module_dependencies,
             declaration_database,
+            lambda_database,
             type_database,
             {}
         );
 
-        add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, core_module, core_module_dependencies, enum_value_constants, compilation_options.is_test_mode, {});
+        add_dependency_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, type_database, declaration_database, lambda_database, core_module, core_module_dependencies, enum_value_constants, compilation_options.is_test_mode, {});
 
         {
             std::pmr::vector<Function_declaration const*> const function_declarations = get_vector_element_pointers(core_module.export_declarations.function_declarations, {});
-            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
+            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, core_module.export_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, lambda_database, false, compilation_options.is_test_mode, {});
         }
 
         {
             std::pmr::vector<Function_declaration const*> const function_declarations = get_vector_element_pointers(core_module.internal_declarations.function_declarations, {});
-            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
+            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, core_module.internal_declarations.global_variable_declarations, std::nullopt, enum_value_constants, type_database, declaration_database, lambda_database, false, compilation_options.is_test_mode, {});
         }
 
         {
             std::pmr::vector<Function_declaration const*> const function_declarations = get_deque_element_pointers(core_module.instanced_declarations.function_declarations, {});
-            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, {}, std::nullopt, enum_value_constants, type_database, declaration_database, false, compilation_options.is_test_mode, {});
+            add_module_declarations(llvm_context, llvm_data_layout, *llvm_module, clang_module_data, core_module, core_module_dependencies, function_declarations, std::nullopt, {}, std::nullopt, enum_value_constants, type_database, declaration_database, lambda_database, false, compilation_options.is_test_mode, {});
         }
 
         if (compilation_options.is_test_mode)
@@ -1263,6 +1287,7 @@ namespace iris::compiler
             core_module_dependencies,
             functions_to_compile,
             declaration_database,
+            lambda_database,
             type_database,
             enum_value_constants,
             debug_info.get(),
@@ -1639,7 +1664,8 @@ namespace iris::compiler
     
     void print_diagnostics_and_exit_if_needed(
         std::span<iris::compiler::Diagnostic const> const diagnostics,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator,
+        std::string_view const failure_summary
     )
     {
         if (!diagnostics.empty())
@@ -1670,7 +1696,7 @@ namespace iris::compiler
             );
 
             if (contains_errors)
-                iris::common::print_message_and_exit("Validation failed.");
+                iris::common::print_message_and_exit(std::string{failure_summary});
         }
     }
 
@@ -1742,23 +1768,88 @@ namespace iris::compiler
         return output;
     }
 
+    // Writes are done to a temporary file which is then renamed into place. This guarantees that an
+    // interrupted or failed write never leaves a truncated output file behind, which the incremental
+    // build would otherwise consider up to date and feed to the linker.
+    static std::filesystem::path get_temporary_output_file_path(
+        std::filesystem::path const& output_file_path
+    )
+    {
+        std::filesystem::path temporary_file_path = output_file_path;
+        temporary_file_path += ".tmp";
+        return temporary_file_path;
+    }
+
+    static void commit_temporary_output_file(
+        std::filesystem::path const& temporary_file_path,
+        std::filesystem::path const& output_file_path
+    )
+    {
+        std::error_code error_code;
+        std::filesystem::rename(temporary_file_path, output_file_path, error_code);
+
+        if (error_code)
+        {
+            std::error_code ignored_error_code;
+            std::filesystem::remove(temporary_file_path, ignored_error_code);
+
+            std::string const error_message = error_code.message();
+            llvm::errs() << "Could not write file '" << output_file_path.generic_string() << "': " << error_message;
+            throw std::runtime_error{ error_message };
+        }
+    }
+
+    struct Output_file_stream
+    {
+        explicit Output_file_stream(std::filesystem::path const& file_path) :
+            error_code{},
+            stream{ file_path.generic_string(), error_code, llvm::sys::fs::OF_None }
+        {
+            if (error_code)
+            {
+                std::string const error_message = error_code.message();
+                llvm::errs() << "Could not open file: " << error_message;
+                throw std::runtime_error{ error_message };
+            }
+        }
+
+        std::error_code error_code;
+        llvm::raw_fd_ostream stream;
+    };
+
+    static void close_output_stream(
+        llvm::raw_fd_ostream& output_stream,
+        std::filesystem::path const& file_path
+    )
+    {
+        output_stream.close();
+
+        if (output_stream.has_error())
+        {
+            std::string const error_message = output_stream.error().message();
+            llvm::errs() << "Could not write to file '" << file_path.generic_string() << "': " << error_message;
+            output_stream.clear_error();
+            throw std::runtime_error{ error_message };
+        }
+    }
+
     void write_bitcode_to_file(
         LLVM_data const& llvm_data,
         llvm::Module& llvm_module,
         std::filesystem::path const& output_file_path
     )
     {
-        std::error_code error_code;
-        llvm::raw_fd_ostream output_stream(output_file_path.generic_string(), error_code, llvm::sys::fs::OF_None);
+        std::filesystem::path const temporary_file_path = get_temporary_output_file_path(output_file_path);
 
-        if (error_code)
         {
-            std::string const error_message = error_code.message();
-            llvm::errs() << "Could not open file: " << error_message;
-            throw std::runtime_error{ error_message };
+            Output_file_stream output_file{ temporary_file_path };
+
+            llvm::WriteBitcodeToFile(llvm_module, output_file.stream);
+
+            close_output_stream(output_file.stream, temporary_file_path);
         }
 
-        llvm::WriteBitcodeToFile(llvm_module, output_stream);
+        commit_temporary_output_file(temporary_file_path, output_file_path);
     }
 
     void write_llvm_ir_to_file(
@@ -1766,17 +1857,17 @@ namespace iris::compiler
         std::filesystem::path const& output_file_path
     )
     {
-        std::error_code error_code;
-        llvm::raw_fd_ostream output_stream(output_file_path.generic_string(), error_code, llvm::sys::fs::OF_None);
+        std::filesystem::path const temporary_file_path = get_temporary_output_file_path(output_file_path);
 
-        if (error_code)
         {
-            std::string const error_message = error_code.message();
-            llvm::errs() << "Could not open file: " << error_message;
-            throw std::runtime_error{ error_message };
+            Output_file_stream output_file{ temporary_file_path };
+
+            llvm_module.print(output_file.stream, nullptr);
+
+            close_output_stream(output_file.stream, temporary_file_path);
         }
 
-        llvm_module.print(output_stream, nullptr);
+        commit_temporary_output_file(temporary_file_path, output_file_path);
     }
 
     void write_object_file(
@@ -1785,25 +1876,25 @@ namespace iris::compiler
         std::filesystem::path const& output_file_path
     )
     {
-        std::error_code error_code;
-        llvm::raw_fd_ostream output_stream(output_file_path.generic_string(), error_code, llvm::sys::fs::OF_None);
+        std::filesystem::path const temporary_file_path = get_temporary_output_file_path(output_file_path);
 
-        if (error_code)
         {
-            std::string const error_message = error_code.message();
-            llvm::errs() << "Could not open file: " << error_message;
-            throw std::runtime_error{ error_message };
+            Output_file_stream output_file{ temporary_file_path };
+
+            llvm::legacy::PassManager pass_manager;
+            if (llvm_data.target_machine->addPassesToEmitFile(pass_manager, output_file.stream, nullptr, llvm::CodeGenFileType::ObjectFile))
+            {
+                std::string const error_message = "target_machine can't emit an object file";
+                llvm::errs() << "Could not emit object file: " << error_message;
+                throw std::runtime_error{ error_message };
+            }
+
+            pass_manager.run(llvm_module);
+
+            close_output_stream(output_file.stream, temporary_file_path);
         }
 
-        llvm::legacy::PassManager pass_manager;
-        if (llvm_data.target_machine->addPassesToEmitFile(pass_manager, output_stream, nullptr, llvm::CodeGenFileType::ObjectFile))
-        {
-            std::string const error_message = error_code.message();
-            llvm::errs() << "Could not emit object file: " << error_message;
-            throw std::runtime_error{ error_message };
-        }
-
-        pass_manager.run(llvm_module);
+        commit_temporary_output_file(temporary_file_path, output_file_path);
     }
 
     void add_builtin_module(
@@ -1843,6 +1934,8 @@ namespace iris::compiler
         for (iris::Module const* const header_module : header_modules)
             add_declarations(declaration_database, *header_module);
 
+        Lambda_database lambda_database;
+
         Clang_context_pointer clang_context = create_clang_context(
             *llvm_data.context,
             *llvm_data.clang_data,
@@ -1879,6 +1972,7 @@ namespace iris::compiler
                 .llvm_context = *llvm_data.context,
                 .llvm_data_layout = llvm_data.data_layout,
                 .declaration_database = declaration_database,
+                .lambda_database = lambda_database,
                 .clang_context = *clang_context,
                 .dependencies = modified.dependencies,
                 .instanced_declarations = modified.instanced_declarations,
@@ -1906,6 +2000,7 @@ namespace iris::compiler
             .transformed_core_modules = std::move(transformed_core_modules),
             .sorted_modules = std::move(sorted_so_far),
             .declaration_database = std::move(declaration_database),
+            .lambda_database = std::move(lambda_database),
         };
     }
 
@@ -1915,6 +2010,7 @@ namespace iris::compiler
         std::span<iris::Module const* const> const all_sorted_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         Declaration_database const& declaration_database,
+        Lambda_database const& lambda_database,
         Compilation_options const& compilation_options
     )
     {
@@ -1945,6 +2041,7 @@ namespace iris::compiler
             core_module_dependencies,
             std::nullopt,
             declaration_database,
+            lambda_database,
             compilation_database.type_database,
             compilation_options
         );

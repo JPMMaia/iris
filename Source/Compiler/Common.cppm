@@ -42,6 +42,8 @@ namespace iris::compiler
         std::string_view declaration_name
     );
 
+    export std::pmr::string get_lambda_environment_struct_name(std::string_view const generated_function_name);
+
     export std::string mangle_struct_name(
         Module const& core_module,
         std::string_view declaration_name

@@ -28,6 +28,40 @@ namespace iris
         return std::holds_alternative<Array_slice_type>(type.data);
     }
 
+    Type_reference create_optional_type_reference(std::pmr::vector<Type_reference> value_type)
+    {
+        return
+        {
+            .data = iris::Optional_type
+            {
+                .value_type = std::move(value_type),
+            }
+        };
+    }
+
+    bool is_optional_type_reference(Type_reference const& type)
+    {
+        return std::holds_alternative<Optional_type>(type.data);
+    }
+
+    std::optional<Type_reference> get_optional_value_type(Type_reference const& type)
+    {
+        if (!std::holds_alternative<Optional_type>(type.data))
+            return std::nullopt;
+
+        Optional_type const& optional_type = std::get<Optional_type>(type.data);
+        if (optional_type.value_type.empty())
+            return std::nullopt;
+
+        return optional_type.value_type.front();
+    }
+
+    bool is_optional_represented_as_pointer(Type_reference const& type)
+    {
+        std::optional<Type_reference> const value_type = get_optional_value_type(type);
+        return value_type.has_value() && is_pointer(value_type.value());
+    }
+
     Type_reference create_bool_type_reference()
     {
         return create_fundamental_type_type_reference(Fundamental_type::Bool);
@@ -290,6 +324,131 @@ namespace iris
     bool is_function_pointer(Type_reference const& type)
     {
         return std::holds_alternative<Function_pointer_type>(type.data);
+    }
+
+    Type_reference create_lambda_type_type_reference(
+        std::pmr::vector<Type_reference> input_parameter_types,
+        std::pmr::vector<Type_reference> output_parameter_types
+    )
+    {
+        return Type_reference
+        {
+            .data = iris::Lambda_type
+            {
+                .input_parameter_types = std::move(input_parameter_types),
+                .output_parameter_types = std::move(output_parameter_types),
+            }
+        };
+    }
+
+    bool is_lambda_type(Type_reference const& type)
+    {
+        return std::holds_alternative<Lambda_type>(type.data);
+    }
+
+    std::optional<Type_reference> get_lambda_output_type_reference(Lambda_type const& lambda_type)
+    {
+        if (lambda_type.output_parameter_types.empty())
+            return std::nullopt;
+
+        if (lambda_type.output_parameter_types.size() == 1)
+            return lambda_type.output_parameter_types.front();
+
+        // TODO lambda with multiple output arguments
+        return std::nullopt;
+    }
+
+    Struct_declaration create_lambda_struct_declaration(
+        std::pmr::string name,
+        std::optional<std::pmr::string> unique_name,
+        std::span<Type_reference const> const input_parameter_types,
+        std::span<Type_reference const> const output_parameter_types,
+        std::span<std::pmr::string const> const input_parameter_names
+    )
+    {
+        Type_reference const user_data_type = create_pointer_type_type_reference({}, true);
+
+        std::pmr::vector<Type_reference> function_input_parameter_types{ input_parameter_types.begin(), input_parameter_types.end() };
+        function_input_parameter_types.push_back(user_data_type);
+
+        std::pmr::vector<std::pmr::string> function_input_parameter_names{ input_parameter_names.begin(), input_parameter_names.end() };
+        function_input_parameter_names.resize(input_parameter_types.size());
+        for (std::size_t index = 0; index < function_input_parameter_names.size(); ++index)
+        {
+            if (function_input_parameter_names[index].empty())
+                function_input_parameter_names[index] = std::pmr::string{ std::format("parameter_{}", index) };
+        }
+        function_input_parameter_names.push_back(std::pmr::string{ "user_data" });
+
+        std::pmr::vector<std::pmr::string> function_output_parameter_names;
+        function_output_parameter_names.reserve(output_parameter_types.size());
+        for (std::size_t index = 0; index < output_parameter_types.size(); ++index)
+            function_output_parameter_names.push_back(std::pmr::string{ std::format("result_{}", index) });
+
+        Type_reference const function_pointer_type = create_function_type_type_reference(
+            Function_type
+            {
+                .input_parameter_types = std::move(function_input_parameter_types),
+                .output_parameter_types = { output_parameter_types.begin(), output_parameter_types.end() },
+                .is_variadic = false,
+            },
+            std::move(function_input_parameter_names),
+            std::move(function_output_parameter_names)
+        );
+
+        std::pmr::vector<Type_reference> member_types;
+        member_types.push_back(function_pointer_type);
+        member_types.push_back(user_data_type);
+
+        std::pmr::vector<std::pmr::string> member_names;
+        member_names.push_back(std::pmr::string{ "function_pointer" });
+        member_names.push_back(std::pmr::string{ "user_data" });
+
+        // Both members default to null, so an uninitialized lambda is a well-defined empty one.
+        auto const create_null_pointer_default_value = []() -> Statement
+        {
+            Statement statement;
+            statement.expressions.push_back(Expression{ .data = Null_pointer_expression{} });
+            return statement;
+        };
+
+        std::pmr::vector<Statement> member_default_values;
+        member_default_values.push_back(create_null_pointer_default_value());
+        member_default_values.push_back(create_null_pointer_default_value());
+
+        return Struct_declaration
+        {
+            .name = std::move(name),
+            .unique_name = std::move(unique_name),
+            .member_types = std::move(member_types),
+            .member_names = std::move(member_names),
+            .member_bit_fields = { std::nullopt, std::nullopt },
+            .member_default_values = std::move(member_default_values),
+            .is_packed = false,
+            .is_literal = false,
+        };
+    }
+
+    Struct_declaration create_lambda_struct_declaration(Lambda_declaration const& lambda_declaration)
+    {
+        return create_lambda_struct_declaration(
+            lambda_declaration.name,
+            lambda_declaration.unique_name,
+            lambda_declaration.input_parameter_types,
+            lambda_declaration.output_parameter_types,
+            lambda_declaration.input_parameter_names
+        );
+    }
+
+    std::pmr::vector<Struct_declaration> create_lambda_struct_declarations(std::span<Lambda_declaration const> const lambda_declarations)
+    {
+        std::pmr::vector<Struct_declaration> struct_declarations;
+        struct_declarations.reserve(lambda_declarations.size());
+
+        for (Lambda_declaration const& lambda_declaration : lambda_declarations)
+            struct_declarations.push_back(create_lambda_struct_declaration(lambda_declaration));
+
+        return struct_declarations;
     }
 
 
@@ -689,6 +848,184 @@ namespace iris
 
     namespace
     {
+        void append_mangled_type_name(std::pmr::string& output, Type_reference const& type)
+        {
+            if (std::holds_alternative<Integer_type>(type.data))
+            {
+                Integer_type const& integer_type = std::get<Integer_type>(type.data);
+                output += integer_type.is_signed ? "Int" : "Uint";
+                output += std::to_string(integer_type.number_of_bits);
+            }
+            else if (std::holds_alternative<Fundamental_type>(type.data))
+            {
+                Fundamental_type const fundamental_type = std::get<Fundamental_type>(type.data);
+
+                switch (fundamental_type)
+                {
+                case Fundamental_type::Bool: output += "Bool"; break;
+                case Fundamental_type::Byte: output += "Byte"; break;
+                case Fundamental_type::Float16: output += "Float16"; break;
+                case Fundamental_type::Float32: output += "Float32"; break;
+                case Fundamental_type::Float64: output += "Float64"; break;
+                case Fundamental_type::String: output += "String"; break;
+                case Fundamental_type::Any_type: output += "Any_type"; break;
+                case Fundamental_type::C_bool: output += "C_bool"; break;
+                case Fundamental_type::C_char: output += "C_char"; break;
+                case Fundamental_type::C_schar: output += "C_schar"; break;
+                case Fundamental_type::C_uchar: output += "C_uchar"; break;
+                case Fundamental_type::C_short: output += "C_short"; break;
+                case Fundamental_type::C_ushort: output += "C_ushort"; break;
+                case Fundamental_type::C_int: output += "C_int"; break;
+                case Fundamental_type::C_uint: output += "C_uint"; break;
+                case Fundamental_type::C_long: output += "C_long"; break;
+                case Fundamental_type::C_ulong: output += "C_ulong"; break;
+                case Fundamental_type::C_longlong: output += "C_longlong"; break;
+                case Fundamental_type::C_ulonglong: output += "C_ulonglong"; break;
+                case Fundamental_type::C_longdouble: output += "C_longdouble"; break;
+                }
+            }
+            else if (std::holds_alternative<Decimal_type>(type.data))
+            {
+                Decimal_type const& decimal_type = std::get<Decimal_type>(type.data);
+                output += "Decimal";
+                output += std::to_string(static_cast<std::uint64_t>(decimal_type.scale));
+            }
+            else if (std::holds_alternative<Custom_type_reference>(type.data))
+            {
+                Custom_type_reference const& custom_type_reference = std::get<Custom_type_reference>(type.data);
+
+                for (char const character : custom_type_reference.module_reference.name)
+                    output += (character == '.') ? '_' : character;
+
+                output += '_';
+                output += custom_type_reference.name;
+            }
+            else if (std::holds_alternative<Pointer_type>(type.data))
+            {
+                Pointer_type const& pointer_type = std::get<Pointer_type>(type.data);
+                output += pointer_type.is_mutable ? "mutable_pointer_to_" : "pointer_to_";
+
+                if (pointer_type.element_type.empty())
+                    output += "void";
+                else
+                    append_mangled_type_name(output, pointer_type.element_type.front());
+            }
+            else if (std::holds_alternative<Array_slice_type>(type.data))
+            {
+                Array_slice_type const& array_slice_type = std::get<Array_slice_type>(type.data);
+                output += "Array_slice_";
+
+                if (array_slice_type.is_mutable)
+                    output += "mutable_";
+
+                if (array_slice_type.element_type.empty())
+                    output += "void";
+                else
+                    append_mangled_type_name(output, array_slice_type.element_type.front());
+            }
+            else if (std::holds_alternative<Constant_array_type>(type.data))
+            {
+                Constant_array_type const& constant_array_type = std::get<Constant_array_type>(type.data);
+                output += "Constant_array_";
+
+                if (constant_array_type.value_type.empty())
+                    output += "void";
+                else
+                    append_mangled_type_name(output, constant_array_type.value_type.front());
+
+                output += '_';
+                output += std::to_string(constant_array_type.size);
+            }
+            else if (std::holds_alternative<Optional_type>(type.data))
+            {
+                Optional_type const& optional_type = std::get<Optional_type>(type.data);
+                output += "Optional_";
+
+                if (optional_type.value_type.empty())
+                    output += "void";
+                else
+                    append_mangled_type_name(output, optional_type.value_type.front());
+            }
+            else
+            {
+                // Anything without a readable spelling still needs a stable name.
+                output += "type_";
+                output += std::to_string(type.data.index());
+            }
+        }
+    }
+
+    std::pmr::string mangle_optional_type_name(std::pmr::vector<Type_reference> const& value_type)
+    {
+        std::pmr::string result = "Optional_";
+
+        if (value_type.empty())
+            result += "void";
+        else
+            append_mangled_type_name(result, value_type.front());
+
+        return result;
+    }
+
+    iris::Struct_declaration create_optional_type_struct_declaration(std::pmr::vector<Type_reference> const& value_type)
+    {
+        return iris::Struct_declaration
+        {
+            .name = mangle_optional_type_name(value_type),
+            .member_types = {
+                value_type.empty() ? iris::create_bool_type_reference() : value_type.front(),
+                iris::create_bool_type_reference()
+            },
+            .member_names = {
+                "value",
+                "has_value"
+            },
+            .member_bit_fields = {
+                std::nullopt,
+                std::nullopt
+            },
+            .member_default_values = {
+                iris::Statement{
+                    .expressions = {
+                        iris::Expression{ .data = iris::Instantiate_expression{} }
+                    }
+                },
+                iris::Statement{
+                    .expressions = {
+                        iris::Expression{
+                            .data = iris::Constant_expression {
+                                .type = iris::create_bool_type_reference(),
+                                .data = "false"
+                            }
+                        }
+                    }
+                }
+            },
+            .is_packed = false,
+            .is_literal = false,
+        };
+    }
+
+    std::optional<iris::Struct_declaration> try_get_builtin_struct_declaration(Type_reference const& type_reference)
+    {
+        if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
+        {
+            iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(type_reference.data);
+            return create_array_slice_type_struct_declaration(array_slice_type.element_type);
+        }
+
+        // Optional of a pointer is represented as a bare pointer, so it has no member record.
+        if (std::holds_alternative<iris::Optional_type>(type_reference.data) && !is_optional_represented_as_pointer(type_reference))
+        {
+            iris::Optional_type const& optional_type = std::get<iris::Optional_type>(type_reference.data);
+            return create_optional_type_struct_declaration(optional_type.value_type);
+        }
+
+        return std::nullopt;
+    }
+
+    namespace
+    {
         template<typename Constructor_parameter_type>
         std::optional<Type_reference> get_instance_argument_type(
             std::span<Constructor_parameter_type const> const constructor_parameters,
@@ -770,6 +1107,15 @@ namespace iris
                         return false;
                 }
             }
+            else if (std::holds_alternative<Optional_type>(type_reference.data))
+            {
+                Optional_type& optional_type = std::get<Optional_type>(type_reference.data);
+                for (Type_reference& value_type : optional_type.value_type)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(value_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+            }
             else if (std::holds_alternative<Constant_array_type>(type_reference.data))
             {
                 Constant_array_type& constant_array_type = std::get<Constant_array_type>(type_reference.data);
@@ -784,6 +1130,20 @@ namespace iris
                 Function_pointer_type& function_pointer_type = std::get<Function_pointer_type>(type_reference.data);
                 if (!replace_parameter_types_by_instance_arguments_impl(function_pointer_type.type, constructor_parameters, instance_arguments))
                     return false;
+            }
+            else if (std::holds_alternative<Lambda_type>(type_reference.data))
+            {
+                Lambda_type& lambda_type = std::get<Lambda_type>(type_reference.data);
+                for (Type_reference& input_parameter_type : lambda_type.input_parameter_types)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(input_parameter_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+                for (Type_reference& output_parameter_type : lambda_type.output_parameter_types)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(output_parameter_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
             }
             else if (std::holds_alternative<Pointer_type>(type_reference.data))
             {

@@ -8,6 +8,7 @@ import iris.core.declarations;
 import iris.compiler.clang_data;
 import iris.compiler.debug_info;
 import iris.compiler.instructions;
+import iris.compiler.lambda_database;
 import iris.compiler.types;
 
 namespace iris::compiler
@@ -53,6 +54,7 @@ namespace iris::compiler
         Module const& core_module;
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies;
         Declaration_database& declaration_database;
+        Lambda_database const& lambda_database;
         Type_database& type_database;
         Enum_value_constants const& enum_value_constants;
         std::span<Block_info> blocks;
@@ -64,13 +66,22 @@ namespace iris::compiler
         Debug_info* debug_info;
         Contract_options contract_options;
         bool enable_bounds_checks = false;
+        bool enable_decimal_overflow_checks = false;
         std::optional<Source_position> source_position;
+        std::span<Global_variable_declaration const* const> globals_being_folded;
         std::pmr::polymorphic_allocator<> const& temporaries_allocator;
     };
 
     export llvm::Constant* fold_constant(
         llvm::Value* value,
-        llvm::DataLayout const& llvm_data_layout
+        Expression_parameters const& parameters,
+        std::optional<Source_position> const& source_position
+    );
+
+    export llvm::Constant* fold_global_variable_initial_value(
+        iris::Module const& global_variable_module,
+        iris::Global_variable_declaration const& global_variable_declaration,
+        Expression_parameters const& parameters
     );
 
     export llvm::Constant* fold_statement_constant(

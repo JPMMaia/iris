@@ -12,6 +12,7 @@ import iris.compiler;
 import iris.compiler.artifact;
 import iris.compiler.builder;
 import iris.compiler.project;
+import iris.compiler.diagnostic;
 import iris.compiler.expressions;
 import iris.compiler.linker;
 import iris.compiler.presets;
@@ -19,6 +20,11 @@ import iris.compiler.repository;
 import iris.compiler.target;
 import iris.core;
 import iris.parser.parser;
+
+struct Cli_error : std::runtime_error
+{
+    using std::runtime_error::runtime_error;
+};
 
 std::pmr::vector<std::filesystem::path> convert_to_path(std::span<std::string const> const values)
 {
@@ -84,6 +90,13 @@ argparse::Argument& add_header_remove_prefix_argument(argparse::ArgumentParser& 
         .append();
 }
 
+argparse::Argument& add_optional_pointers_argument(argparse::ArgumentParser& command)
+{
+    return command.add_argument("--optional-pointers")
+        .help("Import pointer members of C structs and unions as 'Optional::<*T>' instead of the default plain '*T'. Members named in a raw_pointer_members= IRIS_META field stay '*T' even when this is set.")
+        .flag();
+}
+
 argparse::Argument& add_module_search_path_argument(argparse::ArgumentParser& command)
 {
     return command.add_argument("--module-search-path")
@@ -112,6 +125,28 @@ argparse::Argument& add_no_bounds_checks_argument(argparse::ArgumentParser& comm
     return command.add_argument("--no-bounds-checks")
         .help("Disable bounds checks")
         .flag();
+}
+
+argparse::Argument& add_decimal_overflow_checks_arguments(argparse::ArgumentParser& command)
+{
+    command.add_argument("--decimal-overflow-checks")
+        .help("Enable decimal overflow checks (the default in debug builds)")
+        .flag();
+
+    return command.add_argument("--no-decimal-overflow-checks")
+        .help("Disable decimal overflow checks")
+        .flag();
+}
+
+std::optional<bool> get_decimal_overflow_checks(argparse::ArgumentParser const& command)
+{
+    if (command.get<bool>("--no-decimal-overflow-checks"))
+        return false;
+
+    if (command.get<bool>("--decimal-overflow-checks"))
+        return true;
+
+    return std::nullopt;
 }
 
 argparse::Argument& add_output_llvm_ir_argument(argparse::ArgumentParser& command)
@@ -315,7 +350,8 @@ iris::compiler::Compilation_options create_compilation_options(
     iris::compiler::Target const& target,
     bool const no_debug,
     iris::compiler::Contract_options const contract_options,
-    bool const no_bounds_checks
+    bool const no_bounds_checks,
+    std::optional<bool> const decimal_overflow_checks
 )
 {
     bool const output_debug_code_view = !no_debug && target.operating_system == "windows";
@@ -328,6 +364,7 @@ iris::compiler::Compilation_options create_compilation_options(
         .output_debug_code_view = output_debug_code_view,
         .contract_options = contract_options,
         .enable_bounds_checks = !no_bounds_checks,
+        .enable_decimal_overflow_checks = decimal_overflow_checks.value_or(!no_debug),
     };
 
     return compilation_options;
@@ -345,22 +382,30 @@ std::pmr::vector<std::filesystem::path> select_artifact_paths(
 {
     std::pmr::vector<std::filesystem::path> const discovered_paths = find_discovered_artifact_paths();
     if (discovered_paths.empty())
-        throw std::runtime_error("Could not find any iris_artifact.json files in the current directory tree.");
+        throw Cli_error("Could not find any iris_artifact.json files in the current directory tree.");
 
     if (!artifact_name.has_value())
         return discovered_paths;
 
     std::pmr::vector<std::filesystem::path> selected_paths;
+    std::pmr::vector<std::pmr::string> discovered_names;
     for (std::filesystem::path const& artifact_path : discovered_paths)
     {
         iris::compiler::Artifact const artifact = iris::compiler::get_artifact(artifact_path, environment_variables);
+        discovered_names.push_back(std::pmr::string{artifact.name});
         if (std::string_view{artifact.name} == std::string_view{artifact_name.value()})
             selected_paths.push_back(artifact_path);
     }
 
     if (selected_paths.empty())
     {
-        throw std::runtime_error(std::format("Could not find artifact named '{}'.", artifact_name.value()));
+        std::stringstream stream;
+        stream << std::format("Could not find artifact named '{}'.", artifact_name.value()) << '\n';
+        stream << "Available artifacts:" << '\n';
+        for (std::pmr::string const& discovered_name : discovered_names)
+            stream << std::format("- {}", discovered_name) << '\n';
+
+        throw Cli_error(stream.str());
     }
 
     if (selected_paths.size() > 1)
@@ -370,7 +415,7 @@ std::pmr::vector<std::filesystem::path> select_artifact_paths(
         for (std::filesystem::path const& selected_path : selected_paths)
             stream << std::format("- {}", selected_path.generic_string()) << '\n';
 
-        throw std::runtime_error(stream.str());
+        throw Cli_error(stream.str());
     }
 
     return selected_paths;
@@ -416,15 +461,65 @@ std::filesystem::path get_test_output_path(
     return output_path;
 }
 
-int run_test_executables(
+enum class Test_run_outcome
+{
+    Passed,
+    Tests_failed,
+    Run_incomplete,
+    Crashed,
+    Could_not_launch,
+};
+
+Test_run_outcome classify_test_exit_status(int const status)
+{
+    if (status == 0)
+        return Test_run_outcome::Passed;
+
+    if (status == 1)
+        return Test_run_outcome::Tests_failed;
+
+    if (status == 2)
+        return Test_run_outcome::Run_incomplete;
+
+#if defined(_WIN32)
+    // reproc returns the raw GetExitCodeProcess value except for STATUS_CONTROL_C_EXIT, which it
+    // remaps to 143. An interrupted run is incomplete rather than failed.
+    if (status == 143)
+        return Test_run_outcome::Run_incomplete;
+
+    // Exception codes are severity 'error', facility 0: 0xC0000005, 0xC00000FD, 0xC0000409, ... The
+    // upper bound matters, because reproc's own errors are negated Win32 codes (-2, -87, -258,
+    // -10035) which are also negative; as unsigned they all sit well above 0xD0000000.
+    unsigned int const unsigned_status = static_cast<unsigned int>(status);
+    if (unsigned_status >= 0xC0000000u && unsigned_status < 0xD0000000u)
+        return Test_run_outcome::Crashed;
+#else
+    if (status > 128 && status <= 128 + 64)
+        return Test_run_outcome::Crashed;
+#endif
+
+    if (status < 0)
+        return Test_run_outcome::Could_not_launch;
+
+    return Test_run_outcome::Tests_failed;
+}
+
+struct Test_run_summary
+{
+    int failed_count = 0;
+    int incomplete_count = 0;
+};
+
+Test_run_summary run_test_executables(
     std::span<std::filesystem::path const> const artifact_paths,
     std::filesystem::path const& build_directory_path,
     iris::compiler::Target const& target,
-    iris::compiler::Environment_variables const& environment_variables
+    iris::compiler::Environment_variables const& environment_variables,
+    std::string_view const forwarded_arguments
 )
 {
     std::pmr::set<std::pmr::string> seen_artifact_names;
-    int failed_count = 0;
+    Test_run_summary summary;
     int executed_count = 0;
 
     for (std::filesystem::path const& artifact_path : artifact_paths)
@@ -441,11 +536,47 @@ int run_test_executables(
             continue;
 
         ++executed_count;
-        std::string const command = std::format("\"{}\"", test_output_path.generic_string());
-        std::printf("Running tests '%s'\n", test_output_path.generic_string().c_str());
-        int const exit_code = std::system(command.c_str());
-        if (exit_code != 0)
-            ++failed_count;
+
+        std::filesystem::path const absolute_test_path = std::filesystem::absolute(test_output_path);
+        std::string const command = std::format("\"{}\"{}", absolute_test_path.generic_string(), forwarded_arguments);
+        std::printf("Running tests '%s'\n", absolute_test_path.generic_string().c_str());
+        std::fflush(stdout);
+
+        int const status = iris::common::execute_command(std::filesystem::current_path(), command);
+
+        switch (classify_test_exit_status(status))
+        {
+        case Test_run_outcome::Passed:
+            break;
+
+        case Test_run_outcome::Tests_failed:
+            ++summary.failed_count;
+            break;
+
+        case Test_run_outcome::Run_incomplete:
+            ++summary.incomplete_count;
+            break;
+
+        case Test_run_outcome::Crashed:
+            std::fflush(stdout);
+            std::cerr << std::format(
+                "Test executable '{}' crashed (exit status 0x{:08X}) - the run is incomplete, so an unknown number of tests did not execute.\n",
+                absolute_test_path.generic_string(),
+                static_cast<unsigned int>(status)
+            );
+            ++summary.incomplete_count;
+            break;
+
+        case Test_run_outcome::Could_not_launch:
+            std::fflush(stdout);
+            std::cerr << std::format(
+                "Could not launch test executable '{}' (error {}).\n",
+                absolute_test_path.generic_string(),
+                status
+            );
+            ++summary.incomplete_count;
+            break;
+        }
     }
 
     if (executed_count == 0)
@@ -453,139 +584,63 @@ int run_test_executables(
         std::puts("No test executables were generated for the selected artifacts.");
     }
 
-    return failed_count;
+    return summary;
 }
 
-int main(int const argc, char const* const* argv)
+static void report_compile_error(iris::compiler::Compile_error const& error)
 {
-    iris::common::install_abort_handlers();
+    std::pmr::polymorphic_allocator<> allocator{};
 
-    argparse::ArgumentParser program("iris");
+    iris::compiler::Diagnostic const diagnostic = iris::compiler::create_error_diagnostic(
+        error.file_path,
+        error.source_position.has_value() ?
+            std::optional<iris::Source_range>{ iris::Source_range{ .start = *error.source_position, .end = *error.source_position } } :
+            std::nullopt,
+        error.what()
+    );
 
-    // iris build [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header_search_path>]... [--repository=<repository_path>]...
-    argparse::ArgumentParser build_command("build");
-    build_command.add_description("Build one or more artifacts. If no artifact name is provided all artifacts are discovered recursively.");
-    build_command.add_argument("artifact_name")
-        .help("Optional artifact name")
-        .nargs(argparse::nargs_pattern::optional);
-    add_build_directory_argument(build_command);
-    add_header_search_path_argument(build_command);
-    add_repository_argument(build_command);
-    add_no_debug_argument(build_command);
-    add_no_bounds_checks_argument(build_command);
-    add_output_llvm_ir_argument(build_command);
-    add_function_contract_options_argument(build_command);
-    program.add_subparser(build_command);
-    
-    // iris build-tests [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
-    argparse::ArgumentParser build_tests_command("build-tests");
-    build_tests_command.add_description("Build one or more artifacts in test mode. If no artifact name is provided all artifacts are discovered recursively.");
-    build_tests_command.add_argument("artifact_name")
-        .help("Optional artifact name")
-        .nargs(argparse::nargs_pattern::optional);
-    add_build_directory_argument(build_tests_command);
-    add_header_search_path_argument(build_tests_command);
-    add_repository_argument(build_tests_command);
-    add_no_debug_argument(build_tests_command);
-    add_no_bounds_checks_argument(build_tests_command);
-    add_output_llvm_ir_argument(build_tests_command);
-    add_function_contract_options_argument(build_tests_command);
-    program.add_subparser(build_tests_command);
+    std::pmr::string const text = iris::compiler::diagnostic_to_string(diagnostic, allocator, allocator);
 
-    // iris test [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
-    argparse::ArgumentParser test_command("test");
-    test_command.add_description("Build tests and execute test binaries. If no artifact name is provided all artifacts are discovered recursively.");
-    test_command.add_argument("artifact_name")
-        .help("Optional artifact name")
-        .nargs(argparse::nargs_pattern::optional);
-    add_build_directory_argument(test_command);
-    add_header_search_path_argument(test_command);
-    add_repository_argument(test_command);
-    add_no_debug_argument(test_command);
-    add_no_bounds_checks_argument(test_command);
-    add_output_llvm_ir_argument(test_command);
-    add_function_contract_options_argument(test_command);
-    program.add_subparser(test_command);
+    std::fflush(stdout);
+    std::fprintf(stderr, "%s\n", text.c_str());
 
-    // iris list [--build-directory=<build_directory>]
-    argparse::ArgumentParser list_command("list");
-    list_command.add_description("List all discovered artifacts and the output path where each will be built.");
-    add_build_directory_argument(list_command);
-    program.add_subparser(list_command);
+    std::pmr::string const context = iris::compiler::format_compilation_context(allocator);
+    if (!context.empty())
+        std::fprintf(stderr, "%s", context.c_str());
 
-    // iris import-c-header <module_name> <header> <output>
-    argparse::ArgumentParser import_c_header_command("import-c-header");
-    import_c_header_command.add_description("Parse a C header file, convert it into an iris module and write the result to a file.");
-    import_c_header_command.add_argument("module_name")
-        .help("Module name of the output iris module");
-    import_c_header_command.add_argument("header")
-        .help("C Header file path to import");
-    import_c_header_command.add_argument("output")
-        .help("Write iris module to this location");
-    add_target_triple_argument(import_c_header_command);
-    add_header_search_path_argument(import_c_header_command);
-    add_header_public_prefix_argument(import_c_header_command);
-    add_header_remove_prefix_argument(import_c_header_command);
-    program.add_subparser(import_c_header_command);
-
-    // iris print-struct-layout <file> <struct_name> [--target=<target_triple>]
-    argparse::ArgumentParser print_struct_layout_command("print-struct-layout");
-    print_struct_layout_command.add_description("Print a JSON describing the layout of the specified struct.");
-    print_struct_layout_command.add_argument("file")
-        .help("Path to the core module file that contains the struct");
-    print_struct_layout_command.add_argument("struct_name")
-        .help("Name of the struct");
-    add_target_triple_argument(print_struct_layout_command);
-    program.add_subparser(print_struct_layout_command);
-
-    // iris generate-compile-commands [--artifact-file=<artifact_file>] [--output-file=<output_file>] [--build-directory=<build_directory>] [--header-search-path=<header_search_path>]... [--repository=<repository_path>]...
-    argparse::ArgumentParser generate_compile_commands_command("generate-compile-commands");
-    generate_compile_commands_command.add_description("Generate compile_commands.json for C++ files.");
-    add_artifact_file_argument(generate_compile_commands_command);
-    generate_compile_commands_command.add_argument("--output-file")
-        .help("Path to the compile_commands.json file")
-        .default_value("build/compile_commands.json");
-    add_build_directory_argument(generate_compile_commands_command);
-    add_header_search_path_argument(generate_compile_commands_command);
-    add_repository_argument(generate_compile_commands_command);
-    add_target_triple_argument(generate_compile_commands_command);
-    program.add_subparser(generate_compile_commands_command);
-
-    // iris download-dependencies [--project=<project_file>] [--target=<dep_name>]
-    argparse::ArgumentParser download_deps_command("download-dependencies");
-    download_deps_command.add_description("Download dependency source archives.");
-    download_deps_command.add_argument("--project")
-        .help("Path to iris_project.json")
-        .default_value("iris_project.json");
-    download_deps_command.add_argument("--target")
-        .help("Download only this dependency (repeatable)")
-        .default_value<std::vector<std::string>>({})
-        .append();
-    program.add_subparser(download_deps_command);
-
-    // iris build-dependencies [--project=<project_file>] [--target=<dep_name>]
-    argparse::ArgumentParser build_deps_command("build-dependencies");
-    build_deps_command.add_description("Build dependencies.");
-    build_deps_command.add_argument("--project")
-        .help("Path to iris_project.json")
-        .default_value("iris_project.json");
-    build_deps_command.add_argument("--target")
-        .help("Build only this dependency (repeatable)")
-        .default_value<std::vector<std::string>>({})
-        .append();
-    program.add_subparser(build_deps_command);
-
-    try
+    if (!error.source_position.has_value())
     {
-        program.parse_args(argc, argv);
-    }
-    catch (std::exception const& error)
-    {
-        std::cerr << error.what() << std::endl;
-        std::cerr << program;
-        std::exit(1);
+        std::fprintf(
+            stderr,
+            "  reported without a source position, from %s:%u in %s\n",
+            error.throw_site.file_name(),
+            error.throw_site.line(),
+            error.throw_site.function_name()
+        );
     }
 
+    std::fflush(stderr);
+}
+
+static void report_internal_compiler_error(std::string_view const message)
+{
+    std::pmr::polymorphic_allocator<> allocator{};
+
+    std::fflush(stdout);
+    std::fprintf(stderr, "internal compiler error: %.*s\n", static_cast<int>(message.size()), message.data());
+
+    std::pmr::string const context = iris::compiler::format_compilation_context(allocator);
+    if (!context.empty())
+        std::fprintf(stderr, "%s", context.c_str());
+
+    std::fprintf(stderr, "This is a bug in the iris compiler. Please report it.\n");
+    std::fflush(stderr);
+
+    iris::common::print_stacktrace();
+}
+
+static int run_subcommand(argparse::ArgumentParser& program, int const argc, char const* const* argv)
+{
     if (program.is_subcommand_used("build"))
     {
         print_arguments(argc, argv);
@@ -602,7 +657,8 @@ int main(int const argc, char const* const* argv)
         iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks);
+        std::optional<bool> const decimal_overflow_checks = get_decimal_overflow_checks(subprogram);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks, decimal_overflow_checks);
 
         iris::compiler::Builder_options const builder_options =
         {
@@ -620,17 +676,9 @@ int main(int const argc, char const* const* argv)
             {}
         );
 
-        try
-        {
-            std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
-            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name, environment_variables);
-            iris::compiler::build_artifacts(builder, artifact_paths);
-        }
-        catch (std::exception const& error)
-        {
-            std::cerr << error.what() << std::endl;
-            std::exit(1);
-        }
+        std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
+        std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name, environment_variables);
+        iris::compiler::build_artifacts(builder, artifact_paths);
     }
     else if (program.is_subcommand_used("build-tests"))
     {
@@ -648,7 +696,8 @@ int main(int const argc, char const* const* argv)
         iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks);
+        std::optional<bool> const decimal_overflow_checks = get_decimal_overflow_checks(subprogram);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks, decimal_overflow_checks);
 
         iris::compiler::Builder_options const builder_options =
         {
@@ -667,17 +716,9 @@ int main(int const argc, char const* const* argv)
             {}
         );
 
-        try
-        {
-            std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
-            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name, environment_variables);
-            iris::compiler::build_artifacts(builder, artifact_paths);
-        }
-        catch (std::exception const& error)
-        {
-            std::cerr << error.what() << std::endl;
-            std::exit(1);
-        }
+        std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
+        std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name, environment_variables);
+        iris::compiler::build_artifacts(builder, artifact_paths);
     }
     else if (program.is_subcommand_used("test"))
     {
@@ -695,7 +736,8 @@ int main(int const argc, char const* const* argv)
         iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks);
+        std::optional<bool> const decimal_overflow_checks = get_decimal_overflow_checks(subprogram);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, no_debug, contract_options, no_bounds_checks, decimal_overflow_checks);
 
         iris::compiler::Builder_options const builder_options =
         {
@@ -714,22 +756,33 @@ int main(int const argc, char const* const* argv)
             {}
         );
 
-        try
+        std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
+        std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name, environment_variables);
+        iris::compiler::build_artifacts(builder, artifact_paths);
+
+        std::string forwarded_arguments;
+        if (subprogram.get<bool>("--list-tests"))
+            forwarded_arguments += " --list-tests";
+        if (subprogram.get<bool>("--stop-on-crash"))
+            forwarded_arguments += " --stop-on-crash";
+        for (std::string const& test_name : subprogram.get<std::vector<std::string>>("--test-name"))
+            forwarded_arguments += std::format(" \"--test-name={}\"", test_name);
+
+        Test_run_summary const summary = run_test_executables(artifact_paths, build_directory_path, target, environment_variables, forwarded_arguments);
+
+        if (summary.incomplete_count != 0)
         {
-            std::optional<std::string> const artifact_name = subprogram.present<std::string>("artifact_name");
-            std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name, environment_variables);
-            iris::compiler::build_artifacts(builder, artifact_paths);
-            int const failed_tests = run_test_executables(artifact_paths, build_directory_path, target, environment_variables);
-            if (failed_tests != 0)
-            {
-                std::cerr << std::format("{} test executable(s) failed.\n", failed_tests);
-                return 1;
-            }
+            std::cerr << std::format("{} test executable(s) did not run to completion. Test results are incomplete.\n", summary.incomplete_count);
+            return 1;
         }
-        catch (std::exception const& error)
+
+        if (subprogram.get<bool>("--list-tests"))
+            return 0;
+
+        if (summary.failed_count != 0)
         {
-            std::cerr << error.what() << std::endl;
-            std::exit(1);
+            std::cerr << std::format("{} test executable(s) reported failing tests.\n", summary.failed_count);
+            return 1;
         }
     }
     else if (program.is_subcommand_used("list"))
@@ -772,12 +825,15 @@ int main(int const argc, char const* const* argv)
         std::pmr::vector<std::pmr::string> const public_prefixes = convert_to_vector(subprogram.get<std::vector<std::string>>("--header-public-prefix"));
         std::pmr::vector<std::pmr::string> const remove_prefixes = convert_to_vector(subprogram.get<std::vector<std::string>>("--header-remove-prefix"));
 
+        bool const optional_pointers = subprogram.get<bool>("--optional-pointers");
+
         iris::c::Options const options
         {
             .target_triple = target_triple,
             .include_directories = header_search_paths,
             .public_prefixes = public_prefixes,
             .remove_prefixes = remove_prefixes,
+            .wrap_pointers_as_optional = optional_pointers,
         };
 
         std::optional<iris::Module> const header_module = iris::c::import_header_and_write_to_file(module_name, input_file_path, output_file_path, options);
@@ -811,7 +867,7 @@ int main(int const argc, char const* const* argv)
         std::pmr::vector<std::filesystem::path> const repository_paths = get_effective_repository_paths_argument(subprogram, presets);
 
         iris::compiler::Target const target = iris::compiler::get_default_target();
-        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, false, iris::compiler::Contract_options::Log_error_and_abort, false);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, false, iris::compiler::Contract_options::Log_error_and_abort, false, std::nullopt);
 
         iris::compiler::Builder_options const builder_options =
         {
@@ -892,4 +948,181 @@ int main(int const argc, char const* const* argv)
     }
 
     return 0;
+}
+
+int main(int const argc, char const* const* argv)
+{
+    iris::common::install_abort_handlers();
+
+    // Without this, output buffered in stdout is lost on an abort and a crash reads as silence.
+    // _IOLBF is not honoured by the Windows CRT and its assertion rejects a zero size, so the
+    // portable way to get the same guarantee is to not buffer at all.
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+
+    argparse::ArgumentParser program("iris");
+
+    // iris build [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header_search_path>]... [--repository=<repository_path>]...
+    argparse::ArgumentParser build_command("build");
+    build_command.add_description("Build one or more artifacts. If no artifact name is provided all artifacts are discovered recursively.");
+    build_command.add_argument("artifact_name")
+        .help("Optional artifact name")
+        .nargs(argparse::nargs_pattern::optional);
+    add_build_directory_argument(build_command);
+    add_header_search_path_argument(build_command);
+    add_repository_argument(build_command);
+    add_no_debug_argument(build_command);
+    add_no_bounds_checks_argument(build_command);
+    add_decimal_overflow_checks_arguments(build_command);
+    add_output_llvm_ir_argument(build_command);
+    add_function_contract_options_argument(build_command);
+    program.add_subparser(build_command);
+    
+    // iris build-tests [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
+    argparse::ArgumentParser build_tests_command("build-tests");
+    build_tests_command.add_description("Build one or more artifacts in test mode. If no artifact name is provided all artifacts are discovered recursively.");
+    build_tests_command.add_argument("artifact_name")
+        .help("Optional artifact name")
+        .nargs(argparse::nargs_pattern::optional);
+    add_build_directory_argument(build_tests_command);
+    add_header_search_path_argument(build_tests_command);
+    add_repository_argument(build_tests_command);
+    add_no_debug_argument(build_tests_command);
+    add_no_bounds_checks_argument(build_tests_command);
+    add_decimal_overflow_checks_arguments(build_tests_command);
+    add_output_llvm_ir_argument(build_tests_command);
+    add_function_contract_options_argument(build_tests_command);
+    program.add_subparser(build_tests_command);
+
+    // iris test [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
+    argparse::ArgumentParser test_command("test");
+    test_command.add_description("Build tests and execute test binaries. If no artifact name is provided all artifacts are discovered recursively.");
+    test_command.add_argument("artifact_name")
+        .help("Optional artifact name")
+        .nargs(argparse::nargs_pattern::optional);
+    add_build_directory_argument(test_command);
+    add_header_search_path_argument(test_command);
+    add_repository_argument(test_command);
+    add_no_debug_argument(test_command);
+    add_no_bounds_checks_argument(test_command);
+    add_decimal_overflow_checks_arguments(test_command);
+    add_output_llvm_ir_argument(test_command);
+    add_function_contract_options_argument(test_command);
+    test_command.add_argument("--test-name")
+        .help("Run only the test with this name (repeatable). Names are '<module>.<test>'.")
+        .default_value<std::vector<std::string>>({})
+        .append();
+    test_command.add_argument("--list-tests")
+        .help("List the tests each test executable contains instead of running them")
+        .flag();
+    test_command.add_argument("--stop-on-crash")
+        .help("Stop a test executable's run when a test crashes instead of continuing with the next one")
+        .flag();
+    program.add_subparser(test_command);
+
+    // iris list [--build-directory=<build_directory>]
+    argparse::ArgumentParser list_command("list");
+    list_command.add_description("List all discovered artifacts and the output path where each will be built.");
+    add_build_directory_argument(list_command);
+    program.add_subparser(list_command);
+
+    // iris import-c-header <module_name> <header> <output>
+    argparse::ArgumentParser import_c_header_command("import-c-header");
+    import_c_header_command.add_description("Parse a C header file, convert it into an iris module and write the result to a file.");
+    import_c_header_command.add_argument("module_name")
+        .help("Module name of the output iris module");
+    import_c_header_command.add_argument("header")
+        .help("C Header file path to import");
+    import_c_header_command.add_argument("output")
+        .help("Write iris module to this location");
+    add_target_triple_argument(import_c_header_command);
+    add_header_search_path_argument(import_c_header_command);
+    add_header_public_prefix_argument(import_c_header_command);
+    add_header_remove_prefix_argument(import_c_header_command);
+    add_optional_pointers_argument(import_c_header_command);
+    program.add_subparser(import_c_header_command);
+
+    // iris print-struct-layout <file> <struct_name> [--target=<target_triple>]
+    argparse::ArgumentParser print_struct_layout_command("print-struct-layout");
+    print_struct_layout_command.add_description("Print a JSON describing the layout of the specified struct.");
+    print_struct_layout_command.add_argument("file")
+        .help("Path to the core module file that contains the struct");
+    print_struct_layout_command.add_argument("struct_name")
+        .help("Name of the struct");
+    add_target_triple_argument(print_struct_layout_command);
+    program.add_subparser(print_struct_layout_command);
+
+    // iris generate-compile-commands [--artifact-file=<artifact_file>] [--output-file=<output_file>] [--build-directory=<build_directory>] [--header-search-path=<header_search_path>]... [--repository=<repository_path>]...
+    argparse::ArgumentParser generate_compile_commands_command("generate-compile-commands");
+    generate_compile_commands_command.add_description("Generate compile_commands.json for C++ files.");
+    add_artifact_file_argument(generate_compile_commands_command);
+    generate_compile_commands_command.add_argument("--output-file")
+        .help("Path to the compile_commands.json file")
+        .default_value("build/compile_commands.json");
+    add_build_directory_argument(generate_compile_commands_command);
+    add_header_search_path_argument(generate_compile_commands_command);
+    add_repository_argument(generate_compile_commands_command);
+    add_target_triple_argument(generate_compile_commands_command);
+    program.add_subparser(generate_compile_commands_command);
+
+    // iris download-dependencies [--project=<project_file>] [--target=<dep_name>]
+    argparse::ArgumentParser download_deps_command("download-dependencies");
+    download_deps_command.add_description("Download dependency source archives.");
+    download_deps_command.add_argument("--project")
+        .help("Path to iris_project.json")
+        .default_value("iris_project.json");
+    download_deps_command.add_argument("--target")
+        .help("Download only this dependency (repeatable)")
+        .default_value<std::vector<std::string>>({})
+        .append();
+    program.add_subparser(download_deps_command);
+
+    // iris build-dependencies [--project=<project_file>] [--target=<dep_name>]
+    argparse::ArgumentParser build_deps_command("build-dependencies");
+    build_deps_command.add_description("Build dependencies.");
+    build_deps_command.add_argument("--project")
+        .help("Path to iris_project.json")
+        .default_value("iris_project.json");
+    build_deps_command.add_argument("--target")
+        .help("Build only this dependency (repeatable)")
+        .default_value<std::vector<std::string>>({})
+        .append();
+    program.add_subparser(build_deps_command);
+
+    try
+    {
+        program.parse_args(argc, argv);
+    }
+    catch (std::exception const& error)
+    {
+        std::cerr << error.what() << std::endl;
+        std::cerr << program;
+        std::exit(1);
+    }
+
+    try
+    {
+        return run_subcommand(program, argc, argv);
+    }
+    catch (Cli_error const& error)
+    {
+        std::fflush(stdout);
+        std::fprintf(stderr, "error: %s\n", error.what());
+        std::fflush(stderr);
+        return 1;
+    }
+    catch (iris::compiler::Compile_error const& error)
+    {
+        report_compile_error(error);
+        return 1;
+    }
+    catch (std::exception const& error)
+    {
+        report_internal_compiler_error(error.what());
+        return 1;
+    }
+    catch (...)
+    {
+        report_internal_compiler_error("unknown exception type");
+        return 1;
+    }
 }

@@ -7,12 +7,19 @@ import iris.compiler.compile_commands_generator;
 import iris.compiler.target;
 
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
+#include <format>
+#include <cstdint>
 #include <fstream>
+#include <iterator>
 #include <span>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 #include <catch2/catch_all.hpp>
 
@@ -60,14 +67,15 @@ namespace iris::compiler
         return std::pmr::string{name} + ".o";
     }
 
-    void test_builder(
+    std::filesystem::path test_builder(
         std::string_view const project_name,
         std::pmr::vector<std::filesystem::path> const& artifact_paths,
         iris::compiler::Target const& target,
         std::span<std::filesystem::path const> const additional_repository_paths,
         std::span<std::filesystem::path const> const expected_output_paths,
         std::optional<std::string_view> const temporary_directory_name = std::nullopt,
-        iris::compiler::Builder_options const builder_options = {}
+        iris::compiler::Builder_options const builder_options = {},
+        iris::compiler::Compilation_options const compilation_options = {}
     )
     {
         std::filesystem::path const temporary_directory_path = std::filesystem::temp_directory_path();
@@ -84,10 +92,6 @@ namespace iris::compiler
         repository_paths.insert(repository_paths.end(), additional_repository_paths.begin(), additional_repository_paths.end());
 
         std::filesystem::remove_all(build_directory_path);
-
-        iris::compiler::Compilation_options const compilation_options
-        {
-        };
 
         Builder builder = create_builder(
             target,
@@ -106,6 +110,120 @@ namespace iris::compiler
             std::filesystem::path const output_path = build_directory_path / expected_output_path;
             CHECK(std::filesystem::exists(output_path));
         }
+
+        return build_directory_path;
+    }
+
+    // Builds like test_builder, then actually executes the generated test executable and requires
+    // it to succeed. Checking that an output file exists only proves the artifact linked; it does
+    // not prove the program computes the right answer, and for a long time nothing in this repo
+    // ran generated code at all. See Plans/bug_decimal64_arithmetic_needs_divti3.md.
+    void test_builder_and_run(
+        std::string_view const project_name,
+        std::pmr::vector<std::filesystem::path> const& artifact_paths,
+        iris::compiler::Target const& target,
+        std::span<std::filesystem::path const> const additional_repository_paths,
+        std::span<std::filesystem::path const> const expected_output_paths,
+        std::string_view const test_executable_name,
+        std::optional<std::string_view> const temporary_directory_name = std::nullopt,
+        iris::compiler::Compilation_options const compilation_options = {}
+    )
+    {
+        std::filesystem::path const build_directory_path = test_builder(
+            project_name,
+            artifact_paths,
+            target,
+            additional_repository_paths,
+            expected_output_paths,
+            temporary_directory_name,
+            {.is_test_mode = true},
+            compilation_options
+        );
+
+        std::filesystem::path const test_executable_path =
+            build_directory_path / "bin" / get_binary_name(test_executable_name, target);
+
+        REQUIRE(std::filesystem::exists(test_executable_path));
+
+        std::string const command = std::format("\"{}\"", test_executable_path.generic_string());
+        int const exit_code = std::system(command.c_str());
+        CHECK(exit_code == 0);
+    }
+
+    struct Test_run_output
+    {
+        int exit_code = 0;
+        std::string output;
+    };
+
+    // Like test_builder_and_run, but captures the runner's own transcript instead of only looking
+    // at the exit code.
+    Test_run_output test_builder_and_capture_run(
+        std::string_view const project_name,
+        std::pmr::vector<std::filesystem::path> const& artifact_paths,
+        iris::compiler::Target const& target,
+        std::span<std::filesystem::path const> const additional_repository_paths,
+        std::span<std::filesystem::path const> const expected_output_paths,
+        std::string_view const test_executable_name,
+        std::optional<std::string_view> const temporary_directory_name = std::nullopt,
+        std::string_view const test_executable_arguments = {}
+    )
+    {
+        std::filesystem::path const build_directory_path = test_builder(
+            project_name,
+            artifact_paths,
+            target,
+            additional_repository_paths,
+            expected_output_paths,
+            temporary_directory_name,
+            {.is_test_mode = true},
+            {}
+        );
+
+        std::filesystem::path const test_executable_path =
+            build_directory_path / "bin" / get_binary_name(test_executable_name, target);
+
+        REQUIRE(std::filesystem::exists(test_executable_path));
+
+        std::filesystem::path const output_file_path = build_directory_path / "test_run_output.txt";
+
+#if defined(_WIN32)
+        // 'cmd /c' removes the first and last quote character of the whole string, which would
+        // unbalance the quotes around the executable and the redirection target and yield "The
+        // filename, directory name, or volume label syntax is incorrect". An extra outer pair
+        // absorbs that.
+        std::string const command = std::format(
+            "\"\"{}\"{} > \"{}\" 2>&1\"",
+            test_executable_path.generic_string(),
+            test_executable_arguments,
+            output_file_path.generic_string()
+        );
+#else
+        std::string const command = std::format(
+            "\"{}\"{} > \"{}\" 2>&1",
+            test_executable_path.generic_string(),
+            test_executable_arguments,
+            output_file_path.generic_string()
+        );
+#endif
+
+        Test_run_output result;
+        result.exit_code = std::system(command.c_str());
+
+        std::ifstream output_stream{ output_file_path };
+        result.output = std::string{ std::istreambuf_iterator<char>{output_stream}, std::istreambuf_iterator<char>{} };
+
+        return result;
+    }
+
+    static std::uint64_t count_occurrences(std::string_view const haystack, std::string_view const needle)
+    {
+        std::uint64_t count = 0;
+
+        for (std::size_t position = haystack.find(needle); position != std::string_view::npos; position = haystack.find(needle, position + needle.size()))
+            count += 1;
+
+        return count;
     }
 
     void test_compile_commands(
@@ -423,6 +541,241 @@ namespace iris::compiler
         test_builder("Test_framework", {"empty_app/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_3", {.is_test_mode = true});
     }
 
+    TEST_CASE("Test runner always prints a summary line even when everything passes", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("my_library.iris.test", target)
+        };
+
+        Test_run_output const result = test_builder_and_capture_run(
+            "Test_framework",
+            {"my_library/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "my_library.iris.test",
+            "Test_framework_summary"
+        );
+
+        CHECK(result.exit_code == 0);
+        CHECK(result.output.find("1 tests selected, 1 run, 1 passed, 0 failed (0 crashed), 0 not run") != std::string::npos);
+        CHECK(count_occurrences(result.output, "[ RUN      ]") == 1);
+    }
+
+    TEST_CASE("A crashing test is named and the rest of the suite still runs", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework_crash" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("crashrepro.iris.test", target)
+        };
+
+        Test_run_output const result = test_builder_and_capture_run(
+            "Test_framework_crash",
+            {"crashrepro/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "crashrepro.iris.test",
+            "Test_framework_crash_0"
+        );
+
+        // The crashing test is named, rather than being identifiable only by the last RUN line.
+        CHECK(result.output.find("CRASH") != std::string::npos);
+        CHECK(result.output.find("crashrepro.b_crash.test_b_crashes") != std::string::npos);
+
+        // The run continued past the crash: both modules ordered after it were executed.
+        CHECK(result.output.find("crashrepro.c_last.test_c_never_runs_one") != std::string::npos);
+        CHECK(result.output.find("crashrepro.c_last.test_c_never_runs_two") != std::string::npos);
+        CHECK(count_occurrences(result.output, "[ RUN      ]") == 5);
+
+        // The summary reconciles, and the run is reported as complete rather than truncated.
+        CHECK(result.output.find("5 tests selected, 5 run, 4 passed, 1 failed (1 crashed), 0 not run") != std::string::npos);
+        CHECK(result.exit_code != 0);
+    }
+
+    TEST_CASE("Stopping on a crash reports which tests were not executed", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework_crash" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("crashrepro.iris.test", target)
+        };
+
+        Test_run_output const result = test_builder_and_capture_run(
+            "Test_framework_crash",
+            {"crashrepro/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "crashrepro.iris.test",
+            "Test_framework_crash_1",
+            " --stop-on-crash"
+        );
+
+        CHECK(result.output.find("5 tests selected, 3 run, 2 passed, 1 failed (1 crashed), 2 not run") != std::string::npos);
+        CHECK(result.output.find("2 tests were not executed:") != std::string::npos);
+        CHECK(result.output.find("crashrepro.c_last.test_c_never_runs_one") != std::string::npos);
+
+        // Exit code 2 means "the run is incomplete", which the driver reports differently from a
+        // run that completed with failing tests.
+        CHECK(result.exit_code == 2);
+    }
+
+    TEST_CASE("An unmatched test name argument is an error rather than an empty successful run", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("my_library.iris.test", target)
+        };
+
+        Test_run_output const result = test_builder_and_capture_run(
+            "Test_framework",
+            {"my_library/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "my_library.iris.test",
+            "Test_framework_unknown_test_name",
+            " --test-name=my_library.no_such_test"
+        );
+
+        CHECK(result.exit_code == 2);
+        CHECK(result.output.find("no test named 'my_library.no_such_test'") != std::string::npos);
+    }
+
+    // Guards Plans/bug_decimal64_arithmetic_needs_divti3.md: multiply, divide and narrowing casts
+    // of an Int64-backed decimal emit 'sdiv i128', which lowers to a call to compiler-rt's
+    // __divti3. Without the builtins archive on the link line this fails with
+    // "undefined symbol: __divti3". This test links and runs, so it catches both the missing
+    // symbol and a wrong result.
+    TEST_CASE("Build and run Decimal_arithmetic decimal_app in test mode", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Decimal_arithmetic" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "decimal_app.test.bc",
+            std::filesystem::path{"artifacts"} / "decimal_app.generated_tests_information.test.bc",
+            std::filesystem::path{"bin"} / get_binary_name("decimal_app.iris.test", target)
+        };
+
+        test_builder_and_run(
+            "Decimal_arithmetic",
+            {"decimal_app/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "decimal_app.iris.test"
+        );
+    }
+
+    TEST_CASE("Build and run Decimal_arithmetic decimal_app with decimal overflow checks", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Decimal_arithmetic" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("decimal_app.iris.test", target)
+        };
+
+        test_builder_and_run(
+            "Decimal_arithmetic",
+            {"decimal_app/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "decimal_app.iris.test",
+            "Decimal_arithmetic_overflow_checks",
+            {.enable_decimal_overflow_checks = true}
+        );
+    }
+
+    TEST_CASE("Build and run Decimal_arithmetic decimal_overflow_app", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Decimal_arithmetic" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("decimal_overflow_app", target)
+        };
+
+        auto const build_and_run = [&](std::string_view const directory_name, bool const enable_checks) -> int
+        {
+            std::filesystem::path const build_directory_path = test_builder(
+                "Decimal_arithmetic",
+                {"decimal_overflow_app/iris_artifact.json"},
+                target,
+                repository_paths,
+                expected_output_paths,
+                directory_name,
+                {},
+                // Built without debug information on purpose: the check ends in the CRT's abort(),
+                // and the debug CRT turns that into a modal "Debug Error!" box that blocks forever
+                // when nobody is there to dismiss it.
+                {.debug = false, .enable_decimal_overflow_checks = enable_checks}
+            );
+
+            std::filesystem::path const executable_path =
+                build_directory_path / "bin" / get_binary_name("decimal_overflow_app", target);
+
+            REQUIRE(std::filesystem::exists(executable_path));
+
+            std::string const command = std::format("\"{}\"", executable_path.generic_string());
+            return std::system(command.c_str());
+        };
+
+        // Without the checks the overflow is silent. main returns the result as an Int32, so the
+        // exit code is the truncated answer: 4_500_000_000 wraps to 205_032_704, which as a
+        // Decimal6 is 205.032704 and rounds to 205 instead of 4500.
+        CHECK(build_and_run("Decimal_arithmetic_overflow_unchecked", false) == 205);
+
+        // With them it aborts.
+        CHECK(build_and_run("Decimal_arithmetic_overflow_checked", true) != 0);
+    }
+
     TEST_CASE("Build Copy_files", "[Builder]")
     {
         iris::compiler::Target const target = iris::compiler::get_default_target();
@@ -552,10 +905,29 @@ namespace iris::compiler
             build_artifacts(builder, artifact_absolute_paths);
         };
 
+        // 'my_app' returns 'data.last', so its exit code is the value it read. That makes the exit
+        // code the assertion that actually encodes this bug: 'last' defaults to 2 and the field
+        // inserted below defaults to 3, and inserting it moves 'last' from offset 4 to offset 8. A
+        // correctly rebuilt program therefore exits 2, while one still compiled against the old
+        // layout reads offset 4 - now holding 'inserted' - and exits 3. Checking only that the
+        // bitcode was rewritten would pass even if the recompile produced wrong code.
+        auto const run_app_and_get_exit_code = [&]() -> int
+        {
+            std::filesystem::path const app_executable_path =
+                build_directory_path / "bin" / get_binary_name("my_app", target);
+
+            REQUIRE(std::filesystem::exists(app_executable_path));
+
+            std::string const command = std::format("\"{}\"", app_executable_path.generic_string());
+            return std::system(command.c_str());
+        };
+
         build();
 
         std::filesystem::path const app_bitcode_path = build_directory_path / "artifacts" / "my_app.bc";
         REQUIRE(std::filesystem::exists(app_bitcode_path));
+
+        CHECK(run_app_and_get_exit_code() == 2);
 
         std::filesystem::file_time_type const first_build_time = std::filesystem::last_write_time(app_bitcode_path);
 
@@ -588,6 +960,9 @@ namespace iris::compiler
 
         std::filesystem::file_time_type const second_build_time = std::filesystem::last_write_time(app_bitcode_path);
         CHECK(second_build_time > first_build_time);
+
+        // 3 here would mean the module was recompiled against the old layout rather than not at all.
+        CHECK(run_app_and_get_exit_code() == 2);
     }
 
     // A build with no source changes must not recompile anything, otherwise the fix above would
@@ -655,6 +1030,439 @@ namespace iris::compiler
 
         CHECK(std::filesystem::last_write_time(app_bitcode_path) == first_app_time);
         CHECK(std::filesystem::last_write_time(library_bitcode_path) == first_library_time);
+    }
+
+    // Sets up a copy of 'Import_c_header_with_dependency' in which 'module_b.h' pulls its struct in
+    // from a second header rather than declaring it inline. That second header is what the tests
+    // below edit: it is reachable only through a '#include', so nothing in the artifact file names
+    // it and only the recorded include set can connect it to the generated module.
+    //
+    // The example is used as the base because its 'module_b.h' also includes a header that this same
+    // build generates from 'module_a.iris'. That generated header shares its timestamp with the rest
+    // of the build, which is exactly the tie that must not be read as "out of date".
+    struct Nested_header_project
+    {
+        std::filesystem::path source_directory_path;
+        std::filesystem::path build_directory_path;
+        std::filesystem::path shared_header_path;
+        std::pmr::vector<std::filesystem::path> artifact_absolute_paths;
+        std::pmr::vector<std::filesystem::path> repository_paths;
+    };
+
+    static Nested_header_project create_nested_header_project(
+        std::string_view const directory_name,
+        bool const with_shared_header = true
+    )
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / directory_name;
+        std::filesystem::path const source_directory_path = root_directory_path / "source";
+        std::filesystem::path const build_directory_path = root_directory_path / "build";
+
+        std::filesystem::remove_all(root_directory_path);
+        std::filesystem::create_directories(root_directory_path);
+        std::filesystem::copy(
+            g_examples_directory / "Import_c_header_with_dependency",
+            source_directory_path,
+            std::filesystem::copy_options::recursive
+        );
+
+        std::filesystem::path const shared_header_path = source_directory_path / "shared.h";
+
+        if (with_shared_header)
+        {
+            write_source_file(
+                shared_header_path,
+                "struct my_library_module_b_Shared\n"
+                "{\n"
+                "    int first;\n"
+                "    int last;\n"
+                "};\n"
+            );
+
+            write_source_file(
+                source_directory_path / "module_b.h",
+                "#include \"my_library/module_a.h\"\n"
+                "#include \"shared.h\"\n"
+                "\n"
+                "struct my_library_module_a_My_struct my_library_module_b_get_struct(void);\n"
+                "\n"
+                "struct my_library_module_b_Wrapper\n"
+                "{\n"
+                "    struct my_library_module_b_Shared shared;\n"
+                "};\n"
+            );
+        }
+
+        return Nested_header_project
+        {
+            .source_directory_path = source_directory_path,
+            .build_directory_path = build_directory_path,
+            .shared_header_path = shared_header_path,
+            .artifact_absolute_paths = { source_directory_path / "iris_artifact.json" },
+            .repository_paths = { g_standard_repository_file_path },
+        };
+    }
+
+    static void build_nested_header_project(Nested_header_project const& project)
+    {
+        std::pmr::vector<std::filesystem::path> const header_search_directories = iris::common::get_default_header_search_directories();
+
+        Builder builder = create_builder(
+            iris::compiler::get_default_target(),
+            project.build_directory_path,
+            header_search_directories,
+            project.repository_paths,
+            iris::compiler::Compilation_options{},
+            iris::compiler::Builder_options{},
+            {}
+        );
+
+        build_artifacts(builder, project.artifact_absolute_paths);
+    }
+
+    // Regression test: the module generated from a C header used to be considered up to date
+    // whenever it was newer than the header named in the artifact file. A header reached only
+    // through a '#include' was therefore invisible, so changing a struct in it left every dependent
+    // compiled against the old layout with nothing reported - the same silent failure the iris to
+    // iris case above covers.
+    TEST_CASE("Incremental build re-imports a C header when a transitively included header changes", "[Builder]")
+    {
+        Nested_header_project const project = create_nested_header_project("builder_incremental_nested_c_header");
+
+        std::filesystem::path const header_module_path = project.build_directory_path / "artifacts" / "my_library.module_b.irisb";
+        // The default Compilation_options leave output_debug_code_view off, so codegen writes
+        // bitcode rather than object files.
+        std::filesystem::path const dependent_object_path = project.build_directory_path / "artifacts" / "my_library.module_c.bc";
+
+        build_nested_header_project(project);
+
+        REQUIRE(std::filesystem::exists(header_module_path));
+        REQUIRE(std::filesystem::exists(dependent_object_path));
+
+        std::filesystem::file_time_type const first_header_module_time = std::filesystem::last_write_time(header_module_path);
+        std::filesystem::file_time_type const first_dependent_time = std::filesystem::last_write_time(dependent_object_path);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 1100 });
+
+        // Inserting a field at the front moves every following member, so a dependent that was not
+        // regenerated would read the wrong offsets.
+        write_source_file(
+            project.shared_header_path,
+            "struct my_library_module_b_Shared\n"
+            "{\n"
+            "    long long inserted;\n"
+            "    int first;\n"
+            "    int last;\n"
+            "};\n"
+        );
+
+        build_nested_header_project(project);
+
+        CHECK(std::filesystem::last_write_time(header_module_path) > first_header_module_time);
+        CHECK(std::filesystem::last_write_time(dependent_object_path) > first_dependent_time);
+    }
+
+    // The guard for the test above. 'module_b.h' includes a header generated by this same build, so
+    // its recorded includes routinely carry the build's own timestamp; if a tie were read as "out of
+    // date" every build would re-import every header and recompile everything downstream of it.
+    TEST_CASE("Incremental build does not re-import an unchanged C header", "[Builder]")
+    {
+        Nested_header_project const project = create_nested_header_project("builder_incremental_c_header_unchanged");
+
+        std::filesystem::path const header_module_path = project.build_directory_path / "artifacts" / "my_library.module_b.irisb";
+        std::filesystem::path const module_a_object_path = project.build_directory_path / "artifacts" / "my_library.module_a.bc";
+        std::filesystem::path const module_c_object_path = project.build_directory_path / "artifacts" / "my_library.module_c.bc";
+
+        build_nested_header_project(project);
+
+        REQUIRE(std::filesystem::exists(header_module_path));
+        REQUIRE(std::filesystem::exists(module_a_object_path));
+        REQUIRE(std::filesystem::exists(module_c_object_path));
+
+        std::filesystem::file_time_type const first_header_module_time = std::filesystem::last_write_time(header_module_path);
+        std::filesystem::file_time_type const first_module_a_time = std::filesystem::last_write_time(module_a_object_path);
+        std::filesystem::file_time_type const first_module_c_time = std::filesystem::last_write_time(module_c_object_path);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 1100 });
+
+        build_nested_header_project(project);
+
+        CHECK(std::filesystem::last_write_time(header_module_path) == first_header_module_time);
+        CHECK(std::filesystem::last_write_time(module_a_object_path) == first_module_a_time);
+        CHECK(std::filesystem::last_write_time(module_c_object_path) == first_module_c_time);
+    }
+
+    TEST_CASE("C header dependency file lists transitively included headers", "[Builder]")
+    {
+        Nested_header_project const project = create_nested_header_project("builder_c_header_dependency_file");
+
+        build_nested_header_project(project);
+
+        std::filesystem::path const dependency_file_path = project.build_directory_path / "artifacts" / "my_library.module_b.irisb.deps.json";
+        REQUIRE(std::filesystem::exists(dependency_file_path));
+
+        std::optional<std::pmr::string> const contents = iris::common::get_file_contents(dependency_file_path);
+        REQUIRE(contents.has_value());
+
+        nlohmann::json const json = nlohmann::json::parse(contents.value(), nullptr, false);
+        REQUIRE_FALSE(json.is_discarded());
+        CHECK(json["version"] == 1);
+        CHECK(json["module_name"] == "my_library.module_b");
+
+        std::pmr::vector<std::string> filenames;
+        for (nlohmann::json const& include : json["includes"])
+            filenames.push_back(std::filesystem::path{include.get<std::string>()}.filename().generic_string());
+
+        auto const contains = [&](std::string_view const filename) -> bool
+        {
+            return std::find(filenames.begin(), filenames.end(), filename) != filenames.end();
+        };
+
+        CHECK(contains("module_b.h"));
+        CHECK(contains("shared.h"));
+        // Generated by this same build from 'module_a.iris'.
+        CHECK(contains("module_a.h"));
+    }
+
+    // A build directory produced by an older compiler has no dependency file beside the '.irisb'.
+    // There is no way to tell what that module was generated from, so it must be re-imported rather
+    // than trusted.
+    TEST_CASE("A build directory without header dependency files is re-imported", "[Builder]")
+    {
+        Nested_header_project const project = create_nested_header_project("builder_c_header_missing_dependency_file");
+
+        std::filesystem::path const header_module_path = project.build_directory_path / "artifacts" / "my_library.module_b.irisb";
+        std::filesystem::path const dependency_file_path = project.build_directory_path / "artifacts" / "my_library.module_b.irisb.deps.json";
+
+        build_nested_header_project(project);
+
+        REQUIRE(std::filesystem::exists(header_module_path));
+        REQUIRE(std::filesystem::exists(dependency_file_path));
+
+        std::filesystem::file_time_type const first_header_module_time = std::filesystem::last_write_time(header_module_path);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 1100 });
+
+        std::filesystem::remove(dependency_file_path);
+
+        build_nested_header_project(project);
+
+        CHECK(std::filesystem::last_write_time(header_module_path) > first_header_module_time);
+        CHECK(std::filesystem::exists(dependency_file_path));
+    }
+
+    // Regression test: the importer options were built after the cache was consulted and were not
+    // part of the key, so changing one produced a different module from the same header text while
+    // the build kept serving the old one.
+    TEST_CASE("Incremental build re-imports a C header when importer options change", "[Builder]")
+    {
+        Nested_header_project const project = create_nested_header_project("builder_c_header_option_change");
+
+        std::filesystem::path const header_module_path = project.build_directory_path / "artifacts" / "my_library.module_b.irisb";
+        std::filesystem::path const artifact_file_path = project.source_directory_path / "iris_artifact.json";
+
+        build_nested_header_project(project);
+
+        REQUIRE(std::filesystem::exists(header_module_path));
+
+        std::filesystem::file_time_type const first_header_module_time = std::filesystem::last_write_time(header_module_path);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 1100 });
+
+        std::optional<std::pmr::string> const artifact_contents = iris::common::get_file_contents(artifact_file_path);
+        REQUIRE(artifact_contents.has_value());
+
+        nlohmann::json artifact_json = nlohmann::json::parse(artifact_contents.value(), nullptr, false);
+        REQUIRE_FALSE(artifact_json.is_discarded());
+
+        for (nlohmann::json& source_group : artifact_json["sources"])
+        {
+            if (source_group["type"] == "import_c_header")
+                source_group["wrap_pointers_as_optional"] = true;
+        }
+
+        write_source_file(artifact_file_path, artifact_json.dump(4));
+
+        build_nested_header_project(project);
+
+        CHECK(std::filesystem::last_write_time(header_module_path) > first_header_module_time);
+    }
+
+    // The cache key is folded from unordered inputs in places, and an unstable key would re-import
+    // every header on every build without ever reporting why.
+    TEST_CASE("C header cache key is stable across identical builds", "[Builder]")
+    {
+        Nested_header_project const project = create_nested_header_project("builder_c_header_stable_key");
+
+        std::filesystem::path const dependency_file_path = project.build_directory_path / "artifacts" / "my_library.module_b.irisb.deps.json";
+
+        auto const read_cache_key = [&]() -> std::string
+        {
+            std::optional<std::pmr::string> const contents = iris::common::get_file_contents(dependency_file_path);
+            REQUIRE(contents.has_value());
+
+            nlohmann::json const json = nlohmann::json::parse(contents.value(), nullptr, false);
+            REQUIRE_FALSE(json.is_discarded());
+
+            return json["cache_key"].get<std::string>();
+        };
+
+        build_nested_header_project(project);
+        std::string const first_cache_key = read_cache_key();
+
+        // Force a re-import so that the key is recomputed rather than read back unchanged.
+        std::filesystem::remove(dependency_file_path);
+
+        build_nested_header_project(project);
+        std::string const second_cache_key = read_cache_key();
+
+        CHECK(first_cache_key == second_cache_key);
+    }
+
+    // Regression test: nothing in the build directory recorded which configuration produced it, so
+    // building with different codegen options into the same directory silently mixed objects.
+    //
+    // The '.irisb' files must survive: parsing does not depend on codegen options, and re-parsing
+    // every source file on a configuration toggle is the expensive half of a build for no gain.
+    TEST_CASE("Changing compilation options rebuilds objects but not modules", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "builder_compilation_options_change";
+        std::filesystem::path const source_directory_path = root_directory_path / "source";
+        std::filesystem::path const build_directory_path = root_directory_path / "build";
+
+        std::filesystem::remove_all(root_directory_path);
+        std::filesystem::create_directories(root_directory_path);
+        std::filesystem::copy(
+            g_examples_directory / "Link_with_library",
+            source_directory_path,
+            std::filesystem::copy_options::recursive
+        );
+
+        std::pmr::vector<std::filesystem::path> const artifact_absolute_paths
+        {
+            source_directory_path / "my_app" / "iris_artifact.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_standard_repository_file_path,
+            source_directory_path / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const header_search_directories = iris::common::get_default_header_search_directories();
+
+        auto const build = [&](iris::compiler::Compilation_options const& compilation_options) -> void
+        {
+            Builder builder = create_builder(
+                target,
+                build_directory_path,
+                header_search_directories,
+                repository_paths,
+                compilation_options,
+                iris::compiler::Builder_options{},
+                {}
+            );
+
+            build_artifacts(builder, artifact_absolute_paths);
+        };
+
+        iris::compiler::Compilation_options compilation_options{};
+        build(compilation_options);
+
+        std::filesystem::path const app_bitcode_path = build_directory_path / "artifacts" / "my_app.bc";
+        std::filesystem::path const app_module_path = build_directory_path / "artifacts" / "my_app.irisb";
+        std::filesystem::path const library_module_path = build_directory_path / "artifacts" / "my_library.irisb";
+
+        REQUIRE(std::filesystem::exists(app_bitcode_path));
+        REQUIRE(std::filesystem::exists(app_module_path));
+        REQUIRE(std::filesystem::exists(library_module_path));
+
+        std::filesystem::file_time_type const first_bitcode_time = std::filesystem::last_write_time(app_bitcode_path);
+        std::filesystem::file_time_type const first_app_module_time = std::filesystem::last_write_time(app_module_path);
+        std::filesystem::file_time_type const first_library_module_time = std::filesystem::last_write_time(library_module_path);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 1100 });
+
+        // Affects generated code but not the parse, and leaves the output extension alone so that
+        // the comparison below is against the very same file.
+        compilation_options.enable_bounds_checks = false;
+        build(compilation_options);
+
+        CHECK(std::filesystem::last_write_time(app_bitcode_path) > first_bitcode_time);
+        CHECK(std::filesystem::last_write_time(app_module_path) == first_app_module_time);
+        CHECK(std::filesystem::last_write_time(library_module_path) == first_library_module_time);
+    }
+
+    // A compiler upgrade cannot be simulated in-process, so the recorded identity is edited
+    // directly. That still exercises the whole path: the mismatch raises both floors, and every
+    // cached artifact must then be regenerated.
+    TEST_CASE("Build identity change invalidates modules and objects", "[Builder]")
+    {
+        Nested_header_project const project = create_nested_header_project("builder_build_identity_change");
+
+        std::filesystem::path const artifacts_directory = project.build_directory_path / "artifacts";
+        std::filesystem::path const build_state_path = artifacts_directory / "build_state.json";
+        std::filesystem::path const module_path = artifacts_directory / "my_library.module_a.irisb";
+        std::filesystem::path const header_module_path = artifacts_directory / "my_library.module_b.irisb";
+        std::filesystem::path const object_path = artifacts_directory / "my_library.module_a.bc";
+
+        build_nested_header_project(project);
+
+        REQUIRE(std::filesystem::exists(build_state_path));
+        REQUIRE(std::filesystem::exists(module_path));
+        REQUIRE(std::filesystem::exists(header_module_path));
+        REQUIRE(std::filesystem::exists(object_path));
+
+        std::filesystem::file_time_type const first_module_time = std::filesystem::last_write_time(module_path);
+        std::filesystem::file_time_type const first_header_module_time = std::filesystem::last_write_time(header_module_path);
+        std::filesystem::file_time_type const first_object_time = std::filesystem::last_write_time(object_path);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 1100 });
+
+        std::optional<std::pmr::string> const contents = iris::common::get_file_contents(build_state_path);
+        REQUIRE(contents.has_value());
+
+        nlohmann::json build_state = nlohmann::json::parse(contents.value(), nullptr, false);
+        REQUIRE_FALSE(build_state.is_discarded());
+
+        build_state["parse_identity"] = "0123456789abcdef";
+        build_state["codegen_identity"] = "fedcba9876543210";
+        write_source_file(build_state_path, build_state.dump(4));
+
+        build_nested_header_project(project);
+
+        CHECK(std::filesystem::last_write_time(module_path) > first_module_time);
+        CHECK(std::filesystem::last_write_time(header_module_path) > first_header_module_time);
+        CHECK(std::filesystem::last_write_time(object_path) > first_object_time);
+    }
+
+    // The guard for the test above. An identity that is not stable - a timestamp folded in by
+    // mistake, or a directory scan that picks up a file the build itself writes - would raise the
+    // floors on every build and silently turn every build into a full rebuild.
+    TEST_CASE("Build state survives an unchanged rebuild", "[Builder]")
+    {
+        Nested_header_project const project = create_nested_header_project("builder_build_state_stable");
+
+        std::filesystem::path const artifacts_directory = project.build_directory_path / "artifacts";
+        std::filesystem::path const parse_stamp_path = artifacts_directory / "parse.stamp";
+        std::filesystem::path const codegen_stamp_path = artifacts_directory / "codegen.stamp";
+
+        build_nested_header_project(project);
+
+        REQUIRE(std::filesystem::exists(parse_stamp_path));
+        REQUIRE(std::filesystem::exists(codegen_stamp_path));
+
+        std::filesystem::file_time_type const first_parse_stamp_time = std::filesystem::last_write_time(parse_stamp_path);
+        std::filesystem::file_time_type const first_codegen_stamp_time = std::filesystem::last_write_time(codegen_stamp_path);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 1100 });
+
+        build_nested_header_project(project);
+
+        CHECK(std::filesystem::last_write_time(parse_stamp_path) == first_parse_stamp_time);
+        CHECK(std::filesystem::last_write_time(codegen_stamp_path) == first_codegen_stamp_time);
     }
 
     TEST_CASE("Locate artifacts in a directory", "[Builder]")

@@ -23,24 +23,14 @@ struct My_struct
     (Module_name
       (Identifier_with_dots
         (Identifier))))
+  (Comment)
+  (Comment)
   (Declaration
-    (Comment)
     (Struct
       (Struct_name
         (Identifier))
       (Struct_members
-        (Struct_member
-          (Comment)
-          (Struct_member_name
-            (Identifier))
-          (Struct_member_type
-            (Type
-              (Type_name
-                (Identifier))))
-          (Generic_expression_or_instantiate
-            (Generic_expression
-              (Expression_constant
-                (Number)))))
+        (Comment)
         (Struct_member
           (Struct_member_name
             (Identifier))
@@ -53,7 +43,19 @@ struct My_struct
               (Expression_constant
                 (Number)))))
         (Struct_member
-          (Comment)
+          (Struct_member_name
+            (Identifier))
+          (Struct_member_type
+            (Type
+              (Type_name
+                (Identifier))))
+          (Generic_expression_or_instantiate
+            (Generic_expression
+              (Expression_constant
+                (Number)))))
+        (Comment)
+        (Comment)
+        (Struct_member
           (Struct_member_name
             (Identifier))
           (Struct_member_type

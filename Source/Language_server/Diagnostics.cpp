@@ -30,29 +30,6 @@ import iris.parser.parse_tree;
 
 namespace iris::language_server
 {
-    static std::pmr::string create_parser_diagnostic_message(
-        iris::parser::Parse_tree const& tree,
-        iris::parser::Parse_node const& node,
-        iris::Source_range const& range,
-        std::pmr::polymorphic_allocator<> const& output_allocator
-    )
-    {
-        if (iris::parser::is_error_node(node))
-        {
-            return std::pmr::string{
-                std::format("Unexpected token at line {}, column {}.", range.start.line, range.start.column),
-                output_allocator
-            };
-        }
-        else
-        {
-            std::string_view const node_value = iris::parser::get_node_value(tree, node);
-            return std::pmr::string{
-                std::format("Missing '{}' at line {}, column {}.", node_value, range.start.line, range.start.column),
-                output_allocator
-            };
-        }
-    }
 
     std::pmr::vector<iris::compiler::Diagnostic> create_parser_diagnostics(
         std::filesystem::path const& source_file_path,
@@ -61,41 +38,12 @@ namespace iris::language_server
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        iris::parser::Parse_node const& root_node = iris::parser::get_root_node(parse_tree);
-
-        if (iris::parser::has_errors(root_node))
-        {
-            std::pmr::vector<iris::parser::Parse_node> const error_or_missing_nodes = iris::parser::get_error_or_missing_nodes(
-                root_node,
-                temporaries_allocator,
-                temporaries_allocator
-            );
-
-            std::pmr::vector<iris::compiler::Diagnostic> diagnostics{output_allocator};
-            diagnostics.reserve(error_or_missing_nodes.size());
-
-            for (iris::parser::Parse_node const& node : error_or_missing_nodes)
-            {
-                iris::Source_range const range = iris::parser::get_node_source_range(node);
-                std::pmr::string message = create_parser_diagnostic_message(parse_tree, node, range, output_allocator);
-
-                iris::compiler::Diagnostic diagnostic
-                {
-                    .file_path = source_file_path,
-                    .range = range,
-                    .source = iris::compiler::Diagnostic_source::Parser,
-                    .severity = iris::compiler::Diagnostic_severity::Error,
-                    .message = std::move(message),
-                    .related_information = {},
-                };
-
-                diagnostics.push_back(std::move(diagnostic));
-            }
-
-            return diagnostics;
-        }
-
-        return {};
+        return iris::compiler::create_parser_diagnostics(
+            source_file_path,
+            parse_tree,
+            output_allocator,
+            temporaries_allocator
+        );
     }
 
     lsp::WorkspaceFullDocumentDiagnosticReport create_full_document_diagnostics_report(

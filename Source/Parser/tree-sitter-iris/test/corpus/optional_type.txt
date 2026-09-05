@@ -1,0 +1,126 @@
+=========================
+Optional type
+=========================
+
+module Optional_type;
+
+export function run(a: Optional::<Int32>, b: Optional::<*mutable Int32>) -> ()
+{
+    var c: Optional::<Int32> = {};
+    var d = create_optional::<Int32>();
+    var e = create_optional(1);
+    var f = c.has_value;
+    var g = c.value;
+}
+
+---
+
+(Module
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Optional_type
+                  (Type
+                    (Type_name
+                      (Identifier)))))))
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Optional_type
+                  (Type
+                    (Pointer_type
+                      (Type
+                        (Type_name
+                          (Identifier))))))))))
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration_with_type
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Expression_variable_declaration_type
+                (Type
+                  (Optional_type
+                    (Type
+                      (Type_name
+                        (Identifier))))))
+              (Generic_expression_or_instantiate
+                (Expression_instantiate
+                  (Expression_instantiate_members)))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_call
+                  (Generic_expression
+                    (Expression_instance_call
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier))))
+                      (Expression_instance_call_parameter
+                        (Expression_type
+                          (Type
+                            (Type_name
+                              (Identifier)))))))
+                  (Expression_call_arguments)))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_call
+                  (Generic_expression
+                    (Expression_variable
+                      (Variable_name
+                        (Identifier))))
+                  (Expression_call_arguments
+                    (Generic_expression_or_instantiate
+                      (Generic_expression
+                        (Expression_constant
+                          (Number)))))))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_access
+                  (Generic_expression
+                    (Expression_variable
+                      (Variable_name
+                        (Identifier))))
+                  (Expression_access_member_name
+                    (Identifier))))))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_access
+                  (Generic_expression
+                    (Expression_variable
+                      (Variable_name
+                        (Identifier))))
+                  (Expression_access_member_name
+                    (Identifier)))))))))))

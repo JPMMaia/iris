@@ -172,6 +172,19 @@ namespace iris
             update_hash(state, &data.number_of_bits, sizeof(data.number_of_bits));
             update_hash(state, &data.is_signed, sizeof(data.is_signed));
         }
+        else if (std::holds_alternative<iris::Optional_type>(type_reference.data))
+        {
+            iris::Optional_type const& data = std::get<iris::Optional_type>(type_reference.data);
+
+            for (iris::Type_reference const& value_type : data.value_type)
+            {
+                update_hash(state, value_type);
+            }
+
+            // Discriminator, so that Optional::<T> does not hash the same as a bare T.
+            std::uint8_t const tag = 0x01;
+            update_hash(state, &tag, sizeof(tag));
+        }
         else if (std::holds_alternative<iris::Pointer_type>(type_reference.data))
         {
             iris::Pointer_type const& data = std::get<iris::Pointer_type>(type_reference.data);
@@ -397,6 +410,41 @@ namespace iris
 
     void update_hash(
         XXH64_state_t* const state,
+        iris::Lambda_declaration const& declaration
+    )
+    {
+        update_hash(state, declaration.name);
+
+        if (declaration.unique_name.has_value())
+            update_hash(state, *declaration.unique_name);
+
+        for (iris::Type_reference const& type_reference : declaration.input_parameter_types)
+            update_hash(state, type_reference);
+
+        for (iris::Type_reference const& type_reference : declaration.output_parameter_types)
+            update_hash(state, type_reference);
+
+        for (std::pmr::string const& name : declaration.input_parameter_names)
+            update_hash(state, name);
+
+        for (std::pmr::string const& name : declaration.output_parameter_names)
+            update_hash(state, name);
+    }
+
+    void update_hash(
+        XXH64_state_t* const state,
+        iris::Lambda_type const& lambda_type
+    )
+    {
+        for (iris::Type_reference const& type_reference : lambda_type.input_parameter_types)
+            update_hash(state, type_reference);
+
+        for (iris::Type_reference const& type_reference : lambda_type.output_parameter_types)
+            update_hash(state, type_reference);
+    }
+
+    void update_hash(
+        XXH64_state_t* const state,
         Type_instance const& type_instance
     )
     {
@@ -407,6 +455,21 @@ namespace iris
         {
             update_hash(state, statement);
         }
+    }
+
+    std::uint64_t hash_bytes(
+        std::span<std::byte const> const bytes
+    )
+    {
+        XXH64_hash_t const seed = 0;
+        return XXH64(bytes.data(), bytes.size(), seed);
+    }
+
+    std::uint64_t hash_string(
+        std::string_view const value
+    )
+    {
+        return hash_bytes(std::as_bytes(std::span{value.data(), value.size()}));
     }
 
     XXH64_hash_t hash_alias_type_declaration(
@@ -479,6 +542,36 @@ namespace iris
             iris::common::print_message_and_exit("Could not reset xxhash state!");
 
         update_hash(state, declaration);
+
+        XXH64_hash_t const hash = XXH64_digest(state);
+        return hash;
+    }
+
+    XXH64_hash_t hash_lambda_declaration(
+        XXH64_state_t* const state,
+        iris::Lambda_declaration const& declaration
+    )
+    {
+        XXH64_hash_t const seed = 0;
+        if (XXH64_reset(state, seed) == XXH_ERROR)
+            iris::common::print_message_and_exit("Could not reset xxhash state!");
+
+        update_hash(state, declaration);
+
+        XXH64_hash_t const hash = XXH64_digest(state);
+        return hash;
+    }
+
+    XXH64_hash_t hash_lambda_type(
+        XXH64_state_t* const state,
+        iris::Lambda_type const& lambda_type
+    )
+    {
+        XXH64_hash_t const seed = 0;
+        if (XXH64_reset(state, seed) == XXH_ERROR)
+            iris::common::print_message_and_exit("Could not reset xxhash state!");
+
+        update_hash(state, lambda_type);
 
         XXH64_hash_t const hash = XXH64_digest(state);
         return hash;
@@ -588,6 +681,18 @@ namespace iris
         for (Function_declaration const& declaration : core_module.internal_declarations.function_declarations)
         {
             XXH64_hash_t const hash = hash_function_declaration(state, declaration);
+            map.insert(std::make_pair(declaration.name, hash));
+        }
+
+        for (Lambda_declaration const& declaration : core_module.export_declarations.lambda_declarations)
+        {
+            XXH64_hash_t const hash = hash_lambda_declaration(state, declaration);
+            map.insert(std::make_pair(declaration.name, hash));
+        }
+
+        for (Lambda_declaration const& declaration : core_module.internal_declarations.lambda_declarations)
+        {
+            XXH64_hash_t const hash = hash_lambda_declaration(state, declaration);
             map.insert(std::make_pair(declaration.name, hash));
         }
 
