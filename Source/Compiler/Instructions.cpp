@@ -212,12 +212,61 @@ namespace iris::compiler
             true,  
             llvm::GlobalValue::PrivateLinkage,
             string_constant,
-            "function_contract_error_string"
+            "iris_error_string"
         );
 
         global_string->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
         return global_string;
+    }
+
+    // 'stderr' is a C macro, and the object it expands to differs per platform, so it cannot
+    // simply be referenced by name. Resolve it here so that run-time diagnostics do not land on
+    // stdout, where they interleave with the program's own output and are invisible to anything
+    // reading stderr for errors.
+    llvm::Value* create_stderr_pointer_value(
+        llvm::LLVMContext& llvm_context,
+        llvm::Module& llvm_module,
+        llvm::IRBuilder<>& llvm_builder
+    )
+    {
+        llvm::PointerType* const pointer_type = llvm::PointerType::get(llvm_context, 0);
+        llvm::Triple const& target_triple = llvm_module.getTargetTriple();
+
+        // The UCRT does not export a 'stderr' object; stderr is __acrt_iob_func(2).
+        if (target_triple.isOSWindows())
+        {
+            llvm::Function* iob_function = llvm_module.getFunction("__acrt_iob_func");
+            if (!iob_function)
+            {
+                llvm::FunctionType* const iob_function_type = llvm::FunctionType::get(
+                    pointer_type,
+                    llvm::Type::getInt32Ty(llvm_context),
+                    false
+                );
+
+                iob_function = llvm::Function::Create(iob_function_type, llvm::Function::ExternalLinkage, "__acrt_iob_func", llvm_module);
+            }
+
+            return llvm_builder.CreateCall(iob_function, { llvm_builder.getInt32(2) }, "stderr_pointer");
+        }
+
+        char const* const stderr_global_name = target_triple.isOSDarwin() ? "__stderrp" : "stderr";
+
+        llvm::GlobalVariable* stderr_global = llvm_module.getNamedGlobal(stderr_global_name);
+        if (!stderr_global)
+        {
+            stderr_global = new llvm::GlobalVariable(
+                llvm_module,
+                pointer_type,
+                false,
+                llvm::GlobalValue::ExternalLinkage,
+                nullptr,
+                stderr_global_name
+            );
+        }
+
+        return llvm_builder.CreateLoad(pointer_type, stderr_global, "stderr_pointer");
     }
 
     llvm::Value* create_log_error_instruction(
@@ -227,26 +276,32 @@ namespace iris::compiler
         std::string_view const message
     )
     {
-        llvm::Function* puts_function = llvm_module.getFunction("puts");
-        if (!puts_function)
+        llvm::PointerType* const pointer_type = llvm::PointerType::get(llvm_context, 0);
+
+        llvm::Function* fputs_function = llvm_module.getFunction("fputs");
+        if (!fputs_function)
         {
-            llvm::FunctionType* const puts_function_type = llvm::FunctionType::get(
+            llvm::FunctionType* const fputs_function_type = llvm::FunctionType::get(
                 llvm::Type::getInt32Ty(llvm_context),
-                llvm::Type::getInt8Ty(llvm_context)->getPointerTo(),
+                { pointer_type, pointer_type },
                 false
             );
 
-            puts_function = llvm::Function::Create(puts_function_type, llvm::Function::ExternalLinkage, "puts", llvm_module);
+            fputs_function = llvm::Function::Create(fputs_function_type, llvm::Function::ExternalLinkage, "fputs", llvm_module);
         }
+
+        std::string const message_with_newline = std::format("{}\n", message);
 
         llvm::Value* const message_value = create_null_terminated_string_value(
             llvm_context,
             llvm_module,
             llvm_builder,
-            message
+            message_with_newline
         );
 
-        llvm_builder.CreateCall(puts_function, {message_value});
+        llvm::Value* const stderr_pointer = create_stderr_pointer_value(llvm_context, llvm_module, llvm_builder);
+
+        llvm_builder.CreateCall(fputs_function, { message_value, stderr_pointer });
 
         llvm::Function* flush_function = llvm_module.getFunction("fflush");
         if (!flush_function)

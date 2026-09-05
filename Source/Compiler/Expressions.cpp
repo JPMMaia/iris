@@ -1373,6 +1373,32 @@ namespace iris::compiler
         throw Compile_error{ "Could not process access expression!", parameters.source_position };
     }
 
+    static std::string format_error_location_prefix(
+        Expression_parameters const& parameters
+    )
+    {
+        if (!parameters.source_position.has_value())
+            return {};
+
+        std::string const file_name =
+            parameters.core_module.source_file_path.has_value() ?
+            parameters.core_module.source_file_path->filename().string() :
+            std::string{"<unknown>"};
+
+        return std::format("{}:{}:{}: ", file_name, parameters.source_position->line, parameters.source_position->column);
+    }
+
+    static void create_check_failure_instructions(
+        std::string_view const error_message,
+        Expression_parameters const& parameters
+    )
+    {
+        std::string const located_error_message = std::format("{}{}", format_error_location_prefix(parameters), error_message);
+        create_log_error_instruction(parameters.llvm_context, parameters.llvm_module, parameters.llvm_builder, located_error_message);
+        create_abort_instruction(parameters.llvm_context, parameters.llvm_module, parameters.llvm_builder);
+        parameters.llvm_builder.CreateUnreachable();
+    }
+
     // Aborts when .value is read from an empty Optional. Emitted only when contracts are enabled,
     // so release builds keep the plain member load.
     static void create_optional_value_check_instructions(
@@ -1390,9 +1416,7 @@ namespace iris::compiler
         llvm_builder.CreateCondBr(has_value, pass_block, fail_block);
 
         llvm_builder.SetInsertPoint(fail_block);
-        create_log_error_instruction(llvm_context, parameters.llvm_module, llvm_builder, error_message);
-        create_abort_instruction(llvm_context, parameters.llvm_module, llvm_builder);
-        llvm_builder.CreateUnreachable();
+        create_check_failure_instructions(error_message, parameters);
 
         llvm_builder.SetInsertPoint(pass_block);
     }
@@ -1422,9 +1446,7 @@ namespace iris::compiler
         llvm_builder.CreateCondBr(in_bounds, pass_block, fail_block);
 
         llvm_builder.SetInsertPoint(fail_block);
-        create_log_error_instruction(llvm_context, parameters.llvm_module, llvm_builder, error_message);
-        create_abort_instruction(llvm_context, parameters.llvm_module, llvm_builder);
-        llvm_builder.CreateUnreachable();
+        create_check_failure_instructions(error_message, parameters);
 
         llvm_builder.SetInsertPoint(pass_block);
     }
@@ -1470,9 +1492,7 @@ namespace iris::compiler
         llvm_builder.CreateCondBr(in_range, pass_block, fail_block);
 
         llvm_builder.SetInsertPoint(fail_block);
-        create_log_error_instruction(llvm_context, parameters.llvm_module, llvm_builder, error_message);
-        create_abort_instruction(llvm_context, parameters.llvm_module, llvm_builder);
-        llvm_builder.CreateUnreachable();
+        create_check_failure_instructions(error_message, parameters);
 
         llvm_builder.SetInsertPoint(pass_block);
     }
@@ -7700,8 +7720,8 @@ namespace iris::compiler
         // The description comes straight from a string literal, so it still carries its escape
         // sequences; decode them before they reach the message that is printed at run time.
         std::pmr::string const description = unescape_string_literal(function_condition.description, expression_parameters.source_position);
-        std::string const error_message = std::format("In function '{}.{}' {} '{}' failed!", core_module.name, function_declaration.name, condition_type_to_string(condition_type), std::string_view{ description });
-        create_log_error_instruction(llvm_context, llvm_module, llvm_builder, error_message.c_str());
+        std::string const error_message = std::format("{}In function '{}.{}' {} '{}' failed!", format_error_location_prefix(expression_parameters), core_module.name, function_declaration.name, condition_type_to_string(condition_type), std::string_view{ description });
+        create_log_error_instruction(llvm_context, llvm_module, llvm_builder, error_message);
         create_abort_instruction(llvm_context, llvm_module, llvm_builder);
         llvm_builder.CreateUnreachable();
 

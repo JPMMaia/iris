@@ -346,8 +346,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.iris_builtin_Optional_Int32 = type {{ i32, i8 }}
 %struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
 
-@function_contract_error_string = private unnamed_addr constant [73 x i8] c"Read '.value' of an empty Optional in 'Optional_type_codegen.use_value'!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [75 x i8] c"Read '.value' of an empty Optional in 'Optional_type_codegen.use_generic'!\00"
+@iris_error_string = private unnamed_addr constant [107 x i8] c"optional_type_codegen.iris:7:16: Read '.value' of an empty Optional in 'Optional_type_codegen.use_value'!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [110 x i8] c"optional_type_codegen.iris:47:16: Read '.value' of an empty Optional in 'Optional_type_codegen.use_generic'!\0A\00"
 
 ; Function Attrs: convergent
 define i32 @Optional_type_codegen_use_value(i64 noundef %"arguments[0].a") #0 {{
@@ -375,7 +376,8 @@ optional_value_check_pass:                        ; preds = %if_s0_then
   ret i32 %9
 
 optional_value_check_fail:                        ; preds = %if_s0_then
-  %10 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %10 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
   %11 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -454,7 +456,8 @@ optional_value_check_pass:                        ; preds = %if_s0_then
   ret i32 %17
 
 optional_value_check_fail:                        ; preds = %if_s0_then
-  %18 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %18 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
   %19 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -496,7 +499,7 @@ if_s1_after:                                      ; preds = %entry
   ret i64 %14
 }}
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
 
 declare i32 @fflush(ptr)
 
@@ -901,8 +904,9 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
     };
 
     char const* const expected_llvm_ir = R"(
-@function_contract_error_string = private unnamed_addr constant [69 x i8] c"In function 'Assert_expressions.run' assert 'Value is not 0' failed!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [55 x i8] c"In function 'Assert_expressions.run' assert '' failed!\00"
+@iris_error_string = private unnamed_addr constant [99 x i8] c"assert_expressions.iris:5:5: In function 'Assert_expressions.run' assert 'Value is not 0' failed!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [85 x i8] c"assert_expressions.iris:6:5: In function 'Assert_expressions.run' assert '' failed!\0A\00"
 
 ; Function Attrs: convergent
 define void @Assert_expressions_run(i32 noundef %"arguments[0].value") #0 {
@@ -919,7 +923,8 @@ condition_success:                                ; preds = %entry
   br i1 %3, label %condition_success1, label %condition_fail2
 
 condition_fail:                                   ; preds = %entry
-  %4 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %4 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
   %5 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -928,13 +933,14 @@ condition_success1:                               ; preds = %condition_success
   ret void
 
 condition_fail2:                                  ; preds = %condition_success
-  %6 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %6 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer3)
   %7 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
 
 declare i32 @fflush(ptr)
 
@@ -2176,8 +2182,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     char const* const expected_llvm_ir = R"(
 %struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
-@function_contract_error_string = private unnamed_addr constant [67 x i8] c"Out-of-bounds array slice access in 'Bounds_check_0.access_slice'!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [76 x i8] c"Out-of-bounds constant array access in 'Bounds_check_0.access_fixed_array'!\00"
+@iris_error_string = private unnamed_addr constant [95 x i8] c"bounds_check_0.iris:11:12: Out-of-bounds array slice access in 'Bounds_check_0.access_slice'!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [104 x i8] c"bounds_check_0.iris:17:12: Out-of-bounds constant array access in 'Bounds_check_0.access_fixed_array'!\0A\00"
 
 ; Function Attrs: convergent
 define i32 @Bounds_check_0_access_slice(ptr %"arguments[0].integers_0", i64 %"arguments[0].integers_1", i32 noundef %"arguments[1].index") #0 {
@@ -2204,7 +2211,8 @@ bounds_check_pass:                                ; preds = %entry
   ret i32 %7
 
 bounds_check_fail:                                ; preds = %entry
-  %8 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %8 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
   %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -2235,13 +2243,14 @@ bounds_check_pass:                                ; preds = %entry
   ret i32 %1
 
 bounds_check_fail:                                ; preds = %entry
-  %2 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %2 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
   %3 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
 
 declare i32 @fflush(ptr)
 
@@ -2251,6 +2260,95 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_bounds_checks = true });
+  }
+
+  // The MSVC runtime has no exported 'stderr' object, so the diagnostic path resolves it through
+  // __acrt_iob_func(2) instead of loading a global. Windows is the primary target, so pin that here.
+  TEST_CASE("Compile Array Bounds Checks 0 x86_64-pc-windows-msvc", "[LLVM_IR]")
+  {
+    char const* const input_file = "bounds_check_0.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
+
+@iris_error_string = private unnamed_addr constant [95 x i8] c"bounds_check_0.iris:11:12: Out-of-bounds array slice access in 'Bounds_check_0.access_slice'!\0A\00"
+@iris_error_string.1 = private unnamed_addr constant [104 x i8] c"bounds_check_0.iris:17:12: Out-of-bounds constant array access in 'Bounds_check_0.access_fixed_array'!\0A\00"
+
+; Function Attrs: convergent
+define i32 @Bounds_check_0_access_slice(ptr noundef %"arguments[0].integers", i32 noundef %"arguments[1].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  store i32 %"arguments[1].index", ptr %index, align 4
+  %0 = load i32, ptr %index, align 4
+  %1 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %"arguments[0].integers", i32 0, i32 1
+  %2 = load i64, ptr %1, align 8
+  %bounds_check_index = zext i32 %0 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %2
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %3 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %"arguments[0].integers", i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  %array_slice_element_pointer = getelementptr i32, ptr %4, i32 %0
+  %5 = load i32, ptr %array_slice_element_pointer, align 4
+  ret i32 %5
+
+bounds_check_fail:                                ; preds = %entry
+  %stderr_pointer = call ptr @__acrt_iob_func(i32 2)
+  %6 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %7 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i32 @Bounds_check_0_access_fixed_array(i32 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %a = alloca [4 x i32], align 4
+  store i32 %"arguments[0].index", ptr %index, align 4
+  %array_element_pointer = getelementptr [4 x i32], ptr %a, i32 0, i32 0
+  store i32 0, ptr %array_element_pointer, align 4
+  %array_element_pointer1 = getelementptr [4 x i32], ptr %a, i32 0, i32 1
+  store i32 1, ptr %array_element_pointer1, align 4
+  %array_element_pointer2 = getelementptr [4 x i32], ptr %a, i32 0, i32 2
+  store i32 2, ptr %array_element_pointer2, align 4
+  %array_element_pointer3 = getelementptr [4 x i32], ptr %a, i32 0, i32 3
+  store i32 3, ptr %array_element_pointer3, align 4
+  %0 = load i32, ptr %index, align 4
+  %bounds_check_index = zext i32 %0 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %array_element_pointer4 = getelementptr [4 x i32], ptr %a, i32 0, i32 %0
+  %1 = load i32, ptr %array_element_pointer4, align 4
+  ret i32 %1
+
+bounds_check_fail:                                ; preds = %entry
+  %stderr_pointer = call ptr @__acrt_iob_func(i32 2)
+  %2 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
+  %3 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @fputs(ptr, ptr)
+
+declare ptr @__acrt_iob_func(i32)
+
+declare i32 @fflush(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .target_triple = "x86_64-pc-windows-msvc", .enable_bounds_checks = true });
   }
 
   TEST_CASE("Compile Array Bounds Checks 1", "[LLVM_IR]")
@@ -2265,9 +2363,10 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %__hl_soa_array = type { ptr }
 %struct.Bounds_check_1_Particle = type { float, float }
 
-@function_contract_error_string = private unnamed_addr constant [77 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_element'!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [78 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_x'!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [78 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_y'!\00"
+@iris_error_string = private unnamed_addr constant [105 x i8] c"bounds_check_1.iris:12:12: Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_element'!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [106 x i8] c"bounds_check_1.iris:18:12: Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_x'!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [106 x i8] c"bounds_check_1.iris:24:12: Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_y'!\0A\00"
 
 ; Function Attrs: convergent
 define <2 x float> @Bounds_check_1_access_soa_array_element(i32 noundef %"arguments[0].index") #0 {
@@ -2327,7 +2426,8 @@ bounds_check_pass:                                ; preds = %entry
   ret <2 x float> %9
 
 bounds_check_fail:                                ; preds = %entry
-  %10 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %10 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
   %11 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -2381,7 +2481,8 @@ bounds_check_pass:                                ; preds = %entry
   ret float %4
 
 bounds_check_fail:                                ; preds = %entry
-  %5 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %5 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
   %6 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -2435,13 +2536,14 @@ bounds_check_pass:                                ; preds = %entry
   ret float %4
 
 bounds_check_fail:                                ; preds = %entry
-  %5 = call i32 @puts(ptr @function_contract_error_string.2)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %5 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer)
   %6 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
 
 declare i32 @fflush(ptr)
 
@@ -2465,9 +2567,10 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %__hl_soa_array_view = type { i64, i64, i64, ptr }
 %struct.Bounds_check_2_Particle = type { float, float }
 
-@function_contract_error_string = private unnamed_addr constant [87 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_element'!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [88 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_x'!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [88 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_y'!\00"
+@iris_error_string = private unnamed_addr constant [115 x i8] c"bounds_check_2.iris:11:12: Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_element'!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [116 x i8] c"bounds_check_2.iris:16:12: Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_x'!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [116 x i8] c"bounds_check_2.iris:21:12: Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_y'!\0A\00"
 
 ; Function Attrs: convergent
 define <2 x float> @Bounds_check_2_access_soa_array_view_element(ptr noundef byval(%__hl_soa_array_view) align 8 %"arguments[0].view", i32 noundef %"arguments[1].index") #0 {
@@ -2508,7 +2611,8 @@ bounds_check_pass:                                ; preds = %entry
   ret <2 x float> %12
 
 bounds_check_fail:                                ; preds = %entry
-  %13 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %13 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
   %14 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -2539,7 +2643,8 @@ bounds_check_pass:                                ; preds = %entry
   ret float %7
 
 bounds_check_fail:                                ; preds = %entry
-  %8 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %8 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
   %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -2574,13 +2679,14 @@ bounds_check_pass:                                ; preds = %entry
   ret float %7
 
 bounds_check_fail:                                ; preds = %entry
-  %8 = call i32 @puts(ptr @function_contract_error_string.2)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %8 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer)
   %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
 
 declare i32 @fflush(ptr)
 
@@ -4457,11 +4563,12 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     };
 
     char const* const expected_llvm_ir = R"(
-@function_contract_error_string = private unnamed_addr constant [98 x i8] c"Decimal overflow in decimal multiplication in 'Decimal_overflow_checks.checked_multiply' at 5:12!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [91 x i8] c"Decimal overflow in decimal division in 'Decimal_overflow_checks.checked_divide' at 10:12!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [120 x i8] c"Decimal overflow in decimal to decimal conversion in 'Decimal_overflow_checks.checked_decimal_narrowing_cast' at 15:12!\00"
-@function_contract_error_string.3 = private unnamed_addr constant [119 x i8] c"Decimal overflow in decimal to decimal conversion in 'Decimal_overflow_checks.checked_decimal_widening_cast' at 20:12!\00"
-@function_contract_error_string.4 = private unnamed_addr constant [110 x i8] c"Decimal overflow in decimal to integer conversion in 'Decimal_overflow_checks.checked_integer_cast' at 25:12!\00"
+@iris_error_string = private unnamed_addr constant [134 x i8] c"decimal_overflow_checks.iris:5:12: Decimal overflow in decimal multiplication in 'Decimal_overflow_checks.checked_multiply' at 5:12!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [128 x i8] c"decimal_overflow_checks.iris:10:12: Decimal overflow in decimal division in 'Decimal_overflow_checks.checked_divide' at 10:12!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [157 x i8] c"decimal_overflow_checks.iris:15:12: Decimal overflow in decimal to decimal conversion in 'Decimal_overflow_checks.checked_decimal_narrowing_cast' at 15:12!\0A\00"
+@iris_error_string.3 = private unnamed_addr constant [156 x i8] c"decimal_overflow_checks.iris:20:12: Decimal overflow in decimal to decimal conversion in 'Decimal_overflow_checks.checked_decimal_widening_cast' at 20:12!\0A\00"
+@iris_error_string.4 = private unnamed_addr constant [147 x i8] c"decimal_overflow_checks.iris:25:12: Decimal overflow in decimal to integer conversion in 'Decimal_overflow_checks.checked_integer_cast' at 25:12!\0A\00"
 
 ; Function Attrs: convergent
 define i32 @Decimal_overflow_checks_checked_multiply(i32 noundef %"arguments[0].x", i32 noundef %"arguments[1].y") #0 {
@@ -4486,7 +4593,8 @@ decimal_overflow_check_pass:                      ; preds = %entry
   ret i32 %6
 
 decimal_overflow_check_fail:                      ; preds = %entry
-  %7 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %7 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
   %8 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -4515,7 +4623,8 @@ decimal_overflow_check_pass:                      ; preds = %entry
   ret i64 %6
 
 decimal_overflow_check_fail:                      ; preds = %entry
-  %7 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %7 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
   %8 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -4539,7 +4648,8 @@ decimal_overflow_check_pass:                      ; preds = %entry
   ret i32 %3
 
 decimal_overflow_check_fail:                      ; preds = %entry
-  %4 = call i32 @puts(ptr @function_contract_error_string.2)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %4 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer)
   %5 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -4563,7 +4673,8 @@ decimal_overflow_check_pass:                      ; preds = %entry
   ret i64 %3
 
 decimal_overflow_check_fail:                      ; preds = %entry
-  %4 = call i32 @puts(ptr @function_contract_error_string.3)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %4 = call i32 @fputs(ptr @iris_error_string.3, ptr %stderr_pointer)
   %5 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -4590,7 +4701,8 @@ decimal_overflow_check_pass:                      ; preds = %entry
   ret i32 %6
 
 decimal_overflow_check_fail:                      ; preds = %entry
-  %7 = call i32 @puts(ptr @function_contract_error_string.4)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %7 = call i32 @fputs(ptr @iris_error_string.4, ptr %stderr_pointer)
   %8 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -4610,7 +4722,7 @@ entry:
   ret i64 %5
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
 
 declare i32 @fflush(ptr)
 
@@ -5436,12 +5548,13 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
 %struct.dynamic_array_Allocator = type { ptr, ptr }
 %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836 = type { ptr, i64, i64, %struct.dynamic_array_Allocator }
 
-@function_contract_error_string = private unnamed_addr constant [136 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__create__at__17123080338655627377' precondition 'allocator.allocate != null' failed!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [138 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__create__at__17123080338655627377' precondition 'allocator.deallocate != null' failed!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [128 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__push_back__at__4888045391637469292' precondition 'instance != null' failed!\00"
-@function_contract_error_string.3 = private unnamed_addr constant [129 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__push_back__at__4888045391637469292' assert 'Allocation did not fail' failed!\00"
-@function_contract_error_string.4 = private unnamed_addr constant [123 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__get__at__16241305439249145253' precondition 'instance != null' failed!\00"
-@function_contract_error_string.5 = private unnamed_addr constant [131 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__get__at__16241305439249145253' precondition 'index < instance->length' failed!\00"
+@iris_error_string = private unnamed_addr constant [137 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__create__at__17123080338655627377' precondition 'allocator.allocate != null' failed!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [139 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__create__at__17123080338655627377' precondition 'allocator.deallocate != null' failed!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [129 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__push_back__at__4888045391637469292' precondition 'instance != null' failed!\0A\00"
+@iris_error_string.3 = private unnamed_addr constant [162 x i8] c"dynamic_array_usage.iris:46:13: In function 'dynamic_array_usage.dynamic_array__at__push_back__at__4888045391637469292' assert 'Allocation did not fail' failed!\0A\00"
+@iris_error_string.4 = private unnamed_addr constant [124 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__get__at__16241305439249145253' precondition 'instance != null' failed!\0A\00"
+@iris_error_string.5 = private unnamed_addr constant [132 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__get__at__16241305439249145253' precondition 'index < instance->length' failed!\0A\00"
 
 ; Function Attrs: convergent
 define private void @dynamic_array_usage_run() #0 {
@@ -5488,7 +5601,8 @@ condition_success:                                ; preds = %entry
   br i1 %8, label %condition_success1, label %condition_fail2
 
 condition_fail:                                   ; preds = %entry
-  %9 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %9 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
   %10 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -5507,7 +5621,8 @@ condition_success1:                               ; preds = %condition_success
   ret void
 
 condition_fail2:                                  ; preds = %condition_success
-  %16 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %16 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer3)
   %17 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -5539,7 +5654,8 @@ condition_success:                                ; preds = %entry
   br i1 %8, label %if_s0_then, label %if_s1_after
 
 condition_fail:                                   ; preds = %entry
-  %9 = call i32 @puts(ptr @function_contract_error_string.2)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %9 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer)
   %10 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -5598,7 +5714,8 @@ condition_success1:                               ; preds = %if_s0_then
   br label %if_s1_after
 
 condition_fail2:                                  ; preds = %if_s0_then
-  %46 = call i32 @puts(ptr @function_contract_error_string.3)
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %46 = call i32 @fputs(ptr @iris_error_string.3, ptr %stderr_pointer3)
   %47 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -5624,7 +5741,8 @@ condition_success:                                ; preds = %entry
   br i1 %6, label %condition_success1, label %condition_fail2
 
 condition_fail:                                   ; preds = %entry
-  %7 = call i32 @puts(ptr @function_contract_error_string.4)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %7 = call i32 @fputs(ptr @iris_error_string.4, ptr %stderr_pointer)
   %8 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -5639,13 +5757,14 @@ condition_success1:                               ; preds = %condition_success
   ret i32 %13
 
 condition_fail2:                                  ; preds = %condition_success
-  %14 = call i32 @puts(ptr @function_contract_error_string.5)
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %14 = call i32 @fputs(ptr @iris_error_string.5, ptr %stderr_pointer3)
   %15 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
 
 declare i32 @fflush(ptr)
 
@@ -6124,8 +6243,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.If_expressions_2_Container = type { %struct.iris_builtin_Generic_array_slice }
 %struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
-@function_contract_error_string = private unnamed_addr constant [66 x i8] c"Out-of-bounds array slice access in 'If_expressions_2.get_value'!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [66 x i8] c"Out-of-bounds array slice access in 'If_expressions_2.get_value'!\00"
+@iris_error_string = private unnamed_addr constant [96 x i8] c"if_expressions_2.iris:12:16: Out-of-bounds array slice access in 'If_expressions_2.get_value'!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [96 x i8] c"if_expressions_2.iris:16:16: Out-of-bounds array slice access in 'If_expressions_2.get_value'!\0A\00"
 
 ; Function Attrs: convergent
 define private i64 @If_expressions_2_get_value(i64 noundef %"arguments[0].id", ptr noundef %"arguments[1].container") #0 {
@@ -6162,7 +6282,8 @@ bounds_check_pass:                                ; preds = %if_s0_then
   ret i64 %12
 
 bounds_check_fail:                                ; preds = %if_s0_then
-  %13 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %13 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
   %14 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -6170,18 +6291,19 @@ bounds_check_fail:                                ; preds = %if_s0_then
 bounds_check_pass2:                               ; preds = %if_s1_else
   %15 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %7, i32 0, i32 0
   %16 = load ptr, ptr %15, align 8
-  %array_slice_element_pointer4 = getelementptr i64, ptr %16, i64 1
-  %17 = load i64, ptr %array_slice_element_pointer4, align 8
+  %array_slice_element_pointer5 = getelementptr i64, ptr %16, i64 1
+  %17 = load i64, ptr %array_slice_element_pointer5, align 8
   ret i64 %17
 
 bounds_check_fail3:                               ; preds = %if_s1_else
-  %18 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer4 = load ptr, ptr @stderr, align 8
+  %18 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer4)
   %19 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
 
 declare i32 @fflush(ptr)
 
@@ -9396,12 +9518,13 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     };
 
     char const* const expected_llvm_ir = R"(
-@function_contract_error_string = private unnamed_addr constant [67 x i8] c"In function 'Function_contracts.run' precondition 'x >= 0' failed!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [67 x i8] c"In function 'Function_contracts.run' precondition 'x <= 8' failed!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [73 x i8] c"In function 'Function_contracts.run' postcondition 'result >= 0' failed!\00"
-@function_contract_error_string.3 = private unnamed_addr constant [74 x i8] c"In function 'Function_contracts.run' postcondition 'result <= 64' failed!\00"
-@function_contract_error_string.4 = private unnamed_addr constant [73 x i8] c"In function 'Function_contracts.run' postcondition 'result >= 0' failed!\00"
-@function_contract_error_string.5 = private unnamed_addr constant [74 x i8] c"In function 'Function_contracts.run' postcondition 'result <= 64' failed!\00"
+@iris_error_string = private unnamed_addr constant [68 x i8] c"In function 'Function_contracts.run' precondition 'x >= 0' failed!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [68 x i8] c"In function 'Function_contracts.run' precondition 'x <= 8' failed!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [104 x i8] c"function_contracts.iris:11:9: In function 'Function_contracts.run' postcondition 'result >= 0' failed!\0A\00"
+@iris_error_string.3 = private unnamed_addr constant [105 x i8] c"function_contracts.iris:11:9: In function 'Function_contracts.run' postcondition 'result <= 64' failed!\0A\00"
+@iris_error_string.4 = private unnamed_addr constant [104 x i8] c"function_contracts.iris:14:5: In function 'Function_contracts.run' postcondition 'result >= 0' failed!\0A\00"
+@iris_error_string.5 = private unnamed_addr constant [105 x i8] c"function_contracts.iris:14:5: In function 'Function_contracts.run' postcondition 'result <= 64' failed!\0A\00"
 
 ; Function Attrs: convergent
 define i32 @Function_contracts_run(i32 noundef %"arguments[0].x") #0 {
@@ -9418,7 +9541,8 @@ condition_success:                                ; preds = %entry
   br i1 %3, label %condition_success1, label %condition_fail2
 
 condition_fail:                                   ; preds = %entry
-  %4 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %4 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
   %5 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
@@ -9429,60 +9553,65 @@ condition_success1:                               ; preds = %condition_success
   br i1 %7, label %if_s0_then, label %if_s1_after
 
 condition_fail2:                                  ; preds = %condition_success
-  %8 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %8 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer3)
   %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 if_s0_then:                                       ; preds = %condition_success1
-  br i1 true, label %condition_success3, label %condition_fail4
+  br i1 true, label %condition_success4, label %condition_fail5
 
 if_s1_after:                                      ; preds = %condition_success1
   %10 = load i32, ptr %x, align 4
   %11 = load i32, ptr %x, align 4
   %12 = mul i32 %10, %11
   %13 = icmp sge i32 %12, 0
-  br i1 %13, label %condition_success7, label %condition_fail8
+  br i1 %13, label %condition_success10, label %condition_fail11
 
-condition_success3:                               ; preds = %if_s0_then
-  br i1 true, label %condition_success5, label %condition_fail6
+condition_success4:                               ; preds = %if_s0_then
+  br i1 true, label %condition_success7, label %condition_fail8
 
-condition_fail4:                                  ; preds = %if_s0_then
-  %14 = call i32 @puts(ptr @function_contract_error_string.2)
+condition_fail5:                                  ; preds = %if_s0_then
+  %stderr_pointer6 = load ptr, ptr @stderr, align 8
+  %14 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer6)
   %15 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
-condition_success5:                               ; preds = %condition_success3
+condition_success7:                               ; preds = %condition_success4
   ret i32 64
 
-condition_fail6:                                  ; preds = %condition_success3
-  %16 = call i32 @puts(ptr @function_contract_error_string.3)
+condition_fail8:                                  ; preds = %condition_success4
+  %stderr_pointer9 = load ptr, ptr @stderr, align 8
+  %16 = call i32 @fputs(ptr @iris_error_string.3, ptr %stderr_pointer9)
   %17 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
-condition_success7:                               ; preds = %if_s1_after
+condition_success10:                              ; preds = %if_s1_after
   %18 = icmp sle i32 %12, 64
-  br i1 %18, label %condition_success9, label %condition_fail10
+  br i1 %18, label %condition_success13, label %condition_fail14
 
-condition_fail8:                                  ; preds = %if_s1_after
-  %19 = call i32 @puts(ptr @function_contract_error_string.4)
+condition_fail11:                                 ; preds = %if_s1_after
+  %stderr_pointer12 = load ptr, ptr @stderr, align 8
+  %19 = call i32 @fputs(ptr @iris_error_string.4, ptr %stderr_pointer12)
   %20 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
-condition_success9:                               ; preds = %condition_success7
+condition_success13:                              ; preds = %condition_success10
   ret i32 %12
 
-condition_fail10:                                 ; preds = %condition_success7
-  %21 = call i32 @puts(ptr @function_contract_error_string.5)
+condition_fail14:                                 ; preds = %condition_success10
+  %stderr_pointer15 = load ptr, ptr @stderr, align 8
+  %21 = call i32 @fputs(ptr @iris_error_string.5, ptr %stderr_pointer15)
   %22 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
 
 declare i32 @fflush(ptr)
 
