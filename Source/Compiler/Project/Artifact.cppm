@@ -18,7 +18,8 @@ namespace iris::compiler
     export enum Artifact_type
     {
         Executable,
-        Library
+        Library,
+        Dynamic_library
     };
 
     export struct Dependency
@@ -83,6 +84,11 @@ namespace iris::compiler
         std::pmr::unordered_multimap<std::pmr::string, std::pmr::string> external_libraries;
     };
 
+    export struct Dynamic_library_info
+    {
+        std::pmr::vector<std::pmr::string> exports;
+    };
+
     export struct Copy_entry
     {
         std::filesystem::path source;
@@ -98,7 +104,7 @@ namespace iris::compiler
         std::pmr::vector<Dependency> dependencies;
         std::pmr::vector<Source_group> sources;
         std::pmr::vector<std::filesystem::path> public_include_directories;
-        std::optional<std::variant<Executable_info, Library_info>> info;
+        std::optional<std::variant<Executable_info, Library_info, Dynamic_library_info>> info;
         std::pmr::vector<Copy_entry> copy_entries;
     };
 

@@ -16,6 +16,7 @@ namespace iris::compiler
         std::optional<std::string_view> entry_point = std::nullopt;
         bool debug = false;
         Link_type link_type = Link_type::Static_library;
+        std::span<std::pmr::string const> exported_symbols = {};
     };
 
     export bool link(

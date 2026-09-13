@@ -105,6 +105,8 @@ namespace iris::compiler
             return Artifact_type::Executable;
         else if (string == "library")
             return Artifact_type::Library;
+        else if (string == "dynamic_library")
+            return Artifact_type::Dynamic_library;
 
         iris::common::print_message_and_exit(std::format("Failed to parse artifact type '{}'", string));
         return Artifact_type{};
@@ -310,6 +312,21 @@ namespace iris::compiler
         return map;
     }
 
+    Dynamic_library_info parse_dynamic_library_info(nlohmann::json const& json)
+    {
+        Dynamic_library_info dynamic_library_info;
+
+        if (json.contains("exports"))
+        {
+            for (nlohmann::json const& element : json.at("exports"))
+            {
+                dynamic_library_info.exports.push_back(element.get<std::pmr::string>());
+            }
+        }
+
+        return dynamic_library_info;
+    }
+
     Library_info parse_library_info(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         Library_info library_info;
@@ -402,7 +419,7 @@ namespace iris::compiler
         return groups;
     }
 
-    std::optional<std::variant<Executable_info, Library_info>> parse_info(nlohmann::json const& json, Environment_variables const& environment_variables)
+    std::optional<std::variant<Executable_info, Library_info, Dynamic_library_info>> parse_info(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         if (json.contains("executable"))
         {
@@ -411,6 +428,10 @@ namespace iris::compiler
         else if (json.contains("library"))
         {
             return parse_library_info(json.at("library"), environment_variables);
+        }
+        else if (json.contains("dynamic_library"))
+        {
+            return parse_dynamic_library_info(json.at("dynamic_library"));
         }
         else
         {
@@ -473,7 +494,7 @@ namespace iris::compiler
             ? parse_path_array_with_substitution(json.at("public_include_directories"), environment_variables, "public_include_directories")
             : std::pmr::vector<std::filesystem::path>{};
 
-        std::optional<std::variant<Executable_info, Library_info>> info = parse_info(json, environment_variables);
+        std::optional<std::variant<Executable_info, Library_info, Dynamic_library_info>> info = parse_info(json, environment_variables);
 
         std::pmr::vector<Copy_entry> copy_entries = parse_copy_entries(json, environment_variables);
 
@@ -522,6 +543,8 @@ namespace iris::compiler
             json["type"] = "executable";
         else if (artifact.type == Artifact_type::Library)
             json["type"] = "library";
+        else if (artifact.type == Artifact_type::Dynamic_library)
+            json["type"] = "dynamic_library";
         else
             iris::common::print_message_and_exit("Did not handle artifact.type!");
 
@@ -662,6 +685,18 @@ namespace iris::compiler
 
                 if (!library_json.empty())
                     json["library"] = std::move(library_json);
+            }
+            else if (std::holds_alternative<Dynamic_library_info>(*artifact.info))
+            {
+                Dynamic_library_info const& dynamic_library_info = std::get<Dynamic_library_info>(*artifact.info);
+
+                nlohmann::json dynamic_library_json;
+
+                if (!dynamic_library_info.exports.empty())
+                    dynamic_library_json["exports"] = dynamic_library_info.exports;
+
+                if (!dynamic_library_json.empty())
+                    json["dynamic_library"] = std::move(dynamic_library_json);
             }
         }
 

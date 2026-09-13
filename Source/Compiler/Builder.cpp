@@ -2476,6 +2476,32 @@ namespace iris::compiler
                 if (!result)
                     iris::common::print_message_and_exit(std::format("Failed to link static library '{}'.", artifact.name));
             }
+            else if (artifact.type == Artifact_type::Dynamic_library)
+            {
+                std::pmr::vector<std::pmr::string> exported_symbols{ temporaries_allocator };
+                if (artifact.info.has_value() && std::holds_alternative<iris::compiler::Dynamic_library_info>(*artifact.info))
+                    exported_symbols = std::get<iris::compiler::Dynamic_library_info>(*artifact.info).exports;
+
+                iris::compiler::Linker_options const linker_options
+                {
+                    .entry_point = std::nullopt,
+                    .debug = debug,
+                    .link_type = iris::compiler::Link_type::Shared_library,
+                    .exported_symbols = exported_symbols
+                };
+
+                std::filesystem::path const output = builder.build_directory_path / "bin" / artifact.name;
+                create_directory_if_it_does_not_exist(output.parent_path());
+
+                bool const result = iris::compiler::link(
+                    bitcode_files,
+                    artifact_libraries.libraries,
+                    output,
+                    linker_options
+                );
+                if (!result)
+                    iris::common::print_message_and_exit(std::format("Failed to link dynamic library '{}'.", artifact.name));
+            }
             else if (artifact.info.has_value() && std::holds_alternative<iris::compiler::Executable_info>(*artifact.info))
             {
                 iris::compiler::Executable_info const& executable_info = std::get<iris::compiler::Executable_info>(*artifact.info);

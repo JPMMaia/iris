@@ -42,6 +42,20 @@ namespace iris::compiler
             arguments_storage.push_back(std::format("/out:{}.exe", output.generic_string()));
             arguments_storage.push_back("/subsystem:console");
         }
+        else if (options.link_type == Link_type::Shared_library)
+        {
+            arguments_storage.push_back(std::format("/out:{}.dll", output.generic_string()));
+            arguments_storage.push_back("/dll");
+
+            // The DLL has no main, so the CRT entry point is the DLL one. Naming it explicitly
+            // keeps lld from searching for mainCRTStartup and failing.
+            arguments_storage.push_back("/entry:_DllMainCRTStartup");
+
+            for (std::pmr::string const& exported_symbol : options.exported_symbols)
+            {
+                arguments_storage.push_back(std::format("/export:{}", exported_symbol));
+            }
+        }
 
         if (options.debug)
         {

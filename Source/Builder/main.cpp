@@ -437,6 +437,13 @@ std::filesystem::path get_artifact_output_path(
         return output_path;
     }
 
+    if (artifact.type == iris::compiler::Artifact_type::Dynamic_library)
+    {
+        std::filesystem::path output_path = build_directory_path / "bin" / artifact.name;
+        output_path += (target.operating_system == "windows") ? ".dll" : ".so";
+        return output_path;
+    }
+
     if (artifact.info.has_value() && std::holds_alternative<iris::compiler::Executable_info>(*artifact.info))
     {
         std::filesystem::path output_path = build_directory_path / "bin" / artifact.name;

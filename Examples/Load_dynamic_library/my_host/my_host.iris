@@ -1,0 +1,48 @@
+module my_host;
+
+import Dynamic_library_loader as loader;
+import c.stdio as stdio;
+
+// The linker names the output after the artifact, so there is no "lib" prefix on either platform.
+function open_plugin() -> (library: *mutable Void)
+{
+    var windows_library = loader.dynamic_library_open("my_plugin.dll"c);
+    if windows_library != null
+    {
+        return windows_library;
+    }
+
+    return loader.dynamic_library_open("my_plugin.so"c);
+}
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    var library = open_plugin();
+    if library == null
+    {
+        stdio.fprintf(stdio.stderr, "my_host: could not load the plugin\n"c);
+        return 1;
+    }
+    defer loader.dynamic_library_close(library);
+
+    var symbol = loader.dynamic_library_symbol(library, "my_plugin_answer"c);
+    if symbol == null
+    {
+        stdio.fprintf(stdio.stderr, "my_host: the plugin does not export 'my_plugin_answer'\n"c);
+        return 1;
+    }
+
+    var answer = reinterpret_as::<function<() -> (value: Int32)>>(symbol);
+    var value = answer();
+
+    stdio.fprintf(stdio.stdout, "my_host: the plugin answered %d\n"c, value);
+    stdio.fflush(stdio.stdout);
+
+    if value != 42
+    {
+        return 1;
+    }
+
+    return 0;
+}
