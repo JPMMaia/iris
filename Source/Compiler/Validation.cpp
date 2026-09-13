@@ -1319,12 +1319,27 @@ namespace iris::compiler
         {
             iris::Switch_expression const& switch_expression = std::get<iris::Switch_expression>(last_statement_expression.data);
 
-            for (iris::Switch_case_expression_pair const& switch_case : switch_expression.cases)
+            bool has_default_case = false;
+
+            for (std::size_t case_index = 0; case_index < switch_expression.cases.size(); ++case_index)
             {
+                iris::Switch_case_expression_pair const& switch_case = switch_expression.cases[case_index];
+
+                if (!switch_case.case_value.has_value())
+                    has_default_case = true;
+
+                // An empty case falls through into the next one, which decides whether it returns.
+                bool const falls_through_to_next_case = switch_case.statements.empty() && (case_index + 1) < switch_expression.cases.size();
+                if (falls_through_to_next_case)
+                    continue;
+
                 std::pmr::vector<iris::compiler::Diagnostic> const switch_case_diagnostics = validate_function_return_expressions_with_statements(core_module, function_name, switch_case.statements, source_range);
                 if (!switch_case_diagnostics.empty())
                     return switch_case_diagnostics;
             }
+
+            if (!has_default_case)
+                return create_function_missing_return_diagnostic(core_module, function_name, source_range);
 
             return {};
         }

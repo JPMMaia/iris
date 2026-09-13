@@ -1,0 +1,27 @@
+module Access_through_pointer_results;
+
+struct Holder
+{
+    bytes: *Byte = null;
+    count: Uint32 = 7u32;
+}
+
+function values_of(holder: *Holder) -> (values: *mutable Uint32)
+{
+    return reinterpret_as::<*mutable Uint32>(holder->bytes);
+}
+
+function identity(holder: *mutable Holder) -> (same: *mutable Holder)
+{
+    return holder;
+}
+
+export function read_through_results(holder: *mutable Holder) -> (sum: Uint32)
+{
+    var through_reinterpret = reinterpret_as::<*Uint32>(holder->bytes)[1];
+    var through_call = values_of(holder)[1];
+    var through_arrow = identity(holder)->count;
+    values_of(holder)[0] = 3u32;
+    identity(holder)->count = 9u32;
+    return through_reinterpret + through_call + through_arrow;
+}

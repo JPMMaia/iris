@@ -7491,6 +7491,143 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Switch Case Blocks", "[LLVM_IR]")
+  {
+    char const* const input_file = "switch_case_blocks.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define i32 @Switch_case_blocks_run_switch_with_blocks(i32 noundef %"arguments[0].value") #0 {
+entry:
+  %value = alloca i32, align 4
+  %doubled = alloca i32, align 4
+  %tripled = alloca i32, align 4
+  store i32 %"arguments[0].value", ptr %value, align 4
+  %0 = load i32, ptr %value, align 4
+  switch i32 %0, label %switch_case_default [
+    i32 0, label %switch_case_i0_
+    i32 1, label %switch_case_i1_
+    i32 2, label %switch_case_i2_
+  ]
+
+switch_after:                                     ; preds = %switch_case_i1_
+  %1 = load i32, ptr %value, align 4
+  %2 = icmp sgt i32 %1, 10
+  br i1 %2, label %if_s0_then, label %if_s1_after
+
+switch_case_i0_:                                  ; preds = %entry
+  %3 = load i32, ptr %value, align 4
+  %4 = mul i32 %3, 2
+  store i32 %4, ptr %doubled, align 4
+  %5 = load i32, ptr %doubled, align 4
+  ret i32 %5
+
+switch_case_i1_:                                  ; preds = %entry
+  br label %switch_after
+
+switch_case_i2_:                                  ; preds = %entry
+  %6 = load i32, ptr %value, align 4
+  %7 = mul i32 %6, 3
+  store i32 %7, ptr %tripled, align 4
+  br label %switch_case_default
+
+switch_case_default:                              ; preds = %switch_case_i2_, %entry
+  ret i32 2
+
+if_s0_then:                                       ; preds = %switch_after
+  ret i32 10
+
+if_s1_after:                                      ; preds = %switch_after
+  ret i32 3
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Access Through Pointer Results", "[LLVM_IR]")
+  {
+    char const* const input_file = "access_through_pointer_results.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Access_through_pointer_results_Holder = type { ptr, i32 }
+
+; Function Attrs: convergent
+define i32 @Access_through_pointer_results_read_through_results(ptr noundef %"arguments[0].holder") #0 {
+entry:
+  %holder = alloca ptr, align 8
+  %through_reinterpret = alloca i32, align 4
+  %through_call = alloca i32, align 4
+  %through_arrow = alloca i32, align 4
+  store ptr %"arguments[0].holder", ptr %holder, align 8
+  %0 = load ptr, ptr %holder, align 8
+  %1 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %0, i32 0, i32 0
+  %2 = load ptr, ptr %1, align 8
+  %array_element_pointer = getelementptr i32, ptr %2, i32 1
+  %3 = load i32, ptr %array_element_pointer, align 4
+  store i32 %3, ptr %through_reinterpret, align 4
+  %4 = load ptr, ptr %holder, align 8
+  %5 = call ptr @Access_through_pointer_results_values_of(ptr noundef %4)
+  %array_element_pointer1 = getelementptr i32, ptr %5, i32 1
+  %6 = load i32, ptr %array_element_pointer1, align 4
+  store i32 %6, ptr %through_call, align 4
+  %7 = load ptr, ptr %holder, align 8
+  %8 = call ptr @Access_through_pointer_results_identity(ptr noundef %7)
+  %9 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %8, i32 0, i32 1
+  %10 = load i32, ptr %9, align 4
+  store i32 %10, ptr %through_arrow, align 4
+  %11 = load ptr, ptr %holder, align 8
+  %12 = call ptr @Access_through_pointer_results_values_of(ptr noundef %11)
+  %array_element_pointer2 = getelementptr i32, ptr %12, i32 0
+  store i32 3, ptr %array_element_pointer2, align 4
+  %13 = load ptr, ptr %holder, align 8
+  %14 = call ptr @Access_through_pointer_results_identity(ptr noundef %13)
+  %15 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %14, i32 0, i32 1
+  store i32 9, ptr %15, align 4
+  %16 = load i32, ptr %through_reinterpret, align 4
+  %17 = load i32, ptr %through_call, align 4
+  %18 = add i32 %16, %17
+  %19 = load i32, ptr %through_arrow, align 4
+  %20 = add i32 %18, %19
+  ret i32 %20
+}
+
+; Function Attrs: convergent
+define private ptr @Access_through_pointer_results_values_of(ptr noundef %"arguments[0].holder") #0 {
+entry:
+  %holder = alloca ptr, align 8
+  store ptr %"arguments[0].holder", ptr %holder, align 8
+  %0 = load ptr, ptr %holder, align 8
+  %1 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %0, i32 0, i32 0
+  %2 = load ptr, ptr %1, align 8
+  ret ptr %2
+}
+
+; Function Attrs: convergent
+define private ptr @Access_through_pointer_results_identity(ptr noundef %"arguments[0].holder") #0 {
+entry:
+  %holder = alloca ptr, align 8
+  store ptr %"arguments[0].holder", ptr %holder, align 8
+  %0 = load ptr, ptr %holder, align 8
+  ret ptr %0
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Ternary Condition Expressions", "[LLVM_IR]")
   {
     char const* const input_file = "ternary_condition_expressions.iris";

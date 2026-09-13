@@ -306,6 +306,10 @@ namespace iris::compiler
             return false;
 
         Expression const& first_expression = last_statement.expressions[0];
+
+        if (std::holds_alternative<Block_expression>(first_expression.data))
+            return ends_with_terminator_statement(std::get<Block_expression>(first_expression.data).statements);
+
         return std::holds_alternative<Break_expression>(first_expression.data) || std::holds_alternative<Continue_expression>(first_expression.data) || std::holds_alternative<Return_expression>(first_expression.data);
     }
 
@@ -1872,7 +1876,7 @@ namespace iris::compiler
         llvm::Type* const array_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, type_reference_to_use, type_database);
         llvm::Value* const array_pointer =
             using_pointer ?
-            create_load_instruction(llvm_builder, llvm_data_layout, llvm::PointerType::get(llvm_context, 0), left_hand_side_expression_value.value) :
+            load_if_needed(left_hand_side_expression_value, expression.expression.expression_index, statement, parameters).value :
             left_hand_side_expression_value.value;
         
         llvm::Value* const element_pointer = llvm_builder.CreateGEP(
@@ -5213,7 +5217,7 @@ namespace iris::compiler
                 std::optional<Type_reference> const value_type = remove_pointer(type_reference);
                 if (value_type.has_value())
                 {
-                    llvm::Value* const load_address = create_load_instruction(parameters.llvm_builder, parameters.llvm_data_layout, llvm::PointerType::get(parameters.llvm_context, 0), left_hand_side_expression.value);
+                    llvm::Value* const load_address = load_if_needed(left_hand_side_expression, dereference_and_access_expression.expression.expression_index, statement, parameters).value;
                     Value_and_type const loaded_left_hand_side
                     {
                         .name = "",

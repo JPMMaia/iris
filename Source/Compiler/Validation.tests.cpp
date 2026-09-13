@@ -4914,6 +4914,98 @@ function run(value: Int32) -> (result: Int32)
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that empty switch cases fall through to a case that returns", "[Validation][Return_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run(value: Int32) -> (result: Int32)
+{
+    switch value
+    {
+    case 0:
+    case 1:
+        return 1;
+    case 2:
+    {
+        if value > 1
+        {
+            return 2;
+        }
+        return 3;
+    }
+    default:
+        return 4;
+    }
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a switch without a default case does not return on all paths", "[Validation][Return_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run(value: Int32) -> (result: Int32)
+{
+    switch value
+    {
+    case 0:
+        return 0;
+    case 1:
+        return 1;
+    }
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(3, 10, 3, 46),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "'Test.run': not all control paths return a value.",
+                .related_information = {},
+            },
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that an empty last switch case does not return", "[Validation][Return_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run(value: Int32) -> (result: Int32)
+{
+    switch value
+    {
+    case 0:
+        return 0;
+    default:
+    }
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(3, 10, 3, 46),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "'Test.run': not all control paths return a value.",
+                .related_information = {},
+            },
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
 
     TEST_CASE("Validates that @size_of parameter is a valid type", "[Validation][Size_of]")
     {
