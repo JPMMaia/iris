@@ -125,20 +125,104 @@ namespace iris::compiler
         }
     }
 
-    llvm::StoreInst* create_store_instruction(
+    static bool can_write_memory(llvm::Instruction const& instruction)
+    {
+        return llvm::isa<llvm::StoreInst>(instruction)
+            || llvm::isa<llvm::CallBase>(instruction)
+            || llvm::isa<llvm::AtomicCmpXchgInst>(instruction)
+            || llvm::isa<llvm::AtomicRMWInst>(instruction)
+            || llvm::isa<llvm::VAArgInst>(instruction);
+    }
+
+    // True when `load` is earlier in the block being built and nothing between it and the insert
+    // point can write memory, so the loaded value still equals what its source pointer holds.
+    static bool is_source_unchanged_since(
+        llvm::IRBuilder<>& llvm_builder,
+        llvm::LoadInst const& load
+    )
+    {
+        constexpr std::size_t maximum_instructions_to_scan = 32;
+
+        llvm::BasicBlock* const block = llvm_builder.GetInsertBlock();
+        if (block == nullptr || load.getParent() != block)
+            return false;
+
+        llvm::BasicBlock::iterator current = llvm_builder.GetInsertPoint();
+        for (std::size_t scanned = 0; scanned < maximum_instructions_to_scan && current != block->begin(); ++scanned)
+        {
+            --current;
+
+            if (&*current == &load)
+                return true;
+
+            if (can_write_memory(*current))
+                return false;
+        }
+
+        return false;
+    }
+
+    // A first-class aggregate reaches instruction selection split into one value per scalar leaf,
+    // which makes code generation grow with the product of the aggregate's size and the number of
+    // times it is moved: copying a [64 x 170-leaf struct] a dozen times took minutes. Aggregates are
+    // therefore zeroed and copied through memory, which is what clang emits.
+    //
+    // A load is only turned into a copy from its source when nothing between the load and the store
+    // can write memory. A write in between could have gone through that source, as the middle step
+    // of `temporary = a; a = b; b = temporary` does.
+    llvm::Value* create_store_instruction(
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Value* const value,
         llvm::Value* const pointer
     )
     {
+        llvm::Type* const value_type = value->getType();
+
         // If the value is not sized, we cannot store it.
-        if (!value->getType()->isSized())
+        if (!value_type->isSized())
             return nullptr;
 
-        llvm::Align const type_alignment = llvm_data_layout.getABITypeAlign(value->getType());
+        llvm::Align const type_alignment = llvm_data_layout.getABITypeAlign(value_type);
+
+        if (value_type->isAggregateType())
+        {
+            std::uint64_t const size_in_bytes = llvm_data_layout.getTypeAllocSize(value_type);
+
+            if (llvm::Constant const* const constant = llvm::dyn_cast<llvm::Constant>(value); constant != nullptr && constant->isNullValue())
+                return create_memset_to_0_call(llvm_builder, pointer, size_in_bytes, type_alignment);
+
+            if (llvm::LoadInst* const load = llvm::dyn_cast<llvm::LoadInst>(value); load != nullptr && is_source_unchanged_since(llvm_builder, *load))
+                return llvm_builder.CreateMemCpy(pointer, type_alignment, load->getPointerOperand(), load->getAlign(), size_in_bytes);
+        }
+
         llvm::StoreInst* const instruction = llvm_builder.CreateAlignedStore(value, pointer, type_alignment);
         return instruction;
+    }
+
+    // Loads left without users once their stores became copies. They are erased only after the whole
+    // module is generated, because the code generator may still hold on to them until then.
+    void erase_dead_aggregate_loads(
+        llvm::Module& llvm_module
+    )
+    {
+        std::vector<llvm::LoadInst*> dead_loads;
+
+        for (llvm::Function& function : llvm_module)
+        {
+            for (llvm::BasicBlock& block : function)
+            {
+                for (llvm::Instruction& instruction : block)
+                {
+                    llvm::LoadInst* const load = llvm::dyn_cast<llvm::LoadInst>(&instruction);
+                    if (load != nullptr && load->getType()->isAggregateType() && load->use_empty() && !load->isVolatile())
+                        dead_loads.push_back(load);
+                }
+            }
+        }
+
+        for (llvm::LoadInst* const load : dead_loads)
+            load->eraseFromParent();
     }
 
     llvm::Value* create_memcpy_call(
@@ -147,11 +231,11 @@ namespace iris::compiler
         llvm::Module& llvm_module,
         llvm::Value* const destination_pointer,
         llvm::Value* const source_pointer,
-        unsigned const size_in_bits,
+        std::uint64_t const size_in_bytes,
         llvm::Align const alignment
     )
     {
-        if (size_in_bits == 0)
+        if (size_in_bytes == 0)
             return nullptr;
 
         llvm::Type* const int64_type = llvm::Type::getInt64Ty(llvm_context);
@@ -159,7 +243,7 @@ namespace iris::compiler
         llvm::Type* const pointer_type = llvm::PointerType::get(llvm_context, 0);
         llvm::Function* const memcpy_function = llvm::Intrinsic::getOrInsertDeclaration(&llvm_module, llvm::Intrinsic::memcpy, {pointer_type, pointer_type, int64_type});
 
-        llvm::Value* const size = llvm::ConstantInt::get(int64_type, size_in_bits);
+        llvm::Value* const size = llvm::ConstantInt::get(int64_type, size_in_bytes);
         llvm::Value* const is_volatile = llvm::ConstantInt::get(int1_type, 0);
 
         llvm::CallInst* const call = llvm_builder.CreateCall(memcpy_function, {destination_pointer, source_pointer, size, is_volatile});    

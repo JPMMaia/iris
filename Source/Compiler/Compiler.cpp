@@ -1295,6 +1295,8 @@ namespace iris::compiler
             {}
         );
 
+        erase_dead_aggregate_loads(*llvm_module);
+
         if (llvm::verifyModule(*llvm_module, &llvm::errs()))
         {
             llvm_module->print(llvm::errs(), nullptr);

@@ -1295,7 +1295,7 @@ namespace iris::compiler
                     {
                         iris::Type_reference const& original_argument_type = function_type.input_parameter_types[argument_index];
                         llvm::Type* const original_argument_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, original_argument_type, type_database);
-                        std::uint64_t const original_argument_size_in_bits = llvm_data_layout.getTypeAllocSize(original_argument_llvm_type);
+                        std::uint64_t const original_argument_size_in_bytes = llvm_data_layout.getTypeAllocSize(original_argument_llvm_type);
                         llvm::Align const original_argument_alignment = llvm_data_layout.getABITypeAlign(original_argument_llvm_type);
                         
                         llvm::AllocaInst* const alloca_instruction = create_alloca_instruction(llvm_builder, llvm_data_layout, llvm_parent_function, original_argument_llvm_type);
@@ -1306,7 +1306,7 @@ namespace iris::compiler
                             llvm_module,
                             alloca_instruction,
                             original_arguments[argument_index],
-                            original_argument_size_in_bits,
+                            original_argument_size_in_bytes,
                             original_argument_alignment
                         );
 
@@ -1796,7 +1796,7 @@ namespace iris::compiler
 
                 iris::Type_reference const& return_type = function_type.output_parameter_types[0];
                 llvm::Type* const return_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, return_type, type_database);
-                std::uint64_t const return_size_in_bits = llvm_data_layout.getTypeAllocSize(return_llvm_type);
+                std::uint64_t const return_size_in_bytes = llvm_data_layout.getTypeAllocSize(return_llvm_type);
                 llvm::Align const return_alignment = llvm_data_layout.getABITypeAlign(return_llvm_type);
 
                 if (value_to_return.value->getType()->isPointerTy())
@@ -1807,7 +1807,7 @@ namespace iris::compiler
                         llvm_module,
                         return_argument,
                         value_to_return.value,
-                        return_size_in_bits,
+                        return_size_in_bytes,
                         return_alignment
                     );
 

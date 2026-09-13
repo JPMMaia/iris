@@ -434,31 +434,30 @@ entry:
   %7 = call i64 @Optional_type_codegen__at__first__at__9454275149910341776(ptr %4, i64 %6)
   %8 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 0
   store i64 %7, ptr %8, align 4
-  %9 = load %struct.iris_builtin_Optional_Int32, ptr %0, align 4
-  store %struct.iris_builtin_Optional_Int32 %9, ptr %found, align 4
-  %10 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 1
-  %11 = load i8, ptr %10, align 1
-  %12 = trunc i8 %11 to i1
-  br i1 %12, label %if_s0_then, label %if_s1_after
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %found, ptr align 4 %0, i64 8, i1 false)
+  %9 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 1
+  %10 = load i8, ptr %9, align 1
+  %11 = trunc i8 %10 to i1
+  br i1 %11, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
-  %13 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 1
-  %14 = load i8, ptr %13, align 1
-  %15 = trunc i8 %14 to i1
-  br i1 %15, label %optional_value_check_pass, label %optional_value_check_fail
+  %12 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 1
+  %13 = load i8, ptr %12, align 1
+  %14 = trunc i8 %13 to i1
+  br i1 %14, label %optional_value_check_pass, label %optional_value_check_fail
 
 if_s1_after:                                      ; preds = %entry
   ret i32 0
 
 optional_value_check_pass:                        ; preds = %if_s0_then
-  %16 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 0
-  %17 = load i32, ptr %16, align 4
-  ret i32 %17
+  %15 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 0
+  %16 = load i32, ptr %15, align 4
+  ret i32 %16
 
 optional_value_check_fail:                        ; preds = %if_s0_then
   %stderr_pointer = load ptr, ptr @stderr, align 8
-  %18 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
-  %19 = call i32 @fflush(ptr null)
+  %17 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
+  %18 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }}
@@ -505,7 +504,11 @@ declare i32 @fflush(ptr)
 
 declare void @abort()
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: readwrite) }}
 )");
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -713,39 +716,41 @@ entry:
   store ptr %23, ptr %24, align 8, !dbg !43
   %25 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 1, !dbg !43
   store i64 1, ptr %25, align 8, !dbg !43
-  %26 = load %struct.iris_builtin_Generic_array_slice, ptr %3, align 8, !dbg !43
     #dbg_declare(ptr %d, !54, !DIExpression(), !44)
-  store %struct.iris_builtin_Generic_array_slice %26, ptr %d, align 8, !dbg !44
-  %27 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 0, !dbg !59
-  %28 = load ptr, ptr %27, align 8, !dbg !59
-  %29 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 1, !dbg !59
-  %30 = load i64, ptr %29, align 8, !dbg !59
-  call void @Array_slices_take(ptr %28, i64 %30), !dbg !59
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %d, ptr align 8 %3, i64 16, i1 false), !dbg !44
+  %26 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 0, !dbg !59
+  %27 = load ptr, ptr %26, align 8, !dbg !59
+  %28 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 1, !dbg !59
+  %29 = load i64, ptr %28, align 8, !dbg !59
+  call void @Array_slices_take(ptr %27, i64 %29), !dbg !59
     #dbg_declare(ptr %f, !60, !DIExpression(), !45)
   store i32 0, ptr %f, align 4, !dbg !45
     #dbg_declare(ptr %g, !61, !DIExpression(), !46)
   store ptr %f, ptr %g, align 8, !dbg !46
-  %31 = load ptr, ptr %g, align 8, !dbg !46
-  %32 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !46
-  store ptr %31, ptr %32, align 8, !dbg !46
-  %33 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !46
-  store i64 1, ptr %33, align 8, !dbg !46
-  %34 = load %struct.iris_builtin_Generic_array_slice, ptr %4, align 8, !dbg !46
+  %30 = load ptr, ptr %g, align 8, !dbg !46
+  %31 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !46
+  store ptr %30, ptr %31, align 8, !dbg !46
+  %32 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !46
+  store i64 1, ptr %32, align 8, !dbg !46
     #dbg_declare(ptr %h, !62, !DIExpression(), !47)
-  store %struct.iris_builtin_Generic_array_slice %34, ptr %h, align 8, !dbg !47
-  %35 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !47
-  %36 = load ptr, ptr %35, align 8, !dbg !47
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %h, ptr align 8 %4, i64 16, i1 false), !dbg !47
+  %33 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !47
+  %34 = load ptr, ptr %33, align 8, !dbg !47
     #dbg_declare(ptr %i, !63, !DIExpression(), !48)
-  store ptr %36, ptr %i, align 8, !dbg !48
-  %37 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
-  %38 = load ptr, ptr %37, align 8, !dbg !48
-  %array_element_pointer6 = getelementptr i32, ptr %38, i32 0, !dbg !48
+  store ptr %34, ptr %i, align 8, !dbg !48
+  %35 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
+  %36 = load ptr, ptr %35, align 8, !dbg !48
+  %array_element_pointer6 = getelementptr i32, ptr %36, i32 0, !dbg !48
     #dbg_declare(ptr %j, !64, !DIExpression(), !65)
   store ptr %array_element_pointer6, ptr %j, align 8, !dbg !65
   ret void, !dbg !65
 }}
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: readwrite) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -783,7 +788,7 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
 !30 = !DILocalVariable(name: "v2", scope: !3, file: !2, line: 10, type: !10)
 !31 = !DILocation(line: 10, column: 5, scope: !3)
 !32 = !DILocalVariable(name: "index", scope: !3, file: !2, line: 12, type: !10)
-!33 = !DILocalVariable(name: "v3", scope: !3, file: !2, line: 13, type: !10)
+)" R"(!33 = !DILocalVariable(name: "v3", scope: !3, file: !2, line: 13, type: !10)
 !34 = !DILocation(line: 13, column: 5, scope: !3)
 !35 = distinct !DISubprogram(name: "run", linkageName: "Array_slices_run", scope: null, file: !2, line: 16, type: !36, scopeLine: 17, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !38)
 !36 = !DISubroutineType(types: !37)
@@ -844,21 +849,24 @@ entry:
   store ptr null, ptr %1, align 8, !dbg !7
   %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !7
   store i64 0, ptr %2, align 8, !dbg !7
-  %3 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8, !dbg !7
-  %4 = getelementptr inbounds %struct.Array_slices_instantiate_My_struct, ptr %v0, i32 0, i32 0, !dbg !7
-  store %struct.iris_builtin_Generic_array_slice %3, ptr %4, align 8, !dbg !7
+  %3 = getelementptr inbounds %struct.Array_slices_instantiate_My_struct, ptr %v0, i32 0, i32 0, !dbg !7
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %3, ptr align 8 %0, i64 16, i1 false), !dbg !7
     #dbg_declare(ptr %v0, !10, !DIExpression(), !7)
     #dbg_declare(ptr %value, !21, !DIExpression(), !8)
   store i32 0, ptr %value, align 4, !dbg !8
-  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 0, !dbg !9
-  store ptr %value, ptr %5, align 8, !dbg !9
-  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 1, !dbg !9
-  store i64 1, ptr %6, align 8, !dbg !9
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 0, !dbg !9
+  store ptr %value, ptr %4, align 8, !dbg !9
+  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 1, !dbg !9
+  store i64 1, ptr %5, align 8, !dbg !9
     #dbg_declare(ptr %s0, !22, !DIExpression(), !9)
   ret void, !dbg !9
 }}
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: readwrite) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -2747,18 +2755,25 @@ entry:
   store i32 4, ptr %array_element_pointer9, align 4
   %array_element_pointer10 = getelementptr [4 x i32], ptr %array, i32 0, i32 3
   store i32 6, ptr %array_element_pointer10, align 4
-  %1 = load [4 x i32], ptr %array, align 4
+  %1 = getelementptr inbounds %struct.Constant_array_expressions_My_struct, ptr %instance, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %1, ptr align 4 %array, i64 16, i1 false)
   %2 = getelementptr inbounds %struct.Constant_array_expressions_My_struct, ptr %instance, i32 0, i32 0
-  store [4 x i32] %1, ptr %2, align 4
-  %3 = getelementptr inbounds %struct.Constant_array_expressions_My_struct, ptr %instance, i32 0, i32 0
-  %array_element_pointer11 = getelementptr [4 x i32], ptr %3, i32 0, i32 0
-  %4 = load i32, ptr %array_element_pointer11, align 4
-  store i32 %4, ptr %e, align 4
-  store [8 x i32] zeroinitializer, ptr %f, align 4
+  %array_element_pointer11 = getelementptr [4 x i32], ptr %2, i32 0, i32 0
+  %3 = load i32, ptr %array_element_pointer11, align 4
+  store i32 %3, ptr %e, align 4
+  call void @llvm.memset.p0.i64(ptr align 4 %f, i8 0, i64 32, i1 false)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #2
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -2829,68 +2844,70 @@ entry:
   %6 = load float, ptr %soa_member_element_pointer18, align 4
   %7 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element, i32 0, i32 1
   store float %6, ptr %7, align 4
-  %8 = load %struct.soa_array_type_Particle, ptr %soa_element, align 4
-  store %struct.soa_array_type_Particle %8, ptr %p1, align 4
-  %9 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %10 = load ptr, ptr %9, align 8
-  %soa_member_base_pointer20 = getelementptr i8, ptr %10, i64 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %p1, ptr align 4 %soa_element, i64 8, i1 false)
+  %8 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %9 = load ptr, ptr %8, align 8
+  %soa_member_base_pointer20 = getelementptr i8, ptr %9, i64 0
   %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i32 1
-  %11 = load float, ptr %soa_member_element_pointer21, align 4
-  %12 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 0
-  store float %11, ptr %12, align 4
-  %soa_member_base_pointer22 = getelementptr i8, ptr %10, i64 16
+  %10 = load float, ptr %soa_member_element_pointer21, align 4
+  %11 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 0
+  store float %10, ptr %11, align 4
+  %soa_member_base_pointer22 = getelementptr i8, ptr %9, i64 16
   %soa_member_element_pointer23 = getelementptr float, ptr %soa_member_base_pointer22, i32 1
-  %13 = load float, ptr %soa_member_element_pointer23, align 4
-  %14 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 1
-  store float %13, ptr %14, align 4
-  %15 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 0
-  store float 3.000000e+00, ptr %15, align 4
-  %16 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 1
-  store float 4.000000e+00, ptr %16, align 4
-  %17 = load %struct.soa_array_type_Particle, ptr %0, align 4
-  %18 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %19 = load ptr, ptr %18, align 8
-  store %struct.soa_array_type_Particle %17, ptr %soa_assignment_struct, align 4
-  %20 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
-  %soa_member_base_pointer24 = getelementptr i8, ptr %19, i64 0
+  %12 = load float, ptr %soa_member_element_pointer23, align 4
+  %13 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 1
+  store float %12, ptr %13, align 4
+  %14 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 0
+  store float 3.000000e+00, ptr %14, align 4
+  %15 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 1
+  store float 4.000000e+00, ptr %15, align 4
+  %16 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %17 = load ptr, ptr %16, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %soa_assignment_struct, ptr align 4 %0, i64 8, i1 false)
+  %18 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
+  %soa_member_base_pointer24 = getelementptr i8, ptr %17, i64 0
   %soa_member_element_pointer25 = getelementptr float, ptr %soa_member_base_pointer24, i32 1
-  %21 = load float, ptr %20, align 4
-  store float %21, ptr %soa_member_element_pointer25, align 4
-  %22 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
-  %soa_member_base_pointer26 = getelementptr i8, ptr %19, i64 16
+  %19 = load float, ptr %18, align 4
+  store float %19, ptr %soa_member_element_pointer25, align 4
+  %20 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
+  %soa_member_base_pointer26 = getelementptr i8, ptr %17, i64 16
   %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i32 1
-  %23 = load float, ptr %22, align 4
-  store float %23, ptr %soa_member_element_pointer27, align 4
-  %24 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %25 = load ptr, ptr %24, align 8
-  %soa_member_base_pointer28 = getelementptr i8, ptr %25, i64 0
+  %21 = load float, ptr %20, align 4
+  store float %21, ptr %soa_member_element_pointer27, align 4
+  %22 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %23 = load ptr, ptr %22, align 8
+  %soa_member_base_pointer28 = getelementptr i8, ptr %23, i64 0
   %soa_member_element_pointer29 = getelementptr float, ptr %soa_member_base_pointer28, i32 2
-  %26 = load float, ptr %soa_member_element_pointer29, align 4
-  store float %26, ptr %x2, align 4
-  %27 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %28 = load ptr, ptr %27, align 8
-  %soa_member_base_pointer30 = getelementptr i8, ptr %28, i64 0
+  %24 = load float, ptr %soa_member_element_pointer29, align 4
+  store float %24, ptr %x2, align 4
+  %25 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %26 = load ptr, ptr %25, align 8
+  %soa_member_base_pointer30 = getelementptr i8, ptr %26, i64 0
   %soa_member_element_pointer31 = getelementptr float, ptr %soa_member_base_pointer30, i32 2
   store float 1.000000e+00, ptr %soa_member_element_pointer31, align 4
-  %29 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %30 = load ptr, ptr %29, align 8
-  %soa_member_base_pointer32 = getelementptr i8, ptr %30, i64 16
+  %27 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %28 = load ptr, ptr %27, align 8
+  %soa_member_base_pointer32 = getelementptr i8, ptr %28, i64 16
   %soa_member_element_pointer33 = getelementptr float, ptr %soa_member_base_pointer32, i32 3
-  %31 = load float, ptr %soa_member_element_pointer33, align 4
-  store float %31, ptr %y3, align 4
-  %32 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %33 = load ptr, ptr %32, align 8
-  %soa_member_base_pointer34 = getelementptr i8, ptr %33, i64 16
+  %29 = load float, ptr %soa_member_element_pointer33, align 4
+  store float %29, ptr %y3, align 4
+  %30 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %31 = load ptr, ptr %30, align 8
+  %soa_member_base_pointer34 = getelementptr i8, ptr %31, i64 16
   %soa_member_element_pointer35 = getelementptr float, ptr %soa_member_base_pointer34, i32 3
   store float 2.000000e+00, ptr %soa_member_element_pointer35, align 4
   store i64 4, ptr %length, align 8
-  %34 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %35 = load ptr, ptr %34, align 8
-  store ptr %35, ptr %data, align 8
+  %32 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %33 = load ptr, ptr %32, align 8
+  store ptr %33, ptr %data, align 8
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -3038,157 +3055,157 @@ entry:
   store i64 4, ptr %6, align 8
   %7 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
   store ptr %3, ptr %7, align 8
-  %8 = load %__hl_soa_array_view, ptr %soa_array_view, align 8
-  store %__hl_soa_array_view %8, ptr %view, align 8
-  %9 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %10 = load i64, ptr %9, align 8
-  store i64 %10, ptr %start_index, align 8
-  %11 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 1
-  %12 = load i64, ptr %11, align 8
-  store i64 %12, ptr %end_index, align 8
-  %13 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %14 = load i64, ptr %13, align 8
-  store i64 %14, ptr %length, align 8
-  %15 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %16 = load ptr, ptr %15, align 8
-  store ptr %16, ptr %data, align 8
-  %17 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %18 = load ptr, ptr %17, align 8
-  %19 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %20 = load i64, ptr %19, align 8
-  %21 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %22 = load i64, ptr %21, align 8
-  %soa_adjusted_index = add i64 %22, 0
-  %soa_member_base_pointer15 = getelementptr i8, ptr %18, i64 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %view, ptr align 8 %soa_array_view, i64 32, i1 false)
+  %8 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %9 = load i64, ptr %8, align 8
+  store i64 %9, ptr %start_index, align 8
+  %10 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 1
+  %11 = load i64, ptr %10, align 8
+  store i64 %11, ptr %end_index, align 8
+  %12 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %13 = load i64, ptr %12, align 8
+  store i64 %13, ptr %length, align 8
+  %14 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %15 = load ptr, ptr %14, align 8
+  store ptr %15, ptr %data, align 8
+  %16 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %17 = load ptr, ptr %16, align 8
+  %18 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %19 = load i64, ptr %18, align 8
+  %20 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %21 = load i64, ptr %20, align 8
+  %soa_adjusted_index = add i64 %21, 0
+  %soa_member_base_pointer15 = getelementptr i8, ptr %17, i64 0
   %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i64 %soa_adjusted_index
-  %23 = load float, ptr %soa_member_element_pointer16, align 4
-  %24 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 0
-  store float %23, ptr %24, align 4
-  %soa_member_block_size = mul i64 %20, 4
+  %22 = load float, ptr %soa_member_element_pointer16, align 4
+  %23 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 0
+  store float %22, ptr %23, align 4
+  %soa_member_block_size = mul i64 %19, 4
   %soa_member_block_offset = add i64 0, %soa_member_block_size
   %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
   %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
-  %soa_member_base_pointer17 = getelementptr i8, ptr %18, i64 %soa_offset_aligned
+  %soa_member_base_pointer17 = getelementptr i8, ptr %17, i64 %soa_offset_aligned
   %soa_member_element_pointer18 = getelementptr float, ptr %soa_member_base_pointer17, i64 %soa_adjusted_index
-  %25 = load float, ptr %soa_member_element_pointer18, align 4
-  %26 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 1
-  store float %25, ptr %26, align 4
-  %27 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 0
-  store float 3.000000e+00, ptr %27, align 4
-  %28 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 1
-  store float 4.000000e+00, ptr %28, align 4
-  %29 = load %struct.soa_array_view_type_Particle, ptr %0, align 4
-  %30 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %31 = load ptr, ptr %30, align 8
-  %32 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %24 = load float, ptr %soa_member_element_pointer18, align 4
+  %25 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 1
+  store float %24, ptr %25, align 4
+  %26 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 0
+  store float 3.000000e+00, ptr %26, align 4
+  %27 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 1
+  store float 4.000000e+00, ptr %27, align 4
+  %28 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %29 = load ptr, ptr %28, align 8
+  %30 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %31 = load i64, ptr %30, align 8
+  %32 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %33 = load i64, ptr %32, align 8
-  %34 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %35 = load i64, ptr %34, align 8
-  %soa_adjusted_index19 = add i64 %35, 0
-  store %struct.soa_array_view_type_Particle %29, ptr %soa_assignment_struct, align 4
-  %36 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
-  %soa_member_base_pointer20 = getelementptr i8, ptr %31, i64 0
+  %soa_adjusted_index19 = add i64 %33, 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %soa_assignment_struct, ptr align 4 %0, i64 8, i1 false)
+  %34 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
+  %soa_member_base_pointer20 = getelementptr i8, ptr %29, i64 0
   %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i64 %soa_adjusted_index19
-  %37 = load float, ptr %36, align 4
-  store float %37, ptr %soa_member_element_pointer21, align 4
-  %38 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
-  %soa_member_block_size22 = mul i64 %33, 4
+  %35 = load float, ptr %34, align 4
+  store float %35, ptr %soa_member_element_pointer21, align 4
+  %36 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
+  %soa_member_block_size22 = mul i64 %31, 4
   %soa_member_block_offset23 = add i64 0, %soa_member_block_size22
   %soa_offset_adjusted24 = add i64 %soa_member_block_offset23, 3
   %soa_offset_aligned25 = and i64 %soa_offset_adjusted24, -4
-  %soa_member_base_pointer26 = getelementptr i8, ptr %31, i64 %soa_offset_aligned25
+  %soa_member_base_pointer26 = getelementptr i8, ptr %29, i64 %soa_offset_aligned25
   %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i64 %soa_adjusted_index19
-  %39 = load float, ptr %38, align 4
-  store float %39, ptr %soa_member_element_pointer27, align 4
-  %40 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %41 = load ptr, ptr %40, align 8
-  %42 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %37 = load float, ptr %36, align 4
+  store float %37, ptr %soa_member_element_pointer27, align 4
+  %38 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %39 = load ptr, ptr %38, align 8
+  %40 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %41 = load i64, ptr %40, align 8
+  %42 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %43 = load i64, ptr %42, align 8
-  %44 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %45 = load i64, ptr %44, align 8
-  %soa_adjusted_index28 = add i64 %45, 0
-  %soa_member_base_pointer29 = getelementptr i8, ptr %41, i64 0
+  %soa_adjusted_index28 = add i64 %43, 0
+  %soa_member_base_pointer29 = getelementptr i8, ptr %39, i64 0
   %soa_member_element_pointer30 = getelementptr float, ptr %soa_member_base_pointer29, i64 %soa_adjusted_index28
   store float 1.000000e+00, ptr %soa_member_element_pointer30, align 4
-  %46 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %47 = load ptr, ptr %46, align 8
-  %48 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %44 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %45 = load ptr, ptr %44, align 8
+  %46 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %47 = load i64, ptr %46, align 8
+  %48 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %49 = load i64, ptr %48, align 8
-  %50 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %51 = load i64, ptr %50, align 8
-  %soa_adjusted_index31 = add i64 %51, 1
-  %soa_member_block_size32 = mul i64 %49, 4
+  %soa_adjusted_index31 = add i64 %49, 1
+  %soa_member_block_size32 = mul i64 %47, 4
   %soa_member_block_offset33 = add i64 0, %soa_member_block_size32
   %soa_offset_adjusted34 = add i64 %soa_member_block_offset33, 3
   %soa_offset_aligned35 = and i64 %soa_offset_adjusted34, -4
-  %soa_member_base_pointer36 = getelementptr i8, ptr %47, i64 %soa_offset_aligned35
+  %soa_member_base_pointer36 = getelementptr i8, ptr %45, i64 %soa_offset_aligned35
   %soa_member_element_pointer37 = getelementptr float, ptr %soa_member_base_pointer36, i64 %soa_adjusted_index31
   store float 2.000000e+00, ptr %soa_member_element_pointer37, align 4
-  %52 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %53 = load ptr, ptr %52, align 8
-  %54 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %50 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %51 = load ptr, ptr %50, align 8
+  %52 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %53 = load i64, ptr %52, align 8
+  %54 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %55 = load i64, ptr %54, align 8
-  %56 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %57 = load i64, ptr %56, align 8
-  %soa_adjusted_index38 = add i64 %57, 0
-  %soa_member_base_pointer40 = getelementptr i8, ptr %53, i64 0
+  %soa_adjusted_index38 = add i64 %55, 0
+  %soa_member_base_pointer40 = getelementptr i8, ptr %51, i64 0
   %soa_member_element_pointer41 = getelementptr float, ptr %soa_member_base_pointer40, i64 %soa_adjusted_index38
-  %58 = load float, ptr %soa_member_element_pointer41, align 4
-  %59 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 0
-  store float %58, ptr %59, align 4
-  %soa_member_block_size42 = mul i64 %55, 4
+  %56 = load float, ptr %soa_member_element_pointer41, align 4
+  %57 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 0
+  store float %56, ptr %57, align 4
+  %soa_member_block_size42 = mul i64 %53, 4
   %soa_member_block_offset43 = add i64 0, %soa_member_block_size42
   %soa_offset_adjusted44 = add i64 %soa_member_block_offset43, 3
   %soa_offset_aligned45 = and i64 %soa_offset_adjusted44, -4
-  %soa_member_base_pointer46 = getelementptr i8, ptr %53, i64 %soa_offset_aligned45
+  %soa_member_base_pointer46 = getelementptr i8, ptr %51, i64 %soa_offset_aligned45
   %soa_member_element_pointer47 = getelementptr float, ptr %soa_member_base_pointer46, i64 %soa_adjusted_index38
-  %60 = load float, ptr %soa_member_element_pointer47, align 4
-  %61 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 1
-  store float %60, ptr %61, align 4
-  %62 = load %struct.soa_array_view_type_Particle, ptr %soa_element39, align 4
-  store %struct.soa_array_view_type_Particle %62, ptr %p_0, align 4
-  %63 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %64 = load ptr, ptr %63, align 8
-  %65 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %66 = load i64, ptr %65, align 8
-  %67 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %68 = load i64, ptr %67, align 8
-  %soa_adjusted_index48 = add i64 %68, 0
-  %soa_member_base_pointer49 = getelementptr i8, ptr %64, i64 0
+  %58 = load float, ptr %soa_member_element_pointer47, align 4
+  %59 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 1
+  store float %58, ptr %59, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %p_0, ptr align 4 %soa_element39, i64 8, i1 false)
+  %60 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %61 = load ptr, ptr %60, align 8
+  %62 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %63 = load i64, ptr %62, align 8
+  %64 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %65 = load i64, ptr %64, align 8
+  %soa_adjusted_index48 = add i64 %65, 0
+  %soa_member_base_pointer49 = getelementptr i8, ptr %61, i64 0
   %soa_member_element_pointer50 = getelementptr float, ptr %soa_member_base_pointer49, i64 %soa_adjusted_index48
-  %69 = load float, ptr %soa_member_element_pointer50, align 4
-  store float %69, ptr %x0, align 4
-  %70 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %71 = load ptr, ptr %70, align 8
-  %72 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %73 = load i64, ptr %72, align 8
-  %74 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %75 = load i64, ptr %74, align 8
-  %soa_adjusted_index51 = add i64 %75, 1
-  %soa_member_block_size52 = mul i64 %73, 4
+  %66 = load float, ptr %soa_member_element_pointer50, align 4
+  store float %66, ptr %x0, align 4
+  %67 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %68 = load ptr, ptr %67, align 8
+  %69 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %70 = load i64, ptr %69, align 8
+  %71 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %72 = load i64, ptr %71, align 8
+  %soa_adjusted_index51 = add i64 %72, 1
+  %soa_member_block_size52 = mul i64 %70, 4
   %soa_member_block_offset53 = add i64 0, %soa_member_block_size52
   %soa_offset_adjusted54 = add i64 %soa_member_block_offset53, 3
   %soa_offset_aligned55 = and i64 %soa_offset_adjusted54, -4
-  %soa_member_base_pointer56 = getelementptr i8, ptr %71, i64 %soa_offset_aligned55
+  %soa_member_base_pointer56 = getelementptr i8, ptr %68, i64 %soa_offset_aligned55
   %soa_member_element_pointer57 = getelementptr float, ptr %soa_member_base_pointer56, i64 %soa_adjusted_index51
-  %76 = load float, ptr %soa_member_element_pointer57, align 4
-  store float %76, ptr %y1, align 4
-  %77 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %78 = load ptr, ptr %77, align 8
-  %79 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
-  store i64 0, ptr %79, align 8
-  %80 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
-  store i64 4, ptr %80, align 8
-  %81 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
-  store i64 4, ptr %81, align 8
-  %82 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
-  store ptr %78, ptr %82, align 8
-  %83 = load %__hl_soa_array_view, ptr %soa_array_view58, align 8
-  store %__hl_soa_array_view %83, ptr %full_view, align 8
+  %73 = load float, ptr %soa_member_element_pointer57, align 4
+  store float %73, ptr %y1, align 4
+  %74 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %75 = load ptr, ptr %74, align 8
+  %76 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
+  store i64 0, ptr %76, align 8
+  %77 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
+  store i64 4, ptr %77, align 8
+  %78 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
+  store i64 4, ptr %78, align 8
+  %79 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
+  store ptr %75, ptr %79, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %full_view, ptr align 8 %soa_array_view58, i64 32, i1 false)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -3301,18 +3318,21 @@ entry:
   %9 = call i64 @add(i64 noundef %6, i64 noundef %8), !dbg !10
   %10 = getelementptr inbounds %struct.Vector2i, ptr %0, i32 0, i32 0, !dbg !10
   store i64 %9, ptr %10, align 4, !dbg !10
-  %11 = load %struct.Vector2i, ptr %0, align 4, !dbg !10
     #dbg_declare(ptr %c, !19, !DIExpression(), !11)
-  store %struct.Vector2i %11, ptr %c, align 4, !dbg !11
-  %12 = getelementptr inbounds %struct.Vector2i, ptr %c, i32 0, i32 0, !dbg !11
-  %13 = load i32, ptr %12, align 4, !dbg !11
-  %14 = getelementptr inbounds %struct.Vector2i, ptr %c, i32 0, i32 1, !dbg !11
-  %15 = load i32, ptr %14, align 4, !dbg !11
-  %16 = add i32 %13, %15, !dbg !11
-  ret i32 %16, !dbg !20
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %c, ptr align 4 %0, i64 8, i1 false), !dbg !11
+  %11 = getelementptr inbounds %struct.Vector2i, ptr %c, i32 0, i32 0, !dbg !11
+  %12 = load i32, ptr %11, align 4, !dbg !11
+  %13 = getelementptr inbounds %struct.Vector2i, ptr %c, i32 0, i32 1, !dbg !11
+  %14 = load i32, ptr %13, align 4, !dbg !11
+  %15 = add i32 %12, %14, !dbg !11
+  ret i32 %15, !dbg !20
 }}
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: readwrite) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3392,22 +3412,24 @@ entry:
   store ptr %2, ptr %4, align 8, !dbg !20
   %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !20
   store i64 %3, ptr %5, align 8, !dbg !20
-  %6 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8, !dbg !20
     #dbg_declare(ptr %a, !25, !DIExpression(), !21)
-  store %struct.iris_builtin_Generic_array_slice %6, ptr %a, align 8, !dbg !21
-  %7 = load ptr, ptr %vectors, align 8, !dbg !21
-  %8 = load i64, ptr %length, align 8, !dbg !21
-  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !21
-  store ptr %7, ptr %9, align 8, !dbg !21
-  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !21
-  store i64 %8, ptr %10, align 8, !dbg !21
-  %11 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8, !dbg !21
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %a, ptr align 8 %0, i64 16, i1 false), !dbg !21
+  %6 = load ptr, ptr %vectors, align 8, !dbg !21
+  %7 = load i64, ptr %length, align 8, !dbg !21
+  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !21
+  store ptr %6, ptr %8, align 8, !dbg !21
+  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !21
+  store i64 %7, ptr %9, align 8, !dbg !21
     #dbg_declare(ptr %b, !30, !DIExpression(), !34)
-  store %struct.iris_builtin_Generic_array_slice %11, ptr %b, align 8, !dbg !34
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %b, ptr align 8 %1, i64 16, i1 false), !dbg !34
   ret void, !dbg !34
 }}
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: readwrite) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -5572,11 +5594,10 @@ entry:
   %5 = getelementptr inbounds { ptr, ptr }, ptr %allocator, i32 0, i32 1
   %6 = load ptr, ptr %5, align 8
   call void @dynamic_array__at__create__at__17123080338655627377(ptr dead_on_unwind noalias writable sret(%struct.dynamic_array__at__Dynamic_array__at__8677533138919514836) align 8 %0, ptr %4, ptr %6)
-  %7 = load %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, align 8
-  store %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836 %7, ptr %instance, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %instance, ptr align 8 %0, i64 40, i1 false)
   call void @dynamic_array__at__push_back__at__4888045391637469292(ptr noundef %instance, i32 noundef 1)
-  %8 = call i32 @dynamic_array__at__get__at__16241305439249145253(ptr noundef %instance, i64 noundef 0)
-  store i32 %8, ptr %element, align 4
+  %7 = call i32 @dynamic_array__at__get__at__16241305439249145253(ptr noundef %instance, i64 noundef 0)
+  store i32 %7, ptr %element, align 4
   ret void
 }
 
@@ -5614,16 +5635,15 @@ condition_success1:                               ; preds = %condition_success
   store i64 0, ptr %12, align 8
   %13 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 2
   store i64 0, ptr %13, align 8
-  %14 = load %struct.dynamic_array_Allocator, ptr %allocator, align 8
-  %15 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 3
-  store %struct.dynamic_array_Allocator %14, ptr %15, align 8
+  %14 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__8677533138919514836, ptr %0, i32 0, i32 3
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %14, ptr align 8 %allocator, i64 16, i1 false)
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return.instance, ptr align 8 %0, i64 40, i1 false)
   ret void
 
 condition_fail2:                                  ; preds = %condition_success
   %stderr_pointer3 = load ptr, ptr @stderr, align 8
-  %16 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer3)
-  %17 = call i32 @fflush(ptr null)
+  %15 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer3)
+  %16 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -5764,14 +5784,14 @@ condition_fail2:                                  ; preds = %condition_success
   unreachable
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 declare i32 @fputs(ptr, ptr)
 
 declare i32 @fflush(ptr)
 
 declare void @abort()
-
-; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
-declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -6054,19 +6074,22 @@ entry:
   %3 = call ptr %1(ptr noundef %2)
   %4 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16604025477222527611, ptr %0, i32 0, i32 0
   store ptr %3, ptr %4, align 8
-  %5 = load %struct.function_pointer_through_global__at__Holder__at__16604025477222527611, ptr %0, align 8
-  store %struct.function_pointer_through_global__at__Holder__at__16604025477222527611 %5, ptr %holder, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %holder, ptr align 8 %0, i64 8, i1 false)
   store i64 1, ptr %x, align 8
-  %6 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16604025477222527611, ptr %holder, i32 0, i32 0
-  %7 = load ptr, ptr %6, align 8
-  store ptr %7, ptr %f, align 8
-  %8 = load ptr, ptr %f, align 8
-  %9 = call i64 %8(ptr noundef %x)
-  store i64 %9, ptr %result, align 8
+  %5 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16604025477222527611, ptr %holder, i32 0, i32 0
+  %6 = load ptr, ptr %5, align 8
+  store ptr %6, ptr %f, align 8
+  %7 = load ptr, ptr %f, align 8
+  %8 = call i64 %7(ptr noundef %x)
+  store i64 %8, ptr %result, align 8
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -6576,11 +6599,15 @@ entry:
   store i8 0, ptr %c, align 1
   store ptr null, ptr %d, align 8
   store i32 0, ptr %e, align 4
-  store [4 x i32] zeroinitializer, ptr %f, align 4
+  call void @llvm.memset.p0.i64(ptr align 4 %f, i8 0, i64 16, i1 false)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -6620,13 +6647,12 @@ if_s1_after:                                      ; preds = %if_s0_then, %entry
   store ptr %array_element_pointer, ptr %p0, align 8
   %5 = load ptr, ptr %instance, align 8
   %array_element_pointer1 = getelementptr %struct.Load_pointers_My_struct, ptr %5, i32 0
-  %6 = load %struct.Load_pointers_My_struct, ptr %array_element_pointer1, align 8
-  store %struct.Load_pointers_My_struct %6, ptr %v0, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %v0, ptr align 8 %array_element_pointer1, i64 8, i1 false)
   store ptr null, ptr %n, align 8
-  %7 = load ptr, ptr %p0, align 8
-  %8 = load ptr, ptr %n, align 8
-  %9 = icmp eq ptr %7, %8
-  br i1 %9, label %if_s0_then2, label %if_s1_after3
+  %6 = load ptr, ptr %p0, align 8
+  %7 = load ptr, ptr %n, align 8
+  %8 = icmp eq ptr %6, %7
+  br i1 %8, label %if_s0_then2, label %if_s1_after3
 
 if_s0_then2:                                      ; preds = %if_s1_after
   br label %if_s1_after3
@@ -6635,7 +6661,11 @@ if_s1_after3:                                     ; preds = %if_s0_then2, %if_s1
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -7224,16 +7254,14 @@ entry:
   store ptr %stack_array, ptr %3, align 8
   %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 %2, ptr %4, align 8
-  %5 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8
-  store %struct.iris_builtin_Generic_array_slice %5, ptr %array_0, align 8
-  %6 = load i64, ptr %length, align 8
-  %stack_array1 = alloca i32, i64 %6, align 16
-  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
-  store ptr %stack_array1, ptr %7, align 8
-  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
-  store i64 %6, ptr %8, align 8
-  %9 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8
-  store %struct.iris_builtin_Generic_array_slice %9, ptr %array_1, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array_0, ptr align 8 %0, i64 16, i1 false)
+  %5 = load i64, ptr %length, align 8
+  %stack_array1 = alloca i32, i64 %5, align 16
+  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  store ptr %stack_array1, ptr %6, align 8
+  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  store i64 %5, ptr %7, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array_1, ptr align 8 %1, i64 16, i1 false)
   call void @llvm.stackrestore.p0(ptr %stack_save_pointer)
   ret void
 }
@@ -7241,11 +7269,15 @@ entry:
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare ptr @llvm.stacksave.p0() #1
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #2
+
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare void @llvm.stackrestore.p0(ptr) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nosync nounwind willreturn }
+attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -7279,40 +7311,38 @@ entry:
   store ptr %stack_array, ptr %3, align 8
   %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 %2, ptr %4, align 8
-  %5 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8
-  store %struct.iris_builtin_Generic_array_slice %5, ptr %array_0, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array_0, ptr align 8 %0, i64 16, i1 false)
   store i64 1, ptr %index, align 8
   br label %for_loop_condition
 
 for_loop_condition:                               ; preds = %for_loop_update_index, %entry
-  %6 = load i64, ptr %length, align 8
-  %7 = load i64, ptr %index, align 8
-  %8 = icmp ult i64 %7, %6
-  br i1 %8, label %for_loop_then, label %for_loop_after
+  %5 = load i64, ptr %length, align 8
+  %6 = load i64, ptr %index, align 8
+  %7 = icmp ult i64 %6, %5
+  br i1 %7, label %for_loop_then, label %for_loop_after
 
 for_loop_then:                                    ; preds = %for_loop_condition
-  %9 = load i64, ptr %index, align 8
+  %8 = load i64, ptr %index, align 8
   %stack_save_pointer1 = call ptr @llvm.stacksave.p0()
-  %stack_array2 = alloca i32, i64 %9, align 16
-  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
-  store ptr %stack_array2, ptr %10, align 8
-  %11 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
-  store i64 %9, ptr %11, align 8
-  %12 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8
-  store %struct.iris_builtin_Generic_array_slice %12, ptr %array_1, align 8
-  %13 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %array_1, i32 0, i32 0
-  %14 = load ptr, ptr %13, align 8
-  %array_slice_element_pointer = getelementptr i32, ptr %14, i32 0
-  %15 = load i64, ptr %index, align 8
-  %16 = trunc i64 %15 to i32
-  store i32 %16, ptr %array_slice_element_pointer, align 4
+  %stack_array2 = alloca i32, i64 %8, align 16
+  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  store ptr %stack_array2, ptr %9, align 8
+  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  store i64 %8, ptr %10, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array_1, ptr align 8 %1, i64 16, i1 false)
+  %11 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %array_1, i32 0, i32 0
+  %12 = load ptr, ptr %11, align 8
+  %array_slice_element_pointer = getelementptr i32, ptr %12, i32 0
+  %13 = load i64, ptr %index, align 8
+  %14 = trunc i64 %13 to i32
+  store i32 %14, ptr %array_slice_element_pointer, align 4
   call void @llvm.stackrestore.p0(ptr %stack_save_pointer1)
   br label %for_loop_update_index
 
 for_loop_update_index:                            ; preds = %for_loop_then
-  %17 = load i64, ptr %index, align 8
-  %18 = add i64 %17, 1
-  store i64 %18, ptr %index, align 8
+  %15 = load i64, ptr %index, align 8
+  %16 = add i64 %15, 1
+  store i64 %16, ptr %index, align 8
   br label %for_loop_condition
 
 for_loop_after:                                   ; preds = %for_loop_condition
@@ -7323,11 +7353,15 @@ for_loop_after:                                   ; preds = %for_loop_condition
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare ptr @llvm.stacksave.p0() #1
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #2
+
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare void @llvm.stackrestore.p0(ptr) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nosync nounwind willreturn }
+attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -8016,7 +8050,7 @@ if_s0_then:                                       ; preds = %entry
   ret void
 
 if_s1_after:                                      ; preds = %entry
-  store [16 x i8] zeroinitializer, ptr %format_specifier_buffer, align 1
+  call void @llvm.memset.p0.i64(ptr align 1 %format_specifier_buffer, i8 0, i64 16, i1 false)
   %data_pointer = getelementptr [16 x i8], ptr %format_specifier_buffer, i32 0, i32 0
   %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
   store ptr %data_pointer, ptr %7, align 8
@@ -8028,7 +8062,7 @@ if_s1_after:                                      ; preds = %entry
   %12 = load i64, ptr %11, align 8
   %13 = call ptr @iris.json.create_format_specifier(ptr %10, i64 %12, i32 noundef 0, i64 noundef 4)
   store ptr %13, ptr %format_specifier, align 8
-  store [64 x i8] zeroinitializer, ptr %format_buffer, align 1
+  call void @llvm.memset.p0.i64(ptr align 1 %format_buffer, i8 0, i64 64, i1 false)
   %array_element_pointer = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
   %14 = load ptr, ptr %value, align 8
   %15 = load ptr, ptr %format_specifier, align 8
@@ -8174,7 +8208,7 @@ logical_and_end6:                                 ; preds = %logical_and_rhs5, %
   br i1 %31, label %if_s0_then3, label %if_s1_after4
 
 if_s0_then7:                                      ; preds = %if_s1_after4
-  store [16 x i8] zeroinitializer, ptr %buffer, align 1
+  call void @llvm.memset.p0.i64(ptr align 1 %buffer, i8 0, i64 16, i1 false)
   %array_element_pointer = getelementptr [16 x i8], ptr %buffer, i32 0, i32 0
   %32 = load i32, ptr %raw_value, align 4
   %33 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 16, ptr noundef @global_23, i32 noundef %32)
@@ -8337,7 +8371,7 @@ logical_and_end10:                                ; preds = %logical_and_rhs9, %
   br i1 %42, label %if_s0_then7, label %if_s1_after8
 
 if_s0_then11:                                     ; preds = %if_s1_after8
-  store [16 x i8] zeroinitializer, ptr %buffer, align 1
+  call void @llvm.memset.p0.i64(ptr align 1 %buffer, i8 0, i64 16, i1 false)
   %array_element_pointer = getelementptr [16 x i8], ptr %buffer, i32 0, i32 0
   %43 = load i32, ptr %raw_value, align 4
   %44 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 16, ptr noundef @global_37, i32 noundef %43)
@@ -8391,10 +8425,14 @@ entry:
 ; Function Attrs: convergent
 declare void @iris_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+
 ; Function Attrs: convergent
 declare ptr @__acrt_iob_func(i32 noundef) #0
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
 )", g_test_source_files_path.generic_string(), test_source_file_path.size() + 1, test_source_file_path);
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.is_test_mode = true});
@@ -9191,84 +9229,74 @@ entry:
   store i32 1, ptr %19, align 4
   %20 = getelementptr inbounds %struct.Structs_My_struct, ptr %1, i32 0, i32 1
   store i32 2, ptr %20, align 4
-  %21 = load %struct.Structs_My_struct, ptr %1, align 4
-  %22 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 0
-  store %struct.Structs_My_struct %21, ptr %22, align 4
-  %23 = getelementptr inbounds %struct.Structs_My_struct, ptr %2, i32 0, i32 0
+  %21 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %21, ptr align 4 %1, i64 8, i1 false)
+  %22 = getelementptr inbounds %struct.Structs_My_struct, ptr %2, i32 0, i32 0
+  store i32 2, ptr %22, align 4
+  %23 = getelementptr inbounds %struct.Structs_My_struct, ptr %2, i32 0, i32 1
   store i32 2, ptr %23, align 4
-  %24 = getelementptr inbounds %struct.Structs_My_struct, ptr %2, i32 0, i32 1
-  store i32 2, ptr %24, align 4
-  %25 = load %struct.Structs_My_struct, ptr %2, align 4
-  %26 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 1
-  store %struct.Structs_My_struct %25, ptr %26, align 4
-  %27 = getelementptr inbounds %struct.Structs_My_struct, ptr %3, i32 0, i32 0
-  store i32 3, ptr %27, align 4
-  %28 = getelementptr inbounds %struct.Structs_My_struct, ptr %3, i32 0, i32 1
-  store i32 4, ptr %28, align 4
-  %29 = load %struct.Structs_My_struct, ptr %3, align 4
-  %30 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 2
-  store %struct.Structs_My_struct %29, ptr %30, align 4
-  %31 = getelementptr inbounds %struct.Structs_My_struct, ptr %4, i32 0, i32 0
+  %24 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 1
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %24, ptr align 4 %2, i64 8, i1 false)
+  %25 = getelementptr inbounds %struct.Structs_My_struct, ptr %3, i32 0, i32 0
+  store i32 3, ptr %25, align 4
+  %26 = getelementptr inbounds %struct.Structs_My_struct, ptr %3, i32 0, i32 1
+  store i32 4, ptr %26, align 4
+  %27 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 2
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %27, ptr align 4 %3, i64 8, i1 false)
+  %28 = getelementptr inbounds %struct.Structs_My_struct, ptr %4, i32 0, i32 0
+  store i32 1, ptr %28, align 4
+  %29 = getelementptr inbounds %struct.Structs_My_struct, ptr %4, i32 0, i32 1
+  store i32 2, ptr %29, align 4
+  %30 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %30, ptr align 4 %4, i64 8, i1 false)
+  %31 = getelementptr inbounds %struct.Structs_My_struct, ptr %5, i32 0, i32 0
   store i32 1, ptr %31, align 4
-  %32 = getelementptr inbounds %struct.Structs_My_struct, ptr %4, i32 0, i32 1
+  %32 = getelementptr inbounds %struct.Structs_My_struct, ptr %5, i32 0, i32 1
   store i32 2, ptr %32, align 4
-  %33 = load %struct.Structs_My_struct, ptr %4, align 4
-  %34 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 0
-  store %struct.Structs_My_struct %33, ptr %34, align 4
-  %35 = getelementptr inbounds %struct.Structs_My_struct, ptr %5, i32 0, i32 0
+  %33 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 1
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %33, ptr align 4 %5, i64 8, i1 false)
+  %34 = getelementptr inbounds %struct.Structs_My_struct, ptr %6, i32 0, i32 0
+  store i32 0, ptr %34, align 4
+  %35 = getelementptr inbounds %struct.Structs_My_struct, ptr %6, i32 0, i32 1
   store i32 1, ptr %35, align 4
-  %36 = getelementptr inbounds %struct.Structs_My_struct, ptr %5, i32 0, i32 1
-  store i32 2, ptr %36, align 4
-  %37 = load %struct.Structs_My_struct, ptr %5, align 4
-  %38 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 1
-  store %struct.Structs_My_struct %37, ptr %38, align 4
-  %39 = getelementptr inbounds %struct.Structs_My_struct, ptr %6, i32 0, i32 0
-  store i32 0, ptr %39, align 4
-  %40 = getelementptr inbounds %struct.Structs_My_struct, ptr %6, i32 0, i32 1
+  %36 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 2
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %36, ptr align 4 %6, i64 8, i1 false)
+  %37 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 1
+  %38 = getelementptr inbounds %struct.Structs_My_struct, ptr %37, i32 0, i32 0
+  %39 = load i32, ptr %38, align 4
+  store i32 %39, ptr %nested_b_a, align 4
+  %40 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
   store i32 1, ptr %40, align 4
-  %41 = load %struct.Structs_My_struct, ptr %6, align 4
-  %42 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 2
-  store %struct.Structs_My_struct %41, ptr %42, align 4
-  %43 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 1
-  %44 = getelementptr inbounds %struct.Structs_My_struct, ptr %43, i32 0, i32 0
-  %45 = load i32, ptr %44, align 4
-  store i32 %45, ptr %nested_b_a, align 4
-  %46 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
+  %41 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 1
+  store i32 2, ptr %41, align 4
+  %42 = getelementptr inbounds %struct.Structs_My_struct, ptr %7, i32 0, i32 0
+  store i32 10, ptr %42, align 4
+  %43 = getelementptr inbounds %struct.Structs_My_struct, ptr %7, i32 0, i32 1
+  store i32 11, ptr %43, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_4, ptr align 4 %7, i64 8, i1 false)
+  %44 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
+  %45 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
+  store i32 0, ptr %45, align 4
+  %46 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 0
   store i32 1, ptr %46, align 4
-  %47 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 1
+  %47 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 1
   store i32 2, ptr %47, align 4
-  %48 = getelementptr inbounds %struct.Structs_My_struct, ptr %7, i32 0, i32 0
-  store i32 10, ptr %48, align 4
-  %49 = getelementptr inbounds %struct.Structs_My_struct, ptr %7, i32 0, i32 1
-  store i32 11, ptr %49, align 4
-  %50 = load %struct.Structs_My_struct, ptr %7, align 4
-  store %struct.Structs_My_struct %50, ptr %instance_4, align 4
-  %51 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
-  %52 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
-  store i32 0, ptr %52, align 4
-  %53 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 0
+  %48 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 0
+  %49 = load i64, ptr %48, align 4
+  call void @Structs_pass_struct(i64 noundef %49)
+  %50 = call i64 @Structs_return_struct()
+  %51 = getelementptr inbounds %struct.Structs_My_struct, ptr %9, i32 0, i32 0
+  store i64 %50, ptr %51, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_5, ptr align 4 %9, i64 8, i1 false)
+  %52 = getelementptr inbounds %struct.Structs_My_struct_3, ptr %instance_6, i32 0, i32 0
+  store i32 4, ptr %52, align 4
+  %53 = getelementptr inbounds %struct.Structs_My_struct, ptr %10, i32 0, i32 0
   store i32 1, ptr %53, align 4
-  %54 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 1
+  %54 = getelementptr inbounds %struct.Structs_My_struct, ptr %10, i32 0, i32 1
   store i32 2, ptr %54, align 4
-  %55 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 0
-  %56 = load i64, ptr %55, align 4
-  call void @Structs_pass_struct(i64 noundef %56)
-  %57 = call i64 @Structs_return_struct()
-  %58 = getelementptr inbounds %struct.Structs_My_struct, ptr %9, i32 0, i32 0
-  store i64 %57, ptr %58, align 4
-  %59 = load %struct.Structs_My_struct, ptr %9, align 4
-  store %struct.Structs_My_struct %59, ptr %instance_5, align 4
-  %60 = getelementptr inbounds %struct.Structs_My_struct_3, ptr %instance_6, i32 0, i32 0
-  store i32 4, ptr %60, align 4
-  %61 = getelementptr inbounds %struct.Structs_My_struct, ptr %10, i32 0, i32 0
-  store i32 1, ptr %61, align 4
-  %62 = getelementptr inbounds %struct.Structs_My_struct, ptr %10, i32 0, i32 1
-  store i32 2, ptr %62, align 4
-  %63 = load %struct.Structs_My_struct, ptr %10, align 4
-  store %struct.Structs_My_struct %63, ptr %11, align 4
-  %64 = load %union.Structs_My_Union, ptr %11, align 4
-  %65 = getelementptr inbounds %struct.Structs_My_struct_3, ptr %instance_6, i32 0, i32 1
-  store %union.Structs_My_Union %64, ptr %65, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %11, ptr align 4 %10, i64 8, i1 false)
+  %55 = getelementptr inbounds %struct.Structs_My_struct_3, ptr %instance_6, i32 0, i32 1
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %55, ptr align 4 %11, i64 24, i1 false)
   ret void
 }
 
@@ -9294,7 +9322,11 @@ entry:
   ret i64 %4
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -9335,17 +9367,20 @@ entry:
   store ptr null, ptr %5, align 8
   %6 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__13204517064934021800, ptr %0, i32 0, i32 1
   store i64 0, ptr %6, align 8
-  %7 = load %struct.Type_constructor__at__Dynamic_array__at__13204517064934021800, ptr %0, align 8
-  %8 = getelementptr inbounds %struct.Type_constructor_My_struct, ptr %instance_2, i32 0, i32 0
-  store %struct.Type_constructor__at__Dynamic_array__at__13204517064934021800 %7, ptr %8, align 8
-  %9 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__10542566486010520104, ptr %instance_3, i32 0, i32 0
-  store ptr null, ptr %9, align 8
-  %10 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__10542566486010520104, ptr %instance_3, i32 0, i32 1
-  store i64 0, ptr %10, align 8
+  %7 = getelementptr inbounds %struct.Type_constructor_My_struct, ptr %instance_2, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %7, ptr align 8 %0, i64 16, i1 false)
+  %8 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__10542566486010520104, ptr %instance_3, i32 0, i32 0
+  store ptr null, ptr %8, align 8
+  %9 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__10542566486010520104, ptr %instance_3, i32 0, i32 1
+  store i64 0, ptr %9, align 8
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -9512,29 +9547,25 @@ if_s3_after:                                      ; preds = %if_s2_then, %if_s1_
   store i64 3, ptr %instance_4, align 8
   %15 = getelementptr inbounds %struct.Unions_My_struct, ptr %1, i32 0, i32 0
   store i32 1, ptr %15, align 4
-  %16 = load %struct.Unions_My_struct, ptr %1, align 4
-  store %struct.Unions_My_struct %16, ptr %instance_5, align 4
-  %17 = getelementptr inbounds %struct.Unions_My_struct, ptr %2, i32 0, i32 0
-  store i32 2, ptr %17, align 4
-  %18 = load %struct.Unions_My_struct, ptr %2, align 4
-  store %struct.Unions_My_struct %18, ptr %instance_6, align 4
-  %19 = getelementptr inbounds %union.Unions_My_union_3, ptr %instance_6, i32 0, i32 0
-  %20 = getelementptr inbounds %struct.Unions_My_struct, ptr %19, i32 0, i32 0
-  %21 = load i32, ptr %20, align 4
-  store i32 %21, ptr %nested_b_a, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_5, ptr align 4 %1, i64 4, i1 false)
+  %16 = getelementptr inbounds %struct.Unions_My_struct, ptr %2, i32 0, i32 0
+  store i32 2, ptr %16, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_6, ptr align 4 %2, i64 4, i1 false)
+  %17 = getelementptr inbounds %union.Unions_My_union_3, ptr %instance_6, i32 0, i32 0
+  %18 = getelementptr inbounds %struct.Unions_My_struct, ptr %17, i32 0, i32 0
+  %19 = load i32, ptr %18, align 4
+  store i32 %19, ptr %nested_b_a, align 4
   store i32 1, ptr %instance_7, align 4
   store i32 2, ptr %3, align 4
-  %22 = load %union.Unions_My_union, ptr %3, align 4
-  store %union.Unions_My_union %22, ptr %instance_7, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_7, ptr align 4 %3, i64 4, i1 false)
   store i32 4, ptr %4, align 4
-  %23 = getelementptr inbounds %union.Unions_My_union, ptr %4, i32 0, i32 0
-  %24 = load i32, ptr %23, align 4
-  call void @Unions_pass_union(i32 noundef %24)
-  %25 = call i32 @Unions_return_union()
-  %26 = getelementptr inbounds %union.Unions_My_union, ptr %5, i32 0, i32 0
-  store i32 %25, ptr %26, align 4
-  %27 = load %union.Unions_My_union, ptr %5, align 4
-  store %union.Unions_My_union %27, ptr %instance_8, align 4
+  %20 = getelementptr inbounds %union.Unions_My_union, ptr %4, i32 0, i32 0
+  %21 = load i32, ptr %20, align 4
+  call void @Unions_pass_union(i32 noundef %21)
+  %22 = call i32 @Unions_return_union()
+  %23 = getelementptr inbounds %union.Unions_My_union, ptr %5, i32 0, i32 0
+  store i32 %22, ptr %23, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_8, ptr align 4 %5, i64 4, i1 false)
   call void @llvm.memset.p0.i64(ptr align 4 %instance_9, i8 0, i64 4, i1 false)
   ret void
 }
@@ -9558,11 +9589,15 @@ entry:
   ret i32 %2
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #2
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
-attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -10257,8 +10292,7 @@ entry:
   %result = alloca %struct.c_interoperability_My_struct, align 4
   call void @llvm.memset.p0.i64(ptr align 4 %instance, i8 0, i64 20, i1 false)
   call void @c_interoperability_foo(ptr dead_on_unwind noalias writable sret(%struct.c_interoperability_My_struct) align 4 %0, ptr noundef byval(%struct.c_interoperability_My_struct) align 8 %instance)
-  %1 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %1, ptr %result, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %result, ptr align 4 %0, i64 20, i1 false)
   ret void
 }
 
@@ -10300,8 +10334,7 @@ entry:
   call void @llvm.memset.p0.i64(ptr align 4 %instance, i8 0, i64 20, i1 false)
   call void @llvm.memcpy.p0.p0.i64(ptr align 4 %1, ptr align 4 %instance, i64 20, i1 false)
   call void @c_interoperability_foo(ptr dead_on_unwind noalias writable align 4 %0, ptr noundef %1)
-  %2 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %2, ptr %result, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %result, ptr align 4 %0, i64 20, i1 false)
   ret void
 }
 
@@ -10348,8 +10381,7 @@ entry:
   %0 = alloca %struct.c_interoperability_My_struct, align 4
   %instance = alloca %struct.c_interoperability_My_struct, align 4
   call void @c_interoperability_foo(ptr dead_on_unwind noalias writable sret(%struct.c_interoperability_My_struct) align 4 %0)
-  %1 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %1, ptr %instance, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance, ptr align 4 %0, i64 20, i1 false)
   ret void
 }
 
@@ -10392,8 +10424,7 @@ entry:
   %0 = alloca %struct.c_interoperability_My_struct, align 4
   %instance = alloca %struct.c_interoperability_My_struct, align 4
   call void @c_interoperability_foo(ptr dead_on_unwind noalias writable align 4 %0)
-  %1 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %1, ptr %instance, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance, ptr align 4 %0, i64 20, i1 false)
   ret void
 }
 
@@ -10556,12 +10587,15 @@ entry:
   %1 = call i32 @c_interoperability_foo()
   %2 = getelementptr inbounds %struct.c_interoperability_My_struct, ptr %0, i32 0, i32 0
   store i32 %1, ptr %2, align 1
-  %3 = load %struct.c_interoperability_My_struct, ptr %0, align 1
-  store %struct.c_interoperability_My_struct %3, ptr %instance, align 1
+  call void @llvm.memcpy.p0.p0.i64(ptr align 1 %instance, ptr align 1 %0, i64 4, i1 false)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_c_interoperability_common("c_interoperability_function_return_empty_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
@@ -10696,12 +10730,15 @@ entry:
   %4 = getelementptr inbounds { i64, i64 }, ptr %0, i32 0, i32 1
   %5 = extractvalue { i64, i64 } %1, 1
   store i64 %5, ptr %4, align 4
-  %6 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %6, ptr %instance, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance, ptr align 4 %0, i64 16, i1 false)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_c_interoperability_common("c_interoperability_function_return_small_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
@@ -10734,8 +10771,7 @@ entry:
   %0 = alloca %struct.c_interoperability_My_struct, align 4
   %instance = alloca %struct.c_interoperability_My_struct, align 4
   call void @c_interoperability_foo(ptr dead_on_unwind noalias writable align 4 %0)
-  %1 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %1, ptr %instance, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance, ptr align 4 %0, i64 16, i1 false)
   ret void
 }
 
@@ -10775,22 +10811,25 @@ entry:
   store i32 0, ptr %v0, align 4
   %array_element_pointer = getelementptr [1 x ptr], ptr %array, i32 0, i32 0
   store ptr %v0, ptr %array_element_pointer, align 8
-  %1 = load [1 x ptr], ptr %array, align 8
-  store [1 x ptr] %1, ptr %array1, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array1, ptr align 8 %array, i64 8, i1 false)
   %data_pointer = getelementptr [1 x ptr], ptr %array1, i32 0, i32 0
-  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
-  store ptr %data_pointer, ptr %2, align 8
-  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
-  store i64 1, ptr %3, align 8
-  %4 = getelementptr inbounds { ptr, i64 }, ptr %0, i32 0, i32 0
-  %5 = load ptr, ptr %4, align 8
-  %6 = getelementptr inbounds { ptr, i64 }, ptr %0, i32 0, i32 1
-  %7 = load i64, ptr %6, align 8
-  call void @c_interoperability_take(ptr %5, i64 %7)
+  %1 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  store ptr %data_pointer, ptr %1, align 8
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  store i64 1, ptr %2, align 8
+  %3 = getelementptr inbounds { ptr, i64 }, ptr %0, i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  %5 = getelementptr inbounds { ptr, i64 }, ptr %0, i32 0, i32 1
+  %6 = load i64, ptr %5, align 8
+  call void @c_interoperability_take(ptr %4, i64 %6)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_c_interoperability_common("c_interoperability_function_with_array_slice.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
@@ -10818,13 +10857,12 @@ entry:
   store i32 0, ptr %v0, align 4
   %array_element_pointer = getelementptr [1 x ptr], ptr %array, i32 0, i32 0
   store ptr %v0, ptr %array_element_pointer, align 8
-  %2 = load [1 x ptr], ptr %array, align 8
-  store [1 x ptr] %2, ptr %array1, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array1, ptr align 8 %array, i64 8, i1 false)
   %data_pointer = getelementptr [1 x ptr], ptr %array1, i32 0, i32 0
-  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
-  store ptr %data_pointer, ptr %3, align 8
-  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
-  store i64 1, ptr %4, align 8
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  store ptr %data_pointer, ptr %2, align 8
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  store i64 1, ptr %3, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %1, ptr align 8 %0, i64 16, i1 false)
   call void @c_interoperability_take(ptr noundef %1)
   ret void
@@ -11707,8 +11745,7 @@ entry:
   %4 = getelementptr inbounds { ptr, ptr }, ptr %0, i32 0, i32 1
   %5 = extractvalue { ptr, ptr } %1, 1
   store ptr %5, ptr %4, align 8
-  %6 = load %struct.Lambda_return_lambda_Mapper, ptr %0, align 8
-  store %struct.Lambda_return_lambda_Mapper %6, ptr %mapper, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %mapper, ptr align 8 %0, i64 16, i1 false)
   ret void
 }
 
@@ -11724,7 +11761,11 @@ entry:
   ret i32 %1
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
