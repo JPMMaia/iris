@@ -7684,15 +7684,30 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_14 = internal constant [7 x i8] c"' vs '\00"
 @global_15 = internal constant [3 x i8] c"'\0A\00"
 @global_16 = internal constant [5 x i8] c"null\00"
-@global_17 = internal constant [3 x i8] c"??\00"
-@global_18 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
-@global_19 = internal constant [7 x i8] c"' vs '\00"
-@global_20 = internal constant [3 x i8] c"'\0A\00"
-@global_21 = internal constant [5 x i8] c"null\00"
-@global_22 = internal constant [3 x i8] c"??\00"
-@global_23 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
-@global_24 = internal constant [7 x i8] c"' vs '\00"
-@global_25 = internal constant [3 x i8] c"'\0A\00"
+@global_17 = internal constant [2 x i8] c"\22\00"
+@global_18 = internal constant [2 x i8] c"A\00"
+@global_19 = internal constant [2 x i8] c"\22\00"
+@global_20 = internal constant [2 x i8] c"\22\00"
+@global_21 = internal constant [2 x i8] c"B\00"
+@global_22 = internal constant [2 x i8] c"\22\00"
+@global_23 = internal constant [3 x i8] c"%d\00"
+@global_24 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
+@global_25 = internal constant [7 x i8] c"' vs '\00"
+@global_26 = internal constant [3 x i8] c"'\0A\00"
+@global_27 = internal constant [5 x i8] c"null\00"
+@global_28 = internal constant [2 x i8] c"\22\00"
+@global_29 = internal constant [4 x i8] c"Red\00"
+@global_30 = internal constant [2 x i8] c"\22\00"
+@global_31 = internal constant [2 x i8] c"\22\00"
+@global_32 = internal constant [6 x i8] c"Green\00"
+@global_33 = internal constant [2 x i8] c"\22\00"
+@global_34 = internal constant [2 x i8] c"\22\00"
+@global_35 = internal constant [5 x i8] c"Blue\00"
+@global_36 = internal constant [2 x i8] c"\22\00"
+@global_37 = internal constant [3 x i8] c"%d\00"
+@global_38 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
+@global_39 = internal constant [7 x i8] c"' vs '\00"
+@global_40 = internal constant [3 x i8] c"'\0A\00"
 
 ; Function Attrs: convergent
 declare i32 @Test_framework_external_get_color() #0
@@ -7705,6 +7720,9 @@ declare i32 @fprintf(ptr noundef, ptr noundef, ...) #0
 
 ; Function Attrs: convergent
 declare i32 @snprintf(ptr noundef, i64 noundef, ptr noundef, ...) #0
+
+; Function Attrs: convergent
+declare i32 @memcpy_s(ptr noundef, i64 noundef, ptr noundef, i64 noundef) #0
 
 ; Function Attrs: convergent
 declare i64 @strlen(ptr noundef) #0
@@ -7930,7 +7948,7 @@ entry:
   %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %buffer, i32 0, i32 1
   store i64 %"arguments[0].buffer_1", ptr %1, align 8
   store ptr %"arguments[1].specifier", ptr %specifier, align 8
-  %2 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+)" R"(  %2 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
   %3 = load ptr, ptr %2, align 8
   %array_slice_element_pointer = getelementptr i8, ptr %3, i32 0
   store i8 37, ptr %array_slice_element_pointer, align 1
@@ -7950,7 +7968,7 @@ for_loop_then:                                    ; preds = %for_loop_condition
   %9 = load i64, ptr %index, align 8
   %10 = add i64 1, %9
   %11 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
-)" R"(  %12 = load ptr, ptr %11, align 8
+  %12 = load ptr, ptr %11, align 8
   %array_slice_element_pointer1 = getelementptr i8, ptr %12, i64 %10
   %13 = load i64, ptr %index, align 8
   %14 = load ptr, ptr %specifier, align 8
@@ -8076,6 +8094,9 @@ define private void @iris.json__at__to_json__at__3586951934434767466(ptr noundef
 entry:
   %0 = alloca %struct.iris_json_Write_stream, align 8
   %value = alloca ptr, align 8
+  %raw_value = alloca i32, align 4
+  %named = alloca i8, align 1
+  %buffer = alloca [16 x i8], align 1
   %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
   store ptr %"arguments[0].stream", ptr %1, align 8
   store ptr %"arguments[1].value", ptr %value, align 8
@@ -8090,9 +8111,80 @@ if_s0_then:                                       ; preds = %entry
   ret void
 
 if_s1_after:                                      ; preds = %entry
-  %6 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
-  %7 = load ptr, ptr %6, align 8
-  call void %7(ptr noundef @global_17)
+  store i32 0, ptr %raw_value, align 4
+  %6 = load ptr, ptr %value, align 8
+  %7 = call i32 @memcpy_s(ptr noundef %raw_value, i64 noundef 4, ptr noundef %6, i64 noundef 4)
+  store i8 0, ptr %named, align 1
+  %8 = load i8, ptr %named, align 1
+  %9 = icmp eq i8 %8, 0
+  br i1 %9, label %logical_and_rhs, label %logical_and_end
+
+if_s0_then1:                                      ; preds = %logical_and_end
+  %10 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  call void %11(ptr noundef @global_17)
+  %12 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %13 = load ptr, ptr %12, align 8
+  call void %13(ptr noundef @global_18)
+  %14 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %15 = load ptr, ptr %14, align 8
+  call void %15(ptr noundef @global_19)
+  store i8 1, ptr %named, align 1
+  br label %if_s1_after2
+
+if_s1_after2:                                     ; preds = %if_s0_then1, %logical_and_end
+  %16 = load i8, ptr %named, align 1
+  %17 = icmp eq i8 %16, 0
+  br i1 %17, label %logical_and_rhs5, label %logical_and_end6
+
+logical_and_rhs:                                  ; preds = %if_s1_after
+  %18 = load i32, ptr %raw_value, align 4
+  %19 = icmp eq i32 %18, 0
+  br label %logical_and_end
+
+logical_and_end:                                  ; preds = %logical_and_rhs, %if_s1_after
+  %20 = phi i1 [ false, %if_s1_after ], [ %19, %logical_and_rhs ]
+  br i1 %20, label %if_s0_then1, label %if_s1_after2
+
+if_s0_then3:                                      ; preds = %logical_and_end6
+  %21 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %22 = load ptr, ptr %21, align 8
+  call void %22(ptr noundef @global_20)
+  %23 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %24 = load ptr, ptr %23, align 8
+  call void %24(ptr noundef @global_21)
+  %25 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %26 = load ptr, ptr %25, align 8
+  call void %26(ptr noundef @global_22)
+  store i8 1, ptr %named, align 1
+  br label %if_s1_after4
+
+if_s1_after4:                                     ; preds = %if_s0_then3, %logical_and_end6
+  %27 = load i8, ptr %named, align 1
+  %28 = icmp eq i8 %27, 0
+  br i1 %28, label %if_s0_then7, label %if_s1_after8
+
+logical_and_rhs5:                                 ; preds = %if_s1_after2
+  %29 = load i32, ptr %raw_value, align 4
+  %30 = icmp eq i32 %29, 1
+  br label %logical_and_end6
+
+logical_and_end6:                                 ; preds = %logical_and_rhs5, %if_s1_after2
+  %31 = phi i1 [ false, %if_s1_after2 ], [ %30, %logical_and_rhs5 ]
+  br i1 %31, label %if_s0_then3, label %if_s1_after4
+
+if_s0_then7:                                      ; preds = %if_s1_after4
+  store [16 x i8] zeroinitializer, ptr %buffer, align 1
+  %array_element_pointer = getelementptr [16 x i8], ptr %buffer, i32 0, i32 0
+  %32 = load i32, ptr %raw_value, align 4
+  %33 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 16, ptr noundef @global_23, i32 noundef %32)
+  %34 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %35 = load ptr, ptr %34, align 8
+  %array_element_pointer9 = getelementptr [16 x i8], ptr %buffer, i32 0, i32 0
+  call void %35(ptr noundef %array_element_pointer9)
+  br label %if_s1_after8
+
+if_s1_after8:                                     ; preds = %if_s0_then7, %if_s1_after4
   ret void
 }}
 
@@ -8112,22 +8204,22 @@ entry:
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json__at__print_json_difference__at__1809209613748969336(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
+)" R"(define private void @iris.json__at__print_json_difference__at__1809209613748969336(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
 entry:
   %lhs = alloca ptr, align 8
   %rhs = alloca ptr, align 8
   store ptr %"arguments[0].lhs", ptr %lhs, align 8
   store ptr %"arguments[1].rhs", ptr %rhs, align 8
   %0 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_18)
+  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_24)
   %2 = load ptr, ptr %rhs, align 8
   call void @iris.json__at__print_json__at__10654932908070568167(ptr noundef %2)
   %3 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_19)
+  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_25)
   %5 = load ptr, ptr %lhs, align 8
   call void @iris.json__at__print_json__at__10654932908070568167(ptr noundef %5)
   %6 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_20)
+  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_26)
   %8 = call ptr @__acrt_iob_func(i32 noundef 2)
   %9 = call i32 @fflush(ptr noundef %8)
   ret void
@@ -8138,6 +8230,9 @@ define private void @iris.json__at__to_json__at__10108698023711587013(ptr nounde
 entry:
   %0 = alloca %struct.iris_json_Write_stream, align 8
   %value = alloca ptr, align 8
+  %raw_value = alloca i32, align 4
+  %named = alloca i8, align 1
+  %buffer = alloca [16 x i8], align 1
   %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
   store ptr %"arguments[0].stream", ptr %1, align 8
   store ptr %"arguments[1].value", ptr %value, align 8
@@ -8148,13 +8243,111 @@ entry:
 if_s0_then:                                       ; preds = %entry
   %4 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
   %5 = load ptr, ptr %4, align 8
-  call void %5(ptr noundef @global_21)
+  call void %5(ptr noundef @global_27)
   ret void
 
 if_s1_after:                                      ; preds = %entry
-  %6 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
-  %7 = load ptr, ptr %6, align 8
-  call void %7(ptr noundef @global_22)
+  store i32 0, ptr %raw_value, align 4
+  %6 = load ptr, ptr %value, align 8
+  %7 = call i32 @memcpy_s(ptr noundef %raw_value, i64 noundef 4, ptr noundef %6, i64 noundef 4)
+  store i8 0, ptr %named, align 1
+  %8 = load i8, ptr %named, align 1
+  %9 = icmp eq i8 %8, 0
+  br i1 %9, label %logical_and_rhs, label %logical_and_end
+
+if_s0_then1:                                      ; preds = %logical_and_end
+  %10 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  call void %11(ptr noundef @global_28)
+  %12 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %13 = load ptr, ptr %12, align 8
+  call void %13(ptr noundef @global_29)
+  %14 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %15 = load ptr, ptr %14, align 8
+  call void %15(ptr noundef @global_30)
+  store i8 1, ptr %named, align 1
+  br label %if_s1_after2
+
+if_s1_after2:                                     ; preds = %if_s0_then1, %logical_and_end
+  %16 = load i8, ptr %named, align 1
+  %17 = icmp eq i8 %16, 0
+  br i1 %17, label %logical_and_rhs5, label %logical_and_end6
+
+logical_and_rhs:                                  ; preds = %if_s1_after
+  %18 = load i32, ptr %raw_value, align 4
+  %19 = icmp eq i32 %18, 0
+  br label %logical_and_end
+
+logical_and_end:                                  ; preds = %logical_and_rhs, %if_s1_after
+  %20 = phi i1 [ false, %if_s1_after ], [ %19, %logical_and_rhs ]
+  br i1 %20, label %if_s0_then1, label %if_s1_after2
+
+if_s0_then3:                                      ; preds = %logical_and_end6
+  %21 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %22 = load ptr, ptr %21, align 8
+  call void %22(ptr noundef @global_31)
+  %23 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %24 = load ptr, ptr %23, align 8
+  call void %24(ptr noundef @global_32)
+  %25 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %26 = load ptr, ptr %25, align 8
+  call void %26(ptr noundef @global_33)
+  store i8 1, ptr %named, align 1
+  br label %if_s1_after4
+
+if_s1_after4:                                     ; preds = %if_s0_then3, %logical_and_end6
+  %27 = load i8, ptr %named, align 1
+  %28 = icmp eq i8 %27, 0
+  br i1 %28, label %logical_and_rhs9, label %logical_and_end10
+
+logical_and_rhs5:                                 ; preds = %if_s1_after2
+  %29 = load i32, ptr %raw_value, align 4
+  %30 = icmp eq i32 %29, 1
+  br label %logical_and_end6
+
+logical_and_end6:                                 ; preds = %logical_and_rhs5, %if_s1_after2
+  %31 = phi i1 [ false, %if_s1_after2 ], [ %30, %logical_and_rhs5 ]
+  br i1 %31, label %if_s0_then3, label %if_s1_after4
+
+if_s0_then7:                                      ; preds = %logical_and_end10
+  %32 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %33 = load ptr, ptr %32, align 8
+  call void %33(ptr noundef @global_34)
+  %34 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %35 = load ptr, ptr %34, align 8
+  call void %35(ptr noundef @global_35)
+  %36 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %37 = load ptr, ptr %36, align 8
+  call void %37(ptr noundef @global_36)
+  store i8 1, ptr %named, align 1
+  br label %if_s1_after8
+
+if_s1_after8:                                     ; preds = %if_s0_then7, %logical_and_end10
+  %38 = load i8, ptr %named, align 1
+  %39 = icmp eq i8 %38, 0
+  br i1 %39, label %if_s0_then11, label %if_s1_after12
+
+logical_and_rhs9:                                 ; preds = %if_s1_after4
+  %40 = load i32, ptr %raw_value, align 4
+  %41 = icmp eq i32 %40, 2
+  br label %logical_and_end10
+
+logical_and_end10:                                ; preds = %logical_and_rhs9, %if_s1_after4
+  %42 = phi i1 [ false, %if_s1_after4 ], [ %41, %logical_and_rhs9 ]
+  br i1 %42, label %if_s0_then7, label %if_s1_after8
+
+if_s0_then11:                                     ; preds = %if_s1_after8
+  store [16 x i8] zeroinitializer, ptr %buffer, align 1
+  %array_element_pointer = getelementptr [16 x i8], ptr %buffer, i32 0, i32 0
+  %43 = load i32, ptr %raw_value, align 4
+  %44 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 16, ptr noundef @global_37, i32 noundef %43)
+  %45 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %46 = load ptr, ptr %45, align 8
+  %array_element_pointer13 = getelementptr [16 x i8], ptr %buffer, i32 0, i32 0
+  call void %46(ptr noundef %array_element_pointer13)
+  br label %if_s1_after12
+
+if_s1_after12:                                    ; preds = %if_s0_then11, %if_s1_after8
   ret void
 }}
 
@@ -8181,15 +8374,15 @@ entry:
   store ptr %"arguments[0].lhs", ptr %lhs, align 8
   store ptr %"arguments[1].rhs", ptr %rhs, align 8
   %0 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_23)
+  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_38)
   %2 = load ptr, ptr %rhs, align 8
   call void @iris.json__at__print_json__at__16422025103289545880(ptr noundef %2)
   %3 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_24)
+  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_39)
   %5 = load ptr, ptr %lhs, align 8
   call void @iris.json__at__print_json__at__16422025103289545880(ptr noundef %5)
   %6 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_25)
+  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_40)
   %8 = call ptr @__acrt_iob_func(i32 noundef 2)
   %9 = call i32 @fflush(ptr noundef %8)
   ret void

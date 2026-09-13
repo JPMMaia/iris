@@ -676,6 +676,31 @@ namespace iris::compiler
     // __divti3. Without the builtins archive on the link line this fails with
     // "undefined symbol: __divti3". This test links and runs, so it catches both the missing
     // symbol and a wrong result.
+    TEST_CASE("Build and run Reflection_json in test mode", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Reflection_json" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "reflection_json.test.bc",
+            std::filesystem::path{"bin"} / get_binary_name("reflection_json.iris.test", target)
+        };
+
+        test_builder_and_run(
+            "Reflection_json",
+            {"app/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "reflection_json.iris.test"
+        );
+    }
+
     TEST_CASE("Build and run Decimal_arithmetic decimal_app in test mode", "[Builder]")
     {
         iris::compiler::Target const target = iris::compiler::get_default_target();

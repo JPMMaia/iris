@@ -1224,6 +1224,24 @@ namespace iris::compiler
         };
     }
 
+    static std::optional<std::uint64_t> get_constant_integer_value(
+        iris::Statement const& statement,
+        iris::Expression const& expression
+    )
+    {
+        if (!std::holds_alternative<iris::Constant_expression>(expression.data))
+            return std::nullopt;
+
+        iris::Constant_expression const& constant_expression = std::get<iris::Constant_expression>(expression.data);
+
+        char* end = nullptr;
+        std::uint64_t const value = std::strtoull(constant_expression.data.c_str(), &end, 0);
+        if (end == constant_expression.data.c_str())
+            return std::nullopt;
+
+        return value;
+    }
+
     std::optional<Type_info> get_expression_type_info(
         std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
@@ -2470,7 +2488,7 @@ namespace iris::compiler
                     .is_mutable = false,
                 };   
             }
-            else if (data.name == "member_count" || data.name == "member_offset" || data.name == "member_type")
+            else if (data.name == "member_count" || data.name == "member_offset" || data.name == "member_type" || data.name == "enum_count")
             {
                 return Type_info
                 {
@@ -2478,7 +2496,55 @@ namespace iris::compiler
                     .is_mutable = false,
                 };
             }
-            else if (data.name == "member_name" || data.name == "type_name")
+            else if (data.name == "enum_value")
+            {
+                return Type_info
+                {
+                    .type = iris::create_integer_type_type_reference(32, true),
+                    .is_mutable = false,
+                };
+            }
+            else if (data.name == "member_access")
+            {
+                if (data.type_arguments.size() != 1 || data.arguments.size() != 2)
+                    return std::nullopt;
+
+                std::optional<Declaration> const declaration = find_underlying_declaration(declaration_database, data.type_arguments[0]);
+                if (!declaration.has_value())
+                    return std::nullopt;
+
+                std::optional<std::uint64_t> const member_index = get_constant_integer_value(statement, statement.expressions[data.arguments[1].expression_index]);
+                if (!member_index.has_value())
+                    return std::nullopt;
+
+                std::optional<iris::Type_reference> member_type = std::nullopt;
+                if (std::holds_alternative<Struct_declaration const*>(declaration.value().data))
+                {
+                    Struct_declaration const& struct_declaration = *std::get<Struct_declaration const*>(declaration.value().data);
+                    if (*member_index >= struct_declaration.member_types.size())
+                        return std::nullopt;
+
+                    member_type = struct_declaration.member_types[*member_index];
+                }
+                else if (std::holds_alternative<Union_declaration const*>(declaration.value().data))
+                {
+                    Union_declaration const& union_declaration = *std::get<Union_declaration const*>(declaration.value().data);
+                    if (*member_index >= union_declaration.member_types.size())
+                        return std::nullopt;
+
+                    member_type = union_declaration.member_types[*member_index];
+                }
+
+                if (!member_type.has_value())
+                    return std::nullopt;
+
+                return Type_info
+                {
+                    .type = std::move(member_type.value()),
+                    .is_mutable = false,
+                };
+            }
+            else if (data.name == "member_name" || data.name == "type_name" || data.name == "enum_name")
             {
                 return Type_info
                 {

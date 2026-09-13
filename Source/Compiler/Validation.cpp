@@ -4263,6 +4263,104 @@ namespace iris::compiler
                 }
             }
         }
+        else if (expression.name == "member_access")
+        {
+            if (expression.type_arguments.size() != 1)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format("@{} requires only 1 type argument.", expression.name)
+                    )
+                };
+            }
+
+            if (expression.arguments.size() != 2)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format("@{} requires a value parameter and an index parameter.", expression.name)
+                    )
+                };
+            }
+
+            if (!std::holds_alternative<iris::Parameter_type>(expression.type_arguments[0].data))
+            {
+                std::optional<Declaration> const declaration = find_declaration(
+                    parameters.declaration_database,
+                    expression.type_arguments[0]
+                );
+                if (!declaration.has_value() ||
+                    (!std::holds_alternative<Struct_declaration const*>(declaration.value().data) &&
+                     !std::holds_alternative<Union_declaration const*>(declaration.value().data)))
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format("@{} type argument must be a struct or union type.", expression.name)
+                        )
+                    };
+                }
+            }
+        }
+        else if (
+            expression.name == "enum_count" ||
+            expression.name == "enum_name" ||
+            expression.name == "enum_value")
+        {
+            if (expression.type_arguments.size() != 1)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        std::format("@{} requires only 1 type argument.", expression.name)
+                    )
+                };
+            }
+
+            std::size_t const expected_argument_count = expression.name == "enum_count" ? 0 : 1;
+            if (expression.arguments.size() != expected_argument_count)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        source_range,
+                        expected_argument_count == 0 ?
+                            std::format("@{} does not have any parameters.", expression.name) :
+                            std::format("@{} requires 1 index parameter.", expression.name)
+                    )
+                };
+            }
+
+            if (!std::holds_alternative<iris::Parameter_type>(expression.type_arguments[0].data))
+            {
+                std::optional<Declaration> const declaration = find_declaration(
+                    parameters.declaration_database,
+                    expression.type_arguments[0]
+                );
+                if (!declaration.has_value() || !std::holds_alternative<Enum_declaration const*>(declaration.value().data))
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format("@{} type argument must be an enum type.", expression.name)
+                        )
+                    };
+                }
+            }
+        }
         else if (expression.name == "type_name" || expression.name == "get_type_kind")
         {
             if (expression.type_arguments.size() != 1)

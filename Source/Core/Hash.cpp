@@ -296,6 +296,13 @@ namespace iris
             iris::Variable_expression const& data = std::get<iris::Variable_expression>(expression.data);
             update_hash(state, data.name);
         }
+        else if (std::holds_alternative<iris::Invalid_expression>(expression.data))
+        {
+            // replace_expression() leaves invalidated slots behind in the expression pool, and a
+            // statement is hashed slot by slot rather than by walking the tree from its root.
+            std::uint8_t const invalid_value = 0xFF;
+            update_hash(state, &invalid_value, sizeof(invalid_value));
+        }
         else
         {
             iris::common::print_message_and_exit("Hash of expression type is not implemented!");

@@ -1048,9 +1048,12 @@ namespace iris
                 return std::nullopt;
 
             Statement const& argument_statement = instance_arguments[parameter_index];
-            if (argument_statement.expressions.size() != 1)
+            if (argument_statement.expressions.empty())
                 return std::nullopt;
 
+            // Index 0 is the root. A compile-time reflection call that was rewritten into a type
+            // leaves its own operands behind as invalidated slots, so the statement is not
+            // necessarily one expression long.
             Expression const& argument_expression = argument_statement.expressions[0];
             if (!std::holds_alternative<Type_expression>(argument_expression.data))
                 return std::nullopt;
