@@ -1,17 +1,34 @@
+#if !defined(_WIN32)
+    // sigsetjmp/siglongjmp and SIGBUS are POSIX, not ISO C. This file is compiled with -std=c++20
+    // (not gnu++20), which defines __STRICT_ANSI__ and would otherwise hide them.
+    #define _POSIX_C_SOURCE 200809L
+#endif
+
+#include <algorithm>
+#include <csignal>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <memory_resource>
 #include <numeric>
 #include <regex>
 #include <optional>
 #include <span>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <vector>
+
+#if !defined(_WIN32)
+#include <setjmp.h>
+#endif
 
 static constexpr char const* ANSI_GREEN = "\033[32m";
 static constexpr char const* ANSI_RED   = "\033[31m";
 static constexpr char const* ANSI_RESET = "\033[0m";
+
+static constexpr std::uint64_t g_maximum_listed_not_run_tests = 20;
 
 using Test_function_pointer = void(*)();
 
@@ -79,6 +96,12 @@ static bool should_list_tests(int const argc, char const* const argv[])
     return argument.has_value();
 }
 
+static bool should_stop_on_crash(int const argc, char const* const argv[])
+{
+    std::optional<std::string_view> const argument = search_argument(argc, argv, "--stop-on-crash");
+    return argument.has_value();
+}
+
 static bool should_output_json(int const argc, char const* const argv[])
 {
     std::optional<std::string_view> const argument = search_argument(argc, argv, "--output-format");
@@ -98,14 +121,20 @@ static std::filesystem::path get_output_json_file_path(int const argc, char cons
     return "test_detail.json";
 }
 
-static std::pmr::vector<std::uint64_t> filter_tests(int const argc, char const* const argv[], std::span<char const* const> const all_test_names)
+struct Filtered_tests
+{
+    std::pmr::vector<std::uint64_t> indices;
+    std::pmr::vector<std::pmr::string> unknown_names;
+};
+
+static Filtered_tests filter_tests(int const argc, char const* const argv[], std::span<char const* const> const all_test_names)
 {
     std::string_view const argument_prefix = "--test-name=";
-    bool const has_test_name_arguments = std::any_of(argv, argv + argc, [&](std::string_view const argument) { return argument.starts_with(argument_prefix); });
+    bool const has_test_name_arguments = std::any_of(argv + 1, argv + argc, [&](std::string_view const argument) { return argument.starts_with(argument_prefix); });
     if (has_test_name_arguments)
     {
-        std::pmr::vector<std::uint64_t> filtered_tests;
-        filtered_tests.reserve(all_test_names.size());
+        Filtered_tests filtered_tests;
+        filtered_tests.indices.reserve(all_test_names.size());
 
         for (int index = 1; index < argc; ++index)
         {
@@ -117,7 +146,11 @@ static std::pmr::vector<std::uint64_t> filter_tests(int const argc, char const* 
                 if (location != all_test_names.end())
                 {
                     auto const test_index = std::distance(all_test_names.begin(), location);
-                    filtered_tests.push_back(test_index);
+                    filtered_tests.indices.push_back(test_index);
+                }
+                else
+                {
+                    filtered_tests.unknown_names.push_back(std::pmr::string{ test_name });
                 }
             }
         }
@@ -125,9 +158,9 @@ static std::pmr::vector<std::uint64_t> filter_tests(int const argc, char const* 
         return filtered_tests;
     }
 
-    std::pmr::vector<std::uint64_t> filtered_tests;
-    filtered_tests.resize(all_test_names.size());
-    std::iota(filtered_tests.begin(), filtered_tests.end(), std::uint64_t{ 0 });
+    Filtered_tests filtered_tests;
+    filtered_tests.indices.resize(all_test_names.size());
+    std::iota(filtered_tests.indices.begin(), filtered_tests.indices.end(), std::uint64_t{ 0 });
     return filtered_tests;
 }
 
@@ -204,7 +237,7 @@ static void print_test_names_json(std::filesystem::path const& output_file_path)
         std::string_view name;
         std::uint64_t index;
     };
-    
+
     std::span<char const* const> const test_names = get_all_test_names();
     std::span<std::uint64_t const> const source_file_lines = get_all_source_file_lines();
 
@@ -287,13 +320,176 @@ static void print_test_names_json(std::filesystem::path const& output_file_path)
 
 struct Test_results
 {
-    std::uint64_t failed_count = 0;
+    std::uint64_t selected_count = 0;
+    std::uint64_t run_count = 0;
     std::uint64_t success_count = 0;
+    std::uint64_t failed_count = 0;
+    std::uint64_t crashed_count = 0;
 };
 
-static Test_results run_tests(std::span<Test_function_pointer const> const tests_function_pointers, std::span<char const* const> const test_names)
+void print_test_results(Test_results const& test_results)
+{
+    std::uint64_t const not_run_count = test_results.selected_count - test_results.run_count;
+    bool const everything_is_fine = test_results.failed_count == 0 && not_run_count == 0;
+
+    std::printf(
+        "%s%llu tests selected, %llu run, %llu passed, %llu failed (%llu crashed), %llu not run%s\n",
+        everything_is_fine ? ANSI_GREEN : ANSI_RED,
+        test_results.selected_count,
+        test_results.run_count,
+        test_results.success_count,
+        test_results.failed_count,
+        test_results.crashed_count,
+        not_run_count,
+        ANSI_RESET
+    );
+    std::fflush(stdout);
+}
+
+static void print_not_run_tests(std::span<char const* const> const test_names, std::uint64_t const first_not_run_index)
+{
+    if (first_not_run_index >= test_names.size())
+        return;
+
+    std::uint64_t const not_run_count = test_names.size() - first_not_run_index;
+    std::printf("%s%llu tests were not executed:%s\n", ANSI_RED, not_run_count, ANSI_RESET);
+
+    std::uint64_t const listed_count = not_run_count < g_maximum_listed_not_run_tests ? not_run_count : g_maximum_listed_not_run_tests;
+    for (std::uint64_t index = 0; index < listed_count; ++index)
+        std::printf("  %s\n", test_names[first_not_run_index + index]);
+
+    if (listed_count < not_run_count)
+        std::printf("  ... and %llu more\n", not_run_count - listed_count);
+
+    std::fflush(stdout);
+}
+
+static char const* describe_crash_code(unsigned long const code)
+{
+#if defined(_WIN32)
+    switch (code)
+    {
+    case 0xC00000FDul: return "stack overflow";
+    case 0xC0000005ul: return "access violation";
+    case 0xC000001Dul: return "illegal instruction";
+    case 0xC0000094ul: return "integer divide by zero";
+    case 0xC0000096ul: return "privileged instruction";
+    case 0xC0000006ul: return "in-page error";
+    case 0xC000008Cul: return "array bounds exceeded";
+    case 0xC000008Eul: return "float divide by zero";
+    default: return "unknown";
+    }
+#else
+    switch (static_cast<int>(code))
+    {
+    case SIGSEGV: return "segmentation fault";
+    case SIGBUS: return "bus error";
+    case SIGFPE: return "arithmetic exception";
+    case SIGILL: return "illegal instruction";
+    case SIGABRT: return "aborted";
+    default: return "unknown";
+    }
+#endif
+}
+
+static void print_crash_line(char const* const test_name, unsigned long const crash_code)
+{
+#if defined(_WIN32)
+    std::printf("[    %sCRASH%s ] \"%s\" (%s, code 0x%08lX)\n", ANSI_RED, ANSI_RESET, test_name, describe_crash_code(crash_code), crash_code);
+#else
+    std::printf("[    %sCRASH%s ] \"%s\" (%s, signal %lu)\n", ANSI_RED, ANSI_RESET, test_name, describe_crash_code(crash_code), crash_code);
+#endif
+    std::fflush(stdout);
+}
+
+#if !defined(_WIN32)
+static sigjmp_buf g_crash_jump_buffer;
+static volatile std::sig_atomic_t g_crash_signal_number = 0;
+
+static void crash_signal_handler(int const signal_number)
+{
+    g_crash_signal_number = signal_number;
+    siglongjmp(g_crash_jump_buffer, 1);
+}
+
+static void arm_crash_signal_handlers()
+{
+    std::signal(SIGSEGV, crash_signal_handler);
+    std::signal(SIGBUS, crash_signal_handler);
+    std::signal(SIGFPE, crash_signal_handler);
+    std::signal(SIGILL, crash_signal_handler);
+}
+#endif
+
+// Returns 0 when the test returned normally, otherwise the SEH exception code (Windows) or the
+// signal number (POSIX) that took it down.
+static unsigned long invoke_test_guarded(Test_function_pointer const test)
+{
+#if defined(_WIN32)
+    // clang-cl drives this file in CL mode, so -fms-extensions is on and __try / _exception_code()
+    // need no header and no extra flag. EXCEPTION_EXECUTE_HANDLER is spelled as the literal 1 so
+    // that including <windows.h> does not append /DEFAULTLIB:uuid.lib to every test link.
+    __try
+    {
+        test();
+        return 0;
+    }
+    __except (1)
+    {
+        return static_cast<unsigned long>(_exception_code());
+    }
+#else
+    // savemask = 1: the faulting signal is blocked while the handler runs and must be unblocked on
+    // the way out. signal() dispositions are re-armed before every test.
+    g_crash_signal_number = 0;
+    arm_crash_signal_handlers();
+
+    if (sigsetjmp(g_crash_jump_buffer, 1) == 0)
+    {
+        test();
+        return 0;
+    }
+
+    return static_cast<unsigned long>(g_crash_signal_number);
+#endif
+}
+
+static std::span<char const* const> g_running_test_names;
+static Test_results* g_running_results = nullptr;
+
+static void abort_signal_handler(int const signal_number)
+{
+    std::fflush(stdout);
+
+    if (g_running_results != nullptr && g_running_results->run_count < g_running_test_names.size())
+    {
+        std::printf("[    %sCRASH%s ] \"%s\" (aborted, signal %d)\n", ANSI_RED, ANSI_RESET, g_running_test_names[g_running_results->run_count], signal_number);
+        std::fflush(stdout);
+
+        g_running_results->run_count += 1;
+        g_running_results->failed_count += 1;
+        g_running_results->crashed_count += 1;
+
+        print_test_results(*g_running_results);
+        print_not_run_tests(g_running_test_names, g_running_results->run_count);
+    }
+
+    std::fflush(stdout);
+    std::fflush(stderr);
+    std::_Exit(2);
+}
+
+static Test_results run_tests(
+    std::span<Test_function_pointer const> const tests_function_pointers,
+    std::span<char const* const> const test_names,
+    bool const stop_on_crash
+)
 {
     Test_results results = {};
+    results.selected_count = tests_function_pointers.size();
+
+    g_running_test_names = test_names;
+    g_running_results = &results;
 
     for (std::uint64_t i = 0; i < tests_function_pointers.size(); ++i)
     {
@@ -303,20 +499,36 @@ static Test_results run_tests(std::span<Test_function_pointer const> const tests
         std::fflush(stdout);
 
         g_iris_current_test_context = &current_test_context;
-        tests_function_pointers[i]();
+        unsigned long const crash_code = invoke_test_guarded(tests_function_pointers[i]);
         g_iris_current_test_context = nullptr;
 
-        if (current_test_context.success)
+        results.run_count += 1;
+
+        if (crash_code != 0)
+        {
+            print_crash_line(test_names[i], crash_code);
+            results.failed_count += 1;
+            results.crashed_count += 1;
+
+            if (stop_on_crash)
+                break;
+        }
+        else if (current_test_context.success)
         {
             std::printf("[       %sOK%s ] \"%s\"\n", ANSI_GREEN, ANSI_RESET, test_names[i]);
+            std::fflush(stdout);
             results.success_count += 1;
         }
         else
         {
             std::printf("[     %sFAIL%s ] \"%s\"\n", ANSI_RED, ANSI_RESET, test_names[i]);
+            std::fflush(stdout);
             results.failed_count += 1;
         }
     }
+
+    g_running_results = nullptr;
+    g_running_test_names = {};
 
     return results;
 }
@@ -330,19 +542,23 @@ static void print_help(char const* const program_name)
         "  --help                              Show this help message and exit\n"
         "  --list-tests                        List all available test names and exit\n"
         "  --output-format=json[:<file>]       Write test list as JSON (default file: test_detail.json); use with --list-tests\n"
-        "  --test-name=<name>                  Run only the test with this name (repeatable)\n",
+        "  --test-name=<name>                  Run only the test with this name (repeatable)\n"
+        "  --stop-on-crash                     Stop the run when a test crashes instead of continuing with the next one\n"
+        "\n"
+        "Exit codes:\n"
+        "  0  every selected test ran and passed\n"
+        "  1  the run completed; some tests failed or crashed\n"
+        "  2  the run is incomplete: tests were not executed, or --test-name matched nothing\n",
         program_name
     );
 }
 
-void print_test_results(Test_results const& test_results)
-{
-    if (test_results.failed_count > 0)
-        std::printf("%s%llu tests failed%s\n", ANSI_RED, test_results.failed_count, ANSI_RESET);
-}
-
 int main(int const argc, char const* const argv[])
 {
+    // Unbuffered rather than line buffered: the Windows CRT treats _IOLBF as _IOFBF, so this is the
+    // only setting under which a crashing test's own output survives the fault.
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+
     if (argc >= 2)
     {
         if (should_print_help(argc, argv))
@@ -367,13 +583,29 @@ int main(int const argc, char const* const argv[])
         }
     }
 
+    std::signal(SIGABRT, abort_signal_handler);
+
     std::span<char const* const> const all_test_names = get_all_test_names();
-    std::pmr::vector<std::uint64_t> const filtered_test_indices = filter_tests(argc, argv, all_test_names);
-    std::pmr::vector<Test_function_pointer> const tests_function_pointers = get_tests_function_pointers(filtered_test_indices);
-    std::pmr::vector<char const*> const filtered_test_names = get_filtered_test_names(filtered_test_indices, all_test_names);
+    Filtered_tests const filtered_tests = filter_tests(argc, argv, all_test_names);
 
-    Test_results const results = run_tests(tests_function_pointers, filtered_test_names);
+    if (!filtered_tests.unknown_names.empty())
+    {
+        for (std::pmr::string const& unknown_name : filtered_tests.unknown_names)
+            std::fprintf(stderr, "error: no test named '%s'. Use --list-tests to see the available tests.\n", unknown_name.c_str());
+
+        std::fflush(stderr);
+        return 2;
+    }
+
+    std::pmr::vector<Test_function_pointer> const tests_function_pointers = get_tests_function_pointers(filtered_tests.indices);
+    std::pmr::vector<char const*> const filtered_test_names = get_filtered_test_names(filtered_tests.indices, all_test_names);
+
+    Test_results const results = run_tests(tests_function_pointers, filtered_test_names, should_stop_on_crash(argc, argv));
     print_test_results(results);
+    print_not_run_tests(filtered_test_names, results.run_count);
 
-    return results.failed_count == 0 ? 0 : -1;
+    if (results.run_count < results.selected_count)
+        return 2;
+
+    return results.failed_count == 0 ? 0 : 1;
 }

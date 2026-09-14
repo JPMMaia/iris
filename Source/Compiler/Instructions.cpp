@@ -125,20 +125,104 @@ namespace iris::compiler
         }
     }
 
-    llvm::StoreInst* create_store_instruction(
+    static bool can_write_memory(llvm::Instruction const& instruction)
+    {
+        return llvm::isa<llvm::StoreInst>(instruction)
+            || llvm::isa<llvm::CallBase>(instruction)
+            || llvm::isa<llvm::AtomicCmpXchgInst>(instruction)
+            || llvm::isa<llvm::AtomicRMWInst>(instruction)
+            || llvm::isa<llvm::VAArgInst>(instruction);
+    }
+
+    // True when `load` is earlier in the block being built and nothing between it and the insert
+    // point can write memory, so the loaded value still equals what its source pointer holds.
+    static bool is_source_unchanged_since(
+        llvm::IRBuilder<>& llvm_builder,
+        llvm::LoadInst const& load
+    )
+    {
+        constexpr std::size_t maximum_instructions_to_scan = 32;
+
+        llvm::BasicBlock* const block = llvm_builder.GetInsertBlock();
+        if (block == nullptr || load.getParent() != block)
+            return false;
+
+        llvm::BasicBlock::iterator current = llvm_builder.GetInsertPoint();
+        for (std::size_t scanned = 0; scanned < maximum_instructions_to_scan && current != block->begin(); ++scanned)
+        {
+            --current;
+
+            if (&*current == &load)
+                return true;
+
+            if (can_write_memory(*current))
+                return false;
+        }
+
+        return false;
+    }
+
+    // A first-class aggregate reaches instruction selection split into one value per scalar leaf,
+    // which makes code generation grow with the product of the aggregate's size and the number of
+    // times it is moved: copying a [64 x 170-leaf struct] a dozen times took minutes. Aggregates are
+    // therefore zeroed and copied through memory, which is what clang emits.
+    //
+    // A load is only turned into a copy from its source when nothing between the load and the store
+    // can write memory. A write in between could have gone through that source, as the middle step
+    // of `temporary = a; a = b; b = temporary` does.
+    llvm::Value* create_store_instruction(
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Value* const value,
         llvm::Value* const pointer
     )
     {
+        llvm::Type* const value_type = value->getType();
+
         // If the value is not sized, we cannot store it.
-        if (!value->getType()->isSized())
+        if (!value_type->isSized())
             return nullptr;
 
-        llvm::Align const type_alignment = llvm_data_layout.getABITypeAlign(value->getType());
+        llvm::Align const type_alignment = llvm_data_layout.getABITypeAlign(value_type);
+
+        if (value_type->isAggregateType())
+        {
+            std::uint64_t const size_in_bytes = llvm_data_layout.getTypeAllocSize(value_type);
+
+            if (llvm::Constant const* const constant = llvm::dyn_cast<llvm::Constant>(value); constant != nullptr && constant->isNullValue())
+                return create_memset_to_0_call(llvm_builder, pointer, size_in_bytes, type_alignment);
+
+            if (llvm::LoadInst* const load = llvm::dyn_cast<llvm::LoadInst>(value); load != nullptr && is_source_unchanged_since(llvm_builder, *load))
+                return llvm_builder.CreateMemCpy(pointer, type_alignment, load->getPointerOperand(), load->getAlign(), size_in_bytes);
+        }
+
         llvm::StoreInst* const instruction = llvm_builder.CreateAlignedStore(value, pointer, type_alignment);
         return instruction;
+    }
+
+    // Loads left without users once their stores became copies. They are erased only after the whole
+    // module is generated, because the code generator may still hold on to them until then.
+    void erase_dead_aggregate_loads(
+        llvm::Module& llvm_module
+    )
+    {
+        std::vector<llvm::LoadInst*> dead_loads;
+
+        for (llvm::Function& function : llvm_module)
+        {
+            for (llvm::BasicBlock& block : function)
+            {
+                for (llvm::Instruction& instruction : block)
+                {
+                    llvm::LoadInst* const load = llvm::dyn_cast<llvm::LoadInst>(&instruction);
+                    if (load != nullptr && load->getType()->isAggregateType() && load->use_empty() && !load->isVolatile())
+                        dead_loads.push_back(load);
+                }
+            }
+        }
+
+        for (llvm::LoadInst* const load : dead_loads)
+            load->eraseFromParent();
     }
 
     llvm::Value* create_memcpy_call(
@@ -147,11 +231,11 @@ namespace iris::compiler
         llvm::Module& llvm_module,
         llvm::Value* const destination_pointer,
         llvm::Value* const source_pointer,
-        unsigned const size_in_bits,
+        std::uint64_t const size_in_bytes,
         llvm::Align const alignment
     )
     {
-        if (size_in_bits == 0)
+        if (size_in_bytes == 0)
             return nullptr;
 
         llvm::Type* const int64_type = llvm::Type::getInt64Ty(llvm_context);
@@ -159,7 +243,7 @@ namespace iris::compiler
         llvm::Type* const pointer_type = llvm::PointerType::get(llvm_context, 0);
         llvm::Function* const memcpy_function = llvm::Intrinsic::getOrInsertDeclaration(&llvm_module, llvm::Intrinsic::memcpy, {pointer_type, pointer_type, int64_type});
 
-        llvm::Value* const size = llvm::ConstantInt::get(int64_type, size_in_bits);
+        llvm::Value* const size = llvm::ConstantInt::get(int64_type, size_in_bytes);
         llvm::Value* const is_volatile = llvm::ConstantInt::get(int1_type, 0);
 
         llvm::CallInst* const call = llvm_builder.CreateCall(memcpy_function, {destination_pointer, source_pointer, size, is_volatile});    
@@ -212,12 +296,61 @@ namespace iris::compiler
             true,  
             llvm::GlobalValue::PrivateLinkage,
             string_constant,
-            "function_contract_error_string"
+            "iris_error_string"
         );
 
         global_string->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
         return global_string;
+    }
+
+    // 'stderr' is a C macro, and the object it expands to differs per platform, so it cannot
+    // simply be referenced by name. Resolve it here so that run-time diagnostics do not land on
+    // stdout, where they interleave with the program's own output and are invisible to anything
+    // reading stderr for errors.
+    llvm::Value* create_stderr_pointer_value(
+        llvm::LLVMContext& llvm_context,
+        llvm::Module& llvm_module,
+        llvm::IRBuilder<>& llvm_builder
+    )
+    {
+        llvm::PointerType* const pointer_type = llvm::PointerType::get(llvm_context, 0);
+        llvm::Triple const& target_triple = llvm_module.getTargetTriple();
+
+        // The UCRT does not export a 'stderr' object; stderr is __acrt_iob_func(2).
+        if (target_triple.isOSWindows())
+        {
+            llvm::Function* iob_function = llvm_module.getFunction("__acrt_iob_func");
+            if (!iob_function)
+            {
+                llvm::FunctionType* const iob_function_type = llvm::FunctionType::get(
+                    pointer_type,
+                    llvm::Type::getInt32Ty(llvm_context),
+                    false
+                );
+
+                iob_function = llvm::Function::Create(iob_function_type, llvm::Function::ExternalLinkage, "__acrt_iob_func", llvm_module);
+            }
+
+            return llvm_builder.CreateCall(iob_function, { llvm_builder.getInt32(2) }, "stderr_pointer");
+        }
+
+        char const* const stderr_global_name = target_triple.isOSDarwin() ? "__stderrp" : "stderr";
+
+        llvm::GlobalVariable* stderr_global = llvm_module.getNamedGlobal(stderr_global_name);
+        if (!stderr_global)
+        {
+            stderr_global = new llvm::GlobalVariable(
+                llvm_module,
+                pointer_type,
+                false,
+                llvm::GlobalValue::ExternalLinkage,
+                nullptr,
+                stderr_global_name
+            );
+        }
+
+        return llvm_builder.CreateLoad(pointer_type, stderr_global, "stderr_pointer");
     }
 
     llvm::Value* create_log_error_instruction(
@@ -227,26 +360,46 @@ namespace iris::compiler
         std::string_view const message
     )
     {
-        llvm::Function* puts_function = llvm_module.getFunction("puts");
-        if (!puts_function)
+        llvm::PointerType* const pointer_type = llvm::PointerType::get(llvm_context, 0);
+
+        llvm::Function* fputs_function = llvm_module.getFunction("fputs");
+        if (!fputs_function)
         {
-            llvm::FunctionType* const puts_function_type = llvm::FunctionType::get(
+            llvm::FunctionType* const fputs_function_type = llvm::FunctionType::get(
                 llvm::Type::getInt32Ty(llvm_context),
-                llvm::Type::getInt8Ty(llvm_context)->getPointerTo(),
+                { pointer_type, pointer_type },
                 false
             );
 
-            puts_function = llvm::Function::Create(puts_function_type, llvm::Function::ExternalLinkage, "puts", llvm_module);
+            fputs_function = llvm::Function::Create(fputs_function_type, llvm::Function::ExternalLinkage, "fputs", llvm_module);
         }
+
+        std::string const message_with_newline = std::format("{}\n", message);
 
         llvm::Value* const message_value = create_null_terminated_string_value(
             llvm_context,
             llvm_module,
             llvm_builder,
-            message
+            message_with_newline
         );
 
-        return llvm_builder.CreateCall(puts_function, {message_value});
+        llvm::Value* const stderr_pointer = create_stderr_pointer_value(llvm_context, llvm_module, llvm_builder);
+
+        llvm_builder.CreateCall(fputs_function, { message_value, stderr_pointer });
+
+        llvm::Function* flush_function = llvm_module.getFunction("fflush");
+        if (!flush_function)
+        {
+            llvm::FunctionType* const flush_function_type = llvm::FunctionType::get(
+                llvm::Type::getInt32Ty(llvm_context),
+                llvm::PointerType::get(llvm_context, 0),
+                false
+            );
+
+            flush_function = llvm::Function::Create(flush_function_type, llvm::Function::ExternalLinkage, "fflush", llvm_module);
+        }
+
+        return llvm_builder.CreateCall(flush_function, { llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm_context, 0)) });
     }
 
     llvm::Value* create_abort_instruction(

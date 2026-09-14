@@ -14,6 +14,7 @@ import iris.compiler.types;
 import iris.core;
 import iris.core.declarations;
 import iris.core.expressions;
+import iris.core.expressions_visitor;
 import iris.core.formatter;
 import iris.core.types;
 
@@ -761,23 +762,36 @@ namespace iris::compiler
         return std::nullopt;
     }
 
-    static std::uint64_t get_required_reflection_index_argument(
+    static std::optional<iris::Constant_expression> try_get_constant_expression(
+        Compile_time_value_and_type const& value
+    )
+    {
+        if (value.statement.expressions.size() != 1)
+            return std::nullopt;
+
+        iris::Expression const& expression = value.statement.expressions[0];
+        if (!std::holds_alternative<iris::Constant_expression>(expression.data))
+            return std::nullopt;
+
+        return std::get<iris::Constant_expression>(expression.data);
+    }
+
+    static std::uint64_t get_reflection_index_argument_at(
         std::string_view const module_name,
         iris::Statement const& statement,
         iris::Reflection_expression const& expression,
         std::string_view const function_name,
-        Compile_time_parameters const& parameters
+        std::size_t const argument_position,
+        Compile_time_parameters const& parameters,
+        std::vector<Compile_time_local_variable> const& compile_time_local_variables
     )
     {
-        if (expression.arguments.size() != 1)
-            throw std::runtime_error{ std::format("{}() requires exactly one argument!", function_name) };
-
-        iris::Expression_index const index_expression_index = expression.arguments[0];
+        iris::Expression_index const index_expression_index = expression.arguments[argument_position];
         if (index_expression_index.expression_index >= statement.expressions.size())
             throw std::runtime_error{ std::format("{}() has an invalid argument index!", function_name) };
 
         iris::Expression const& index_expression = statement.expressions[index_expression_index.expression_index];
-        std::optional<Compile_time_value_and_type> const index_value = evaluate_compile_time_expression(module_name, statement, index_expression, parameters);
+        std::optional<Compile_time_value_and_type> const index_value = evaluate_compile_time_expression(module_name, statement, index_expression, parameters, compile_time_local_variables);
         if (!index_value.has_value())
             throw std::runtime_error{ std::format("{}() argument must be a compile-time integer constant!", function_name) };
 
@@ -794,6 +808,113 @@ namespace iris::compiler
         }
 
         return integer_value->unsigned_value;
+    }
+
+    static std::uint64_t get_required_reflection_index_argument(
+        std::string_view const module_name,
+        iris::Statement const& statement,
+        iris::Reflection_expression const& expression,
+        std::string_view const function_name,
+        Compile_time_parameters const& parameters,
+        std::vector<Compile_time_local_variable> const& compile_time_local_variables
+    )
+    {
+        if (expression.arguments.size() != 1)
+            throw std::runtime_error{ std::format("{}() requires exactly one argument!", function_name) };
+
+        return get_reflection_index_argument_at(module_name, statement, expression, function_name, 0, parameters, compile_time_local_variables);
+    }
+
+    static std::pmr::string get_reflection_member_name(
+        iris::Declaration const& declaration,
+        std::uint64_t const member_index,
+        std::string_view const function_name,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        if (std::holds_alternative<iris::Struct_declaration const*>(declaration.data))
+        {
+            iris::Struct_declaration const& struct_declaration = *std::get<iris::Struct_declaration const*>(declaration.data);
+            if (member_index >= struct_declaration.member_names.size())
+                throw std::runtime_error{ std::format("{}() index is out of bounds!", function_name) };
+
+            return std::pmr::string{struct_declaration.member_names[member_index], output_allocator};
+        }
+
+        if (std::holds_alternative<iris::Union_declaration const*>(declaration.data))
+        {
+            iris::Union_declaration const& union_declaration = *std::get<iris::Union_declaration const*>(declaration.data);
+            if (member_index >= union_declaration.member_names.size())
+                throw std::runtime_error{ std::format("{}() index is out of bounds!", function_name) };
+
+            return std::pmr::string{union_declaration.member_names[member_index], output_allocator};
+        }
+
+        throw std::runtime_error{ std::format("{}() requires a struct or union type argument!", function_name) };
+    }
+
+    static iris::Enum_declaration const& get_reflection_enum_declaration(
+        iris::Declaration const& declaration,
+        std::string_view const function_name
+    )
+    {
+        if (!std::holds_alternative<iris::Enum_declaration const*>(declaration.data))
+            throw std::runtime_error{ std::format("{}() requires an enum type argument!", function_name) };
+
+        return *std::get<iris::Enum_declaration const*>(declaration.data);
+    }
+
+    static std::int64_t evaluate_enum_value_constant(
+        std::string_view const module_name,
+        iris::Enum_declaration const& enum_declaration,
+        std::size_t const value_index,
+        Compile_time_parameters const& parameters,
+        std::vector<Compile_time_local_variable> const& compile_time_local_variables
+    )
+    {
+        iris::Statement const& value_statement = enum_declaration.values[value_index].value.value();
+        if (value_statement.expressions.empty())
+            throw std::runtime_error{ "enum_value() found an enum value with no expression!" };
+
+        std::optional<Compile_time_value_and_type> const value = evaluate_compile_time_expression(module_name, value_statement, value_statement.expressions[0], parameters, compile_time_local_variables);
+        if (!value.has_value())
+            throw std::runtime_error{ "enum_value() requires enum values to be compile-time constants!" };
+
+        std::optional<Compile_time_integer_value> const integer_value = get_integer_from_value(value.value());
+        if (!integer_value.has_value())
+            throw std::runtime_error{ "enum_value() requires enum values to be integer constants!" };
+
+        return integer_value->is_signed ?
+            integer_value->signed_value :
+            static_cast<std::int64_t>(integer_value->unsigned_value);
+    }
+
+    // Mirrors what codegen does for an implicit enum value: the nearest preceding explicit value plus
+    // the gap to it, or the ordinal when nothing before it was written out.
+    static std::int64_t evaluate_enum_value(
+        std::string_view const module_name,
+        iris::Enum_declaration const& enum_declaration,
+        std::size_t const value_index,
+        Compile_time_parameters const& parameters,
+        std::vector<Compile_time_local_variable> const& compile_time_local_variables
+    )
+    {
+        if (enum_declaration.values[value_index].value.has_value())
+            return evaluate_enum_value_constant(module_name, enum_declaration, value_index, parameters, compile_time_local_variables);
+
+        std::size_t index = value_index;
+        while (index > 0)
+        {
+            index -= 1;
+
+            if (enum_declaration.values[index].value.has_value())
+            {
+                return evaluate_enum_value_constant(module_name, enum_declaration, index, parameters, compile_time_local_variables)
+                    + static_cast<std::int64_t>(value_index - index);
+            }
+        }
+
+        return static_cast<std::int64_t>(value_index);
     }
 
     static std::pmr::string get_type_kind_member_name(
@@ -949,6 +1070,14 @@ namespace iris::compiler
             for (iris::Statement& statement : data.array_data)
                 replace_variable_with_constant_in_statement(statement, variable_name, constant_type, constant_data);
         }
+        else if (std::holds_alternative<iris::Instance_call_expression>(expression.data))
+        {
+            // The type arguments of `f::<...>(...)` are statements of their own, so an unrolled
+            // loop index only reaches a reflection call inside them through here.
+            iris::Instance_call_expression& data = std::get<iris::Instance_call_expression>(expression.data);
+            for (iris::Statement& statement : data.arguments)
+                replace_variable_with_constant_in_statement(statement, variable_name, constant_type, constant_data);
+        }
         else if (std::holds_alternative<iris::For_loop_expression>(expression.data))
         {
             iris::For_loop_expression& data = std::get<iris::For_loop_expression>(expression.data);
@@ -1053,13 +1182,19 @@ namespace iris::compiler
         std::pmr::vector<iris::Statement> iteration_blocks{parameters.output_allocator};
         iteration_blocks.reserve(16);
 
+        // Like a runtime for loop, the index has the type of the range begin.
+        std::optional<iris::Constant_expression> const range_begin_constant = try_get_constant_expression(range_begin_value.value());
+        std::optional<iris::Type_reference> const index_type_optional = range_begin_constant.has_value() ? std::optional<iris::Type_reference>{range_begin_constant->type} : range_begin_value->type;
+        if (!index_type_optional.has_value())
+            return std::nullopt;
+        iris::Type_reference const& index_type = index_type_optional.value();
+
         auto const create_iteration_block = [&](auto const loop_index_value) -> void
         {
             std::pmr::vector<iris::Statement> body{parameters.output_allocator};
             body.assign(expression.then_statements.begin(), expression.then_statements.end());
 
             std::pmr::string const integer_string = std::pmr::string{std::to_string(loop_index_value)};
-            iris::Type_reference const index_type = range_begin_value->type.value_or(create_integer_type_type_reference(64, true));
 
             for (iris::Statement& statement : body)
                 replace_variable_with_constant_in_statement(statement, expression.variable_name, index_type, integer_string);
@@ -1126,7 +1261,8 @@ namespace iris::compiler
         std::string_view const module_name,
         iris::Statement const& statement,
         iris::Reflection_expression const& expression,
-        Compile_time_parameters const& parameters
+        Compile_time_parameters const& parameters,
+        std::vector<Compile_time_local_variable> const& compile_time_local_variables
     )
     {
         if (expression.name == "alignment_of")
@@ -1231,7 +1367,7 @@ namespace iris::compiler
             if (expression.type_arguments.size() != 1)
                 throw std::runtime_error{ "member_type() requires exactly one type argument!" };
 
-            std::uint64_t const member_index = get_required_reflection_index_argument(module_name, statement, expression, "member_type", parameters);
+            std::uint64_t const member_index = get_required_reflection_index_argument(module_name, statement, expression, "member_type", parameters, compile_time_local_variables);
 
             Type_reference const& type_reference = expression.type_arguments[0];
             std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
@@ -1269,7 +1405,7 @@ namespace iris::compiler
             if (expression.type_arguments.size() != 1)
                 throw std::runtime_error{ "member_offset() requires exactly one type argument!" };
 
-            std::uint64_t const member_index = get_required_reflection_index_argument(module_name, statement, expression, "member_offset", parameters);
+            std::uint64_t const member_index = get_required_reflection_index_argument(module_name, statement, expression, "member_offset", parameters, compile_time_local_variables);
 
             Type_reference const& type_reference = expression.type_arguments[0];
             std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
@@ -1320,7 +1456,7 @@ namespace iris::compiler
             if (expression.type_arguments.size() != 1)
                 throw std::runtime_error{ "member_name() requires exactly one type argument!" };
 
-            std::uint64_t const member_index = get_required_reflection_index_argument(module_name, statement, expression, "member_name", parameters);
+            std::uint64_t const member_index = get_required_reflection_index_argument(module_name, statement, expression, "member_name", parameters, compile_time_local_variables);
 
             Type_reference const& type_reference = expression.type_arguments[0];
             std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
@@ -1352,6 +1488,129 @@ namespace iris::compiler
             return create_value_and_type(create_constant_expression_statement(
                 create_c_string_type_reference(false),
                 std::move(member_name)
+            ));
+        }
+        else if (expression.name == "member_access")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "member_access() requires exactly one type argument!" };
+
+            if (expression.arguments.size() != 2)
+                throw std::runtime_error{ "member_access() requires a value argument and an index argument!" };
+
+            iris::Expression_index const value_expression_index = expression.arguments[0];
+            if (value_expression_index.expression_index >= statement.expressions.size())
+                throw std::runtime_error{ "member_access() value argument index is out of bounds!" };
+
+            std::uint64_t const member_index = get_reflection_index_argument_at(module_name, statement, expression, "member_access", 1, parameters, compile_time_local_variables);
+
+            Type_reference const& type_reference = expression.type_arguments[0];
+            std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, type_reference);
+            if (!declaration.has_value())
+                throw std::runtime_error{ "member_access() could not resolve declaration for type argument!" };
+
+            std::pmr::string member_name = get_reflection_member_name(*declaration, member_index, "member_access", parameters.output_allocator);
+
+            std::pmr::vector<bool> is_reachable{statement.expressions.size(), false, parameters.temporaries_allocator};
+            visit_expressions_recursively(
+                statement,
+                statement.expressions[value_expression_index.expression_index],
+                [&is_reachable](iris::Statement const& visited_statement, iris::Expression const& visited_expression) -> void
+                {
+                    std::size_t const index = find_expression_index(visited_statement, visited_expression);
+                    if (index < is_reachable.size())
+                        is_reachable[index] = true;
+                }
+            );
+
+            // replace_expression() shifts everything it appends by the statement's current size, so
+            // the copies keep their original indices and the root points one past them. Whatever the
+            // value argument does not read is copied as Invalid_expression: the index literal and the
+            // reflection node itself must not survive, or the pass would find them again.
+            iris::Statement result = {};
+            result.expressions.reserve(statement.expressions.size() + 1);
+
+            result.expressions.push_back(
+                iris::Expression
+                {
+                    .data = iris::Access_expression
+                    {
+                        .expression = iris::Expression_index{ value_expression_index.expression_index + 1 },
+                        .member_name = std::move(member_name)
+                    }
+                }
+            );
+
+            for (std::size_t index = 0; index < statement.expressions.size(); ++index)
+            {
+                result.expressions.push_back(
+                    is_reachable[index] ?
+                    statement.expressions[index] :
+                    iris::Expression{ .data = iris::Invalid_expression{} }
+                );
+            }
+
+            return create_value_and_type(std::move(result));
+        }
+        else if (expression.name == "enum_count")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "enum_count() requires exactly one type argument!" };
+
+            if (!expression.arguments.empty())
+                throw std::runtime_error{ "enum_count() does not take runtime arguments!" };
+
+            std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, expression.type_arguments[0]);
+            if (!declaration.has_value())
+                throw std::runtime_error{ "enum_count() could not resolve declaration for type argument!" };
+
+            iris::Enum_declaration const& enum_declaration = get_reflection_enum_declaration(*declaration, "enum_count");
+
+            return create_value_and_type(create_constant_expression_statement(
+                create_integer_type_type_reference(64, false),
+                std::pmr::string{std::to_string(enum_declaration.values.size())}
+            ));
+        }
+        else if (expression.name == "enum_name")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "enum_name() requires exactly one type argument!" };
+
+            std::uint64_t const value_index = get_required_reflection_index_argument(module_name, statement, expression, "enum_name", parameters, compile_time_local_variables);
+
+            std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, expression.type_arguments[0]);
+            if (!declaration.has_value())
+                throw std::runtime_error{ "enum_name() could not resolve declaration for type argument!" };
+
+            iris::Enum_declaration const& enum_declaration = get_reflection_enum_declaration(*declaration, "enum_name");
+            if (value_index >= enum_declaration.values.size())
+                throw std::runtime_error{ "enum_name() index is out of bounds!" };
+
+            return create_value_and_type(create_constant_expression_statement(
+                create_c_string_type_reference(false),
+                std::pmr::string{enum_declaration.values[value_index].name, parameters.output_allocator}
+            ));
+        }
+        else if (expression.name == "enum_value")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "enum_value() requires exactly one type argument!" };
+
+            std::uint64_t const value_index = get_required_reflection_index_argument(module_name, statement, expression, "enum_value", parameters, compile_time_local_variables);
+
+            std::optional<iris::Declaration> const declaration = find_underlying_declaration(parameters.declaration_database, expression.type_arguments[0]);
+            if (!declaration.has_value())
+                throw std::runtime_error{ "enum_value() could not resolve declaration for type argument!" };
+
+            iris::Enum_declaration const& enum_declaration = get_reflection_enum_declaration(*declaration, "enum_value");
+            if (value_index >= enum_declaration.values.size())
+                throw std::runtime_error{ "enum_value() index is out of bounds!" };
+
+            std::int64_t const value = evaluate_enum_value(module_name, enum_declaration, value_index, parameters, compile_time_local_variables);
+
+            return create_value_and_type(create_constant_expression_statement(
+                create_integer_type_type_reference(32, true),
+                std::pmr::string{std::to_string(value)}
             ));
         }
         else if (expression.name == "get_type_kind")
@@ -1466,6 +1725,34 @@ namespace iris::compiler
         return std::nullopt;
     }
 
+    // A reflection call such as @get_type_kind yields an enum value as `Enum.Member`, which is only
+    // an integer once that access is itself evaluated. A compile_time var gets that second step for
+    // free when it is read back; an operand written inline does not, so it is taken here.
+    static std::optional<Compile_time_value_and_type> fold_enum_value_operand(
+        std::string_view const module_name,
+        std::optional<Compile_time_value_and_type> value,
+        Compile_time_parameters const& parameters,
+        std::vector<Compile_time_local_variable> const& compile_time_local_variables
+    )
+    {
+        if (!value.has_value() || value->statement.expressions.empty())
+            return value;
+
+        iris::Expression const& root = value->statement.expressions[0];
+        if (!std::holds_alternative<iris::Access_expression>(root.data))
+            return value;
+
+        std::optional<Compile_time_value_and_type> folded = evaluate_compile_time_expression(
+            module_name,
+            value->statement,
+            root,
+            parameters,
+            compile_time_local_variables
+        );
+
+        return folded.has_value() ? folded : value;
+    }
+
     static std::optional<Compile_time_value_and_type> evaluate_compile_time_binary_expression(
         std::string_view const module_name,
         iris::Statement const& statement,
@@ -1486,11 +1773,21 @@ namespace iris::compiler
         iris::Expression const& left_expression = statement.expressions[expression.left_hand_side.expression_index];
         iris::Expression const& right_expression = statement.expressions[expression.right_hand_side.expression_index];
 
-        std::optional<Compile_time_value_and_type> const left_value = evaluate_compile_time_expression(module_name, statement, left_expression, parameters, compile_time_local_variables);
+        std::optional<Compile_time_value_and_type> const left_value = fold_enum_value_operand(
+            module_name,
+            evaluate_compile_time_expression(module_name, statement, left_expression, parameters, compile_time_local_variables),
+            parameters,
+            compile_time_local_variables
+        );
         if (!left_value.has_value())
             throw std::runtime_error{ "Could not evaluate left operand in compile_time binary expression" };
 
-        std::optional<Compile_time_value_and_type> const right_value = evaluate_compile_time_expression(module_name, statement, right_expression, parameters, compile_time_local_variables);
+        std::optional<Compile_time_value_and_type> const right_value = fold_enum_value_operand(
+            module_name,
+            evaluate_compile_time_expression(module_name, statement, right_expression, parameters, compile_time_local_variables),
+            parameters,
+            compile_time_local_variables
+        );
         if (!right_value.has_value())
             throw std::runtime_error{ "Could not evaluate right operand in compile_time binary expression" };
 
@@ -1550,20 +1847,6 @@ namespace iris::compiler
             : compare(left_integer->unsigned_value, right_integer->unsigned_value);
 
         return create_value_and_type(create_constant_bool_expression_statement(result));
-    }
-
-    static std::optional<iris::Constant_expression> try_get_constant_expression(
-        Compile_time_value_and_type const& value
-    )
-    {
-        if (value.statement.expressions.size() != 1)
-            return std::nullopt;
-
-        iris::Expression const& expression = value.statement.expressions[0];
-        if (!std::holds_alternative<iris::Constant_expression>(expression.data))
-            return std::nullopt;
-
-        return std::get<iris::Constant_expression>(expression.data);
     }
 
     static Compile_time_local_variable const* find_compile_time_local_variable(
@@ -1810,7 +2093,7 @@ namespace iris::compiler
         else if (std::holds_alternative<iris::Reflection_expression>(expression.data))
         {
             iris::Reflection_expression const& reflection_expression = std::get<iris::Reflection_expression>(expression.data);
-            return evaluate_compile_time_reflection_expression(module_name, statement, reflection_expression, parameters);
+            return evaluate_compile_time_reflection_expression(module_name, statement, reflection_expression, parameters, compile_time_local_variables);
         }
         else if (std::holds_alternative<iris::Unary_expression>(expression.data))
         {
@@ -2007,7 +2290,8 @@ namespace iris::compiler
                 module_name,
                 statement,
                 reflection_expression,
-                parameters
+                parameters,
+                compile_time_local_variables
             );
             if (new_value.has_value())
             {

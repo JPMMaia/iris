@@ -2,6 +2,7 @@
 #define IRIS_BUILTIN
 
 #include <stdint.h>
+#include <stdbool.h>
 
 struct Array_slice_Int8{ int8_t* data; uint64_t size; };
 struct Array_slice_Int16{ int16_t* data; uint64_t size; };
