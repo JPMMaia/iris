@@ -7569,6 +7569,7 @@ entry:
   %through_reinterpret = alloca i32, align 4
   %through_call = alloca i32, align 4
   %through_arrow = alloca i32, align 4
+  %through_indirection = alloca i32, align 4
   store ptr %"arguments[0].holder", ptr %holder, align 8
   %0 = load ptr, ptr %holder, align 8
   %1 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %0, i32 0, i32 0
@@ -7588,18 +7589,64 @@ entry:
   store i32 %10, ptr %through_arrow, align 4
   %11 = load ptr, ptr %holder, align 8
   %12 = call ptr @Access_through_pointer_results_values_of(ptr noundef %11)
-  %array_element_pointer2 = getelementptr i32, ptr %12, i32 0
+  %13 = load i32, ptr %12, align 4
+  store i32 %13, ptr %through_indirection, align 4
+  %14 = load ptr, ptr %holder, align 8
+  %15 = call ptr @Access_through_pointer_results_values_of(ptr noundef %14)
+  %array_element_pointer2 = getelementptr i32, ptr %15, i32 0
   store i32 3, ptr %array_element_pointer2, align 4
-  %13 = load ptr, ptr %holder, align 8
-  %14 = call ptr @Access_through_pointer_results_identity(ptr noundef %13)
-  %15 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %14, i32 0, i32 1
-  store i32 9, ptr %15, align 4
-  %16 = load i32, ptr %through_reinterpret, align 4
-  %17 = load i32, ptr %through_call, align 4
-  %18 = add i32 %16, %17
-  %19 = load i32, ptr %through_arrow, align 4
-  %20 = add i32 %18, %19
-  ret i32 %20
+  %16 = load ptr, ptr %holder, align 8
+  %17 = call ptr @Access_through_pointer_results_identity(ptr noundef %16)
+  %18 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %17, i32 0, i32 1
+  store i32 9, ptr %18, align 4
+  %19 = load ptr, ptr %holder, align 8
+  %20 = call ptr @Access_through_pointer_results_values_of(ptr noundef %19)
+  store i32 4, ptr %20, align 4
+  %21 = load i32, ptr %through_reinterpret, align 4
+  %22 = load i32, ptr %through_call, align 4
+  %23 = add i32 %21, %22
+  %24 = load i32, ptr %through_arrow, align 4
+  %25 = add i32 %23, %24
+  %26 = load i32, ptr %through_indirection, align 4
+  %27 = add i32 %25, %26
+  ret i32 %27
+}
+
+; Function Attrs: convergent
+define ptr @Access_through_pointer_results_read_pointers_through_results(ptr noundef %"arguments[0].slots", ptr noundef %"arguments[1].handles") #0 {
+entry:
+  %slots = alloca ptr, align 8
+  %handles = alloca ptr, align 8
+  %through_call = alloca ptr, align 8
+  %through_parenthesis = alloca ptr, align 8
+  %through_variable = alloca ptr, align 8
+  %through_double_indirection = alloca i8, align 1
+  store ptr %"arguments[0].slots", ptr %slots, align 8
+  store ptr %"arguments[1].handles", ptr %handles, align 8
+  %0 = load ptr, ptr %slots, align 8
+  %1 = load ptr, ptr %handles, align 8
+  %2 = call ptr @Access_through_pointer_results_first_slot(ptr noundef %0, ptr noundef %1)
+  %3 = load ptr, ptr %2, align 8
+  store ptr %3, ptr %through_call, align 8
+  %4 = load ptr, ptr %slots, align 8
+  %5 = load ptr, ptr %handles, align 8
+  %6 = call ptr @Access_through_pointer_results_first_slot(ptr noundef %4, ptr noundef %5)
+  %7 = load ptr, ptr %6, align 8
+  store ptr %7, ptr %through_parenthesis, align 8
+  %8 = load ptr, ptr %slots, align 8
+  %9 = load ptr, ptr %8, align 8
+  store ptr %9, ptr %through_variable, align 8
+  %10 = load ptr, ptr %handles, align 8
+  %11 = load ptr, ptr %10, align 8
+  %12 = load i8, ptr %11, align 1
+  store i8 %12, ptr %through_double_indirection, align 1
+  %13 = load ptr, ptr %slots, align 8
+  %14 = load ptr, ptr %handles, align 8
+  %15 = call ptr @Access_through_pointer_results_first_slot(ptr noundef %13, ptr noundef %14)
+  %16 = load ptr, ptr %through_call, align 8
+  store ptr %16, ptr %15, align 8
+  %17 = load ptr, ptr %through_variable, align 8
+  ret ptr %17
 }
 
 ; Function Attrs: convergent
@@ -7619,6 +7666,17 @@ entry:
   %holder = alloca ptr, align 8
   store ptr %"arguments[0].holder", ptr %holder, align 8
   %0 = load ptr, ptr %holder, align 8
+  ret ptr %0
+}
+
+; Function Attrs: convergent
+define private ptr @Access_through_pointer_results_first_slot(ptr noundef %"arguments[0].slots", ptr noundef %"arguments[1].handles") #0 {
+entry:
+  %slots = alloca ptr, align 8
+  %handles = alloca ptr, align 8
+  store ptr %"arguments[0].slots", ptr %slots, align 8
+  store ptr %"arguments[1].handles", ptr %handles, align 8
+  %0 = load ptr, ptr %slots, align 8
   ret ptr %0
 }
 

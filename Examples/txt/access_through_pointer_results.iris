@@ -21,7 +21,24 @@ export function read_through_results(holder: *mutable Holder) -> (sum: Uint32)
     var through_reinterpret = reinterpret_as::<*Uint32>(holder->bytes)[1];
     var through_call = values_of(holder)[1];
     var through_arrow = identity(holder)->count;
+    var through_indirection = *values_of(holder);
     values_of(holder)[0] = 3u32;
     identity(holder)->count = 9u32;
-    return through_reinterpret + through_call + through_arrow;
+    *values_of(holder) = 4u32;
+    return through_reinterpret + through_call + through_arrow + through_indirection;
+}
+
+function first_slot(slots: *mutable *Byte, handles: **Byte) -> (slot: *mutable *Byte)
+{
+    return slots;
+}
+
+export function read_pointers_through_results(slots: *mutable *Byte, handles: **Byte) -> (first: *Byte)
+{
+    var through_call = *first_slot(slots, handles);
+    var through_parenthesis = (*first_slot(slots, handles));
+    var through_variable = *slots;
+    var through_double_indirection = **handles;
+    *first_slot(slots, handles) = through_call;
+    return through_variable;
 }

@@ -6643,7 +6643,7 @@ namespace iris::compiler
             {
                 Type_reference const core_pointee_type = remove_pointer(type).value();
 
-                llvm::Value* const load_address = create_load_instruction(llvm_builder, llvm_data_layout, value_expression.value->getType(), value_expression.value);
+                llvm::Value* const load_address = load_if_needed(value_expression, expression.expression.expression_index, statement, parameters).value;
 
                 return Value_and_type
                 {
@@ -7467,6 +7467,26 @@ namespace iris::compiler
         return global_variable->getValueType()->isArrayTy();
     }
 
+    static bool is_indirection_expression(
+        Statement const& statement,
+        iris::Expression const& expression
+    )
+    {
+        if (std::holds_alternative<iris::Parenthesis_expression>(expression.data))
+        {
+            iris::Parenthesis_expression const& parenthesis_expression = std::get<iris::Parenthesis_expression>(expression.data);
+            return is_indirection_expression(statement, statement.expressions[parenthesis_expression.expression.expression_index]);
+        }
+
+        if (std::holds_alternative<iris::Unary_expression>(expression.data))
+        {
+            iris::Unary_expression const& unary_expression = std::get<iris::Unary_expression>(expression.data);
+            return unary_expression.operation == Unary_operation::Indirection;
+        }
+
+        return false;
+    }
+
     Value_and_type load_if_needed(
         Value_and_type const& value,
         std::size_t const expression_index,
@@ -7480,6 +7500,23 @@ namespace iris::compiler
                 return value;
 
             iris::Expression const& expression = statement.expressions[expression_index];
+
+            // An indirection always yields the address of its pointee, which cannot be told apart from a
+            // pointer value by its LLVM type when the pointee is itself a pointer.
+            if (is_indirection_expression(statement, expression))
+            {
+                llvm::Type* const pointee_llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, value.type.value(), parameters.type_database);
+                if (pointee_llvm_type->isFunctionTy())
+                    return value;
+
+                llvm::Value* const loaded_value = create_load_instruction(parameters.llvm_builder, parameters.llvm_data_layout, pointee_llvm_type, value.value);
+                return Value_and_type
+                {
+                    .name = value.name,
+                    .value = loaded_value,
+                    .type = value.type
+                };
+            }
 
             if (llvm::AllocaInst::classof(value.value) || llvm::GetElementPtrInst::classof(value.value) || llvm::GlobalVariable::classof(value.value))
             {
