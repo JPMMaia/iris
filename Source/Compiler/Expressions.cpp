@@ -6643,7 +6643,7 @@ namespace iris::compiler
             {
                 Type_reference const core_pointee_type = remove_pointer(type).value();
 
-                llvm::Value* const load_address = create_load_instruction(llvm_builder, llvm_data_layout, value_expression.value->getType(), value_expression.value);
+                llvm::Value* const load_address = load_if_needed(value_expression, expression.expression.expression_index, statement, parameters).value;
 
                 return Value_and_type
                 {

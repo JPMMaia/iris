@@ -7569,6 +7569,7 @@ entry:
   %through_reinterpret = alloca i32, align 4
   %through_call = alloca i32, align 4
   %through_arrow = alloca i32, align 4
+  %through_indirection = alloca i32, align 4
   store ptr %"arguments[0].holder", ptr %holder, align 8
   %0 = load ptr, ptr %holder, align 8
   %1 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %0, i32 0, i32 0
@@ -7588,18 +7589,27 @@ entry:
   store i32 %10, ptr %through_arrow, align 4
   %11 = load ptr, ptr %holder, align 8
   %12 = call ptr @Access_through_pointer_results_values_of(ptr noundef %11)
-  %array_element_pointer2 = getelementptr i32, ptr %12, i32 0
+  %13 = load i32, ptr %12, align 4
+  store i32 %13, ptr %through_indirection, align 4
+  %14 = load ptr, ptr %holder, align 8
+  %15 = call ptr @Access_through_pointer_results_values_of(ptr noundef %14)
+  %array_element_pointer2 = getelementptr i32, ptr %15, i32 0
   store i32 3, ptr %array_element_pointer2, align 4
-  %13 = load ptr, ptr %holder, align 8
-  %14 = call ptr @Access_through_pointer_results_identity(ptr noundef %13)
-  %15 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %14, i32 0, i32 1
-  store i32 9, ptr %15, align 4
-  %16 = load i32, ptr %through_reinterpret, align 4
-  %17 = load i32, ptr %through_call, align 4
-  %18 = add i32 %16, %17
-  %19 = load i32, ptr %through_arrow, align 4
-  %20 = add i32 %18, %19
-  ret i32 %20
+  %16 = load ptr, ptr %holder, align 8
+  %17 = call ptr @Access_through_pointer_results_identity(ptr noundef %16)
+  %18 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %17, i32 0, i32 1
+  store i32 9, ptr %18, align 4
+  %19 = load ptr, ptr %holder, align 8
+  %20 = call ptr @Access_through_pointer_results_values_of(ptr noundef %19)
+  store i32 4, ptr %20, align 4
+  %21 = load i32, ptr %through_reinterpret, align 4
+  %22 = load i32, ptr %through_call, align 4
+  %23 = add i32 %21, %22
+  %24 = load i32, ptr %through_arrow, align 4
+  %25 = add i32 %23, %24
+  %26 = load i32, ptr %through_indirection, align 4
+  %27 = add i32 %25, %26
+  ret i32 %27
 }
 
 ; Function Attrs: convergent
