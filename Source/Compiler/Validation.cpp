@@ -1900,6 +1900,10 @@ namespace iris::compiler
 
         // A `return` inside the body returns from the lambda, not from the enclosing function,
         // so the body is validated against a declaration standing in for the lambda itself.
+        // A lambda declared inside a test function is compiled with it, so builtins that are only
+        // available in test functions, such as check(), are available in its body too.
+        bool const is_inside_test_function = parameters.function_declaration != nullptr && parameters.function_declaration->is_test;
+
         iris::Function_declaration const lambda_function_declaration
         {
             .name = "lambda",
@@ -1910,6 +1914,7 @@ namespace iris::compiler
                 .is_variadic = false,
             },
             .input_parameter_names = lambda_expression.parameter_names,
+            .is_test = is_inside_test_function,
         };
 
         // A block body is a sequence of statements rather than a value, so only an inline
@@ -3067,7 +3072,23 @@ namespace iris::compiler
         if (callable_type_optional.has_value() && is_builtin_type_reference(callable_type_optional.value()))
         {
             iris::Builtin_type_reference const& builtin_type_reference = std::get<iris::Builtin_type_reference>(callable_type_optional->data);
-            if (builtin_type_reference.value == "create_array_slice_from_pointer")
+            if (builtin_type_reference.value == "check")
+            {
+                // The test framework's check function is only declared when compiling in test mode, and a
+                // function that is not marked with @test is also compiled outside of it.
+                if (parameters.function_declaration == nullptr || !parameters.function_declaration->is_test)
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            "check() can only be called from a function marked with @test."
+                        )
+                    };
+                }
+            }
+            else if (builtin_type_reference.value == "create_array_slice_from_pointer")
             {
                 if (expression.arguments.size() > 1)
                 {

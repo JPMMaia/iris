@@ -3958,6 +3958,11 @@ namespace iris::compiler
                 std::pmr::vector<bool> const is_expression_address_of{false, false, false};
                 llvm::Function* const llvm_function_callee = parameters.llvm_module.getFunction("iris_test_check");
 
+                // The test framework's check function is only declared when compiling in test mode, which
+                // means a check() outside a @test function has no callee to call.
+                if (llvm_function_callee == nullptr)
+                    throw Compile_error{ "check() can only be called from a function marked with @test!", statement_source_position.has_value() ? statement_source_position : parameters.source_position };
+
                 std::pmr::vector<llvm::Value*> llvm_arguments{parameters.temporaries_allocator};
                 llvm_arguments.resize(3);
 

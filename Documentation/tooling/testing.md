@@ -26,6 +26,20 @@ function test_addition() -> ()
 
 - `@test` marks a function as a test case. Test functions take no parameters and return `()`.
 - `check(condition)` asserts that `condition` is `true`. A failing `check` reports the location and marks the test as failed; the rest of the test body still runs.
+- `check` may only be called from a function marked with `@test` (or from a lambda inside one). The test framework is only linked into test builds, so a `check` in a plain helper would have no implementation in a normal build. Helpers factored out of a test are still fine, as long as they return the condition and the `@test` function does the checking:
+
+```iris
+function is_even(value: Int32) -> (even: Bool)
+{
+    return (value % 2i32) == 0i32;
+}
+
+@test
+function test_even_numbers_are_even() -> ()
+{
+    check(is_even(4i32));
+}
+```
 
 ## Running Tests
 

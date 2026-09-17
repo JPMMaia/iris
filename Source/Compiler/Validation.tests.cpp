@@ -8635,6 +8635,66 @@ export function main() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that check can be called from a test function", "[Validation][Test]")
+    {
+        std::string_view const input = R"(module Test;
+
+@test
+function test_something() -> ()
+{
+    check(1i32 == 1i32);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that check can be called from a lambda inside a test function", "[Validation][Test]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Predicate() -> ();
+
+@test
+function test_something() -> ()
+{
+    var predicate: Predicate = lambda () => { check(1i32 == 1i32); };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that check cannot be called from a function that is not a test", "[Validation][Test]")
+    {
+        std::string_view const input = R"(module Test;
+
+function is_even(value: Int32) -> (even: Bool)
+{
+    check(value >= 0i32);
+    return (value % 2i32) == 0i32;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 5, 5, 25),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "check() can only be called from a function marked with @test.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates lambda with mixed parameter types", "[Validation][Lambda]")
     {
         std::string_view const input = R"(module Test;
