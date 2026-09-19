@@ -1929,6 +1929,20 @@ namespace iris::compiler
             llvm::LoadInst* const destination_value = llvm_builder.CreateAlignedLoad(destination_llvm_type, pointer_to_source, llvm_data_layout.getABITypeAlign(source_llvm_type));
             return destination_value;
         }
+        else if (source_llvm_type->isArrayTy() && destination_llvm_type->isPointerTy())
+        {
+            // C passes an array parameter as a pointer to its first element: pass the address of the array.
+            return create_alloca_and_store_if_not_pointer(llvm_builder, llvm_data_layout, llvm_parent_function, source_llvm_value, source_llvm_type);
+        }
+        else if (source_llvm_type->isPointerTy() && destination_llvm_type->isArrayTy())
+        {
+            // The parameter is taken by value, so the callee works on its own copy of the array it was pointed at.
+            llvm::AllocaInst* const destination = create_alloca_instruction(llvm_builder, llvm_data_layout, llvm_parent_function, destination_llvm_type);
+            llvm::Align const alignment = llvm_data_layout.getABITypeAlign(destination_llvm_type);
+            std::uint64_t const size_in_bytes = llvm_data_layout.getTypeAllocSize(destination_llvm_type);
+            llvm_builder.CreateMemCpy(destination, alignment, source_llvm_value, alignment, size_in_bytes);
+            return destination;
+        }
         else if (source_llvm_type->isIntegerTy() && destination_llvm_type->isIntegerTy())
         {
             if (abi_argument_info.isExtend())
@@ -1949,7 +1963,16 @@ namespace iris::compiler
             }
         }
 
-        throw std::runtime_error{ "read_from_different_type not implemented yet!" };
+        std::string description;
+        llvm::raw_string_ostream stream{description};
+        stream << "read_from_different_type not implemented yet! From ";
+        source_llvm_type->print(stream);
+        stream << " to ";
+        destination_llvm_type->print(stream);
+        stream << " (value ";
+        source_llvm_value->getType()->print(stream);
+        stream << ")";
+        throw std::runtime_error{ stream.str() };
     }
 
     llvm::Value* read_from_type(

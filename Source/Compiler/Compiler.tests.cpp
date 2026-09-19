@@ -7686,6 +7686,91 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Constant Array Parameters", "[LLVM_IR]")
+  {
+    char const* const input_file = "constant_array_parameters.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Constant_array_parameters_Pair = type { i32, i32 }
+
+; Function Attrs: convergent
+define float @Constant_array_parameters_pass_arrays_by_value(ptr noundef %"arguments[0].pairs") #0 {
+entry:
+  %pairs = alloca ptr, align 8
+  %values = alloca [8 x float], align 4
+  %first = alloca i32, align 4
+  store ptr %"arguments[0].pairs", ptr %pairs, align 8
+  %array_element_pointer = getelementptr [8 x float], ptr %values, i32 0, i32 0
+  store float 1.000000e+00, ptr %array_element_pointer, align 4
+  %array_element_pointer1 = getelementptr [8 x float], ptr %values, i32 0, i32 1
+  store float 2.000000e+00, ptr %array_element_pointer1, align 4
+  %array_element_pointer2 = getelementptr [8 x float], ptr %values, i32 0, i32 2
+  store float 3.000000e+00, ptr %array_element_pointer2, align 4
+  %array_element_pointer3 = getelementptr [8 x float], ptr %values, i32 0, i32 3
+  store float 4.000000e+00, ptr %array_element_pointer3, align 4
+  %array_element_pointer4 = getelementptr [8 x float], ptr %values, i32 0, i32 4
+  store float 5.000000e+00, ptr %array_element_pointer4, align 4
+  %array_element_pointer5 = getelementptr [8 x float], ptr %values, i32 0, i32 5
+  store float 6.000000e+00, ptr %array_element_pointer5, align 4
+  %array_element_pointer6 = getelementptr [8 x float], ptr %values, i32 0, i32 6
+  store float 7.000000e+00, ptr %array_element_pointer6, align 4
+  %array_element_pointer7 = getelementptr [8 x float], ptr %values, i32 0, i32 7
+  store float 8.000000e+00, ptr %array_element_pointer7, align 4
+  %0 = load ptr, ptr %pairs, align 8
+  %1 = call i32 @Constant_array_parameters_first_of_copy(ptr noundef %0)
+  store i32 %1, ptr %first, align 4
+  %2 = call float @Constant_array_parameters_sum_ends(ptr noundef %values)
+  %3 = load i32, ptr %first, align 4
+  %4 = sitofp i32 %3 to float
+  %5 = fadd float %2, %4
+  ret float %5
+}
+
+; Function Attrs: convergent
+define private float @Constant_array_parameters_sum_ends(ptr noundef %"arguments[0].values") #0 {
+entry:
+  %0 = alloca [8 x float], align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %0, ptr align 4 %"arguments[0].values", i64 32, i1 false)
+  %array_element_pointer = getelementptr [8 x float], ptr %0, i32 0, i32 0
+  %1 = load float, ptr %array_element_pointer, align 4
+  %array_element_pointer1 = getelementptr [8 x float], ptr %0, i32 0, i32 7
+  %2 = load float, ptr %array_element_pointer1, align 4
+  %3 = fadd float %1, %2
+  ret float %3
+}
+
+; Function Attrs: convergent
+define private i32 @Constant_array_parameters_first_of_copy(ptr noundef %"arguments[0].pairs") #0 {
+entry:
+  %0 = alloca [3 x %struct.Constant_array_parameters_Pair], align 4
+  %copy = alloca [3 x %struct.Constant_array_parameters_Pair], align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %0, ptr align 4 %"arguments[0].pairs", i64 24, i1 false)
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %copy, ptr align 4 %0, i64 24, i1 false)
+  %array_element_pointer = getelementptr [3 x %struct.Constant_array_parameters_Pair], ptr %copy, i32 0, i32 0
+  %1 = getelementptr inbounds %struct.Constant_array_parameters_Pair, ptr %array_element_pointer, i32 0, i32 0
+  %array_element_pointer1 = getelementptr [3 x %struct.Constant_array_parameters_Pair], ptr %copy, i32 0, i32 0
+  %2 = getelementptr inbounds %struct.Constant_array_parameters_Pair, ptr %array_element_pointer1, i32 0, i32 0
+  store i32 5, ptr %2, align 4
+  %array_element_pointer2 = getelementptr [3 x %struct.Constant_array_parameters_Pair], ptr %copy, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.Constant_array_parameters_Pair, ptr %array_element_pointer2, i32 0, i32 0
+  %4 = load i32, ptr %3, align 4
+  ret i32 %4
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Ternary Condition Expressions", "[LLVM_IR]")
   {
     char const* const input_file = "ternary_condition_expressions.iris";
