@@ -281,6 +281,15 @@ namespace iris::compiler
             llvm_value;
     }
 
+    llvm::Value* convert_from_boolean(
+        llvm::LLVMContext& llvm_context,
+        llvm::IRBuilder<>& llvm_builder,
+        llvm::Value* const llvm_value
+    )
+    {
+        return llvm_builder.CreateZExt(llvm_value, llvm::Type::getInt8Ty(llvm_context));
+    }
+
     llvm::Value* create_null_terminated_string_value(
         llvm::LLVMContext& llvm_context,
         llvm::Module& llvm_module,

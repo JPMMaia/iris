@@ -53,6 +53,20 @@ namespace iris::compiler
         );
     }
 
+    static Value_and_type create_bool_result(
+        llvm::LLVMContext& llvm_context,
+        llvm::IRBuilder<>& llvm_builder,
+        llvm::Value* const value
+    )
+    {
+        return Value_and_type
+        {
+            .name = "",
+            .value = convert_from_boolean(llvm_context, llvm_builder, value),
+            .type = create_bool_type_reference()
+        };
+    }
+
     Expression_parameters set_core_module(Expression_parameters const& parameters, iris::Module const& core_module)
     {
         if (&parameters.core_module == &core_module)
@@ -1121,12 +1135,11 @@ namespace iris::compiler
 
                 if (expression.member_name == "has_value")
                 {
-                    return Value_and_type
-                    {
-                        .name = "",
-                        .value = parameters.llvm_builder.CreateICmpNE(loaded.value, null_pointer),
-                        .type = iris::create_bool_type_reference()
-                    };
+                    return create_bool_result(
+                        parameters.llvm_context,
+                        parameters.llvm_builder,
+                        parameters.llvm_builder.CreateICmpNE(loaded.value, null_pointer)
+                    );
                 }
 
                 if (expression.member_name == "value")
@@ -2255,7 +2268,7 @@ namespace iris::compiler
         return v;
     }
 
-    Value_and_type create_binary_operation_instruction(
+    Value_and_type create_binary_operation_instruction_impl(
         llvm::IRBuilder<>& llvm_builder,
         Value_and_type const& left_hand_side,
         Value_and_type const& right_hand_side,
@@ -2845,6 +2858,65 @@ namespace iris::compiler
         throw Compile_error{ std::format("Binary operation '{}' not implemented!", static_cast<std::uint32_t>(operation)), source_position };
     }
 
+    Value_and_type create_binary_operation_instruction(
+        llvm::IRBuilder<>& llvm_builder,
+        Value_and_type const& left_hand_side,
+        Value_and_type const& right_hand_side,
+        Binary_operation const operation,
+        iris::Module const& core_module,
+        Declaration_database const& declaration_database,
+        std::optional<Source_position> const& source_position,
+        Expression_parameters const& parameters
+    )
+    {
+        // Operands are widened before the operation, not only afterwards: `icmp` requires both of
+        // its operands to have the same LLVM type, and a `Bool` that is still in register form
+        // would otherwise assert inside LLVM against one loaded from memory.
+        auto const normalize_operand = [&](Value_and_type const& value) -> Value_and_type
+        {
+            if (value.type.has_value() && (is_bool(value.type.value()) || is_c_bool(value.type.value())) &&
+                value.value != nullptr && value.value->getType()->isIntegerTy(1))
+                return Value_and_type{ .name = value.name, .value = convert_from_boolean(parameters.llvm_context, llvm_builder, value.value), .type = value.type };
+
+            return value;
+        };
+
+        Value_and_type const normalized_left_hand_side = normalize_operand(left_hand_side);
+        Value_and_type const normalized_right_hand_side = normalize_operand(right_hand_side);
+
+        // `icmp` and `fcmp` both require their two operands to have the same LLVM type. Letting a
+        // mismatch through aborts inside LLVM with a stack trace of compiler frames and nothing
+        // that points back at the source, so say which statement it was.
+        bool const is_comparison =
+            iris::is_equality_binary_operation(operation) ||
+            iris::is_comparison_binary_operation(operation);
+
+        if (is_comparison &&
+            normalized_left_hand_side.type.has_value() && normalized_right_hand_side.type.has_value() &&
+            normalized_left_hand_side.value != nullptr && normalized_right_hand_side.value != nullptr &&
+            normalized_left_hand_side.value->getType() != normalized_right_hand_side.value->getType())
+            throw Compile_error{ format_type_mismatch_error("Left and right side of a comparison have different representations!", core_module, left_hand_side.type, right_hand_side.type), source_position };
+
+        Value_and_type const result = create_binary_operation_instruction_impl(
+            llvm_builder,
+            normalized_left_hand_side,
+            normalized_right_hand_side,
+            operation,
+            core_module,
+            declaration_database,
+            source_position,
+            parameters
+        );
+
+        // Every comparison and logical operator above computes an `i1`; hand back the `Bool`
+        // storage representation instead, so the result is indistinguishable from one loaded from
+        // a variable, a parameter or a struct field.
+        if (result.type.has_value() && is_bool(result.type.value()) && result.value != nullptr)
+            return create_bool_result(parameters.llvm_context, llvm_builder, result.value);
+
+        return result;
+    }
+
     // `a && b` and `a || b` must not evaluate `b` when `a` already decides the result. This is
     // lowered the same way the ternary condition is: branch on the left operand, evaluate the
     // right one only on the edge where it can still matter, and merge with a phi node.
@@ -2906,12 +2978,7 @@ namespace iris::compiler
         phi_node->addIncoming(llvm::ConstantInt::getBool(llvm_context, !is_and), left_hand_side_end_block);
         phi_node->addIncoming(right_bool_value, right_hand_side_end_block);
 
-        return Value_and_type
-        {
-            .name = "",
-            .value = phi_node,
-            .type = create_bool_type_reference()
-        };
+        return create_bool_result(llvm_context, llvm_builder, phi_node);
     }
 
     Value_and_type create_binary_expression_value(
@@ -3579,7 +3646,7 @@ namespace iris::compiler
         Value_and_type const has_value_value
         {
             .name = "",
-            .value = llvm::ConstantInt::get(llvm::Type::getInt1Ty(parameters.llvm_context), value.has_value() ? 1 : 0),
+            .value = llvm::ConstantInt::get(llvm::Type::getInt8Ty(parameters.llvm_context), value.has_value() ? 1 : 0),
             .type = iris::create_bool_type_reference()
         };
 
@@ -5338,8 +5405,9 @@ namespace iris::compiler
 
             Binary_operation const compare_operation = expression.range_comparison_operation;
             Value_and_type const condition_value = create_binary_operation_instruction(llvm_builder, loaded_variable_value, range_end_value, compare_operation, parameters.core_module, parameters.declaration_database, parameters.source_position, parameters);
+            llvm::Value* const condition_converted_value = convert_to_boolean(parameters.llvm_context, llvm_builder, condition_value.value, condition_value.type);
 
-            llvm_builder.CreateCondBr(condition_value.value, then_block, after_block);
+            llvm_builder.CreateCondBr(condition_converted_value, then_block, after_block);
         }
 
         // Loop body:
@@ -6505,6 +6573,16 @@ namespace iris::compiler
 
         // End:
         llvm_builder.SetInsertPoint(end_block);
+
+        if (then_value.value == nullptr || else_value.value == nullptr)
+            throw Compile_error{ "Ternary condition then and else statements must produce a value!", parameters.source_position };
+
+        // The two arms agree on the Iris type by now; if they still disagree on the LLVM one the
+        // `phi` below would assert inside LLVM, naming neither the module nor the line. Report it
+        // here instead, with the position of the statement that produced it.
+        if (then_value.value->getType() != else_value.value->getType())
+            throw Compile_error{ "Ternary condition then and else statements produced values of different representations!", parameters.source_position };
+
         llvm::PHINode* const phi_node = llvm_builder.CreatePHI(then_value.value->getType(), 2);
         phi_node->addIncoming(then_value.value, then_end_block);
         phi_node->addIncoming(else_value.value, else_end_block);
@@ -6561,7 +6639,7 @@ namespace iris::compiler
                 return Value_and_type
                 {
                     .name = "",
-                    .value = result,
+                    .value = convert_from_boolean(llvm_context, llvm_builder, result),
                     .type = type
                 };
             }

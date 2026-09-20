@@ -88,6 +88,12 @@ namespace iris::compiler
         std::optional<iris::Type_reference> const& type
     );
 
+    export llvm::Value* convert_from_boolean(
+        llvm::LLVMContext& llvm_context,
+        llvm::IRBuilder<>& llvm_builder,
+        llvm::Value* const llvm_value
+    );
+
     export llvm::Value* create_null_terminated_string_value(
         llvm::LLVMContext& llvm_context,
         llvm::Module& llvm_module,

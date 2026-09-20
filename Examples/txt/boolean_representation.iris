@@ -1,0 +1,42 @@
+module Boolean_representation;
+
+export function mixed_not_equal(flag: Bool, first: Int32, second: Int32) -> (result: Bool)
+{
+    return flag != (first == second);
+}
+
+export function mixed_equal(flag: Bool, first: Int32, second: Int32) -> (result: Bool)
+{
+    return flag == (first == second);
+}
+
+export function mixed_not_equal_reversed(flag: Bool, first: Int32, second: Int32) -> (result: Bool)
+{
+    return (first == second) != flag;
+}
+
+export function mixed_with_not(first_boolean: Bool, second_boolean: Bool) -> (result: Bool)
+{
+    return first_boolean != !second_boolean;
+}
+
+export function mixed_ternary(flag: Bool, first: Int32, second: Int32) -> (result: Bool)
+{
+    return flag ? (first == second) : flag;
+}
+
+export function mixed_condition(flag: Bool, first: Int32, second: Int32) -> (result: Int32)
+{
+    if flag != (first == second)
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+export function comparison_in_variable(first: Int32, second: Int32) -> (result: Bool)
+{
+    var same = first == second;
+    return same;
+}

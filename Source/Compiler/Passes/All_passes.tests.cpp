@@ -204,8 +204,8 @@ export function_constructor add(value_type: Type)
     };
 }
 
-@unique_name("All_passes_test_1__at__add__at__5019270203090708701")
-function All_passes_test_1__at__add__at__5019270203090708701(first: Int32, second: Int32) -> (result: Int32)
+@unique_name("All_passes_test_1__at__add__at__5932735177449921095")
+function All_passes_test_1__at__add__at__5932735177449921095(first: Int32, second: Int32) -> (result: Int32)
 {
     return first + second;
 }
@@ -213,7 +213,7 @@ function All_passes_test_1__at__add__at__5019270203090708701(first: Int32, secon
 function run() -> ()
 {
     {
-        var a = All_passes_test_1__at__add__at__5019270203090708701(1, 2);
+        var a = All_passes_test_1__at__add__at__5932735177449921095(1, 2);
     }
 }
 )";
@@ -257,8 +257,8 @@ export type_constructor Box(element_type: Type)
     };
 }
 
-@unique_name("All_passes_test_2__at__Box__at__11396666856726831887")
-struct All_passes_test_2__at__Box__at__11396666856726831887
+@unique_name("All_passes_test_2__at__Box__at__4089689690562554094")
+struct All_passes_test_2__at__Box__at__4089689690562554094
 {
     value: Int32 = ;
 }
@@ -270,7 +270,7 @@ export function get_value(instance: *Box::<element_type>, element_type: Type) ->
 
 function run() -> ()
 {
-    mutable b: All_passes_test_2__at__Box__at__11396666856726831887 = {};
+    mutable b: All_passes_test_2__at__Box__at__4089689690562554094 = {};
     var v = get_value(&b);
 }
 )";
@@ -326,8 +326,8 @@ export type_constructor Box(element_type: Type)
     };
 }
 
-@unique_name("All_passes_test_3__at__Box__at__13337215502393515354")
-struct All_passes_test_3__at__Box__at__13337215502393515354
+@unique_name("All_passes_test_3__at__Box__at__6165847472760269805")
+struct All_passes_test_3__at__Box__at__6165847472760269805
 {
     value: Int32 = ;
 }
@@ -340,7 +340,7 @@ export function get_value(instance: *Box::<element_type>, element_type: Type) ->
 function run() -> ()
 {
     {
-        mutable b: All_passes_test_3__at__Box__at__13337215502393515354 = {};
+        mutable b: All_passes_test_3__at__Box__at__6165847472760269805 = {};
         var v = get_value(&b);
     }
 }
@@ -442,14 +442,14 @@ import containers.dynamic_array as da;
 function run() -> ()
 {
     var allocator: da.Allocator = {};
-    var instance = containers.dynamic_array__at__create__at__9778156454858735274(allocator);
+    var instance = containers.dynamic_array__at__create__at__18314165141492431991(allocator);
 
-    containers.dynamic_array__at__push_back__at__4230141207440943837(&instance, 1);
-    var element = containers.dynamic_array__at__get__at__7165733274530171095(&instance, 0u64);
+    containers.dynamic_array__at__push_back__at__4871948593735285231(&instance, 1);
+    var element = containers.dynamic_array__at__get__at__7836134604126537465(&instance, 0u64);
 }
 
-@unique_name("containers.dynamic_array__at__Dynamic_array__at__14338321328141388858")
-struct containers.dynamic_array__at__Dynamic_array__at__14338321328141388858
+@unique_name("containers.dynamic_array__at__Dynamic_array__at__13315284152231425440")
+struct containers.dynamic_array__at__Dynamic_array__at__13315284152231425440
 {
     data: *mutable Int32 = null;
     length: Uint64 = 0u64;
@@ -457,8 +457,8 @@ struct containers.dynamic_array__at__Dynamic_array__at__14338321328141388858
     allocator: da.Allocator = {};
 }
 
-@unique_name("containers.dynamic_array__at__create__at__9778156454858735274")
-function containers.dynamic_array__at__create__at__9778156454858735274(allocator: da.Allocator) -> (instance: da.containers.dynamic_array__at__Dynamic_array__at__14338321328141388858)
+@unique_name("containers.dynamic_array__at__create__at__18314165141492431991")
+function containers.dynamic_array__at__create__at__18314165141492431991(allocator: da.Allocator) -> (instance: da.containers.dynamic_array__at__Dynamic_array__at__13315284152231425440)
     precondition "allocator.allocate != null" { allocator.allocate != null }
     precondition "allocator.deallocate != null" { allocator.deallocate != null }
 {
@@ -470,8 +470,8 @@ function containers.dynamic_array__at__create__at__9778156454858735274(allocator
     };
 }
 
-@unique_name("containers.dynamic_array__at__push_back__at__4230141207440943837")
-function containers.dynamic_array__at__push_back__at__4230141207440943837(instance: *mutable da.containers.dynamic_array__at__Dynamic_array__at__14338321328141388858, element: Int32) -> ()
+@unique_name("containers.dynamic_array__at__push_back__at__4871948593735285231")
+function containers.dynamic_array__at__push_back__at__4871948593735285231(instance: *mutable da.containers.dynamic_array__at__Dynamic_array__at__13315284152231425440, element: Int32) -> ()
     precondition "instance != null" { instance != null }
 {
     if instance->length == instance->capacity
@@ -491,8 +491,8 @@ function containers.dynamic_array__at__push_back__at__4230141207440943837(instan
     instance->length += 1u64;
 }
 
-@unique_name("containers.dynamic_array__at__get__at__7165733274530171095")
-function containers.dynamic_array__at__get__at__7165733274530171095(instance: *mutable da.containers.dynamic_array__at__Dynamic_array__at__14338321328141388858, index: Uint64) -> (result: Int32)
+@unique_name("containers.dynamic_array__at__get__at__7836134604126537465")
+function containers.dynamic_array__at__get__at__7836134604126537465(instance: *mutable da.containers.dynamic_array__at__Dynamic_array__at__13315284152231425440, index: Uint64) -> (result: Int32)
     precondition "instance != null" { instance != null }
     precondition "index < instance->length" { index < instance->length }
 {
@@ -549,15 +549,15 @@ export type_constructor Vector3(Value_type: Type)
     };
 }
 
-@unique_name("module_a__at__Vector3__at__15688195949589937512")
-struct module_a__at__Vector3__at__15688195949589937512
+@unique_name("module_a__at__Vector3__at__11918435639450755138")
+struct module_a__at__Vector3__at__11918435639450755138
 {
     x: Float32 = 0 as Float32;
     y: Float32 = 0 as Float32;
     z: Float32 = 0 as Float32;
 }
 
-export using Vector3f32 = module_a__at__Vector3__at__15688195949589937512;
+export using Vector3f32 = module_a__at__Vector3__at__11918435639450755138;
 
 export function get_vector3f32_size_of() -> (result: Uint64)
 {
@@ -572,13 +572,13 @@ export function_constructor get_vector3_size_of(Value_type: Type)
     };
 }
 
-@unique_name("module_a__at__get_vector3_size_of__at__11333903767154633147")
-function module_a__at__get_vector3_size_of__at__11333903767154633147() -> (result: Uint64)
+@unique_name("module_a__at__get_vector3_size_of__at__1021003501614521332")
+function module_a__at__get_vector3_size_of__at__1021003501614521332() -> (result: Uint64)
 {
     return 24u64;
 }
 
-export var get_vector3f64_size_of = module_a__at__get_vector3_size_of__at__11333903767154633147;
+export var get_vector3f64_size_of = module_a__at__get_vector3_size_of__at__1021003501614521332;
 )";
 
         std::pmr::vector<std::string_view> const dependencies = { };
@@ -620,8 +620,8 @@ export function_constructor get_size_of(Value_type: Type)
     };
 }
 
-@unique_name("module_a__at__get_size_of__at__18028050719820586937")
-function module_a__at__get_size_of__at__18028050719820586937() -> (result: Uint64)
+@unique_name("module_a__at__get_size_of__at__14651575645507637444")
+function module_a__at__get_size_of__at__14651575645507637444() -> (result: Uint64)
 {
     if 4u64 == 4u64
     {
@@ -630,7 +630,7 @@ function module_a__at__get_size_of__at__18028050719820586937() -> (result: Uint6
     return 4u64;
 }
 
-export var get_int32_size_of = module_a__at__get_size_of__at__18028050719820586937;
+export var get_int32_size_of = module_a__at__get_size_of__at__14651575645507637444;
 )";
 
         std::pmr::vector<std::string_view> const dependencies = { };

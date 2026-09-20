@@ -401,3 +401,63 @@ TEST_CASE("Hashes Lambda_declaration with multiple output parameters", "[Core][H
     XXH64_hash_t const hash = iris::hash_lambda_declaration(state, lambda_decl);
     CHECK(hash != 0);
 }
+
+namespace
+{
+    // The hash of one type reference on its own: a lambda type that takes it and returns nothing.
+    static XXH64_hash_t hash_of_type(iris::Type_reference type_reference)
+    {
+        XXH64_state_t* const state = create_hash_state();
+        Scope_exit const scope_exit_guard{[&]() { XXH64_freeState(state); }};
+
+        auto const lambda_type = create_lambda_type(
+            std::pmr::vector<iris::Type_reference>{ std::move(type_reference) },
+            {}
+        );
+
+        return iris::hash_lambda_type(state, lambda_type);
+    }
+
+    static iris::Type_reference pointer_to(iris::Type_reference element_type)
+    {
+        return iris::create_pointer_type_type_reference(
+            std::pmr::vector<iris::Type_reference>{ std::move(element_type) },
+            false
+        );
+    }
+
+    static iris::Type_reference slice_of(iris::Type_reference element_type)
+    {
+        return iris::create_array_slice_type_reference(
+            std::pmr::vector<iris::Type_reference>{ std::move(element_type) },
+            false
+        );
+    }
+}
+
+TEST_CASE("Types of different kinds do not hash alike", "[Core][Hash]")
+{
+    // A function constructor is instantiated once per hash of its type arguments, so two types
+    // that hash alike share one instantiation: create_array::<Uint8> allocated and indexed as if
+    // its element were a *C_char.
+    CHECK(hash_of_type(pointer_to(create_fundamental_type(iris::Fundamental_type::C_char)))
+        != hash_of_type(iris::create_integer_type_type_reference(8, false)));
+
+    CHECK(hash_of_type(pointer_to(iris::create_integer_type_type_reference(32, false)))
+        != hash_of_type(slice_of(iris::create_integer_type_type_reference(32, false))));
+
+    CHECK(hash_of_type(iris::create_decimal_type_reference(6))
+        != hash_of_type(create_fundamental_type(iris::Fundamental_type::Any_type)));
+
+    CHECK(hash_of_type(pointer_to(create_fundamental_type(iris::Fundamental_type::Bool)))
+        != hash_of_type(create_fundamental_type(iris::Fundamental_type::Bool)));
+}
+
+TEST_CASE("The same type still hashes the same after the kind tag", "[Core][Hash]")
+{
+    CHECK(hash_of_type(pointer_to(create_fundamental_type(iris::Fundamental_type::C_char)))
+        == hash_of_type(pointer_to(create_fundamental_type(iris::Fundamental_type::C_char))));
+
+    CHECK(hash_of_type(iris::create_integer_type_type_reference(8, false))
+        != hash_of_type(iris::create_integer_type_type_reference(8, true)));
+}

@@ -1668,11 +1668,13 @@ namespace iris::compiler
             if (iris::is_optional_represented_as_pointer(type_reference))
                 return llvm::PointerType::get(llvm_context, 0);
 
+            llvm::Type* const bool_llvm_type = llvm::Type::getInt8Ty(llvm_context);
+
             llvm::Type* const value_llvm_type = !data.value_type.empty()
                 ? type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, data.value_type[0], declaration_database, clang_context)
-                : llvm::Type::getInt1Ty(llvm_context);
+                : bool_llvm_type;
 
-            return llvm::StructType::create({ value_llvm_type, llvm::Type::getInt1Ty(llvm_context) }, "__hl_optional");
+            return llvm::StructType::create({ value_llvm_type, bool_llvm_type }, "__hl_optional");
         }
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {

@@ -118,6 +118,9 @@ namespace iris
         iris::Type_reference const& type_reference
     )
     {
+        std::uint8_t const kind = static_cast<std::uint8_t>(type_reference.data.index());
+        update_hash(state, &kind, sizeof(kind));
+
         if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
         {
             iris::Array_slice_type const& data = std::get<iris::Array_slice_type>(type_reference.data);
@@ -180,10 +183,6 @@ namespace iris
             {
                 update_hash(state, value_type);
             }
-
-            // Discriminator, so that Optional::<T> does not hash the same as a bare T.
-            std::uint8_t const tag = 0x01;
-            update_hash(state, &tag, sizeof(tag));
         }
         else if (std::holds_alternative<iris::Pointer_type>(type_reference.data))
         {
