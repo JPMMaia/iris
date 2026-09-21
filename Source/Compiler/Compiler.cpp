@@ -535,18 +535,10 @@ namespace iris::compiler
                 if (!llvm_function.getReturnType()->isVoidTy())
                     return false;
 
-                if (!function_definition.statements.empty())
-                {
-                    Statement const& statement = function_definition.statements.back();
-                    if (!statement.expressions.empty())
-                    {
-                        Expression const& expression = statement.expressions[0];
-                        if (std::holds_alternative<Return_expression>(expression.data))
-                            return false;
-                    }
-                }
-
-                return true;
+                // Asking the block rather than the last statement also sees a return nested in a block, which
+                // is what compile_time if leaves behind.
+                llvm::BasicBlock const* const block = llvm_builder.GetInsertBlock();
+                return block == nullptr || block->getTerminator() == nullptr;
             };
 
             if (return_void_is_missing())

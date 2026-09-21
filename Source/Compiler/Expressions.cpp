@@ -7704,9 +7704,13 @@ namespace iris::compiler
         all_local_variables.insert(all_local_variables.begin(), parameters.local_variables.begin(), parameters.local_variables.end());
 
         Expression_parameters new_parameters = parameters;
+        bool is_terminated = false;
 
         for (Statement const& statement : statements)
         {
+            if (is_terminated)
+                break;
+
             if (!is_comment(statement) && !statement.expressions.empty())
             {
                 new_parameters.local_variables = all_local_variables;
@@ -7725,10 +7729,12 @@ namespace iris::compiler
 
                 if (!statement_value.name.empty())
                     all_local_variables.push_back(statement_value);
+
+                is_terminated = ends_with_terminator_statement(std::span<Statement const>{ &statement, 1 });
             }
         }
 
-        if (create_defer_expressions_at_end && !ends_with_terminator_statement(statements))
+        if (create_defer_expressions_at_end && !is_terminated)
         {
             new_parameters.local_variables = all_local_variables;
             create_instructions_at_end_of_block(new_parameters);

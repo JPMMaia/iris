@@ -6129,6 +6129,51 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile skips statements after a block that returns", "[LLVM_IR]")
+  {
+    char const* const input_file = "unreachable_after_return.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private i32 @Unreachable_after_return_run(i32 noundef %"arguments[0].value") #0 {
+entry:
+  %value = alloca i32, align 4
+  store i32 %"arguments[0].value", ptr %value, align 4
+  %0 = load i32, ptr %value, align 4
+  ret i32 %0
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile does not return twice from a void function whose block returns", "[LLVM_IR]")
+  {
+    char const* const input_file = "void_return_in_block.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private void @Void_return_in_block_run() #0 {
+entry:
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile For Loop Expressions", "[LLVM_IR]")
   {
     char const* const input_file = "for_loop_expressions.iris";
