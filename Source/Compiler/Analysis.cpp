@@ -2538,10 +2538,22 @@ namespace iris::compiler
                 if (!member_type.has_value())
                     return std::nullopt;
 
+                std::optional<Type_info> const value_type_info = get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.arguments[0].expression_index], std::nullopt, declaration_database);
+                bool const is_mutable = [&]() -> bool
+                {
+                    if (!value_type_info.has_value())
+                        return false;
+
+                    if (std::holds_alternative<iris::Pointer_type>(value_type_info->type.data))
+                        return std::get<iris::Pointer_type>(value_type_info->type.data).is_mutable;
+
+                    return value_type_info->is_mutable;
+                }();
+
                 return Type_info
                 {
                     .type = std::move(member_type.value()),
-                    .is_mutable = false,
+                    .is_mutable = is_mutable,
                 };
             }
             else if (data.name == "member_name" || data.name == "type_name" || data.name == "enum_name")

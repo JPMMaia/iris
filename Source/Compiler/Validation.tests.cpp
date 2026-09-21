@@ -4175,6 +4175,61 @@ function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that member_access can assign through a mutable pointer or variable", "[Validation][Mutability]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: *C_char = null;
+}
+
+function run(pair: *mutable Pair) -> ()
+{
+    @member_access::<Pair>(pair, 0u64) = 1;
+    @member_access::<Pair>(pair, 1u64) = "text"c;
+
+    mutable local: Pair = {};
+    @member_access::<Pair>(local, 0u64) = 2;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that member_access cannot assign through a non-mutable pointer", "[Validation][Mutability]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Pair
+{
+    first: Int32 = 0;
+}
+
+function run(pair: *Pair) -> ()
+{
+    @member_access::<Pair>(pair, 0u64) = 1;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 5, 10, 43),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot modify non-mutable value.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that cannot assign to value of non-mutable pointer", "[Validation][Mutability]")
     {
         std::string_view const input = R"(module Test;

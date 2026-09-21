@@ -1016,6 +1016,12 @@ namespace iris::compiler
         Expression_parameters const& parameters
     );
 
+    Value_and_type create_dereference_and_access_expression_value(
+        Dereference_and_access_expression const& dereference_and_access_expression,
+        Statement const& statement,
+        Expression_parameters const& parameters
+    );
+
     Value_and_type create_access_expression_value(
         Access_expression const& expression,
         Statement const& statement,
@@ -1029,6 +1035,18 @@ namespace iris::compiler
         Enum_value_constants const& enum_value_constants = parameters.enum_value_constants;
 
         Value_and_type const left_hand_side = create_expression_value(expression.expression.expression_index, statement, parameters);
+
+        // Only compile_time lowering (@member_access) produces an access through a pointer:
+        // validation rejects `pointer.member` written in source.
+        if (left_hand_side.value != nullptr && left_hand_side.type.has_value() && is_non_void_pointer(left_hand_side.type.value()))
+        {
+            Dereference_and_access_expression const dereference_and_access
+            {
+                .expression = expression.expression,
+                .member_name = expression.member_name,
+            };
+            return create_dereference_and_access_expression_value(dereference_and_access, statement, parameters);
+        }
 
         // Check if left hand side corresponds to a module name:
         {

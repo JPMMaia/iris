@@ -1258,6 +1258,70 @@ export function run() -> ()
         CHECK(expected == actual);
     }
 
+    TEST_CASE("Evaluates compile_time reflection element_type", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_element_type() -> ()
+{
+    var text: @element_type::<*C_char>() = 0;
+    var target: @element_type::<*mutable Pair>() = {};
+    var slice_element: @element_type::<Array_slice::<Float32>>() = 0.0f32;
+    var array_element: @element_type::<Constant_array::<Uint16, 4>>() = 0u16;
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_element_type() -> ()
+{
+    var text: C_char = 0;
+    var target: Pair = {};
+    var slice_element: Float32 = 0.0f32;
+    var array_element: Uint16 = 0u16;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_element_type");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection element_type in constructor type argument", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+export function run_element_type_argument(values: Array_slice::<Float32>) -> ()
+{
+    var value = reinterpret_as::<@element_type::<Array_slice::<Float32>>()>(values.data);
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+export function run_element_type_argument(values: Array_slice::<Float32>) -> ()
+{
+    var value = reinterpret_as::<Float32>(values.data);
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_element_type_argument");
+
+        CHECK(expected == actual);
+    }
+
     TEST_CASE("Evaluates compile_time enum access", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_reflection;

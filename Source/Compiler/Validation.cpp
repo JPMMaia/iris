@@ -4397,7 +4397,7 @@ namespace iris::compiler
                 }
             }
         }
-        else if (expression.name == "type_name" || expression.name == "get_type_kind")
+        else if (expression.name == "type_name" || expression.name == "get_type_kind" || expression.name == "element_type")
         {
             if (expression.type_arguments.size() != 1)
             {

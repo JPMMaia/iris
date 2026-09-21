@@ -1009,6 +1009,26 @@ namespace iris::compiler
         return std::pmr::string{"Custom", parameters.output_allocator};
     }
 
+    static std::optional<Type_reference> get_element_type(
+        Declaration_database const& declaration_database,
+        Type_reference const& type_reference
+    )
+    {
+        std::optional<Type_reference> const underlying_type = get_underlying_type(declaration_database, type_reference);
+        Type_reference const& resolved_type = underlying_type.value_or(type_reference);
+
+        if (std::holds_alternative<iris::Pointer_type>(resolved_type.data))
+            return std::get<iris::Pointer_type>(resolved_type.data).element_type.at(0);
+
+        if (std::holds_alternative<iris::Array_slice_type>(resolved_type.data))
+            return std::get<iris::Array_slice_type>(resolved_type.data).element_type.at(0);
+
+        if (std::holds_alternative<iris::Constant_array_type>(resolved_type.data))
+            return std::get<iris::Constant_array_type>(resolved_type.data).value_type.at(0);
+
+        return std::nullopt;
+    }
+
     static void replace_variable_with_constant_in_statement(
         iris::Statement& statement,
         std::string_view const variable_name,
@@ -1399,6 +1419,20 @@ namespace iris::compiler
             add_import_usage_for_module(parameters.dependencies, "iris.builtin", "Type_kind");
 
             return create_value_and_type(create_type_expression_statement(output_type.value()));
+        }
+        else if (expression.name == "element_type")
+        {
+            if (expression.type_arguments.size() != 1)
+                throw std::runtime_error{ "element_type() requires exactly one type argument!" };
+
+            if (!expression.arguments.empty())
+                throw std::runtime_error{ "element_type() does not take runtime arguments!" };
+
+            std::optional<Type_reference> const element_type = get_element_type(parameters.declaration_database, expression.type_arguments[0]);
+            if (!element_type.has_value())
+                throw std::runtime_error{ "element_type() requires a pointer, Array_slice or Constant_array type argument!" };
+
+            return create_value_and_type(create_type_expression_statement(element_type.value()));
         }
         else if (expression.name == "member_offset")
         {
