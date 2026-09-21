@@ -534,6 +534,53 @@ function iris.json_nested__at__to_json__at__7014527333063429389(value: *Int32) -
         CHECK(expected == actual);
     }
 
+    TEST_CASE("Imports the module a nested instance comes from when the target does not", "[Instantiate_pass][Passes]")
+    {
+        std::string_view const inner = R"(module nested_inner;
+
+export function helper() -> ()
+{
+}
+
+export function_constructor make(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+        helper();
+    };
+}
+)";
+
+        std::string_view const outer = R"(module nested_outer;
+
+import nested_inner as nested_inner;
+
+export function_constructor wrap(value_type: Type)
+{
+    return function(value: *value_type) -> ()
+    {
+        nested_inner.make::<value_type>(value);
+    };
+}
+)";
+
+        std::string_view const input = R"(module nested_usage;
+
+import nested_outer as nested_outer;
+
+function run(value: *Int32) -> ()
+{
+    nested_outer.wrap::<Int32>(value);
+}
+)";
+
+        std::array<std::string_view, 2> const dependencies = { inner, outer };
+        std::pmr::string const actual = run_instantiate_pass_and_format(input, dependencies, "run");
+
+        CHECK(actual.find("import nested_inner as iris_instance_import_nested_inner;") != std::pmr::string::npos);
+        CHECK(actual.find("iris_instance_import_nested_inner.helper();") != std::pmr::string::npos);
+    }
+
     TEST_CASE("Duplicates private function dependencies recursively across modules", "[Instantiate_pass][Passes]")
     {
         std::string_view const dependency = R"(module iris.json_recursive;

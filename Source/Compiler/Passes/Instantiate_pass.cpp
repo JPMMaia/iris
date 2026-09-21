@@ -398,7 +398,21 @@ namespace iris::compiler
             return;
 
         Import_module_with_alias const* const source_module_import = find_import_module_with_module_name(target_dependencies, source_module_name);
-        std::pmr::string const source_module_alias = source_module_import != nullptr ? source_module_import->alias : std::pmr::string{};
+        std::pmr::string source_module_alias = source_module_import != nullptr ? source_module_import->alias : std::pmr::string{output_allocator};
+
+        auto const ensure_source_module_alias = [&]() -> bool
+        {
+            if (!source_module_alias.empty())
+                return true;
+
+            std::pmr::string preferred_alias{"iris_instance_import_", output_allocator};
+            for (char const character : source_module_name)
+                preferred_alias.push_back(character == '.' ? '_' : character);
+
+            std::pmr::string const alias = create_unique_import_alias(target_dependencies, preferred_alias, output_allocator);
+            source_module_alias = ensure_import_module_with_alias(target_dependencies, source_module_name, alias, output_allocator).alias;
+            return true;
+        };
 
         struct Direct_call_rewrite
         {
@@ -465,7 +479,7 @@ namespace iris::compiler
                                     .function_name = std::pmr::string{variable_expression.name, output_allocator}
                                 });
                             }
-                            else if (declaration.has_value() && !source_module_alias.empty())
+                            else if (declaration.has_value() && ensure_source_module_alias())
                             {
                                 direct_call_rewrites.push_back({
                                     .statement = &owning_statement,
@@ -504,7 +518,7 @@ namespace iris::compiler
                             .function_name = std::pmr::string{variable_expression.name, output_allocator}
                         });
                     }
-                    else if (declaration.has_value() && !source_module_alias.empty())
+                    else if (declaration.has_value() && ensure_source_module_alias())
                     {
                         variable_reference_rewrites.push_back({
                             .statement = &owning_statement,
