@@ -79,6 +79,18 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 
+    export std::pmr::vector<Parse_node> get_named_child_nodes_with_comments(
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    );
+
+    export std::pmr::vector<Parse_node> get_preceding_comment_nodes(
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    );
+
     export std::pmr::vector<Parse_node> get_child_nodes_of_parent(
         Parse_tree const& tree,
         Parse_node const& node,

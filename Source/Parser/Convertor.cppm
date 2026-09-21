@@ -154,6 +154,16 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
+    iris::Lambda_declaration node_to_lambda_declaration(
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::optional<std::string_view> const unique_name,
+        std::optional<std::pmr::string> const& comment,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     iris::Union_declaration node_to_union_declaration(
         Module_info const& module_info,
         Parse_tree const& tree,
@@ -297,7 +307,7 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
-    iris::Comment_expression node_to_expression_comment(
+    iris::Statement comment_node_to_statement(
         Parse_tree const& tree,
         Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator,
@@ -337,6 +347,15 @@ namespace iris::parser
     );
 
     iris::Function_expression node_to_expression_function(
+        iris::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    iris::Lambda_expression node_to_expression_lambda(
         iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,

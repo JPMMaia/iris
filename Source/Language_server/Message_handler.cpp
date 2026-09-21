@@ -239,6 +239,13 @@ namespace iris::language_server
             }
         );
 
+        message_handler.add<lsp::requests::TextDocument_Hover>(
+            [&](lsp::requests::TextDocument_Hover::Params&& parameters) -> lsp::requests::TextDocument_Hover::Result
+            {
+                return compute_text_document_hover(server, parameters);
+            }
+        );
+
         message_handler.add<lsp::requests::TextDocument_Definition>(
             [&](lsp::requests::TextDocument_Definition::Params&& parameters) -> lsp::requests::TextDocument_Definition::Result
             {

@@ -1,0 +1,11 @@
+module Indirect_global_constant;
+
+// Deliberately does NOT import Indirect_global_constant_provider: the only way the provider's
+// global is reached is through the default member value of Holder.Unit.
+import Indirect_global_constant_holder as Holder;
+
+export function use_default() -> (speed: Float32)
+{
+    var unit: Holder.Unit = {};
+    return unit.speed_meters_per_second;
+}

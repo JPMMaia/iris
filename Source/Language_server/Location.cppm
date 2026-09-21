@@ -2,6 +2,7 @@ module;
 
 #include <functional>
 #include <optional>
+#include <span>
 #include <string_view>
 
 #include <lsp/types.h>
@@ -42,6 +43,19 @@ namespace iris::language_server
         iris::Module const& core_module,
         iris::Statement const& statement,
         iris::Expression const& expression
+    );
+
+    // Like iris::compiler::visit_statements_using_scope, but it also walks the body of every lambda
+    // literal it meets, with the lambda's own parameters added to the scope. The compiler reaches a
+    // lambda body through the function the lambda pass generates from it, which does not exist while
+    // the file is still being edited, so the language server walks the body where it was written.
+    export void visit_statements_using_scope_including_lambda_bodies(
+        Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Function_declaration const* const function_declaration,
+        iris::compiler::Scope& scope,
+        std::span<iris::Statement const> const statements,
+        std::function<void(iris::Statement const&, iris::compiler::Scope const&)> const& callback
     );
 
     export void visit_expressions_that_contain_position(

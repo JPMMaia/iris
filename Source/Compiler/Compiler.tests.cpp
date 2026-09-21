@@ -166,6 +166,7 @@ namespace iris
     std::string_view target_triple = "x86_64-pc-linux-gnu";
     iris::compiler::Contract_options contract_options = iris::compiler::Contract_options::Log_error_and_abort;
     bool enable_bounds_checks = false;
+    bool enable_decimal_overflow_checks = false;
     bool is_test_mode = false;
   };
 
@@ -216,6 +217,7 @@ namespace iris
       .debug = test_options.debug,
       .contract_options = test_options.contract_options,
       .enable_bounds_checks = test_options.enable_bounds_checks,
+      .enable_decimal_overflow_checks = test_options.enable_decimal_overflow_checks,
       .is_test_mode = test_options.is_test_mode,
     };
 
@@ -270,6 +272,7 @@ namespace iris
       preprocessed.sorted_modules,
       module_name_to_file_path_map,
       preprocessed.declaration_database,
+      preprocessed.lambda_database,
       compilation_options
     );
     std::string const llvm_ir = iris::compiler::to_string(*llvm_module);
@@ -323,6 +326,262 @@ entry:
   %3 = getelementptr inbounds %struct.Address_of_My_struct, ptr %0, i32 0, i32 1
   store ptr %3, ptr %p1, align 8
   ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Optional type", "[LLVM_IR]")
+  {
+    char const* const input_file = "optional_type_codegen.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+%struct.iris_builtin_Optional_Int32 = type {{ i32, i8 }}
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
+
+@iris_error_string = private unnamed_addr constant [107 x i8] c"optional_type_codegen.iris:7:16: Read '.value' of an empty Optional in 'Optional_type_codegen.use_value'!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [110 x i8] c"optional_type_codegen.iris:47:16: Read '.value' of an empty Optional in 'Optional_type_codegen.use_generic'!\0A\00"
+
+; Function Attrs: convergent
+define i32 @Optional_type_codegen_use_value(i64 noundef %"arguments[0].a") #0 {{
+entry:
+  %0 = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %1 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 0
+  store i64 %"arguments[0].a", ptr %1, align 4
+  %2 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 1
+  %3 = load i8, ptr %2, align 1
+  %4 = trunc i8 %3 to i1
+  br i1 %4, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  %5 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 1
+  %6 = load i8, ptr %5, align 1
+  %7 = trunc i8 %6 to i1
+  br i1 %7, label %optional_value_check_pass, label %optional_value_check_fail
+
+if_s1_after:                                      ; preds = %entry
+  ret i32 0
+
+optional_value_check_pass:                        ; preds = %if_s0_then
+  %8 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 0
+  %9 = load i32, ptr %8, align 4
+  ret i32 %9
+
+optional_value_check_fail:                        ; preds = %if_s0_then
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %10 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %11 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}}
+
+; Function Attrs: convergent
+define i1 @Optional_type_codegen_use_pointer(ptr noundef %"arguments[0].a") #0 {{
+entry:
+  %a = alloca ptr, align 8
+  store ptr %"arguments[0].a", ptr %a, align 8
+  %0 = load ptr, ptr %a, align 8
+  %1 = icmp ne ptr %0, null
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  ret i1 %3
+}}
+
+; Function Attrs: convergent
+define i64 @Optional_type_codegen_make() #0 {{
+entry:
+  %optional = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %0 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 0
+  store i32 1, ptr %0, align 4
+  %1 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 1
+  store i8 1, ptr %1, align 1
+  %2 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 0
+  %3 = load i64, ptr %2, align 4
+  ret i64 %3
+}}
+
+; Function Attrs: convergent
+define i64 @Optional_type_codegen_make_empty() #0 {{
+entry:
+  %optional = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %0 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 1
+  store i8 0, ptr %0, align 1
+  %1 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 0
+  %2 = load i64, ptr %1, align 4
+  ret i64 %2
+}}
+
+; Function Attrs: convergent
+define i32 @Optional_type_codegen_use_generic(ptr %"arguments[0].values_0", i64 %"arguments[0].values_1") #0 {{
+entry:
+  %values = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %0 = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %found = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 0
+  store ptr %"arguments[0].values_0", ptr %1, align 8
+  %2 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 1
+  store i64 %"arguments[0].values_1", ptr %2, align 8
+  %3 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  %5 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 1
+  %6 = load i64, ptr %5, align 8
+  %7 = call i64 @Optional_type_codegen__at__first__at__664968548327861497(ptr %4, i64 %6)
+  %8 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %0, i32 0, i32 0
+  store i64 %7, ptr %8, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %found, ptr align 4 %0, i64 8, i1 false)
+  %9 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 1
+  %10 = load i8, ptr %9, align 1
+  %11 = trunc i8 %10 to i1
+  br i1 %11, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  %12 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 1
+  %13 = load i8, ptr %12, align 1
+  %14 = trunc i8 %13 to i1
+  br i1 %14, label %optional_value_check_pass, label %optional_value_check_fail
+
+if_s1_after:                                      ; preds = %entry
+  ret i32 0
+
+optional_value_check_pass:                        ; preds = %if_s0_then
+  %15 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %found, i32 0, i32 0
+  %16 = load i32, ptr %15, align 4
+  ret i32 %16
+
+optional_value_check_fail:                        ; preds = %if_s0_then
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %17 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
+  %18 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}}
+
+; Function Attrs: convergent
+define private i64 @Optional_type_codegen__at__first__at__664968548327861497(ptr %"arguments[0].values_0", i64 %"arguments[0].values_1") #0 {{
+entry:
+  %values = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %optional = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %optional1 = alloca %struct.iris_builtin_Optional_Int32, align 4
+  %0 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 0
+  store ptr %"arguments[0].values_0", ptr %0, align 8
+  %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 1
+  store i64 %"arguments[0].values_1", ptr %1, align 8
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %values, i32 0, i32 1
+  %3 = load i64, ptr %2, align 8
+  %4 = icmp eq i64 %3, 0
+  %5 = zext i1 %4 to i8
+  %6 = trunc i8 %5 to i1
+  br i1 %6, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  %7 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 1
+  store i8 0, ptr %7, align 1
+  %8 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional, i32 0, i32 0
+  %9 = load i64, ptr %8, align 4
+  ret i64 %9
+
+if_s1_after:                                      ; preds = %entry
+  %10 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %values, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  %array_slice_element_pointer = getelementptr i32, ptr %11, i32 0
+  %12 = load i32, ptr %array_slice_element_pointer, align 4
+  %13 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional1, i32 0, i32 0
+  store i32 %12, ptr %13, align 4
+  %14 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional1, i32 0, i32 1
+  store i8 1, ptr %14, align 1
+  %15 = getelementptr inbounds %struct.iris_builtin_Optional_Int32, ptr %optional1, i32 0, i32 0
+  %16 = load i64, ptr %15, align 4
+  ret i64 %16
+}}
+
+declare i32 @fputs(ptr, ptr)
+
+declare i32 @fflush(ptr)
+
+declare void @abort()
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: readwrite) }}
+)");
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Optional pointer assigned from null and from pointers", "[LLVM_IR]")
+  {
+    char const* const input_file = "optional_null_codegen.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Optional_null_codegen_My_struct = type { ptr }
+
+; Function Attrs: convergent
+define ptr @Optional_null_codegen_make_null() #0 {
+entry:
+  ret ptr null
+}
+
+; Function Attrs: convergent
+define void @Optional_null_codegen_take(ptr noundef %"arguments[0].a") #0 {
+entry:
+  %a = alloca ptr, align 8
+  store ptr %"arguments[0].a", ptr %a, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define void @Optional_null_codegen_pass_null() #0 {
+entry:
+  call void @Optional_null_codegen_take(ptr noundef null)
+  ret void
+}
+
+; Function Attrs: convergent
+define i1 @Optional_null_codegen_assign_null(ptr noundef %"arguments[0].a") #0 {
+entry:
+  %a = alloca ptr, align 8
+  %b = alloca ptr, align 8
+  store ptr %"arguments[0].a", ptr %a, align 8
+  %0 = load ptr, ptr %a, align 8
+  store ptr %0, ptr %b, align 8
+  store ptr null, ptr %b, align 8
+  %1 = load ptr, ptr %b, align 8
+  %2 = icmp ne ptr %1, null
+  %3 = zext i1 %2 to i8
+  %4 = trunc i8 %3 to i1
+  ret i1 %4
+}
+
+; Function Attrs: convergent
+define ptr @Optional_null_codegen_from_pointer(ptr noundef %"arguments[0].p") #0 {
+entry:
+  %p = alloca ptr, align 8
+  %a = alloca ptr, align 8
+  %b = alloca %struct.Optional_null_codegen_My_struct, align 8
+  store ptr %"arguments[0].p", ptr %p, align 8
+  %0 = load ptr, ptr %p, align 8
+  store ptr %0, ptr %a, align 8
+  %1 = load ptr, ptr %p, align 8
+  %2 = getelementptr inbounds %struct.Optional_null_codegen_My_struct, ptr %b, i32 0, i32 0
+  store ptr %1, ptr %2, align 8
+  %3 = load ptr, ptr %p, align 8
+  call void @Optional_null_codegen_take(ptr noundef %3)
+  %4 = load ptr, ptr %a, align 8
+  ret ptr %4
 }
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
@@ -463,39 +722,41 @@ entry:
   store ptr %23, ptr %24, align 8, !dbg !43
   %25 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 1, !dbg !43
   store i64 1, ptr %25, align 8, !dbg !43
-  %26 = load %struct.iris_builtin_Generic_array_slice, ptr %3, align 8, !dbg !43
     #dbg_declare(ptr %d, !54, !DIExpression(), !44)
-  store %struct.iris_builtin_Generic_array_slice %26, ptr %d, align 8, !dbg !44
-  %27 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 0, !dbg !59
-  %28 = load ptr, ptr %27, align 8, !dbg !59
-  %29 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 1, !dbg !59
-  %30 = load i64, ptr %29, align 8, !dbg !59
-  call void @Array_slices_take(ptr %28, i64 %30), !dbg !59
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %d, ptr align 8 %3, i64 16, i1 false), !dbg !44
+  %26 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 0, !dbg !59
+  %27 = load ptr, ptr %26, align 8, !dbg !59
+  %28 = getelementptr inbounds {{ ptr, i64 }}, ptr %d, i32 0, i32 1, !dbg !59
+  %29 = load i64, ptr %28, align 8, !dbg !59
+  call void @Array_slices_take(ptr %27, i64 %29), !dbg !59
     #dbg_declare(ptr %f, !60, !DIExpression(), !45)
   store i32 0, ptr %f, align 4, !dbg !45
     #dbg_declare(ptr %g, !61, !DIExpression(), !46)
   store ptr %f, ptr %g, align 8, !dbg !46
-  %31 = load ptr, ptr %g, align 8, !dbg !46
-  %32 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !46
-  store ptr %31, ptr %32, align 8, !dbg !46
-  %33 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !46
-  store i64 1, ptr %33, align 8, !dbg !46
-  %34 = load %struct.iris_builtin_Generic_array_slice, ptr %4, align 8, !dbg !46
+  %30 = load ptr, ptr %g, align 8, !dbg !46
+  %31 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 0, !dbg !46
+  store ptr %30, ptr %31, align 8, !dbg !46
+  %32 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %4, i32 0, i32 1, !dbg !46
+  store i64 1, ptr %32, align 8, !dbg !46
     #dbg_declare(ptr %h, !62, !DIExpression(), !47)
-  store %struct.iris_builtin_Generic_array_slice %34, ptr %h, align 8, !dbg !47
-  %35 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !47
-  %36 = load ptr, ptr %35, align 8, !dbg !47
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %h, ptr align 8 %4, i64 16, i1 false), !dbg !47
+  %33 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !47
+  %34 = load ptr, ptr %33, align 8, !dbg !47
     #dbg_declare(ptr %i, !63, !DIExpression(), !48)
-  store ptr %36, ptr %i, align 8, !dbg !48
-  %37 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
-  %38 = load ptr, ptr %37, align 8, !dbg !48
-  %array_element_pointer6 = getelementptr i32, ptr %38, i32 0, !dbg !48
+  store ptr %34, ptr %i, align 8, !dbg !48
+  %35 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %h, i32 0, i32 0, !dbg !48
+  %36 = load ptr, ptr %35, align 8, !dbg !48
+  %array_element_pointer6 = getelementptr i32, ptr %36, i32 0, !dbg !48
     #dbg_declare(ptr %j, !64, !DIExpression(), !65)
   store ptr %array_element_pointer6, ptr %j, align 8, !dbg !65
   ret void, !dbg !65
 }}
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: readwrite) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -533,7 +794,7 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
 !30 = !DILocalVariable(name: "v2", scope: !3, file: !2, line: 10, type: !10)
 !31 = !DILocation(line: 10, column: 5, scope: !3)
 !32 = !DILocalVariable(name: "index", scope: !3, file: !2, line: 12, type: !10)
-!33 = !DILocalVariable(name: "v3", scope: !3, file: !2, line: 13, type: !10)
+)" R"(!33 = !DILocalVariable(name: "v3", scope: !3, file: !2, line: 13, type: !10)
 !34 = !DILocation(line: 13, column: 5, scope: !3)
 !35 = distinct !DISubprogram(name: "run", linkageName: "Array_slices_run", scope: null, file: !2, line: 16, type: !36, scopeLine: 17, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !38)
 !36 = !DISubroutineType(types: !37)
@@ -594,21 +855,24 @@ entry:
   store ptr null, ptr %1, align 8, !dbg !7
   %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !7
   store i64 0, ptr %2, align 8, !dbg !7
-  %3 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8, !dbg !7
-  %4 = getelementptr inbounds %struct.Array_slices_instantiate_My_struct, ptr %v0, i32 0, i32 0, !dbg !7
-  store %struct.iris_builtin_Generic_array_slice %3, ptr %4, align 8, !dbg !7
+  %3 = getelementptr inbounds %struct.Array_slices_instantiate_My_struct, ptr %v0, i32 0, i32 0, !dbg !7
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %3, ptr align 8 %0, i64 16, i1 false), !dbg !7
     #dbg_declare(ptr %v0, !10, !DIExpression(), !7)
     #dbg_declare(ptr %value, !21, !DIExpression(), !8)
   store i32 0, ptr %value, align 4, !dbg !8
-  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 0, !dbg !9
-  store ptr %value, ptr %5, align 8, !dbg !9
-  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 1, !dbg !9
-  store i64 1, ptr %6, align 8, !dbg !9
+  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 0, !dbg !9
+  store ptr %value, ptr %4, align 8, !dbg !9
+  %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %s0, i32 0, i32 1, !dbg !9
+  store i64 1, ptr %5, align 8, !dbg !9
     #dbg_declare(ptr %s0, !22, !DIExpression(), !9)
   ret void, !dbg !9
 }}
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: readwrite) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -654,8 +918,9 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
     };
 
     char const* const expected_llvm_ir = R"(
-@function_contract_error_string = private unnamed_addr constant [69 x i8] c"In function 'Assert_expressions.run' assert 'Value is not 0' failed!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [55 x i8] c"In function 'Assert_expressions.run' assert '' failed!\00"
+@iris_error_string = private unnamed_addr constant [99 x i8] c"assert_expressions.iris:5:5: In function 'Assert_expressions.run' assert 'Value is not 0' failed!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [85 x i8] c"assert_expressions.iris:6:5: In function 'Assert_expressions.run' assert '' failed!\0A\00"
 
 ; Function Attrs: convergent
 define void @Assert_expressions_run(i32 noundef %"arguments[0].value") #0 {
@@ -664,15 +929,21 @@ entry:
   store i32 %"arguments[0].value", ptr %value, align 4
   %0 = load i32, ptr %value, align 4
   %1 = icmp ne i32 %0, 0
-  br i1 %1, label %condition_success, label %condition_fail
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %condition_success, label %condition_fail
 
 condition_success:                                ; preds = %entry
-  %2 = load i32, ptr %value, align 4
-  %3 = icmp ne i32 %2, 1
-  br i1 %3, label %condition_success1, label %condition_fail2
+  %4 = load i32, ptr %value, align 4
+  %5 = icmp ne i32 %4, 1
+  %6 = zext i1 %5 to i8
+  %7 = trunc i8 %6 to i1
+  br i1 %7, label %condition_success1, label %condition_fail2
 
 condition_fail:                                   ; preds = %entry
-  %4 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %8 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
@@ -680,12 +951,16 @@ condition_success1:                               ; preds = %condition_success
   ret void
 
 condition_fail2:                                  ; preds = %condition_success
-  %5 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %10 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer3)
+  %11 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -834,10 +1109,10 @@ entry:
   %case_7 = alloca i32, align 4
   %case_8 = alloca i32, align 4
   %case_9 = alloca i32, align 4
-  %case_10 = alloca i1, align 1
-  %case_11 = alloca i1, align 1
-  %case_12 = alloca i1, align 1
-  %case_13 = alloca i1, align 1
+  %case_10 = alloca i8, align 1
+  %case_11 = alloca i8, align 1
+  %case_12 = alloca i8, align 1
+  %case_13 = alloca i8, align 1
   %case_14 = alloca i32, align 4
   store i32 %"arguments[0].a", ptr %a, align 4
   store i32 %"arguments[1].b", ptr %b, align 4
@@ -894,52 +1169,64 @@ entry:
   store i32 %39, ptr %case_9, align 4
   %40 = load i32, ptr %a, align 4
   %41 = icmp eq i32 %40, 0
-  br i1 %41, label %logical_and_rhs, label %logical_and_end
+  %42 = zext i1 %41 to i8
+  %43 = trunc i8 %42 to i1
+  br i1 %43, label %logical_and_rhs, label %logical_and_end
 
 logical_and_rhs:                                  ; preds = %entry
-  %42 = load i32, ptr %b, align 4
-  %43 = icmp eq i32 %42, 1
+  %44 = load i32, ptr %b, align 4
+  %45 = icmp eq i32 %44, 1
+  %46 = zext i1 %45 to i8
+  %47 = trunc i8 %46 to i1
   br label %logical_and_end
 
 logical_and_end:                                  ; preds = %logical_and_rhs, %entry
-  %44 = phi i1 [ false, %entry ], [ %43, %logical_and_rhs ]
-  store i1 %44, ptr %case_10, align 1
-  %45 = load i32, ptr %a, align 4
-  %46 = load i32, ptr %b, align 4
-  %47 = and i32 %45, %46
-  %48 = load i32, ptr %b, align 4
-  %49 = load i32, ptr %a, align 4
-  %50 = and i32 %48, %49
-  %51 = icmp eq i32 %47, %50
-  store i1 %51, ptr %case_11, align 1
-  %52 = load i32, ptr %a, align 4
+  %48 = phi i1 [ false, %entry ], [ %47, %logical_and_rhs ]
+  %49 = zext i1 %48 to i8
+  store i8 %49, ptr %case_10, align 1
+  %50 = load i32, ptr %a, align 4
+  %51 = load i32, ptr %b, align 4
+  %52 = and i32 %50, %51
   %53 = load i32, ptr %b, align 4
-  %54 = icmp slt i32 %52, %53
-  br i1 %54, label %logical_and_rhs1, label %logical_and_end2
+  %54 = load i32, ptr %a, align 4
+  %55 = and i32 %53, %54
+  %56 = icmp eq i32 %52, %55
+  %57 = zext i1 %56 to i8
+  store i8 %57, ptr %case_11, align 1
+  %58 = load i32, ptr %a, align 4
+  %59 = load i32, ptr %b, align 4
+  %60 = icmp slt i32 %58, %59
+  %61 = zext i1 %60 to i8
+  %62 = trunc i8 %61 to i1
+  br i1 %62, label %logical_and_rhs1, label %logical_and_end2
 
 logical_and_rhs1:                                 ; preds = %logical_and_end
-  %55 = load i32, ptr %b, align 4
-  %56 = load i32, ptr %c, align 4
-  %57 = icmp slt i32 %55, %56
+  %63 = load i32, ptr %b, align 4
+  %64 = load i32, ptr %c, align 4
+  %65 = icmp slt i32 %63, %64
+  %66 = zext i1 %65 to i8
+  %67 = trunc i8 %66 to i1
   br label %logical_and_end2
 
 logical_and_end2:                                 ; preds = %logical_and_rhs1, %logical_and_end
-  %58 = phi i1 [ false, %logical_and_end ], [ %57, %logical_and_rhs1 ]
-  store i1 %58, ptr %case_12, align 1
-  %59 = load i32, ptr %a, align 4
-  %60 = load i32, ptr %b, align 4
-  %61 = add i32 %59, %60
-  %62 = load i32, ptr %b, align 4
-  %63 = load i32, ptr %c, align 4
-  %64 = add i32 %62, %63
-  %65 = icmp eq i32 %61, %64
-  store i1 %65, ptr %case_13, align 1
-  %66 = load i32, ptr %a, align 4
-  %67 = sub i32 0, %66
-  %68 = load i32, ptr %b, align 4
-  %69 = sub i32 0, %68
-  %70 = add i32 %67, %69
-  store i32 %70, ptr %case_14, align 4
+  %68 = phi i1 [ false, %logical_and_end ], [ %67, %logical_and_rhs1 ]
+  %69 = zext i1 %68 to i8
+  store i8 %69, ptr %case_12, align 1
+  %70 = load i32, ptr %a, align 4
+  %71 = load i32, ptr %b, align 4
+  %72 = add i32 %70, %71
+  %73 = load i32, ptr %b, align 4
+  %74 = load i32, ptr %c, align 4
+  %75 = add i32 %73, %74
+  %76 = icmp eq i32 %72, %75
+  %77 = zext i1 %76 to i8
+  store i8 %77, ptr %case_13, align 1
+  %78 = load i32, ptr %a, align 4
+  %79 = sub i32 0, %78
+  %80 = load i32, ptr %b, align 4
+  %81 = sub i32 0, %80
+  %82 = add i32 %79, %81
+  store i32 %82, ptr %case_14, align 4
   ret void
 }
 
@@ -978,16 +1265,16 @@ entry:
   %unsigned_divide = alloca i32, align 4
   %signed_modulus = alloca i32, align 4
   %unsigned_modulus = alloca i32, align 4
-  %equal = alloca i1, align 1
-  %not_equal = alloca i1, align 1
-  %signed_less_than = alloca i1, align 1
-  %unsigned_less_than = alloca i1, align 1
-  %signed_less_than_or_equal_to = alloca i1, align 1
-  %unsigned_less_than_or_equal_to = alloca i1, align 1
-  %signed_greater_than = alloca i1, align 1
-  %unsigned_greater_than = alloca i1, align 1
-  %signed_greater_than_or_equal_to = alloca i1, align 1
-  %unsigned_greater_than_or_equal_to = alloca i1, align 1
+  %equal = alloca i8, align 1
+  %not_equal = alloca i8, align 1
+  %signed_less_than = alloca i8, align 1
+  %unsigned_less_than = alloca i8, align 1
+  %signed_less_than_or_equal_to = alloca i8, align 1
+  %unsigned_less_than_or_equal_to = alloca i8, align 1
+  %signed_greater_than = alloca i8, align 1
+  %unsigned_greater_than = alloca i8, align 1
+  %signed_greater_than_or_equal_to = alloca i8, align 1
+  %unsigned_greater_than_or_equal_to = alloca i8, align 1
   %bitwise_and = alloca i32, align 4
   %bitwise_or = alloca i32, align 4
   %bitwise_xor = alloca i32, align 4
@@ -1029,67 +1316,77 @@ entry:
   %21 = load i32, ptr %first_signed_integer, align 4
   %22 = load i32, ptr %second_signed_integer, align 4
   %23 = icmp eq i32 %21, %22
-  store i1 %23, ptr %equal, align 1
-  %24 = load i32, ptr %first_signed_integer, align 4
-  %25 = load i32, ptr %second_signed_integer, align 4
-  %26 = icmp ne i32 %24, %25
-  store i1 %26, ptr %not_equal, align 1
-  %27 = load i32, ptr %first_signed_integer, align 4
-  %28 = load i32, ptr %second_signed_integer, align 4
-  %29 = icmp slt i32 %27, %28
-  store i1 %29, ptr %signed_less_than, align 1
-  %30 = load i32, ptr %first_unsigned_integer, align 4
-  %31 = load i32, ptr %second_unsigned_integer, align 4
-  %32 = icmp ult i32 %30, %31
-  store i1 %32, ptr %unsigned_less_than, align 1
-  %33 = load i32, ptr %first_signed_integer, align 4
-  %34 = load i32, ptr %second_signed_integer, align 4
-  %35 = icmp sle i32 %33, %34
-  store i1 %35, ptr %signed_less_than_or_equal_to, align 1
-  %36 = load i32, ptr %first_unsigned_integer, align 4
-  %37 = load i32, ptr %second_unsigned_integer, align 4
-  %38 = icmp ule i32 %36, %37
-  store i1 %38, ptr %unsigned_less_than_or_equal_to, align 1
-  %39 = load i32, ptr %first_signed_integer, align 4
-  %40 = load i32, ptr %second_signed_integer, align 4
-  %41 = icmp sgt i32 %39, %40
-  store i1 %41, ptr %signed_greater_than, align 1
-  %42 = load i32, ptr %first_unsigned_integer, align 4
-  %43 = load i32, ptr %second_unsigned_integer, align 4
-  %44 = icmp ugt i32 %42, %43
-  store i1 %44, ptr %unsigned_greater_than, align 1
+  %24 = zext i1 %23 to i8
+  store i8 %24, ptr %equal, align 1
+  %25 = load i32, ptr %first_signed_integer, align 4
+  %26 = load i32, ptr %second_signed_integer, align 4
+  %27 = icmp ne i32 %25, %26
+  %28 = zext i1 %27 to i8
+  store i8 %28, ptr %not_equal, align 1
+  %29 = load i32, ptr %first_signed_integer, align 4
+  %30 = load i32, ptr %second_signed_integer, align 4
+  %31 = icmp slt i32 %29, %30
+  %32 = zext i1 %31 to i8
+  store i8 %32, ptr %signed_less_than, align 1
+  %33 = load i32, ptr %first_unsigned_integer, align 4
+  %34 = load i32, ptr %second_unsigned_integer, align 4
+  %35 = icmp ult i32 %33, %34
+  %36 = zext i1 %35 to i8
+  store i8 %36, ptr %unsigned_less_than, align 1
+  %37 = load i32, ptr %first_signed_integer, align 4
+  %38 = load i32, ptr %second_signed_integer, align 4
+  %39 = icmp sle i32 %37, %38
+  %40 = zext i1 %39 to i8
+  store i8 %40, ptr %signed_less_than_or_equal_to, align 1
+  %41 = load i32, ptr %first_unsigned_integer, align 4
+  %42 = load i32, ptr %second_unsigned_integer, align 4
+  %43 = icmp ule i32 %41, %42
+  %44 = zext i1 %43 to i8
+  store i8 %44, ptr %unsigned_less_than_or_equal_to, align 1
   %45 = load i32, ptr %first_signed_integer, align 4
   %46 = load i32, ptr %second_signed_integer, align 4
-  %47 = icmp sge i32 %45, %46
-  store i1 %47, ptr %signed_greater_than_or_equal_to, align 1
-  %48 = load i32, ptr %first_unsigned_integer, align 4
-  %49 = load i32, ptr %second_unsigned_integer, align 4
-  %50 = icmp uge i32 %48, %49
-  store i1 %50, ptr %unsigned_greater_than_or_equal_to, align 1
-  %51 = load i32, ptr %first_signed_integer, align 4
-  %52 = load i32, ptr %second_signed_integer, align 4
-  %53 = and i32 %51, %52
-  store i32 %53, ptr %bitwise_and, align 4
-  %54 = load i32, ptr %first_signed_integer, align 4
-  %55 = load i32, ptr %second_signed_integer, align 4
-  %56 = or i32 %54, %55
-  store i32 %56, ptr %bitwise_or, align 4
-  %57 = load i32, ptr %first_signed_integer, align 4
-  %58 = load i32, ptr %second_signed_integer, align 4
-  %59 = xor i32 %57, %58
-  store i32 %59, ptr %bitwise_xor, align 4
-  %60 = load i32, ptr %first_signed_integer, align 4
-  %61 = load i32, ptr %second_signed_integer, align 4
-  %62 = shl i32 %60, %61
-  store i32 %62, ptr %bit_shift_left, align 4
-  %63 = load i32, ptr %first_signed_integer, align 4
-  %64 = load i32, ptr %second_signed_integer, align 4
-  %65 = ashr i32 %63, %64
-  store i32 %65, ptr %signed_bit_shift_right, align 4
-  %66 = load i32, ptr %first_unsigned_integer, align 4
-  %67 = load i32, ptr %second_unsigned_integer, align 4
-  %68 = lshr i32 %66, %67
-  store i32 %68, ptr %unsigned_bit_shift_right, align 4
+  %47 = icmp sgt i32 %45, %46
+  %48 = zext i1 %47 to i8
+  store i8 %48, ptr %signed_greater_than, align 1
+  %49 = load i32, ptr %first_unsigned_integer, align 4
+  %50 = load i32, ptr %second_unsigned_integer, align 4
+  %51 = icmp ugt i32 %49, %50
+  %52 = zext i1 %51 to i8
+  store i8 %52, ptr %unsigned_greater_than, align 1
+  %53 = load i32, ptr %first_signed_integer, align 4
+  %54 = load i32, ptr %second_signed_integer, align 4
+  %55 = icmp sge i32 %53, %54
+  %56 = zext i1 %55 to i8
+  store i8 %56, ptr %signed_greater_than_or_equal_to, align 1
+  %57 = load i32, ptr %first_unsigned_integer, align 4
+  %58 = load i32, ptr %second_unsigned_integer, align 4
+  %59 = icmp uge i32 %57, %58
+  %60 = zext i1 %59 to i8
+  store i8 %60, ptr %unsigned_greater_than_or_equal_to, align 1
+  %61 = load i32, ptr %first_signed_integer, align 4
+  %62 = load i32, ptr %second_signed_integer, align 4
+  %63 = and i32 %61, %62
+  store i32 %63, ptr %bitwise_and, align 4
+  %64 = load i32, ptr %first_signed_integer, align 4
+  %65 = load i32, ptr %second_signed_integer, align 4
+  %66 = or i32 %64, %65
+  store i32 %66, ptr %bitwise_or, align 4
+  %67 = load i32, ptr %first_signed_integer, align 4
+  %68 = load i32, ptr %second_signed_integer, align 4
+  %69 = xor i32 %67, %68
+  store i32 %69, ptr %bitwise_xor, align 4
+  %70 = load i32, ptr %first_signed_integer, align 4
+  %71 = load i32, ptr %second_signed_integer, align 4
+  %72 = shl i32 %70, %71
+  store i32 %72, ptr %bit_shift_left, align 4
+  %73 = load i32, ptr %first_signed_integer, align 4
+  %74 = load i32, ptr %second_signed_integer, align 4
+  %75 = ashr i32 %73, %74
+  store i32 %75, ptr %signed_bit_shift_right, align 4
+  %76 = load i32, ptr %first_unsigned_integer, align 4
+  %77 = load i32, ptr %second_unsigned_integer, align 4
+  %78 = lshr i32 %76, %77
+  store i32 %78, ptr %unsigned_bit_shift_right, align 4
   ret void
 }
 
@@ -1098,13 +1395,13 @@ define void @Binary_expressions_boolean_operations(i1 noundef zeroext %"argument
 entry:
   %first_boolean = alloca i8, align 1
   %second_boolean = alloca i8, align 1
-  %equal = alloca i1, align 1
-  %not_equal = alloca i1, align 1
-  %logical_and = alloca i1, align 1
-  %logical_or = alloca i1, align 1
-  %mix = alloca i1, align 1
-  %mix_0 = alloca i1, align 1
-  %mix_1 = alloca i1, align 1
+  %equal = alloca i8, align 1
+  %not_equal = alloca i8, align 1
+  %logical_and = alloca i8, align 1
+  %logical_or = alloca i8, align 1
+  %mix = alloca i8, align 1
+  %mix_0 = alloca i8, align 1
+  %mix_1 = alloca i8, align 1
   %0 = zext i1 %"arguments[0].first_boolean" to i8
   store i8 %0, ptr %first_boolean, align 1
   %1 = zext i1 %"arguments[1].second_boolean" to i8
@@ -1112,74 +1409,87 @@ entry:
   %2 = load i8, ptr %first_boolean, align 1
   %3 = load i8, ptr %second_boolean, align 1
   %4 = icmp eq i8 %2, %3
-  store i1 %4, ptr %equal, align 1
-  %5 = load i8, ptr %first_boolean, align 1
-  %6 = load i8, ptr %second_boolean, align 1
-  %7 = icmp ne i8 %5, %6
-  store i1 %7, ptr %not_equal, align 1
-  %8 = load i8, ptr %first_boolean, align 1
-  %9 = trunc i8 %8 to i1
-  br i1 %9, label %logical_and_rhs, label %logical_and_end
+  %5 = zext i1 %4 to i8
+  store i8 %5, ptr %equal, align 1
+  %6 = load i8, ptr %first_boolean, align 1
+  %7 = load i8, ptr %second_boolean, align 1
+  %8 = icmp ne i8 %6, %7
+  %9 = zext i1 %8 to i8
+  store i8 %9, ptr %not_equal, align 1
+  %10 = load i8, ptr %first_boolean, align 1
+  %11 = trunc i8 %10 to i1
+  br i1 %11, label %logical_and_rhs, label %logical_and_end
 
 logical_and_rhs:                                  ; preds = %entry
-  %10 = load i8, ptr %second_boolean, align 1
-  %11 = trunc i8 %10 to i1
+  %12 = load i8, ptr %second_boolean, align 1
+  %13 = trunc i8 %12 to i1
   br label %logical_and_end
 
 logical_and_end:                                  ; preds = %logical_and_rhs, %entry
-  %12 = phi i1 [ false, %entry ], [ %11, %logical_and_rhs ]
-  store i1 %12, ptr %logical_and, align 1
-  %13 = load i8, ptr %first_boolean, align 1
-  %14 = trunc i8 %13 to i1
-  br i1 %14, label %logical_or_end, label %logical_or_rhs
+  %14 = phi i1 [ false, %entry ], [ %13, %logical_and_rhs ]
+  %15 = zext i1 %14 to i8
+  store i8 %15, ptr %logical_and, align 1
+  %16 = load i8, ptr %first_boolean, align 1
+  %17 = trunc i8 %16 to i1
+  br i1 %17, label %logical_or_end, label %logical_or_rhs
 
 logical_or_rhs:                                   ; preds = %logical_and_end
-  %15 = load i8, ptr %second_boolean, align 1
-  %16 = trunc i8 %15 to i1
+  %18 = load i8, ptr %second_boolean, align 1
+  %19 = trunc i8 %18 to i1
   br label %logical_or_end
 
 logical_or_end:                                   ; preds = %logical_or_rhs, %logical_and_end
-  %17 = phi i1 [ true, %logical_and_end ], [ %16, %logical_or_rhs ]
-  store i1 %17, ptr %logical_or, align 1
-  %18 = load i8, ptr %first_boolean, align 1
-  %19 = trunc i8 %18 to i1
-  br i1 %19, label %logical_and_rhs1, label %logical_and_end2
+  %20 = phi i1 [ true, %logical_and_end ], [ %19, %logical_or_rhs ]
+  %21 = zext i1 %20 to i8
+  store i8 %21, ptr %logical_or, align 1
+  %22 = load i8, ptr %first_boolean, align 1
+  %23 = trunc i8 %22 to i1
+  br i1 %23, label %logical_and_rhs1, label %logical_and_end2
 
 logical_and_rhs1:                                 ; preds = %logical_or_end
-  %20 = load i8, ptr %first_boolean, align 1
-  %21 = load i8, ptr %second_boolean, align 1
-  %22 = icmp eq i8 %20, %21
+  %24 = load i8, ptr %first_boolean, align 1
+  %25 = load i8, ptr %second_boolean, align 1
+  %26 = icmp eq i8 %24, %25
+  %27 = zext i1 %26 to i8
+  %28 = trunc i8 %27 to i1
   br label %logical_and_end2
 
 logical_and_end2:                                 ; preds = %logical_and_rhs1, %logical_or_end
-  %23 = phi i1 [ false, %logical_or_end ], [ %22, %logical_and_rhs1 ]
-  store i1 %23, ptr %mix, align 1
-  %24 = load i8, ptr %first_boolean, align 1
-  %25 = trunc i8 %24 to i1
-  br i1 %25, label %logical_or_end4, label %logical_or_rhs3
+  %29 = phi i1 [ false, %logical_or_end ], [ %28, %logical_and_rhs1 ]
+  %30 = zext i1 %29 to i8
+  store i8 %30, ptr %mix, align 1
+  %31 = load i8, ptr %first_boolean, align 1
+  %32 = trunc i8 %31 to i1
+  br i1 %32, label %logical_or_end4, label %logical_or_rhs3
 
 logical_or_rhs3:                                  ; preds = %logical_and_end2
-  %26 = load i8, ptr %first_boolean, align 1
-  %27 = load i8, ptr %second_boolean, align 1
-  %28 = icmp ne i8 %26, %27
+  %33 = load i8, ptr %first_boolean, align 1
+  %34 = load i8, ptr %second_boolean, align 1
+  %35 = icmp ne i8 %33, %34
+  %36 = zext i1 %35 to i8
+  %37 = trunc i8 %36 to i1
   br label %logical_or_end4
 
 logical_or_end4:                                  ; preds = %logical_or_rhs3, %logical_and_end2
-  %29 = phi i1 [ true, %logical_and_end2 ], [ %28, %logical_or_rhs3 ]
-  store i1 %29, ptr %mix_0, align 1
-  %30 = load i8, ptr %first_boolean, align 1
-  %31 = load i8, ptr %second_boolean, align 1
-  %32 = icmp eq i8 %30, %31
-  br i1 %32, label %logical_and_rhs5, label %logical_and_end6
+  %38 = phi i1 [ true, %logical_and_end2 ], [ %37, %logical_or_rhs3 ]
+  %39 = zext i1 %38 to i8
+  store i8 %39, ptr %mix_0, align 1
+  %40 = load i8, ptr %first_boolean, align 1
+  %41 = load i8, ptr %second_boolean, align 1
+  %42 = icmp eq i8 %40, %41
+  %43 = zext i1 %42 to i8
+  %44 = trunc i8 %43 to i1
+  br i1 %44, label %logical_and_rhs5, label %logical_and_end6
 
 logical_and_rhs5:                                 ; preds = %logical_or_end4
-  %33 = load i8, ptr %first_boolean, align 1
-  %34 = trunc i8 %33 to i1
+  %45 = load i8, ptr %first_boolean, align 1
+  %46 = trunc i8 %45 to i1
   br label %logical_and_end6
 
 logical_and_end6:                                 ; preds = %logical_and_rhs5, %logical_or_end4
-  %35 = phi i1 [ false, %logical_or_end4 ], [ %34, %logical_and_rhs5 ]
-  store i1 %35, ptr %mix_1, align 1
+  %47 = phi i1 [ false, %logical_or_end4 ], [ %46, %logical_and_rhs5 ]
+  %48 = zext i1 %47 to i8
+  store i8 %48, ptr %mix_1, align 1
   ret void
 }
 
@@ -1193,12 +1503,12 @@ entry:
   %multiply = alloca float, align 4
   %divide = alloca float, align 4
   %modulus = alloca float, align 4
-  %equal = alloca i1, align 1
-  %not_equal = alloca i1, align 1
-  %less_than = alloca i1, align 1
-  %less_than_or_equal_to = alloca i1, align 1
-  %greater_than = alloca i1, align 1
-  %greater_than_or_equal_to = alloca i1, align 1
+  %equal = alloca i8, align 1
+  %not_equal = alloca i8, align 1
+  %less_than = alloca i8, align 1
+  %less_than_or_equal_to = alloca i8, align 1
+  %greater_than = alloca i8, align 1
+  %greater_than_or_equal_to = alloca i8, align 1
   store float %"arguments[0].first_float", ptr %first_float, align 4
   store float %"arguments[1].second_float", ptr %second_float, align 4
   %0 = load float, ptr %first_float, align 4
@@ -1224,28 +1534,210 @@ entry:
   %15 = load float, ptr %first_float, align 4
   %16 = load float, ptr %second_float, align 4
   %17 = fcmp oeq float %15, %16
-  store i1 %17, ptr %equal, align 1
-  %18 = load float, ptr %first_float, align 4
-  %19 = load float, ptr %second_float, align 4
-  %20 = fcmp one float %18, %19
-  store i1 %20, ptr %not_equal, align 1
-  %21 = load float, ptr %first_float, align 4
-  %22 = load float, ptr %second_float, align 4
-  %23 = fcmp olt float %21, %22
-  store i1 %23, ptr %less_than, align 1
-  %24 = load float, ptr %first_float, align 4
-  %25 = load float, ptr %second_float, align 4
-  %26 = fcmp ole float %24, %25
-  store i1 %26, ptr %less_than_or_equal_to, align 1
+  %18 = zext i1 %17 to i8
+  store i8 %18, ptr %equal, align 1
+  %19 = load float, ptr %first_float, align 4
+  %20 = load float, ptr %second_float, align 4
+  %21 = fcmp one float %19, %20
+  %22 = zext i1 %21 to i8
+  store i8 %22, ptr %not_equal, align 1
+  %23 = load float, ptr %first_float, align 4
+  %24 = load float, ptr %second_float, align 4
+  %25 = fcmp olt float %23, %24
+  %26 = zext i1 %25 to i8
+  store i8 %26, ptr %less_than, align 1
   %27 = load float, ptr %first_float, align 4
   %28 = load float, ptr %second_float, align 4
-  %29 = fcmp ogt float %27, %28
-  store i1 %29, ptr %greater_than, align 1
-  %30 = load float, ptr %first_float, align 4
-  %31 = load float, ptr %second_float, align 4
-  %32 = fcmp oge float %30, %31
-  store i1 %32, ptr %greater_than_or_equal_to, align 1
+  %29 = fcmp ole float %27, %28
+  %30 = zext i1 %29 to i8
+  store i8 %30, ptr %less_than_or_equal_to, align 1
+  %31 = load float, ptr %first_float, align 4
+  %32 = load float, ptr %second_float, align 4
+  %33 = fcmp ogt float %31, %32
+  %34 = zext i1 %33 to i8
+  store i8 %34, ptr %greater_than, align 1
+  %35 = load float, ptr %first_float, align 4
+  %36 = load float, ptr %second_float, align 4
+  %37 = fcmp oge float %35, %36
+  %38 = zext i1 %37 to i8
+  store i8 %38, ptr %greater_than_or_equal_to, align 1
   ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  // A `Bool` has one representation, `i8`, whoever produced it. These are the expressions that
+  // mix a `Bool` read from memory with one computed in a register: each used to reach LLVM with
+  // mismatched operand types and abort the compiler inside `icmp` or `phi`.
+  TEST_CASE("Compile Boolean Representation", "[LLVM_IR]")
+  {
+    char const* const input_file = "boolean_representation.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define i1 @Boolean_representation_mixed_not_equal(i1 noundef zeroext %"arguments[0].flag", i32 noundef %"arguments[1].first", i32 noundef %"arguments[2].second") #0 {
+entry:
+  %flag = alloca i8, align 1
+  %first = alloca i32, align 4
+  %second = alloca i32, align 4
+  %0 = zext i1 %"arguments[0].flag" to i8
+  store i8 %0, ptr %flag, align 1
+  store i32 %"arguments[1].first", ptr %first, align 4
+  store i32 %"arguments[2].second", ptr %second, align 4
+  %1 = load i8, ptr %flag, align 1
+  %2 = load i32, ptr %first, align 4
+  %3 = load i32, ptr %second, align 4
+  %4 = icmp eq i32 %2, %3
+  %5 = zext i1 %4 to i8
+  %6 = icmp ne i8 %1, %5
+  %7 = zext i1 %6 to i8
+  %8 = trunc i8 %7 to i1
+  ret i1 %8
+}
+
+; Function Attrs: convergent
+define i1 @Boolean_representation_mixed_equal(i1 noundef zeroext %"arguments[0].flag", i32 noundef %"arguments[1].first", i32 noundef %"arguments[2].second") #0 {
+entry:
+  %flag = alloca i8, align 1
+  %first = alloca i32, align 4
+  %second = alloca i32, align 4
+  %0 = zext i1 %"arguments[0].flag" to i8
+  store i8 %0, ptr %flag, align 1
+  store i32 %"arguments[1].first", ptr %first, align 4
+  store i32 %"arguments[2].second", ptr %second, align 4
+  %1 = load i8, ptr %flag, align 1
+  %2 = load i32, ptr %first, align 4
+  %3 = load i32, ptr %second, align 4
+  %4 = icmp eq i32 %2, %3
+  %5 = zext i1 %4 to i8
+  %6 = icmp eq i8 %1, %5
+  %7 = zext i1 %6 to i8
+  %8 = trunc i8 %7 to i1
+  ret i1 %8
+}
+
+; Function Attrs: convergent
+define i1 @Boolean_representation_mixed_not_equal_reversed(i1 noundef zeroext %"arguments[0].flag", i32 noundef %"arguments[1].first", i32 noundef %"arguments[2].second") #0 {
+entry:
+  %flag = alloca i8, align 1
+  %first = alloca i32, align 4
+  %second = alloca i32, align 4
+  %0 = zext i1 %"arguments[0].flag" to i8
+  store i8 %0, ptr %flag, align 1
+  store i32 %"arguments[1].first", ptr %first, align 4
+  store i32 %"arguments[2].second", ptr %second, align 4
+  %1 = load i32, ptr %first, align 4
+  %2 = load i32, ptr %second, align 4
+  %3 = icmp eq i32 %1, %2
+  %4 = zext i1 %3 to i8
+  %5 = load i8, ptr %flag, align 1
+  %6 = icmp ne i8 %4, %5
+  %7 = zext i1 %6 to i8
+  %8 = trunc i8 %7 to i1
+  ret i1 %8
+}
+
+; Function Attrs: convergent
+define i1 @Boolean_representation_mixed_with_not(i1 noundef zeroext %"arguments[0].first_boolean", i1 noundef zeroext %"arguments[1].second_boolean") #0 {
+entry:
+  %first_boolean = alloca i8, align 1
+  %second_boolean = alloca i8, align 1
+  %0 = zext i1 %"arguments[0].first_boolean" to i8
+  store i8 %0, ptr %first_boolean, align 1
+  %1 = zext i1 %"arguments[1].second_boolean" to i8
+  store i8 %1, ptr %second_boolean, align 1
+  %2 = load i8, ptr %first_boolean, align 1
+  %3 = load i8, ptr %second_boolean, align 1
+  %4 = icmp eq i8 %3, 0
+  %5 = zext i1 %4 to i8
+  %6 = icmp ne i8 %2, %5
+  %7 = zext i1 %6 to i8
+  %8 = trunc i8 %7 to i1
+  ret i1 %8
+}
+
+; Function Attrs: convergent
+define i1 @Boolean_representation_mixed_ternary(i1 noundef zeroext %"arguments[0].flag", i32 noundef %"arguments[1].first", i32 noundef %"arguments[2].second") #0 {
+entry:
+  %flag = alloca i8, align 1
+  %first = alloca i32, align 4
+  %second = alloca i32, align 4
+  %0 = zext i1 %"arguments[0].flag" to i8
+  store i8 %0, ptr %flag, align 1
+  store i32 %"arguments[1].first", ptr %first, align 4
+  store i32 %"arguments[2].second", ptr %second, align 4
+  %1 = load i8, ptr %flag, align 1
+  %2 = trunc i8 %1 to i1
+  br i1 %2, label %ternary_condition_then, label %ternary_condition_else
+
+ternary_condition_then:                           ; preds = %entry
+  %3 = load i32, ptr %first, align 4
+  %4 = load i32, ptr %second, align 4
+  %5 = icmp eq i32 %3, %4
+  %6 = zext i1 %5 to i8
+  br label %ternary_condition_end
+
+ternary_condition_else:                           ; preds = %entry
+  %7 = load i8, ptr %flag, align 1
+  br label %ternary_condition_end
+
+ternary_condition_end:                            ; preds = %ternary_condition_else, %ternary_condition_then
+  %8 = phi i8 [ %6, %ternary_condition_then ], [ %7, %ternary_condition_else ]
+  %9 = trunc i8 %8 to i1
+  ret i1 %9
+}
+
+; Function Attrs: convergent
+define i32 @Boolean_representation_mixed_condition(i1 noundef zeroext %"arguments[0].flag", i32 noundef %"arguments[1].first", i32 noundef %"arguments[2].second") #0 {
+entry:
+  %flag = alloca i8, align 1
+  %first = alloca i32, align 4
+  %second = alloca i32, align 4
+  %0 = zext i1 %"arguments[0].flag" to i8
+  store i8 %0, ptr %flag, align 1
+  store i32 %"arguments[1].first", ptr %first, align 4
+  store i32 %"arguments[2].second", ptr %second, align 4
+  %1 = load i8, ptr %flag, align 1
+  %2 = load i32, ptr %first, align 4
+  %3 = load i32, ptr %second, align 4
+  %4 = icmp eq i32 %2, %3
+  %5 = zext i1 %4 to i8
+  %6 = icmp ne i8 %1, %5
+  %7 = zext i1 %6 to i8
+  %8 = trunc i8 %7 to i1
+  br i1 %8, label %if_s0_then, label %if_s1_after
+
+if_s0_then:                                       ; preds = %entry
+  ret i32 1
+
+if_s1_after:                                      ; preds = %entry
+  ret i32 0
+}
+
+; Function Attrs: convergent
+define i1 @Boolean_representation_comparison_in_variable(i32 noundef %"arguments[0].first", i32 noundef %"arguments[1].second") #0 {
+entry:
+  %first = alloca i32, align 4
+  %second = alloca i32, align 4
+  %same = alloca i8, align 1
+  store i32 %"arguments[0].first", ptr %first, align 4
+  store i32 %"arguments[1].second", ptr %second, align 4
+  %0 = load i32, ptr %first, align 4
+  %1 = load i32, ptr %second, align 4
+  %2 = icmp eq i32 %0, %1
+  %3 = zext i1 %2 to i8
+  store i8 %3, ptr %same, align 1
+  %4 = load i8, ptr %same, align 1
+  %5 = trunc i8 %4 to i1
+  ret i1 %5
 }
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
@@ -1267,11 +1759,12 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 define void @Binary_expression_types_run() #0 {
 entry:
   %p0 = alloca ptr, align 8
-  %v0 = alloca i1, align 1
+  %v0 = alloca i8, align 1
   store ptr null, ptr %p0, align 8
   %0 = load ptr, ptr %p0, align 8
   %1 = icmp eq ptr %0, null
-  store i1 %1, ptr %v0, align 1
+  %2 = zext i1 %1 to i8
+  store i8 %2, ptr %v0, align 1
   ret void
 }
 
@@ -1297,11 +1790,12 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 define void @Binary_expression_pointer_mutability_run() #0 {
 entry:
   %a = alloca i32, align 4
-  %v0 = alloca i1, align 1
+  %v0 = alloca i8, align 1
   store i32 0, ptr %a, align 4
   %0 = call ptr @Binary_expression_pointer_mutability_get_pointer(ptr noundef %a)
   %1 = icmp eq ptr %0, %a
-  store i1 %1, ptr %v0, align 1
+  %2 = zext i1 %1 to i8
+  store i8 %2, ptr %v0, align 1
   ret void
 }
 
@@ -1571,17 +2065,21 @@ for_loop_condition:                               ; preds = %for_loop_update_ind
   %0 = load i32, ptr %size, align 4
   %1 = load i32, ptr %index, align 4
   %2 = icmp slt i32 %1, %0
-  br i1 %2, label %for_loop_then, label %for_loop_after
+  %3 = zext i1 %2 to i8
+  %4 = trunc i8 %3 to i1
+  br i1 %4, label %for_loop_then, label %for_loop_after
 
 for_loop_then:                                    ; preds = %for_loop_condition
-  %3 = load i32, ptr %index, align 4
-  %4 = icmp sgt i32 %3, 4
-  br i1 %4, label %if_s0_then, label %if_s1_after
+  %5 = load i32, ptr %index, align 4
+  %6 = icmp sgt i32 %5, 4
+  %7 = zext i1 %6 to i8
+  %8 = trunc i8 %7 to i1
+  br i1 %8, label %if_s0_then, label %if_s1_after
 
 for_loop_update_index:                            ; preds = %if_s1_after
-  %5 = load i32, ptr %index, align 4
-  %6 = add i32 %5, 1
-  store i32 %6, ptr %index, align 4
+  %9 = load i32, ptr %index, align 4
+  %10 = add i32 %9, 1
+  store i32 %10, ptr %index, align 4
   br label %for_loop_condition
 
 for_loop_after:                                   ; preds = %if_s0_then, %for_loop_condition
@@ -1592,24 +2090,26 @@ if_s0_then:                                       ; preds = %for_loop_then
   br label %for_loop_after
 
 if_s1_after:                                      ; preds = %for_loop_then
-  %7 = load i32, ptr %index, align 4
-  call void @Break_expressions_print_integer(i32 noundef %7)
+  %11 = load i32, ptr %index, align 4
+  call void @Break_expressions_print_integer(i32 noundef %11)
   br label %for_loop_update_index
 
 for_loop_condition2:                              ; preds = %for_loop_update_index4, %for_loop_after
-  %8 = load i32, ptr %size, align 4
-  %9 = load i32, ptr %index1, align 4
-  %10 = icmp slt i32 %9, %8
-  br i1 %10, label %for_loop_then3, label %for_loop_after5
+  %12 = load i32, ptr %size, align 4
+  %13 = load i32, ptr %index1, align 4
+  %14 = icmp slt i32 %13, %12
+  %15 = zext i1 %14 to i8
+  %16 = trunc i8 %15 to i1
+  br i1 %16, label %for_loop_then3, label %for_loop_after5
 
 for_loop_then3:                                   ; preds = %for_loop_condition2
   store i32 0, ptr %index_2, align 4
   br label %while_loop_condition
 
 for_loop_update_index4:                           ; preds = %while_loop_after
-  %11 = load i32, ptr %index1, align 4
-  %12 = add i32 %11, 1
-  store i32 %12, ptr %index1, align 4
+  %17 = load i32, ptr %index1, align 4
+  %18 = add i32 %17, 1
+  store i32 %18, ptr %index1, align 4
   br label %for_loop_condition2
 
 for_loop_after5:                                  ; preds = %for_loop_condition2
@@ -1617,76 +2117,86 @@ for_loop_after5:                                  ; preds = %for_loop_condition2
   br label %for_loop_condition9
 
 while_loop_condition:                             ; preds = %if_s1_after7, %for_loop_then3
-  %13 = load i32, ptr %index_2, align 4
-  %14 = load i32, ptr %size, align 4
-  %15 = icmp slt i32 %13, %14
-  br i1 %15, label %while_loop_then, label %while_loop_after
+  %19 = load i32, ptr %index_2, align 4
+  %20 = load i32, ptr %size, align 4
+  %21 = icmp slt i32 %19, %20
+  %22 = zext i1 %21 to i8
+  %23 = trunc i8 %22 to i1
+  br i1 %23, label %while_loop_then, label %while_loop_after
 
 while_loop_then:                                  ; preds = %while_loop_condition
-  %16 = load i32, ptr %index1, align 4
-  %17 = icmp sgt i32 %16, 3
-  br i1 %17, label %if_s0_then6, label %if_s1_after7
+  %24 = load i32, ptr %index1, align 4
+  %25 = icmp sgt i32 %24, 3
+  %26 = zext i1 %25 to i8
+  %27 = trunc i8 %26 to i1
+  br i1 %27, label %if_s0_then6, label %if_s1_after7
 
 while_loop_after:                                 ; preds = %if_s0_then6, %while_loop_condition
-  %18 = load i32, ptr %index1, align 4
-  call void @Break_expressions_print_integer(i32 noundef %18)
+  %28 = load i32, ptr %index1, align 4
+  call void @Break_expressions_print_integer(i32 noundef %28)
   br label %for_loop_update_index4
 
 if_s0_then6:                                      ; preds = %while_loop_then
   br label %while_loop_after
 
 if_s1_after7:                                     ; preds = %while_loop_then
-  %19 = load i32, ptr %index_2, align 4
-  call void @Break_expressions_print_integer(i32 noundef %19)
-  %20 = load i32, ptr %index1, align 4
-  %21 = add i32 %20, 1
-  store i32 %21, ptr %index1, align 4
+  %29 = load i32, ptr %index_2, align 4
+  call void @Break_expressions_print_integer(i32 noundef %29)
+  %30 = load i32, ptr %index1, align 4
+  %31 = add i32 %30, 1
+  store i32 %31, ptr %index1, align 4
   br label %while_loop_condition
 
 for_loop_condition9:                              ; preds = %for_loop_update_index11, %for_loop_after5
-  %22 = load i32, ptr %size, align 4
-  %23 = load i32, ptr %index8, align 4
-  %24 = icmp slt i32 %23, %22
-  br i1 %24, label %for_loop_then10, label %for_loop_after12
+  %32 = load i32, ptr %size, align 4
+  %33 = load i32, ptr %index8, align 4
+  %34 = icmp slt i32 %33, %32
+  %35 = zext i1 %34 to i8
+  %36 = trunc i8 %35 to i1
+  br i1 %36, label %for_loop_then10, label %for_loop_after12
 
 for_loop_then10:                                  ; preds = %for_loop_condition9
   store i32 0, ptr %index_213, align 4
   br label %while_loop_condition14
 
 for_loop_update_index11:                          ; preds = %while_loop_after16
-  %25 = load i32, ptr %index8, align 4
-  %26 = add i32 %25, 1
-  store i32 %26, ptr %index8, align 4
+  %37 = load i32, ptr %index8, align 4
+  %38 = add i32 %37, 1
+  store i32 %38, ptr %index8, align 4
   br label %for_loop_condition9
 
 for_loop_after12:                                 ; preds = %if_s0_then17, %for_loop_condition9
   ret void
 
 while_loop_condition14:                           ; preds = %if_s1_after18, %for_loop_then10
-  %27 = load i32, ptr %index_213, align 4
-  %28 = load i32, ptr %size, align 4
-  %29 = icmp slt i32 %27, %28
-  br i1 %29, label %while_loop_then15, label %while_loop_after16
+  %39 = load i32, ptr %index_213, align 4
+  %40 = load i32, ptr %size, align 4
+  %41 = icmp slt i32 %39, %40
+  %42 = zext i1 %41 to i8
+  %43 = trunc i8 %42 to i1
+  br i1 %43, label %while_loop_then15, label %while_loop_after16
 
 while_loop_then15:                                ; preds = %while_loop_condition14
-  %30 = load i32, ptr %index8, align 4
-  %31 = icmp sgt i32 %30, 3
-  br i1 %31, label %if_s0_then17, label %if_s1_after18
+  %44 = load i32, ptr %index8, align 4
+  %45 = icmp sgt i32 %44, 3
+  %46 = zext i1 %45 to i8
+  %47 = trunc i8 %46 to i1
+  br i1 %47, label %if_s0_then17, label %if_s1_after18
 
 while_loop_after16:                               ; preds = %while_loop_condition14
-  %32 = load i32, ptr %index8, align 4
-  call void @Break_expressions_print_integer(i32 noundef %32)
+  %48 = load i32, ptr %index8, align 4
+  call void @Break_expressions_print_integer(i32 noundef %48)
   br label %for_loop_update_index11
 
 if_s0_then17:                                     ; preds = %while_loop_then15
   br label %for_loop_after12
 
 if_s1_after18:                                    ; preds = %while_loop_then15
-  %33 = load i32, ptr %index_213, align 4
-  call void @Break_expressions_print_integer(i32 noundef %33)
-  %34 = load i32, ptr %index8, align 4
-  %35 = add i32 %34, 1
-  store i32 %35, ptr %index8, align 4
+  %49 = load i32, ptr %index_213, align 4
+  call void @Break_expressions_print_integer(i32 noundef %49)
+  %50 = load i32, ptr %index8, align 4
+  %51 = add i32 %50, 1
+  store i32 %51, ptr %index8, align 4
   br label %while_loop_condition14
 }
 
@@ -1722,7 +2232,7 @@ entry:
   %second = alloca i32, align 4
   %third = alloca i32, align 4
   %a = alloca i32, align 4
-  %b = alloca i1, align 1
+  %b = alloca i8, align 1
   %c = alloca i32, align 4
   %d = alloca i32, align 4
   %e = alloca i32, align 4
@@ -1733,13 +2243,14 @@ entry:
   %0 = load i32, ptr %a, align 4
   %1 = load i32, ptr %first, align 4
   %2 = icmp eq i32 %0, %1
-  store i1 %2, ptr %b, align 1
-  %3 = load i32, ptr %second, align 4
-  store i32 %3, ptr %c, align 4
-  %4 = load i32, ptr %a, align 4
-  store i32 %4, ptr %d, align 4
-  %5 = load i32, ptr %third, align 4
-  store i32 %5, ptr %e, align 4
+  %3 = zext i1 %2 to i8
+  store i8 %3, ptr %b, align 1
+  %4 = load i32, ptr %second, align 4
+  store i32 %4, ptr %c, align 4
+  %5 = load i32, ptr %a, align 4
+  store i32 %5, ptr %d, align 4
+  %6 = load i32, ptr %third, align 4
+  store i32 %6, ptr %e, align 4
   ret void
 }
 
@@ -1774,15 +2285,17 @@ if_s1_after:                                      ; preds = %if_s0_then, %entry
 for_loop_condition:                               ; preds = %for_loop_update_index, %if_s1_after
   %0 = load i32, ptr %index, align 4
   %1 = icmp slt i32 %0, 3
-  br i1 %1, label %for_loop_then, label %for_loop_after
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %for_loop_then, label %for_loop_after
 
 for_loop_then:                                    ; preds = %for_loop_condition
   br label %for_loop_update_index
 
 for_loop_update_index:                            ; preds = %for_loop_then
-  %2 = load i32, ptr %index, align 4
-  %3 = add i32 %2, 1
-  store i32 %3, ptr %index, align 4
+  %4 = load i32, ptr %index, align 4
+  %5 = add i32 %4, 1
+  store i32 %5, ptr %index, align 4
   br label %for_loop_condition
 
 for_loop_after:                                   ; preds = %for_loop_condition
@@ -1925,8 +2438,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     char const* const expected_llvm_ir = R"(
 %struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
-@function_contract_error_string = private unnamed_addr constant [67 x i8] c"Out-of-bounds array slice access in 'Bounds_check_0.access_slice'!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [76 x i8] c"Out-of-bounds constant array access in 'Bounds_check_0.access_fixed_array'!\00"
+@iris_error_string = private unnamed_addr constant [95 x i8] c"bounds_check_0.iris:11:12: Out-of-bounds array slice access in 'Bounds_check_0.access_slice'!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [104 x i8] c"bounds_check_0.iris:17:12: Out-of-bounds constant array access in 'Bounds_check_0.access_fixed_array'!\0A\00"
 
 ; Function Attrs: convergent
 define i32 @Bounds_check_0_access_slice(ptr %"arguments[0].integers_0", i64 %"arguments[0].integers_1", i32 noundef %"arguments[1].index") #0 {
@@ -1953,7 +2467,9 @@ bounds_check_pass:                                ; preds = %entry
   ret i32 %7
 
 bounds_check_fail:                                ; preds = %entry
-  %8 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %8 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -1983,12 +2499,16 @@ bounds_check_pass:                                ; preds = %entry
   ret i32 %1
 
 bounds_check_fail:                                ; preds = %entry
-  %2 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %2 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
+  %3 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -1996,6 +2516,95 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_bounds_checks = true });
+  }
+
+  // The MSVC runtime has no exported 'stderr' object, so the diagnostic path resolves it through
+  // __acrt_iob_func(2) instead of loading a global. Windows is the primary target, so pin that here.
+  TEST_CASE("Compile Array Bounds Checks 0 x86_64-pc-windows-msvc", "[LLVM_IR]")
+  {
+    char const* const input_file = "bounds_check_0.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
+
+@iris_error_string = private unnamed_addr constant [95 x i8] c"bounds_check_0.iris:11:12: Out-of-bounds array slice access in 'Bounds_check_0.access_slice'!\0A\00"
+@iris_error_string.1 = private unnamed_addr constant [104 x i8] c"bounds_check_0.iris:17:12: Out-of-bounds constant array access in 'Bounds_check_0.access_fixed_array'!\0A\00"
+
+; Function Attrs: convergent
+define i32 @Bounds_check_0_access_slice(ptr noundef %"arguments[0].integers", i32 noundef %"arguments[1].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  store i32 %"arguments[1].index", ptr %index, align 4
+  %0 = load i32, ptr %index, align 4
+  %1 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %"arguments[0].integers", i32 0, i32 1
+  %2 = load i64, ptr %1, align 8
+  %bounds_check_index = zext i32 %0 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, %2
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %3 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %"arguments[0].integers", i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  %array_slice_element_pointer = getelementptr i32, ptr %4, i32 %0
+  %5 = load i32, ptr %array_slice_element_pointer, align 4
+  ret i32 %5
+
+bounds_check_fail:                                ; preds = %entry
+  %stderr_pointer = call ptr @__acrt_iob_func(i32 2)
+  %6 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %7 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i32 @Bounds_check_0_access_fixed_array(i32 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i32, align 4
+  %a = alloca [4 x i32], align 4
+  store i32 %"arguments[0].index", ptr %index, align 4
+  %array_element_pointer = getelementptr [4 x i32], ptr %a, i32 0, i32 0
+  store i32 0, ptr %array_element_pointer, align 4
+  %array_element_pointer1 = getelementptr [4 x i32], ptr %a, i32 0, i32 1
+  store i32 1, ptr %array_element_pointer1, align 4
+  %array_element_pointer2 = getelementptr [4 x i32], ptr %a, i32 0, i32 2
+  store i32 2, ptr %array_element_pointer2, align 4
+  %array_element_pointer3 = getelementptr [4 x i32], ptr %a, i32 0, i32 3
+  store i32 3, ptr %array_element_pointer3, align 4
+  %0 = load i32, ptr %index, align 4
+  %bounds_check_index = zext i32 %0 to i64
+  %bounds_check_in_bounds = icmp ult i64 %bounds_check_index, 4
+  br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
+
+bounds_check_pass:                                ; preds = %entry
+  %array_element_pointer4 = getelementptr [4 x i32], ptr %a, i32 0, i32 %0
+  %1 = load i32, ptr %array_element_pointer4, align 4
+  ret i32 %1
+
+bounds_check_fail:                                ; preds = %entry
+  %stderr_pointer = call ptr @__acrt_iob_func(i32 2)
+  %2 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
+  %3 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @fputs(ptr, ptr)
+
+declare ptr @__acrt_iob_func(i32)
+
+declare i32 @fflush(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .target_triple = "x86_64-pc-windows-msvc", .enable_bounds_checks = true });
   }
 
   TEST_CASE("Compile Array Bounds Checks 1", "[LLVM_IR]")
@@ -2010,9 +2619,10 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %__hl_soa_array = type { ptr }
 %struct.Bounds_check_1_Particle = type { float, float }
 
-@function_contract_error_string = private unnamed_addr constant [77 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_element'!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [78 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_x'!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [78 x i8] c"Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_y'!\00"
+@iris_error_string = private unnamed_addr constant [105 x i8] c"bounds_check_1.iris:12:12: Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_element'!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [106 x i8] c"bounds_check_1.iris:18:12: Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_x'!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [106 x i8] c"bounds_check_1.iris:24:12: Out-of-bounds SOA array access in 'Bounds_check_1.access_soa_array_member_y'!\0A\00"
 
 ; Function Attrs: convergent
 define <2 x float> @Bounds_check_1_access_soa_array_element(i32 noundef %"arguments[0].index") #0 {
@@ -2072,7 +2682,9 @@ bounds_check_pass:                                ; preds = %entry
   ret <2 x float> %9
 
 bounds_check_fail:                                ; preds = %entry
-  %10 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %10 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %11 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -2125,7 +2737,9 @@ bounds_check_pass:                                ; preds = %entry
   ret float %4
 
 bounds_check_fail:                                ; preds = %entry
-  %5 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %5 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
+  %6 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -2178,12 +2792,16 @@ bounds_check_pass:                                ; preds = %entry
   ret float %4
 
 bounds_check_fail:                                ; preds = %entry
-  %5 = call i32 @puts(ptr @function_contract_error_string.2)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %5 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer)
+  %6 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -2205,9 +2823,10 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %__hl_soa_array_view = type { i64, i64, i64, ptr }
 %struct.Bounds_check_2_Particle = type { float, float }
 
-@function_contract_error_string = private unnamed_addr constant [87 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_element'!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [88 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_x'!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [88 x i8] c"Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_y'!\00"
+@iris_error_string = private unnamed_addr constant [115 x i8] c"bounds_check_2.iris:11:12: Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_element'!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [116 x i8] c"bounds_check_2.iris:16:12: Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_x'!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [116 x i8] c"bounds_check_2.iris:21:12: Out-of-bounds SOA array view access in 'Bounds_check_2.access_soa_array_view_member_y'!\0A\00"
 
 ; Function Attrs: convergent
 define <2 x float> @Bounds_check_2_access_soa_array_view_element(ptr noundef byval(%__hl_soa_array_view) align 8 %"arguments[0].view", i32 noundef %"arguments[1].index") #0 {
@@ -2248,7 +2867,9 @@ bounds_check_pass:                                ; preds = %entry
   ret <2 x float> %12
 
 bounds_check_fail:                                ; preds = %entry
-  %13 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %13 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %14 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -2278,7 +2899,9 @@ bounds_check_pass:                                ; preds = %entry
   ret float %7
 
 bounds_check_fail:                                ; preds = %entry
-  %8 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %8 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
+  %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
@@ -2312,12 +2935,16 @@ bounds_check_pass:                                ; preds = %entry
   ret float %7
 
 bounds_check_fail:                                ; preds = %entry
-  %8 = call i32 @puts(ptr @function_contract_error_string.2)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %8 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer)
+  %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -2337,6 +2964,10 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
     char const* const expected_llvm_ir = R"(
 %struct.Constant_array_expressions_My_struct = type { [4 x i32] }
+
+@Constant_array_expressions_g_empty_array = global [2 x i32] zeroinitializer
+@Constant_array_expressions_g_empty_struct_array = constant [2 x %struct.Constant_array_expressions_My_struct] zeroinitializer
+@Constant_array_expressions_g_filled_array = constant [3 x i32] [i32 1, i32 2, i32 3]
 
 ; Function Attrs: convergent
 define void @Constant_array_expressions_foo() #0 {
@@ -2372,18 +3003,25 @@ entry:
   store i32 4, ptr %array_element_pointer9, align 4
   %array_element_pointer10 = getelementptr [4 x i32], ptr %array, i32 0, i32 3
   store i32 6, ptr %array_element_pointer10, align 4
-  %1 = load [4 x i32], ptr %array, align 4
+  %1 = getelementptr inbounds %struct.Constant_array_expressions_My_struct, ptr %instance, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %1, ptr align 4 %array, i64 16, i1 false)
   %2 = getelementptr inbounds %struct.Constant_array_expressions_My_struct, ptr %instance, i32 0, i32 0
-  store [4 x i32] %1, ptr %2, align 4
-  %3 = getelementptr inbounds %struct.Constant_array_expressions_My_struct, ptr %instance, i32 0, i32 0
-  %array_element_pointer11 = getelementptr [4 x i32], ptr %3, i32 0, i32 0
-  %4 = load i32, ptr %array_element_pointer11, align 4
-  store i32 %4, ptr %e, align 4
-  store [8 x i32] zeroinitializer, ptr %f, align 4
+  %array_element_pointer11 = getelementptr [4 x i32], ptr %2, i32 0, i32 0
+  %3 = load i32, ptr %array_element_pointer11, align 4
+  store i32 %3, ptr %e, align 4
+  call void @llvm.memset.p0.i64(ptr align 4 %f, i8 0, i64 32, i1 false)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #2
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -2454,68 +3092,70 @@ entry:
   %6 = load float, ptr %soa_member_element_pointer18, align 4
   %7 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element, i32 0, i32 1
   store float %6, ptr %7, align 4
-  %8 = load %struct.soa_array_type_Particle, ptr %soa_element, align 4
-  store %struct.soa_array_type_Particle %8, ptr %p1, align 4
-  %9 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %10 = load ptr, ptr %9, align 8
-  %soa_member_base_pointer20 = getelementptr i8, ptr %10, i64 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %p1, ptr align 4 %soa_element, i64 8, i1 false)
+  %8 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %9 = load ptr, ptr %8, align 8
+  %soa_member_base_pointer20 = getelementptr i8, ptr %9, i64 0
   %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i32 1
-  %11 = load float, ptr %soa_member_element_pointer21, align 4
-  %12 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 0
-  store float %11, ptr %12, align 4
-  %soa_member_base_pointer22 = getelementptr i8, ptr %10, i64 16
+  %10 = load float, ptr %soa_member_element_pointer21, align 4
+  %11 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 0
+  store float %10, ptr %11, align 4
+  %soa_member_base_pointer22 = getelementptr i8, ptr %9, i64 16
   %soa_member_element_pointer23 = getelementptr float, ptr %soa_member_base_pointer22, i32 1
-  %13 = load float, ptr %soa_member_element_pointer23, align 4
-  %14 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 1
-  store float %13, ptr %14, align 4
-  %15 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 0
-  store float 3.000000e+00, ptr %15, align 4
-  %16 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 1
-  store float 4.000000e+00, ptr %16, align 4
-  %17 = load %struct.soa_array_type_Particle, ptr %0, align 4
-  %18 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %19 = load ptr, ptr %18, align 8
-  store %struct.soa_array_type_Particle %17, ptr %soa_assignment_struct, align 4
-  %20 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
-  %soa_member_base_pointer24 = getelementptr i8, ptr %19, i64 0
+  %12 = load float, ptr %soa_member_element_pointer23, align 4
+  %13 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_element19, i32 0, i32 1
+  store float %12, ptr %13, align 4
+  %14 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 0
+  store float 3.000000e+00, ptr %14, align 4
+  %15 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %0, i32 0, i32 1
+  store float 4.000000e+00, ptr %15, align 4
+  %16 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %17 = load ptr, ptr %16, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %soa_assignment_struct, ptr align 4 %0, i64 8, i1 false)
+  %18 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
+  %soa_member_base_pointer24 = getelementptr i8, ptr %17, i64 0
   %soa_member_element_pointer25 = getelementptr float, ptr %soa_member_base_pointer24, i32 1
-  %21 = load float, ptr %20, align 4
-  store float %21, ptr %soa_member_element_pointer25, align 4
-  %22 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
-  %soa_member_base_pointer26 = getelementptr i8, ptr %19, i64 16
+  %19 = load float, ptr %18, align 4
+  store float %19, ptr %soa_member_element_pointer25, align 4
+  %20 = getelementptr inbounds %struct.soa_array_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
+  %soa_member_base_pointer26 = getelementptr i8, ptr %17, i64 16
   %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i32 1
-  %23 = load float, ptr %22, align 4
-  store float %23, ptr %soa_member_element_pointer27, align 4
-  %24 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %25 = load ptr, ptr %24, align 8
-  %soa_member_base_pointer28 = getelementptr i8, ptr %25, i64 0
+  %21 = load float, ptr %20, align 4
+  store float %21, ptr %soa_member_element_pointer27, align 4
+  %22 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %23 = load ptr, ptr %22, align 8
+  %soa_member_base_pointer28 = getelementptr i8, ptr %23, i64 0
   %soa_member_element_pointer29 = getelementptr float, ptr %soa_member_base_pointer28, i32 2
-  %26 = load float, ptr %soa_member_element_pointer29, align 4
-  store float %26, ptr %x2, align 4
-  %27 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %28 = load ptr, ptr %27, align 8
-  %soa_member_base_pointer30 = getelementptr i8, ptr %28, i64 0
+  %24 = load float, ptr %soa_member_element_pointer29, align 4
+  store float %24, ptr %x2, align 4
+  %25 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %26 = load ptr, ptr %25, align 8
+  %soa_member_base_pointer30 = getelementptr i8, ptr %26, i64 0
   %soa_member_element_pointer31 = getelementptr float, ptr %soa_member_base_pointer30, i32 2
   store float 1.000000e+00, ptr %soa_member_element_pointer31, align 4
-  %29 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %30 = load ptr, ptr %29, align 8
-  %soa_member_base_pointer32 = getelementptr i8, ptr %30, i64 16
+  %27 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %28 = load ptr, ptr %27, align 8
+  %soa_member_base_pointer32 = getelementptr i8, ptr %28, i64 16
   %soa_member_element_pointer33 = getelementptr float, ptr %soa_member_base_pointer32, i32 3
-  %31 = load float, ptr %soa_member_element_pointer33, align 4
-  store float %31, ptr %y3, align 4
-  %32 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %33 = load ptr, ptr %32, align 8
-  %soa_member_base_pointer34 = getelementptr i8, ptr %33, i64 16
+  %29 = load float, ptr %soa_member_element_pointer33, align 4
+  store float %29, ptr %y3, align 4
+  %30 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %31 = load ptr, ptr %30, align 8
+  %soa_member_base_pointer34 = getelementptr i8, ptr %31, i64 16
   %soa_member_element_pointer35 = getelementptr float, ptr %soa_member_base_pointer34, i32 3
   store float 2.000000e+00, ptr %soa_member_element_pointer35, align 4
   store i64 4, ptr %length, align 8
-  %34 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %35 = load ptr, ptr %34, align 8
-  store ptr %35, ptr %data, align 8
+  %32 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %33 = load ptr, ptr %32, align 8
+  store ptr %33, ptr %data, align 8
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -2663,157 +3303,157 @@ entry:
   store i64 4, ptr %6, align 8
   %7 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view, i32 0, i32 3
   store ptr %3, ptr %7, align 8
-  %8 = load %__hl_soa_array_view, ptr %soa_array_view, align 8
-  store %__hl_soa_array_view %8, ptr %view, align 8
-  %9 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %10 = load i64, ptr %9, align 8
-  store i64 %10, ptr %start_index, align 8
-  %11 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 1
-  %12 = load i64, ptr %11, align 8
-  store i64 %12, ptr %end_index, align 8
-  %13 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %14 = load i64, ptr %13, align 8
-  store i64 %14, ptr %length, align 8
-  %15 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %16 = load ptr, ptr %15, align 8
-  store ptr %16, ptr %data, align 8
-  %17 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %18 = load ptr, ptr %17, align 8
-  %19 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %20 = load i64, ptr %19, align 8
-  %21 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %22 = load i64, ptr %21, align 8
-  %soa_adjusted_index = add i64 %22, 0
-  %soa_member_base_pointer15 = getelementptr i8, ptr %18, i64 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %view, ptr align 8 %soa_array_view, i64 32, i1 false)
+  %8 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %9 = load i64, ptr %8, align 8
+  store i64 %9, ptr %start_index, align 8
+  %10 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 1
+  %11 = load i64, ptr %10, align 8
+  store i64 %11, ptr %end_index, align 8
+  %12 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %13 = load i64, ptr %12, align 8
+  store i64 %13, ptr %length, align 8
+  %14 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %15 = load ptr, ptr %14, align 8
+  store ptr %15, ptr %data, align 8
+  %16 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %17 = load ptr, ptr %16, align 8
+  %18 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %19 = load i64, ptr %18, align 8
+  %20 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %21 = load i64, ptr %20, align 8
+  %soa_adjusted_index = add i64 %21, 0
+  %soa_member_base_pointer15 = getelementptr i8, ptr %17, i64 0
   %soa_member_element_pointer16 = getelementptr float, ptr %soa_member_base_pointer15, i64 %soa_adjusted_index
-  %23 = load float, ptr %soa_member_element_pointer16, align 4
-  %24 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 0
-  store float %23, ptr %24, align 4
-  %soa_member_block_size = mul i64 %20, 4
+  %22 = load float, ptr %soa_member_element_pointer16, align 4
+  %23 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 0
+  store float %22, ptr %23, align 4
+  %soa_member_block_size = mul i64 %19, 4
   %soa_member_block_offset = add i64 0, %soa_member_block_size
   %soa_offset_adjusted = add i64 %soa_member_block_offset, 3
   %soa_offset_aligned = and i64 %soa_offset_adjusted, -4
-  %soa_member_base_pointer17 = getelementptr i8, ptr %18, i64 %soa_offset_aligned
+  %soa_member_base_pointer17 = getelementptr i8, ptr %17, i64 %soa_offset_aligned
   %soa_member_element_pointer18 = getelementptr float, ptr %soa_member_base_pointer17, i64 %soa_adjusted_index
-  %25 = load float, ptr %soa_member_element_pointer18, align 4
-  %26 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 1
-  store float %25, ptr %26, align 4
-  %27 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 0
-  store float 3.000000e+00, ptr %27, align 4
-  %28 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 1
-  store float 4.000000e+00, ptr %28, align 4
-  %29 = load %struct.soa_array_view_type_Particle, ptr %0, align 4
-  %30 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %31 = load ptr, ptr %30, align 8
-  %32 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %24 = load float, ptr %soa_member_element_pointer18, align 4
+  %25 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element, i32 0, i32 1
+  store float %24, ptr %25, align 4
+  %26 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 0
+  store float 3.000000e+00, ptr %26, align 4
+  %27 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %0, i32 0, i32 1
+  store float 4.000000e+00, ptr %27, align 4
+  %28 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %29 = load ptr, ptr %28, align 8
+  %30 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %31 = load i64, ptr %30, align 8
+  %32 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %33 = load i64, ptr %32, align 8
-  %34 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %35 = load i64, ptr %34, align 8
-  %soa_adjusted_index19 = add i64 %35, 0
-  store %struct.soa_array_view_type_Particle %29, ptr %soa_assignment_struct, align 4
-  %36 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
-  %soa_member_base_pointer20 = getelementptr i8, ptr %31, i64 0
+  %soa_adjusted_index19 = add i64 %33, 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %soa_assignment_struct, ptr align 4 %0, i64 8, i1 false)
+  %34 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 0
+  %soa_member_base_pointer20 = getelementptr i8, ptr %29, i64 0
   %soa_member_element_pointer21 = getelementptr float, ptr %soa_member_base_pointer20, i64 %soa_adjusted_index19
-  %37 = load float, ptr %36, align 4
-  store float %37, ptr %soa_member_element_pointer21, align 4
-  %38 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
-  %soa_member_block_size22 = mul i64 %33, 4
+  %35 = load float, ptr %34, align 4
+  store float %35, ptr %soa_member_element_pointer21, align 4
+  %36 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_assignment_struct, i32 0, i32 1
+  %soa_member_block_size22 = mul i64 %31, 4
   %soa_member_block_offset23 = add i64 0, %soa_member_block_size22
   %soa_offset_adjusted24 = add i64 %soa_member_block_offset23, 3
   %soa_offset_aligned25 = and i64 %soa_offset_adjusted24, -4
-  %soa_member_base_pointer26 = getelementptr i8, ptr %31, i64 %soa_offset_aligned25
+  %soa_member_base_pointer26 = getelementptr i8, ptr %29, i64 %soa_offset_aligned25
   %soa_member_element_pointer27 = getelementptr float, ptr %soa_member_base_pointer26, i64 %soa_adjusted_index19
-  %39 = load float, ptr %38, align 4
-  store float %39, ptr %soa_member_element_pointer27, align 4
-  %40 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %41 = load ptr, ptr %40, align 8
-  %42 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %37 = load float, ptr %36, align 4
+  store float %37, ptr %soa_member_element_pointer27, align 4
+  %38 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %39 = load ptr, ptr %38, align 8
+  %40 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %41 = load i64, ptr %40, align 8
+  %42 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %43 = load i64, ptr %42, align 8
-  %44 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %45 = load i64, ptr %44, align 8
-  %soa_adjusted_index28 = add i64 %45, 0
-  %soa_member_base_pointer29 = getelementptr i8, ptr %41, i64 0
+  %soa_adjusted_index28 = add i64 %43, 0
+  %soa_member_base_pointer29 = getelementptr i8, ptr %39, i64 0
   %soa_member_element_pointer30 = getelementptr float, ptr %soa_member_base_pointer29, i64 %soa_adjusted_index28
   store float 1.000000e+00, ptr %soa_member_element_pointer30, align 4
-  %46 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %47 = load ptr, ptr %46, align 8
-  %48 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %44 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %45 = load ptr, ptr %44, align 8
+  %46 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %47 = load i64, ptr %46, align 8
+  %48 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %49 = load i64, ptr %48, align 8
-  %50 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %51 = load i64, ptr %50, align 8
-  %soa_adjusted_index31 = add i64 %51, 1
-  %soa_member_block_size32 = mul i64 %49, 4
+  %soa_adjusted_index31 = add i64 %49, 1
+  %soa_member_block_size32 = mul i64 %47, 4
   %soa_member_block_offset33 = add i64 0, %soa_member_block_size32
   %soa_offset_adjusted34 = add i64 %soa_member_block_offset33, 3
   %soa_offset_aligned35 = and i64 %soa_offset_adjusted34, -4
-  %soa_member_base_pointer36 = getelementptr i8, ptr %47, i64 %soa_offset_aligned35
+  %soa_member_base_pointer36 = getelementptr i8, ptr %45, i64 %soa_offset_aligned35
   %soa_member_element_pointer37 = getelementptr float, ptr %soa_member_base_pointer36, i64 %soa_adjusted_index31
   store float 2.000000e+00, ptr %soa_member_element_pointer37, align 4
-  %52 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %53 = load ptr, ptr %52, align 8
-  %54 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %50 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %51 = load ptr, ptr %50, align 8
+  %52 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %53 = load i64, ptr %52, align 8
+  %54 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
   %55 = load i64, ptr %54, align 8
-  %56 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %57 = load i64, ptr %56, align 8
-  %soa_adjusted_index38 = add i64 %57, 0
-  %soa_member_base_pointer40 = getelementptr i8, ptr %53, i64 0
+  %soa_adjusted_index38 = add i64 %55, 0
+  %soa_member_base_pointer40 = getelementptr i8, ptr %51, i64 0
   %soa_member_element_pointer41 = getelementptr float, ptr %soa_member_base_pointer40, i64 %soa_adjusted_index38
-  %58 = load float, ptr %soa_member_element_pointer41, align 4
-  %59 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 0
-  store float %58, ptr %59, align 4
-  %soa_member_block_size42 = mul i64 %55, 4
+  %56 = load float, ptr %soa_member_element_pointer41, align 4
+  %57 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 0
+  store float %56, ptr %57, align 4
+  %soa_member_block_size42 = mul i64 %53, 4
   %soa_member_block_offset43 = add i64 0, %soa_member_block_size42
   %soa_offset_adjusted44 = add i64 %soa_member_block_offset43, 3
   %soa_offset_aligned45 = and i64 %soa_offset_adjusted44, -4
-  %soa_member_base_pointer46 = getelementptr i8, ptr %53, i64 %soa_offset_aligned45
+  %soa_member_base_pointer46 = getelementptr i8, ptr %51, i64 %soa_offset_aligned45
   %soa_member_element_pointer47 = getelementptr float, ptr %soa_member_base_pointer46, i64 %soa_adjusted_index38
-  %60 = load float, ptr %soa_member_element_pointer47, align 4
-  %61 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 1
-  store float %60, ptr %61, align 4
-  %62 = load %struct.soa_array_view_type_Particle, ptr %soa_element39, align 4
-  store %struct.soa_array_view_type_Particle %62, ptr %p_0, align 4
-  %63 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %64 = load ptr, ptr %63, align 8
-  %65 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %66 = load i64, ptr %65, align 8
-  %67 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %68 = load i64, ptr %67, align 8
-  %soa_adjusted_index48 = add i64 %68, 0
-  %soa_member_base_pointer49 = getelementptr i8, ptr %64, i64 0
+  %58 = load float, ptr %soa_member_element_pointer47, align 4
+  %59 = getelementptr inbounds %struct.soa_array_view_type_Particle, ptr %soa_element39, i32 0, i32 1
+  store float %58, ptr %59, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %p_0, ptr align 4 %soa_element39, i64 8, i1 false)
+  %60 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %61 = load ptr, ptr %60, align 8
+  %62 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %63 = load i64, ptr %62, align 8
+  %64 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %65 = load i64, ptr %64, align 8
+  %soa_adjusted_index48 = add i64 %65, 0
+  %soa_member_base_pointer49 = getelementptr i8, ptr %61, i64 0
   %soa_member_element_pointer50 = getelementptr float, ptr %soa_member_base_pointer49, i64 %soa_adjusted_index48
-  %69 = load float, ptr %soa_member_element_pointer50, align 4
-  store float %69, ptr %x0, align 4
-  %70 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
-  %71 = load ptr, ptr %70, align 8
-  %72 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
-  %73 = load i64, ptr %72, align 8
-  %74 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
-  %75 = load i64, ptr %74, align 8
-  %soa_adjusted_index51 = add i64 %75, 1
-  %soa_member_block_size52 = mul i64 %73, 4
+  %66 = load float, ptr %soa_member_element_pointer50, align 4
+  store float %66, ptr %x0, align 4
+  %67 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 3
+  %68 = load ptr, ptr %67, align 8
+  %69 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 2
+  %70 = load i64, ptr %69, align 8
+  %71 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %view, i32 0, i32 0
+  %72 = load i64, ptr %71, align 8
+  %soa_adjusted_index51 = add i64 %72, 1
+  %soa_member_block_size52 = mul i64 %70, 4
   %soa_member_block_offset53 = add i64 0, %soa_member_block_size52
   %soa_offset_adjusted54 = add i64 %soa_member_block_offset53, 3
   %soa_offset_aligned55 = and i64 %soa_offset_adjusted54, -4
-  %soa_member_base_pointer56 = getelementptr i8, ptr %71, i64 %soa_offset_aligned55
+  %soa_member_base_pointer56 = getelementptr i8, ptr %68, i64 %soa_offset_aligned55
   %soa_member_element_pointer57 = getelementptr float, ptr %soa_member_base_pointer56, i64 %soa_adjusted_index51
-  %76 = load float, ptr %soa_member_element_pointer57, align 4
-  store float %76, ptr %y1, align 4
-  %77 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
-  %78 = load ptr, ptr %77, align 8
-  %79 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
-  store i64 0, ptr %79, align 8
-  %80 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
-  store i64 4, ptr %80, align 8
-  %81 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
-  store i64 4, ptr %81, align 8
-  %82 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
-  store ptr %78, ptr %82, align 8
-  %83 = load %__hl_soa_array_view, ptr %soa_array_view58, align 8
-  store %__hl_soa_array_view %83, ptr %full_view, align 8
+  %73 = load float, ptr %soa_member_element_pointer57, align 4
+  store float %73, ptr %y1, align 4
+  %74 = getelementptr inbounds nuw %__hl_soa_array, ptr %particles, i32 0, i32 0
+  %75 = load ptr, ptr %74, align 8
+  %76 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 0
+  store i64 0, ptr %76, align 8
+  %77 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 1
+  store i64 4, ptr %77, align 8
+  %78 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 2
+  store i64 4, ptr %78, align 8
+  %79 = getelementptr inbounds nuw %__hl_soa_array_view, ptr %soa_array_view58, i32 0, i32 3
+  store ptr %75, ptr %79, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %full_view, ptr align 8 %soa_array_view58, i64 32, i1 false)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -2926,18 +3566,21 @@ entry:
   %9 = call i64 @add(i64 noundef %6, i64 noundef %8), !dbg !10
   %10 = getelementptr inbounds %struct.Vector2i, ptr %0, i32 0, i32 0, !dbg !10
   store i64 %9, ptr %10, align 4, !dbg !10
-  %11 = load %struct.Vector2i, ptr %0, align 4, !dbg !10
     #dbg_declare(ptr %c, !19, !DIExpression(), !11)
-  store %struct.Vector2i %11, ptr %c, align 4, !dbg !11
-  %12 = getelementptr inbounds %struct.Vector2i, ptr %c, i32 0, i32 0, !dbg !11
-  %13 = load i32, ptr %12, align 4, !dbg !11
-  %14 = getelementptr inbounds %struct.Vector2i, ptr %c, i32 0, i32 1, !dbg !11
-  %15 = load i32, ptr %14, align 4, !dbg !11
-  %16 = add i32 %13, %15, !dbg !11
-  ret i32 %16, !dbg !20
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %c, ptr align 4 %0, i64 8, i1 false), !dbg !11
+  %11 = getelementptr inbounds %struct.Vector2i, ptr %c, i32 0, i32 0, !dbg !11
+  %12 = load i32, ptr %11, align 4, !dbg !11
+  %13 = getelementptr inbounds %struct.Vector2i, ptr %c, i32 0, i32 1, !dbg !11
+  %14 = load i32, ptr %13, align 4, !dbg !11
+  %15 = add i32 %12, %14, !dbg !11
+  ret i32 %15, !dbg !20
 }}
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: readwrite) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3017,22 +3660,24 @@ entry:
   store ptr %2, ptr %4, align 8, !dbg !20
   %5 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1, !dbg !20
   store i64 %3, ptr %5, align 8, !dbg !20
-  %6 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8, !dbg !20
     #dbg_declare(ptr %a, !25, !DIExpression(), !21)
-  store %struct.iris_builtin_Generic_array_slice %6, ptr %a, align 8, !dbg !21
-  %7 = load ptr, ptr %vectors, align 8, !dbg !21
-  %8 = load i64, ptr %length, align 8, !dbg !21
-  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !21
-  store ptr %7, ptr %9, align 8, !dbg !21
-  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !21
-  store i64 %8, ptr %10, align 8, !dbg !21
-  %11 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8, !dbg !21
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %a, ptr align 8 %0, i64 16, i1 false), !dbg !21
+  %6 = load ptr, ptr %vectors, align 8, !dbg !21
+  %7 = load i64, ptr %length, align 8, !dbg !21
+  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0, !dbg !21
+  store ptr %6, ptr %8, align 8, !dbg !21
+  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1, !dbg !21
+  store i64 %7, ptr %9, align 8, !dbg !21
     #dbg_declare(ptr %b, !30, !DIExpression(), !34)
-  store %struct.iris_builtin_Generic_array_slice %11, ptr %b, align 8, !dbg !34
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %b, ptr align 8 %1, i64 16, i1 false), !dbg !34
   ret void, !dbg !34
 }}
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: readwrite) }}
 
 !llvm.module.flags = !{{!0}}
 !llvm.dbg.cu = !{{!1}}
@@ -3159,24 +3804,26 @@ entry:
 for_loop_condition:                               ; preds = %for_loop_update_index, %entry
   %0 = load i32, ptr %index, align 4, !dbg !10
   %1 = icmp slt i32 %0, 10, !dbg !10
-  br i1 %1, label %for_loop_then, label %for_loop_after, !dbg !10
+  %2 = zext i1 %1 to i8, !dbg !10
+  %3 = trunc i8 %2 to i1, !dbg !10
+  br i1 %3, label %for_loop_then, label %for_loop_after, !dbg !10
 
 for_loop_then:                                    ; preds = %for_loop_condition
-  %2 = load i32, ptr %value, align 4, !dbg !10
-  %3 = load i32, ptr %index, align 4, !dbg !10
-  %4 = add i32 %2, %3, !dbg !10
-  store i32 %4, ptr %value, align 4, !dbg !13
+  %4 = load i32, ptr %value, align 4, !dbg !10
+  %5 = load i32, ptr %index, align 4, !dbg !10
+  %6 = add i32 %4, %5, !dbg !10
+  store i32 %6, ptr %value, align 4, !dbg !13
   br label %for_loop_update_index, !dbg !13
 
 for_loop_update_index:                            ; preds = %for_loop_then
-  %5 = load i32, ptr %index, align 4, !dbg !10
-  %6 = add i32 %5, 1, !dbg !10
-  store i32 %6, ptr %index, align 4, !dbg !10
+  %7 = load i32, ptr %index, align 4, !dbg !10
+  %8 = add i32 %7, 1, !dbg !10
+  store i32 %8, ptr %index, align 4, !dbg !10
   br label %for_loop_condition, !dbg !10
 
 for_loop_after:                                   ; preds = %for_loop_condition
-  %7 = load i32, ptr %value, align 4, !dbg !14
-  ret i32 %7, !dbg !14
+  %9 = load i32, ptr %value, align 4, !dbg !14
+  ret i32 %9, !dbg !14
 }}
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
@@ -3285,7 +3932,7 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
 define i32 @Debug_information_function_constructor_consumer_run() #0 !dbg !3 {{
 entry:
   %value = alloca i32, align 4, !dbg !8
-  %0 = call i32 @Debug_information_function_constructor_provider__at__add__at__489334907677298949(i32 noundef 1, i32 noundef 2), !dbg !9
+  %0 = call i32 @Debug_information_function_constructor_provider__at__add__at__2834052215564097615(i32 noundef 1, i32 noundef 2), !dbg !9
     #dbg_declare(ptr %value, !10, !DIExpression(), !8)
   store i32 %0, ptr %value, align 4, !dbg !8
   %1 = load i32, ptr %value, align 4, !dbg !11
@@ -3293,7 +3940,7 @@ entry:
 }}
 
 ; Function Attrs: convergent
-define private i32 @Debug_information_function_constructor_provider__at__add__at__489334907677298949(i32 noundef %"arguments[0].lhs", i32 noundef %"arguments[1].rhs") #0 !dbg !12 {{
+define private i32 @Debug_information_function_constructor_provider__at__add__at__2834052215564097615(i32 noundef %"arguments[0].lhs", i32 noundef %"arguments[1].rhs") #0 !dbg !12 {{
 entry:
   %lhs = alloca i32, align 4
   %rhs = alloca i32, align 4
@@ -3324,7 +3971,7 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
 !9 = !DILocation(line: 7, column: 17, scope: !3)
 !10 = !DILocalVariable(name: "value", scope: !3, file: !2, line: 7, type: !6)
 !11 = !DILocation(line: 8, column: 5, scope: !3)
-!12 = distinct !DISubprogram(name: "Debug_information_function_constructor_provider__at__add__at__489334907677298949", linkageName: "Debug_information_function_constructor_provider__at__add__at__489334907677298949", scope: null, file: !13, line: 5, type: !14, scopeLine: 5, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !16)
+!12 = distinct !DISubprogram(name: "Debug_information_function_constructor_provider__at__add__at__2834052215564097615", linkageName: "Debug_information_function_constructor_provider__at__add__at__2834052215564097615", scope: null, file: !13, line: 5, type: !14, scopeLine: 5, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !16)
 !13 = !DIFile(filename: "debug_information_function_constructor_provider.iris", directory: "{}")
 !14 = !DISubroutineType(types: !15)
 !15 = !{{!6, !6, !6}}
@@ -3357,15 +4004,19 @@ entry:
     #dbg_declare(ptr %value, !8, !DIExpression(), !9)
   %0 = load i32, ptr %value, align 4, !dbg !10
   %1 = icmp eq i32 %0, 0, !dbg !10
-  br i1 %1, label %if_s0_then, label %if_s1_else, !dbg !10
+  %2 = zext i1 %1 to i8, !dbg !10
+  %3 = trunc i8 %2 to i1, !dbg !10
+  br i1 %3, label %if_s0_then, label %if_s1_else, !dbg !10
 
 if_s0_then:                                       ; preds = %entry
   ret i32 1, !dbg !11
 
 if_s1_else:                                       ; preds = %entry
-  %2 = load i32, ptr %value, align 4, !dbg !13
-  %3 = icmp eq i32 %2, 1, !dbg !13
-  br i1 %3, label %if_s2_then, label %if_s3_else, !dbg !13
+  %4 = load i32, ptr %value, align 4, !dbg !13
+  %5 = icmp eq i32 %4, 1, !dbg !13
+  %6 = zext i1 %5 to i8, !dbg !13
+  %7 = trunc i8 %6 to i1, !dbg !13
+  br i1 %7, label %if_s2_then, label %if_s3_else, !dbg !13
 
 if_s2_then:                                       ; preds = %if_s1_else
   ret i32 2, !dbg !14
@@ -3673,32 +4324,36 @@ entry:
 while_loop_condition:                             ; preds = %while_loop_then, %entry
   %0 = load i32, ptr %index, align 4, !dbg !10
   %1 = icmp slt i32 %0, 10, !dbg !10
-  br i1 %1, label %while_loop_then, label %while_loop_after, !dbg !10
+  %2 = zext i1 %1 to i8, !dbg !10
+  %3 = trunc i8 %2 to i1, !dbg !10
+  br i1 %3, label %while_loop_then, label %while_loop_after, !dbg !10
 
 while_loop_then:                                  ; preds = %while_loop_condition
-  %2 = load i32, ptr %value, align 4, !dbg !10
-  %3 = load i32, ptr %index, align 4, !dbg !10
-  %4 = add i32 %2, %3, !dbg !10
-  store i32 %4, ptr %value, align 4, !dbg !12
-  %5 = load i32, ptr %index, align 4, !dbg !12
-  %6 = add i32 %5, 1, !dbg !12
-  store i32 %6, ptr %index, align 4, !dbg !14
+  %4 = load i32, ptr %value, align 4, !dbg !10
+  %5 = load i32, ptr %index, align 4, !dbg !10
+  %6 = add i32 %4, %5, !dbg !10
+  store i32 %6, ptr %value, align 4, !dbg !12
+  %7 = load i32, ptr %index, align 4, !dbg !12
+  %8 = add i32 %7, 1, !dbg !12
+  store i32 %8, ptr %index, align 4, !dbg !14
   br label %while_loop_condition, !dbg !15
 
 while_loop_after:                                 ; preds = %while_loop_condition
   br label %while_loop_then1, !dbg !16
 
 while_loop_then1:                                 ; preds = %if_s1_after, %while_loop_after
-  %7 = load i32, ptr %index, align 4, !dbg !16
-  %8 = add i32 %7, 1, !dbg !16
-  store i32 %8, ptr %index, align 4, !dbg !17
-  %9 = load i32, ptr %index, align 4, !dbg !19
-  %10 = icmp sge i32 %9, 20, !dbg !19
-  br i1 %10, label %if_s0_then, label %if_s1_after, !dbg !19
+  %9 = load i32, ptr %index, align 4, !dbg !16
+  %10 = add i32 %9, 1, !dbg !16
+  store i32 %10, ptr %index, align 4, !dbg !17
+  %11 = load i32, ptr %index, align 4, !dbg !19
+  %12 = icmp sge i32 %11, 20, !dbg !19
+  %13 = zext i1 %12 to i8, !dbg !19
+  %14 = trunc i8 %13 to i1, !dbg !19
+  br i1 %14, label %if_s0_then, label %if_s1_after, !dbg !19
 
 while_loop_after2:                                ; preds = %if_s0_then
-  %11 = load i32, ptr %value, align 4, !dbg !20
-  ret i32 %11, !dbg !20
+  %15 = load i32, ptr %value, align 4, !dbg !20
+  ret i32 %15, !dbg !20
 
 if_s0_then:                                       ; preds = %while_loop_then1
   br label %while_loop_after2, !dbg !21
@@ -3856,27 +4511,33 @@ entry:
   %0 = load i32, ptr %x, align 4
   %1 = load i32, ptr %y, align 4
   %2 = icmp eq i32 %0, %1
-  store i1 %2, ptr %eq, align 1
-  %3 = load i32, ptr %x, align 4
-  %4 = load i32, ptr %y, align 4
-  %5 = icmp ne i32 %3, %4
-  store i1 %5, ptr %neq, align 1
-  %6 = load i32, ptr %x, align 4
-  %7 = load i32, ptr %y, align 4
-  %8 = icmp slt i32 %6, %7
-  store i1 %8, ptr %lt, align 1
-  %9 = load i32, ptr %x, align 4
-  %10 = load i32, ptr %y, align 4
-  %11 = icmp sle i32 %9, %10
-  store i1 %11, ptr %le, align 1
+  %3 = zext i1 %2 to i8
+  store i8 %3, ptr %eq, align 1
+  %4 = load i32, ptr %x, align 4
+  %5 = load i32, ptr %y, align 4
+  %6 = icmp ne i32 %4, %5
+  %7 = zext i1 %6 to i8
+  store i8 %7, ptr %neq, align 1
+  %8 = load i32, ptr %x, align 4
+  %9 = load i32, ptr %y, align 4
+  %10 = icmp slt i32 %8, %9
+  %11 = zext i1 %10 to i8
+  store i8 %11, ptr %lt, align 1
   %12 = load i32, ptr %x, align 4
   %13 = load i32, ptr %y, align 4
-  %14 = icmp sgt i32 %12, %13
-  store i1 %14, ptr %gt, align 1
-  %15 = load i32, ptr %x, align 4
-  %16 = load i32, ptr %y, align 4
-  %17 = icmp sge i32 %15, %16
-  store i1 %17, ptr %ge, align 1
+  %14 = icmp sle i32 %12, %13
+  %15 = zext i1 %14 to i8
+  store i8 %15, ptr %le, align 1
+  %16 = load i32, ptr %x, align 4
+  %17 = load i32, ptr %y, align 4
+  %18 = icmp sgt i32 %16, %17
+  %19 = zext i1 %18 to i8
+  store i8 %19, ptr %gt, align 1
+  %20 = load i32, ptr %x, align 4
+  %21 = load i32, ptr %y, align 4
+  %22 = icmp sge i32 %20, %21
+  %23 = zext i1 %22 to i8
+  store i8 %23, ptr %ge, align 1
   ret void
 }
 
@@ -3896,27 +4557,33 @@ entry:
   %0 = load i64, ptr %x, align 8
   %1 = load i64, ptr %y, align 8
   %2 = icmp eq i64 %0, %1
-  store i1 %2, ptr %eq, align 1
-  %3 = load i64, ptr %x, align 8
-  %4 = load i64, ptr %y, align 8
-  %5 = icmp ne i64 %3, %4
-  store i1 %5, ptr %neq, align 1
-  %6 = load i64, ptr %x, align 8
-  %7 = load i64, ptr %y, align 8
-  %8 = icmp slt i64 %6, %7
-  store i1 %8, ptr %lt, align 1
-  %9 = load i64, ptr %x, align 8
-  %10 = load i64, ptr %y, align 8
-  %11 = icmp sle i64 %9, %10
-  store i1 %11, ptr %le, align 1
+  %3 = zext i1 %2 to i8
+  store i8 %3, ptr %eq, align 1
+  %4 = load i64, ptr %x, align 8
+  %5 = load i64, ptr %y, align 8
+  %6 = icmp ne i64 %4, %5
+  %7 = zext i1 %6 to i8
+  store i8 %7, ptr %neq, align 1
+  %8 = load i64, ptr %x, align 8
+  %9 = load i64, ptr %y, align 8
+  %10 = icmp slt i64 %8, %9
+  %11 = zext i1 %10 to i8
+  store i8 %11, ptr %lt, align 1
   %12 = load i64, ptr %x, align 8
   %13 = load i64, ptr %y, align 8
-  %14 = icmp sgt i64 %12, %13
-  store i1 %14, ptr %gt, align 1
-  %15 = load i64, ptr %x, align 8
-  %16 = load i64, ptr %y, align 8
-  %17 = icmp sge i64 %15, %16
-  store i1 %17, ptr %ge, align 1
+  %14 = icmp sle i64 %12, %13
+  %15 = zext i1 %14 to i8
+  store i8 %15, ptr %le, align 1
+  %16 = load i64, ptr %x, align 8
+  %17 = load i64, ptr %y, align 8
+  %18 = icmp sgt i64 %16, %17
+  %19 = zext i1 %18 to i8
+  store i8 %19, ptr %gt, align 1
+  %20 = load i64, ptr %x, align 8
+  %21 = load i64, ptr %y, align 8
+  %22 = icmp sge i64 %20, %21
+  %23 = zext i1 %22 to i8
+  store i8 %23, ptr %ge, align 1
   ret void
 }
 
@@ -4077,6 +4744,306 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Decimal Overflow Checks Disabled", "[LLVM_IR]")
+  {
+    char const* const input_file = "decimal_overflow_checks.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_multiply(i32 noundef %"arguments[0].x", i32 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i32, align 4
+  %y = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store i32 %"arguments[1].y", ptr %y, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = load i32, ptr %y, align 4
+  %2 = sext i32 %0 to i64
+  %3 = sext i32 %1 to i64
+  %4 = mul i64 %2, %3
+  %5 = sdiv i64 %4, 10000
+  %6 = trunc i64 %5 to i32
+  ret i32 %6
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_checked_divide(i64 noundef %"arguments[0].x", i64 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i64, align 8
+  %y = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  store i64 %"arguments[1].y", ptr %y, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = load i64, ptr %y, align 8
+  %2 = sext i64 %0 to i128
+  %3 = sext i64 %1 to i128
+  %4 = mul i128 %2, 10000000
+  %5 = sdiv i128 %4, %3
+  %6 = trunc i128 %5 to i64
+  ret i64 %6
+}
+
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_decimal_narrowing_cast(i64 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = sext i64 %0 to i128
+  %2 = sdiv i128 %1, 1000
+  %3 = trunc i128 %2 to i32
+  ret i32 %3
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_checked_decimal_widening_cast(i32 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = sext i32 %0 to i128
+  %2 = mul i128 %1, 1000
+  %3 = trunc i128 %2 to i64
+  ret i64 %3
+}
+
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_integer_cast(i64 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = sext i64 %0 to i128
+  %2 = icmp sge i128 %1, 0
+  %3 = select i1 %2, i128 5000000, i128 -5000000
+  %4 = add i128 %1, %3
+  %5 = sdiv i128 %4, 10000000
+  %6 = trunc i128 %5 to i32
+  ret i32 %6
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_unchecked_integer_cast(i32 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = sext i32 %0 to i64
+  %2 = icmp sge i64 %1, 0
+  %3 = select i1 %2, i64 5000, i64 -5000
+  %4 = add i64 %1, %3
+  %5 = sdiv i64 %4, 10000
+  ret i64 %5
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Decimal Overflow Checks Enabled", "[LLVM_IR]")
+  {
+    char const* const input_file = "decimal_overflow_checks.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+@iris_error_string = private unnamed_addr constant [134 x i8] c"decimal_overflow_checks.iris:5:12: Decimal overflow in decimal multiplication in 'Decimal_overflow_checks.checked_multiply' at 5:12!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [128 x i8] c"decimal_overflow_checks.iris:10:12: Decimal overflow in decimal division in 'Decimal_overflow_checks.checked_divide' at 10:12!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [157 x i8] c"decimal_overflow_checks.iris:15:12: Decimal overflow in decimal to decimal conversion in 'Decimal_overflow_checks.checked_decimal_narrowing_cast' at 15:12!\0A\00"
+@iris_error_string.3 = private unnamed_addr constant [156 x i8] c"decimal_overflow_checks.iris:20:12: Decimal overflow in decimal to decimal conversion in 'Decimal_overflow_checks.checked_decimal_widening_cast' at 20:12!\0A\00"
+@iris_error_string.4 = private unnamed_addr constant [147 x i8] c"decimal_overflow_checks.iris:25:12: Decimal overflow in decimal to integer conversion in 'Decimal_overflow_checks.checked_integer_cast' at 25:12!\0A\00"
+
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_multiply(i32 noundef %"arguments[0].x", i32 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i32, align 4
+  %y = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store i32 %"arguments[1].y", ptr %y, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = load i32, ptr %y, align 4
+  %2 = sext i32 %0 to i64
+  %3 = sext i32 %1 to i64
+  %4 = mul i64 %2, %3
+  %5 = sdiv i64 %4, 10000
+  %decimal_overflow_check_at_least_minimum = icmp sge i64 %5, -2147483648
+  %decimal_overflow_check_at_most_maximum = icmp sle i64 %5, 2147483647
+  %decimal_overflow_check_in_range = and i1 %decimal_overflow_check_at_least_minimum, %decimal_overflow_check_at_most_maximum
+  br i1 %decimal_overflow_check_in_range, label %decimal_overflow_check_pass, label %decimal_overflow_check_fail
+
+decimal_overflow_check_pass:                      ; preds = %entry
+  %6 = trunc i64 %5 to i32
+  ret i32 %6
+
+decimal_overflow_check_fail:                      ; preds = %entry
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %7 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %8 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_checked_divide(i64 noundef %"arguments[0].x", i64 noundef %"arguments[1].y") #0 {
+entry:
+  %x = alloca i64, align 8
+  %y = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  store i64 %"arguments[1].y", ptr %y, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = load i64, ptr %y, align 8
+  %2 = sext i64 %0 to i128
+  %3 = sext i64 %1 to i128
+  %4 = mul i128 %2, 10000000
+  %5 = sdiv i128 %4, %3
+  %decimal_overflow_check_at_least_minimum = icmp sge i128 %5, -9223372036854775808
+  %decimal_overflow_check_at_most_maximum = icmp sle i128 %5, 9223372036854775807
+  %decimal_overflow_check_in_range = and i1 %decimal_overflow_check_at_least_minimum, %decimal_overflow_check_at_most_maximum
+  br i1 %decimal_overflow_check_in_range, label %decimal_overflow_check_pass, label %decimal_overflow_check_fail
+
+decimal_overflow_check_pass:                      ; preds = %entry
+  %6 = trunc i128 %5 to i64
+  ret i64 %6
+
+decimal_overflow_check_fail:                      ; preds = %entry
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %7 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer)
+  %8 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_decimal_narrowing_cast(i64 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = sext i64 %0 to i128
+  %2 = sdiv i128 %1, 1000
+  %decimal_overflow_check_at_least_minimum = icmp sge i128 %2, -2147483648
+  %decimal_overflow_check_at_most_maximum = icmp sle i128 %2, 2147483647
+  %decimal_overflow_check_in_range = and i1 %decimal_overflow_check_at_least_minimum, %decimal_overflow_check_at_most_maximum
+  br i1 %decimal_overflow_check_in_range, label %decimal_overflow_check_pass, label %decimal_overflow_check_fail
+
+decimal_overflow_check_pass:                      ; preds = %entry
+  %3 = trunc i128 %2 to i32
+  ret i32 %3
+
+decimal_overflow_check_fail:                      ; preds = %entry
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %4 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer)
+  %5 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_checked_decimal_widening_cast(i32 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = sext i32 %0 to i128
+  %2 = mul i128 %1, 1000
+  %decimal_overflow_check_at_least_minimum = icmp sge i128 %2, -9223372036854775808
+  %decimal_overflow_check_at_most_maximum = icmp sle i128 %2, 9223372036854775807
+  %decimal_overflow_check_in_range = and i1 %decimal_overflow_check_at_least_minimum, %decimal_overflow_check_at_most_maximum
+  br i1 %decimal_overflow_check_in_range, label %decimal_overflow_check_pass, label %decimal_overflow_check_fail
+
+decimal_overflow_check_pass:                      ; preds = %entry
+  %3 = trunc i128 %2 to i64
+  ret i64 %3
+
+decimal_overflow_check_fail:                      ; preds = %entry
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %4 = call i32 @fputs(ptr @iris_error_string.3, ptr %stderr_pointer)
+  %5 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i32 @Decimal_overflow_checks_checked_integer_cast(i64 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i64, align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  %0 = load i64, ptr %x, align 8
+  %1 = sext i64 %0 to i128
+  %2 = icmp sge i128 %1, 0
+  %3 = select i1 %2, i128 5000000, i128 -5000000
+  %4 = add i128 %1, %3
+  %5 = sdiv i128 %4, 10000000
+  %decimal_overflow_check_at_least_minimum = icmp sge i128 %5, -2147483648
+  %decimal_overflow_check_at_most_maximum = icmp sle i128 %5, 2147483647
+  %decimal_overflow_check_in_range = and i1 %decimal_overflow_check_at_least_minimum, %decimal_overflow_check_at_most_maximum
+  br i1 %decimal_overflow_check_in_range, label %decimal_overflow_check_pass, label %decimal_overflow_check_fail
+
+decimal_overflow_check_pass:                      ; preds = %entry
+  %6 = trunc i128 %5 to i32
+  ret i32 %6
+
+decimal_overflow_check_fail:                      ; preds = %entry
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %7 = call i32 @fputs(ptr @iris_error_string.4, ptr %stderr_pointer)
+  %8 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define i64 @Decimal_overflow_checks_unchecked_integer_cast(i32 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  %0 = load i32, ptr %x, align 4
+  %1 = sext i32 %0 to i64
+  %2 = icmp sge i64 %1, 0
+  %3 = select i1 %2, i64 5000, i64 -5000
+  %4 = add i64 %1, %3
+  %5 = sdiv i64 %4, 10000
+  ret i64 %5
+}
+
+declare i32 @fputs(ptr, ptr)
+
+declare i32 @fflush(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .enable_decimal_overflow_checks = true });
+  }
+
+  // The runtime check cannot catch a folded constant -- there is nothing left to branch on -- so an
+  // out-of-range constant result is rejected at compile time, in every configuration and regardless
+  // of enable_decimal_overflow_checks. Note this test leaves that flag off.
+  TEST_CASE("Compile Decimal Constant Overflow Is An Error", "[LLVM_IR]")
+  {
+    char const* const input_file = "decimal_constant_overflow.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    CHECK_THROWS_WITH(
+      test_create_llvm_module(input_file, module_name_to_file_path_map, ""),
+      Catch::Matchers::ContainsSubstring("Result of decimal division does not fit the 32-bit backing integer")
+        && Catch::Matchers::ContainsSubstring("4500000000")
+    );
+  }
+
   TEST_CASE("Compile Decimal Comparisons", "[LLVM_IR]")
   {
     char const* const input_file = "decimal_expressions.iris";
@@ -4192,27 +5159,33 @@ entry:
   %0 = load i32, ptr %x, align 4
   %1 = load i32, ptr %y, align 4
   %2 = icmp eq i32 %0, %1
-  store i1 %2, ptr %eq, align 1
-  %3 = load i32, ptr %x, align 4
-  %4 = load i32, ptr %y, align 4
-  %5 = icmp ne i32 %3, %4
-  store i1 %5, ptr %neq, align 1
-  %6 = load i32, ptr %x, align 4
-  %7 = load i32, ptr %y, align 4
-  %8 = icmp slt i32 %6, %7
-  store i1 %8, ptr %lt, align 1
-  %9 = load i32, ptr %x, align 4
-  %10 = load i32, ptr %y, align 4
-  %11 = icmp sle i32 %9, %10
-  store i1 %11, ptr %le, align 1
+  %3 = zext i1 %2 to i8
+  store i8 %3, ptr %eq, align 1
+  %4 = load i32, ptr %x, align 4
+  %5 = load i32, ptr %y, align 4
+  %6 = icmp ne i32 %4, %5
+  %7 = zext i1 %6 to i8
+  store i8 %7, ptr %neq, align 1
+  %8 = load i32, ptr %x, align 4
+  %9 = load i32, ptr %y, align 4
+  %10 = icmp slt i32 %8, %9
+  %11 = zext i1 %10 to i8
+  store i8 %11, ptr %lt, align 1
   %12 = load i32, ptr %x, align 4
   %13 = load i32, ptr %y, align 4
-  %14 = icmp sgt i32 %12, %13
-  store i1 %14, ptr %gt, align 1
-  %15 = load i32, ptr %x, align 4
-  %16 = load i32, ptr %y, align 4
-  %17 = icmp sge i32 %15, %16
-  store i1 %17, ptr %ge, align 1
+  %14 = icmp sle i32 %12, %13
+  %15 = zext i1 %14 to i8
+  store i8 %15, ptr %le, align 1
+  %16 = load i32, ptr %x, align 4
+  %17 = load i32, ptr %y, align 4
+  %18 = icmp sgt i32 %16, %17
+  %19 = zext i1 %18 to i8
+  store i8 %19, ptr %gt, align 1
+  %20 = load i32, ptr %x, align 4
+  %21 = load i32, ptr %y, align 4
+  %22 = icmp sge i32 %20, %21
+  %23 = zext i1 %22 to i8
+  store i8 %23, ptr %ge, align 1
   ret void
 }
 
@@ -4232,27 +5205,33 @@ entry:
   %0 = load i64, ptr %x, align 8
   %1 = load i64, ptr %y, align 8
   %2 = icmp eq i64 %0, %1
-  store i1 %2, ptr %eq, align 1
-  %3 = load i64, ptr %x, align 8
-  %4 = load i64, ptr %y, align 8
-  %5 = icmp ne i64 %3, %4
-  store i1 %5, ptr %neq, align 1
-  %6 = load i64, ptr %x, align 8
-  %7 = load i64, ptr %y, align 8
-  %8 = icmp slt i64 %6, %7
-  store i1 %8, ptr %lt, align 1
-  %9 = load i64, ptr %x, align 8
-  %10 = load i64, ptr %y, align 8
-  %11 = icmp sle i64 %9, %10
-  store i1 %11, ptr %le, align 1
+  %3 = zext i1 %2 to i8
+  store i8 %3, ptr %eq, align 1
+  %4 = load i64, ptr %x, align 8
+  %5 = load i64, ptr %y, align 8
+  %6 = icmp ne i64 %4, %5
+  %7 = zext i1 %6 to i8
+  store i8 %7, ptr %neq, align 1
+  %8 = load i64, ptr %x, align 8
+  %9 = load i64, ptr %y, align 8
+  %10 = icmp slt i64 %8, %9
+  %11 = zext i1 %10 to i8
+  store i8 %11, ptr %lt, align 1
   %12 = load i64, ptr %x, align 8
   %13 = load i64, ptr %y, align 8
-  %14 = icmp sgt i64 %12, %13
-  store i1 %14, ptr %gt, align 1
-  %15 = load i64, ptr %x, align 8
-  %16 = load i64, ptr %y, align 8
-  %17 = icmp sge i64 %15, %16
-  store i1 %17, ptr %ge, align 1
+  %14 = icmp sle i64 %12, %13
+  %15 = zext i1 %14 to i8
+  store i8 %15, ptr %le, align 1
+  %16 = load i64, ptr %x, align 8
+  %17 = load i64, ptr %y, align 8
+  %18 = icmp sgt i64 %16, %17
+  %19 = zext i1 %18 to i8
+  store i8 %19, ptr %gt, align 1
+  %20 = load i64, ptr %x, align 8
+  %21 = load i64, ptr %y, align 8
+  %22 = icmp sge i64 %20, %21
+  %23 = zext i1 %22 to i8
+  store i8 %23, ptr %ge, align 1
   ret void
 }
 
@@ -4530,26 +5509,28 @@ if_s0_then:                                       ; preds = %entry
 if_s1_else:                                       ; preds = %entry
   %4 = load i32, ptr %value, align 4
   %5 = icmp eq i32 %4, 0
-  br i1 %5, label %if_s2_then, label %if_s3_else
+  %6 = zext i1 %5 to i8
+  %7 = trunc i8 %6 to i1
+  br i1 %7, label %if_s2_then, label %if_s3_else
 
 if_s2_then:                                       ; preds = %if_s1_else
   store i32 3, ptr %v3, align 4
-  %6 = load i32, ptr %v3, align 4
-  call void @Defer_expressions_do_defer(i32 noundef %6)
+  %8 = load i32, ptr %v3, align 4
+  call void @Defer_expressions_do_defer(i32 noundef %8)
   call void @Defer_expressions_do_defer(i32 noundef 3)
   br label %if_s4_after
 
 if_s3_else:                                       ; preds = %if_s1_else
   store i32 4, ptr %v4, align 4
-  %7 = load i32, ptr %v4, align 4
-  call void @Defer_expressions_do_defer(i32 noundef %7)
+  %9 = load i32, ptr %v4, align 4
+  call void @Defer_expressions_do_defer(i32 noundef %9)
   call void @Defer_expressions_do_defer(i32 noundef 4)
   br label %if_s4_after
 
 if_s4_after:                                      ; preds = %if_s3_else, %if_s2_then, %if_s0_then
-  %8 = load i8, ptr %condition, align 1
-  %9 = trunc i8 %8 to i1
-  br i1 %9, label %if_s0_then1, label %if_s1_after
+  %10 = load i8, ptr %condition, align 1
+  %11 = trunc i8 %10 to i1
+  br i1 %11, label %if_s0_then1, label %if_s1_after
 
 if_s0_then1:                                      ; preds = %if_s4_after
   call void @Defer_expressions_do_defer(i32 noundef 1)
@@ -4560,14 +5541,14 @@ if_s1_after:                                      ; preds = %if_s4_after
   br label %while_loop_condition
 
 while_loop_condition:                             ; preds = %while_loop_then, %if_s1_after
-  %10 = load i8, ptr %condition, align 1
-  %11 = trunc i8 %10 to i1
-  br i1 %11, label %while_loop_then, label %while_loop_after
+  %12 = load i8, ptr %condition, align 1
+  %13 = trunc i8 %12 to i1
+  br i1 %13, label %while_loop_then, label %while_loop_after
 
 while_loop_then:                                  ; preds = %while_loop_condition
   store i32 5, ptr %v5, align 4
-  %12 = load i32, ptr %v5, align 4
-  call void @Defer_expressions_do_defer(i32 noundef %12)
+  %14 = load i32, ptr %v5, align 4
+  call void @Defer_expressions_do_defer(i32 noundef %14)
   call void @Defer_expressions_do_defer(i32 noundef 5)
   br label %while_loop_condition
 
@@ -4575,9 +5556,9 @@ while_loop_after:                                 ; preds = %while_loop_conditio
   br label %while_loop_condition2
 
 while_loop_condition2:                            ; preds = %while_loop_then3, %while_loop_after
-  %13 = load i8, ptr %condition, align 1
-  %14 = trunc i8 %13 to i1
-  br i1 %14, label %while_loop_then3, label %while_loop_after4
+  %15 = load i8, ptr %condition, align 1
+  %16 = trunc i8 %15 to i1
+  br i1 %16, label %while_loop_then3, label %while_loop_after4
 
 while_loop_then3:                                 ; preds = %while_loop_condition2
   store i32 6, ptr %v6, align 4
@@ -4588,9 +5569,9 @@ while_loop_after4:                                ; preds = %while_loop_conditio
   br label %while_loop_condition5
 
 while_loop_condition5:                            ; preds = %while_loop_after4
-  %15 = load i8, ptr %condition, align 1
-  %16 = trunc i8 %15 to i1
-  br i1 %16, label %while_loop_then6, label %while_loop_after7
+  %17 = load i8, ptr %condition, align 1
+  %18 = trunc i8 %17 to i1
+  br i1 %18, label %while_loop_then6, label %while_loop_after7
 
 while_loop_then6:                                 ; preds = %while_loop_condition5
   store i32 7, ptr %v7, align 4
@@ -4602,59 +5583,65 @@ while_loop_after7:                                ; preds = %while_loop_then6, %
   br label %for_loop_condition
 
 for_loop_condition:                               ; preds = %for_loop_update_index, %while_loop_after7
-  %17 = load i32, ptr %index, align 4
-  %18 = icmp slt i32 %17, 10
-  br i1 %18, label %for_loop_then, label %for_loop_after
+  %19 = load i32, ptr %index, align 4
+  %20 = icmp slt i32 %19, 10
+  %21 = zext i1 %20 to i8
+  %22 = trunc i8 %21 to i1
+  br i1 %22, label %for_loop_then, label %for_loop_after
 
 for_loop_then:                                    ; preds = %for_loop_condition
   store i32 8, ptr %v8, align 4
-  %19 = load i32, ptr %v8, align 4
-  call void @Defer_expressions_do_defer(i32 noundef %19)
+  %23 = load i32, ptr %v8, align 4
+  call void @Defer_expressions_do_defer(i32 noundef %23)
   call void @Defer_expressions_do_defer(i32 noundef 8)
   br label %for_loop_update_index
 
 for_loop_update_index:                            ; preds = %for_loop_then
-  %20 = load i32, ptr %index, align 4
-  %21 = add i32 %20, 1
-  store i32 %21, ptr %index, align 4
+  %24 = load i32, ptr %index, align 4
+  %25 = add i32 %24, 1
+  store i32 %25, ptr %index, align 4
   br label %for_loop_condition
 
 for_loop_after:                                   ; preds = %for_loop_condition
-  %22 = load i32, ptr %value, align 4
-  switch i32 %22, label %switch_after [
+  %26 = load i32, ptr %value, align 4
+  switch i32 %26, label %switch_after [
     i32 0, label %switch_case_i0_
   ]
 
 switch_after:                                     ; preds = %switch_case_i0_, %for_loop_after
   store i32 10, ptr %v10, align 4
-  %23 = load i32, ptr %v10, align 4
-  call void @Defer_expressions_do_defer(i32 noundef %23)
+  %27 = load i32, ptr %v10, align 4
+  call void @Defer_expressions_do_defer(i32 noundef %27)
   call void @Defer_expressions_do_defer(i32 noundef 10)
   store i32 0, ptr %i, align 4
   br label %for_loop_condition8
 
 switch_case_i0_:                                  ; preds = %for_loop_after
   store i32 9, ptr %v9, align 4
-  %24 = load i32, ptr %v9, align 4
-  call void @Defer_expressions_do_defer(i32 noundef %24)
+  %28 = load i32, ptr %v9, align 4
+  call void @Defer_expressions_do_defer(i32 noundef %28)
   call void @Defer_expressions_do_defer(i32 noundef 9)
   br label %switch_after
 
 for_loop_condition8:                              ; preds = %for_loop_update_index10, %switch_after
-  %25 = load i32, ptr %i, align 4
-  %26 = icmp slt i32 %25, 10
-  br i1 %26, label %for_loop_then9, label %for_loop_after11
+  %29 = load i32, ptr %i, align 4
+  %30 = icmp slt i32 %29, 10
+  %31 = zext i1 %30 to i8
+  %32 = trunc i8 %31 to i1
+  br i1 %32, label %for_loop_then9, label %for_loop_after11
 
 for_loop_then9:                                   ; preds = %for_loop_condition8
-  %27 = load i32, ptr %i, align 4
-  %28 = srem i32 %27, 2
-  %29 = icmp eq i32 %28, 0
-  br i1 %29, label %if_s0_then12, label %if_s1_after13
+  %33 = load i32, ptr %i, align 4
+  %34 = srem i32 %33, 2
+  %35 = icmp eq i32 %34, 0
+  %36 = zext i1 %35 to i8
+  %37 = trunc i8 %36 to i1
+  br i1 %37, label %if_s0_then12, label %if_s1_after13
 
 for_loop_update_index10:                          ; preds = %if_s1_after13
-  %30 = load i32, ptr %i, align 4
-  %31 = add i32 %30, 1
-  store i32 %31, ptr %i, align 4
+  %38 = load i32, ptr %i, align 4
+  %39 = add i32 %38, 1
+  store i32 %39, ptr %i, align 4
   br label %for_loop_condition8
 
 for_loop_after11:                                 ; preds = %if_s0_then18, %for_loop_condition8
@@ -4671,20 +5658,24 @@ if_s1_after13:                                    ; preds = %for_loop_after17, %
   br label %for_loop_update_index10
 
 for_loop_condition14:                             ; preds = %for_loop_update_index16, %if_s0_then12
-  %32 = load i32, ptr %j, align 4
-  %33 = icmp slt i32 %32, 10
-  br i1 %33, label %for_loop_then15, label %for_loop_after17
+  %40 = load i32, ptr %j, align 4
+  %41 = icmp slt i32 %40, 10
+  %42 = zext i1 %41 to i8
+  %43 = trunc i8 %42 to i1
+  br i1 %43, label %for_loop_then15, label %for_loop_after17
 
 for_loop_then15:                                  ; preds = %for_loop_condition14
-  %34 = load i32, ptr %j, align 4
-  %35 = srem i32 %34, 2
-  %36 = icmp eq i32 %35, 0
-  br i1 %36, label %if_s0_then18, label %if_s1_after19
+  %44 = load i32, ptr %j, align 4
+  %45 = srem i32 %44, 2
+  %46 = icmp eq i32 %45, 0
+  %47 = zext i1 %46 to i8
+  %48 = trunc i8 %47 to i1
+  br i1 %48, label %if_s0_then18, label %if_s1_after19
 
 for_loop_update_index16:                          ; preds = %if_s1_after19
-  %37 = load i32, ptr %j, align 4
-  %38 = add i32 %37, 1
-  store i32 %38, ptr %j, align 4
+  %49 = load i32, ptr %j, align 4
+  %50 = add i32 %49, 1
+  store i32 %50, ptr %j, align 4
   br label %for_loop_condition14
 
 for_loop_after17:                                 ; preds = %for_loop_condition14
@@ -4871,21 +5862,22 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
 
     char const* const expected_llvm_ir = R"(
 %struct.dynamic_array_Allocator = type { ptr, ptr }
-%struct.dynamic_array__at__Dynamic_array__at__10870525800499546629 = type { ptr, i64, i64, %struct.dynamic_array_Allocator }
+%struct.dynamic_array__at__Dynamic_array__at__7430847874973399898 = type { ptr, i64, i64, %struct.dynamic_array_Allocator }
 
-@function_contract_error_string = private unnamed_addr constant [135 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__create__at__9190698639914732028' precondition 'allocator.allocate != null' failed!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [137 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__create__at__9190698639914732028' precondition 'allocator.deallocate != null' failed!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [129 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__push_back__at__15363871578545837817' precondition 'instance != null' failed!\00"
-@function_contract_error_string.3 = private unnamed_addr constant [130 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__push_back__at__15363871578545837817' assert 'Allocation did not fail' failed!\00"
-@function_contract_error_string.4 = private unnamed_addr constant [123 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__get__at__11326571526526506051' precondition 'instance != null' failed!\00"
-@function_contract_error_string.5 = private unnamed_addr constant [131 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__get__at__11326571526526506051' precondition 'index < instance->length' failed!\00"
+@iris_error_string = private unnamed_addr constant [136 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__create__at__9435930352103716202' precondition 'allocator.allocate != null' failed!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [138 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__create__at__9435930352103716202' precondition 'allocator.deallocate != null' failed!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [129 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__push_back__at__1509216844805279606' precondition 'instance != null' failed!\0A\00"
+@iris_error_string.3 = private unnamed_addr constant [162 x i8] c"dynamic_array_usage.iris:46:13: In function 'dynamic_array_usage.dynamic_array__at__push_back__at__1509216844805279606' assert 'Allocation did not fail' failed!\0A\00"
+@iris_error_string.4 = private unnamed_addr constant [124 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__get__at__16027583573935281112' precondition 'instance != null' failed!\0A\00"
+@iris_error_string.5 = private unnamed_addr constant [132 x i8] c"In function 'dynamic_array_usage.dynamic_array__at__get__at__16027583573935281112' precondition 'index < instance->length' failed!\0A\00"
 
 ; Function Attrs: convergent
 define private void @dynamic_array_usage_run() #0 {
 entry:
   %allocator = alloca %struct.dynamic_array_Allocator, align 8
-  %0 = alloca %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, align 8
-  %instance = alloca %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, align 8
+  %0 = alloca %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, align 8
+  %instance = alloca %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, align 8
   %element = alloca i32, align 4
   %1 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %allocator, i32 0, i32 0
   store ptr null, ptr %1, align 8
@@ -4895,20 +5887,19 @@ entry:
   %4 = load ptr, ptr %3, align 8
   %5 = getelementptr inbounds { ptr, ptr }, ptr %allocator, i32 0, i32 1
   %6 = load ptr, ptr %5, align 8
-  call void @dynamic_array__at__create__at__9190698639914732028(ptr dead_on_unwind noalias writable sret(%struct.dynamic_array__at__Dynamic_array__at__10870525800499546629) align 8 %0, ptr %4, ptr %6)
-  %7 = load %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %0, align 8
-  store %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629 %7, ptr %instance, align 8
-  call void @dynamic_array__at__push_back__at__15363871578545837817(ptr noundef %instance, i32 noundef 1)
-  %8 = call i32 @dynamic_array__at__get__at__11326571526526506051(ptr noundef %instance, i64 noundef 0)
-  store i32 %8, ptr %element, align 4
+  call void @dynamic_array__at__create__at__9435930352103716202(ptr dead_on_unwind noalias writable sret(%struct.dynamic_array__at__Dynamic_array__at__7430847874973399898) align 8 %0, ptr %4, ptr %6)
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %instance, ptr align 8 %0, i64 40, i1 false)
+  call void @dynamic_array__at__push_back__at__1509216844805279606(ptr noundef %instance, i32 noundef 1)
+  %7 = call i32 @dynamic_array__at__get__at__16027583573935281112(ptr noundef %instance, i64 noundef 0)
+  store i32 %7, ptr %element, align 4
   ret void
 }
 
 ; Function Attrs: convergent
-define private void @dynamic_array__at__create__at__9190698639914732028(ptr dead_on_unwind noalias writable sret(%struct.dynamic_array__at__Dynamic_array__at__10870525800499546629) align 8 %return.instance, ptr %"arguments[0].allocator_0", ptr %"arguments[0].allocator_1") #0 {
+define private void @dynamic_array__at__create__at__9435930352103716202(ptr dead_on_unwind noalias writable sret(%struct.dynamic_array__at__Dynamic_array__at__7430847874973399898) align 8 %return.instance, ptr %"arguments[0].allocator_0", ptr %"arguments[0].allocator_1") #0 {
 entry:
   %allocator = alloca %struct.dynamic_array_Allocator, align 8
-  %0 = alloca %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, align 8
+  %0 = alloca %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, align 8
   %1 = getelementptr inbounds { ptr, ptr }, ptr %allocator, i32 0, i32 0
   store ptr %"arguments[0].allocator_0", ptr %1, align 8
   %2 = getelementptr inbounds { ptr, ptr }, ptr %allocator, i32 0, i32 1
@@ -4916,40 +5907,47 @@ entry:
   %3 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %allocator, i32 0, i32 0
   %4 = load ptr, ptr %3, align 8
   %5 = icmp ne ptr %4, null
-  br i1 %5, label %condition_success, label %condition_fail
+  %6 = zext i1 %5 to i8
+  %7 = trunc i8 %6 to i1
+  br i1 %7, label %condition_success, label %condition_fail
 
 condition_success:                                ; preds = %entry
-  %6 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %allocator, i32 0, i32 1
-  %7 = load ptr, ptr %6, align 8
-  %8 = icmp ne ptr %7, null
-  br i1 %8, label %condition_success1, label %condition_fail2
+  %8 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %allocator, i32 0, i32 1
+  %9 = load ptr, ptr %8, align 8
+  %10 = icmp ne ptr %9, null
+  %11 = zext i1 %10 to i8
+  %12 = trunc i8 %11 to i1
+  br i1 %12, label %condition_success1, label %condition_fail2
 
 condition_fail:                                   ; preds = %entry
-  %9 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %13 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %14 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 condition_success1:                               ; preds = %condition_success
-  %10 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %0, i32 0, i32 0
-  store ptr null, ptr %10, align 8
-  %11 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %0, i32 0, i32 1
-  store i64 0, ptr %11, align 8
-  %12 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %0, i32 0, i32 2
-  store i64 0, ptr %12, align 8
-  %13 = load %struct.dynamic_array_Allocator, ptr %allocator, align 8
-  %14 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %0, i32 0, i32 3
-  store %struct.dynamic_array_Allocator %13, ptr %14, align 8
+  %15 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %0, i32 0, i32 0
+  store ptr null, ptr %15, align 8
+  %16 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %0, i32 0, i32 1
+  store i64 0, ptr %16, align 8
+  %17 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %0, i32 0, i32 2
+  store i64 0, ptr %17, align 8
+  %18 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %0, i32 0, i32 3
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %18, ptr align 8 %allocator, i64 16, i1 false)
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return.instance, ptr align 8 %0, i64 40, i1 false)
   ret void
 
 condition_fail2:                                  ; preds = %condition_success
-  %15 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %19 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer3)
+  %20 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
 ; Function Attrs: convergent
-define private void @dynamic_array__at__push_back__at__15363871578545837817(ptr noundef %"arguments[0].instance", i32 noundef %"arguments[1].element") #0 {
+define private void @dynamic_array__at__push_back__at__1509216844805279606(ptr noundef %"arguments[0].instance", i32 noundef %"arguments[1].element") #0 {
 entry:
   %instance = alloca ptr, align 8
   %element = alloca i32, align 4
@@ -4961,84 +5959,94 @@ entry:
   store i32 %"arguments[1].element", ptr %element, align 4
   %0 = load ptr, ptr %instance, align 8
   %1 = icmp ne ptr %0, null
-  br i1 %1, label %condition_success, label %condition_fail
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %condition_success, label %condition_fail
 
 condition_success:                                ; preds = %entry
-  %2 = load ptr, ptr %instance, align 8
-  %3 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %2, i32 0, i32 1
-  %4 = load i64, ptr %3, align 8
-  %5 = load ptr, ptr %instance, align 8
-  %6 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %5, i32 0, i32 2
-  %7 = load i64, ptr %6, align 8
-  %8 = icmp eq i64 %4, %7
-  br i1 %8, label %if_s0_then, label %if_s1_after
+  %4 = load ptr, ptr %instance, align 8
+  %5 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %4, i32 0, i32 1
+  %6 = load i64, ptr %5, align 8
+  %7 = load ptr, ptr %instance, align 8
+  %8 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %7, i32 0, i32 2
+  %9 = load i64, ptr %8, align 8
+  %10 = icmp eq i64 %6, %9
+  %11 = zext i1 %10 to i8
+  %12 = trunc i8 %11 to i1
+  br i1 %12, label %if_s0_then, label %if_s1_after
 
 condition_fail:                                   ; preds = %entry
-  %9 = call i32 @puts(ptr @function_contract_error_string.2)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %13 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer)
+  %14 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 if_s0_then:                                       ; preds = %condition_success
-  %10 = load ptr, ptr %instance, align 8
-  %11 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %10, i32 0, i32 2
-  %12 = load i64, ptr %11, align 8
-  %13 = add i64 %12, 1
-  %14 = mul i64 2, %13
-  store i64 %14, ptr %new_capacity, align 8
-  %15 = load i64, ptr %new_capacity, align 8
-  %16 = mul i64 %15, 4
-  store i64 %16, ptr %allocation_size_in_bytes, align 8
-  %17 = load ptr, ptr %instance, align 8
-  %18 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %17, i32 0, i32 3
-  %19 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %18, i32 0, i32 0
-  %20 = load ptr, ptr %19, align 8
-  %21 = load i64, ptr %allocation_size_in_bytes, align 8
-  %22 = call ptr %20(i64 noundef %21, i64 noundef 4)
-  store ptr %22, ptr %allocation, align 8
-  %23 = load ptr, ptr %allocation, align 8
-  %24 = icmp ne ptr %23, null
-  br i1 %24, label %condition_success1, label %condition_fail2
+  %15 = load ptr, ptr %instance, align 8
+  %16 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %15, i32 0, i32 2
+  %17 = load i64, ptr %16, align 8
+  %18 = add i64 %17, 1
+  %19 = mul i64 2, %18
+  store i64 %19, ptr %new_capacity, align 8
+  %20 = load i64, ptr %new_capacity, align 8
+  %21 = mul i64 %20, 4
+  store i64 %21, ptr %allocation_size_in_bytes, align 8
+  %22 = load ptr, ptr %instance, align 8
+  %23 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %22, i32 0, i32 3
+  %24 = getelementptr inbounds %struct.dynamic_array_Allocator, ptr %23, i32 0, i32 0
+  %25 = load ptr, ptr %24, align 8
+  %26 = load i64, ptr %allocation_size_in_bytes, align 8
+  %27 = call ptr %25(i64 noundef %26, i64 noundef 4)
+  store ptr %27, ptr %allocation, align 8
+  %28 = load ptr, ptr %allocation, align 8
+  %29 = icmp ne ptr %28, null
+  %30 = zext i1 %29 to i8
+  %31 = trunc i8 %30 to i1
+  br i1 %31, label %condition_success1, label %condition_fail2
 
 if_s1_after:                                      ; preds = %condition_success1, %condition_success
-  %25 = load ptr, ptr %instance, align 8
-  %26 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %25, i32 0, i32 1
-  %27 = load i64, ptr %26, align 8
-  store i64 %27, ptr %index, align 8
-  %28 = load i64, ptr %index, align 8
-  %29 = load ptr, ptr %instance, align 8
-  %30 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %29, i32 0, i32 0
-  %31 = load ptr, ptr %30, align 8
-  %array_element_pointer = getelementptr i32, ptr %31, i64 %28
-  %32 = load i32, ptr %element, align 4
-  store i32 %32, ptr %array_element_pointer, align 4
-  %33 = load ptr, ptr %instance, align 8
-  %34 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %33, i32 0, i32 1
-  %35 = load ptr, ptr %instance, align 8
-  %36 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %35, i32 0, i32 1
-  %37 = load i64, ptr %36, align 8
-  %38 = add i64 %37, 1
-  store i64 %38, ptr %34, align 8
+  %32 = load ptr, ptr %instance, align 8
+  %33 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %32, i32 0, i32 1
+  %34 = load i64, ptr %33, align 8
+  store i64 %34, ptr %index, align 8
+  %35 = load i64, ptr %index, align 8
+  %36 = load ptr, ptr %instance, align 8
+  %37 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %36, i32 0, i32 0
+  %38 = load ptr, ptr %37, align 8
+  %array_element_pointer = getelementptr i32, ptr %38, i64 %35
+  %39 = load i32, ptr %element, align 4
+  store i32 %39, ptr %array_element_pointer, align 4
+  %40 = load ptr, ptr %instance, align 8
+  %41 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %40, i32 0, i32 1
+  %42 = load ptr, ptr %instance, align 8
+  %43 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %42, i32 0, i32 1
+  %44 = load i64, ptr %43, align 8
+  %45 = add i64 %44, 1
+  store i64 %45, ptr %41, align 8
   ret void
 
 condition_success1:                               ; preds = %if_s0_then
-  %39 = load ptr, ptr %instance, align 8
-  %40 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %39, i32 0, i32 0
-  %41 = load ptr, ptr %allocation, align 8
-  store ptr %41, ptr %40, align 8
-  %42 = load ptr, ptr %instance, align 8
-  %43 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %42, i32 0, i32 2
-  %44 = load i64, ptr %new_capacity, align 8
-  store i64 %44, ptr %43, align 8
+  %46 = load ptr, ptr %instance, align 8
+  %47 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %46, i32 0, i32 0
+  %48 = load ptr, ptr %allocation, align 8
+  store ptr %48, ptr %47, align 8
+  %49 = load ptr, ptr %instance, align 8
+  %50 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %49, i32 0, i32 2
+  %51 = load i64, ptr %new_capacity, align 8
+  store i64 %51, ptr %50, align 8
   br label %if_s1_after
 
 condition_fail2:                                  ; preds = %if_s0_then
-  %45 = call i32 @puts(ptr @function_contract_error_string.3)
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %52 = call i32 @fputs(ptr @iris_error_string.3, ptr %stderr_pointer3)
+  %53 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
 ; Function Attrs: convergent
-define private i32 @dynamic_array__at__get__at__11326571526526506051(ptr noundef %"arguments[0].instance", i64 noundef %"arguments[1].index") #0 {
+define private i32 @dynamic_array__at__get__at__16027583573935281112(ptr noundef %"arguments[0].instance", i64 noundef %"arguments[1].index") #0 {
 entry:
   %instance = alloca ptr, align 8
   %index = alloca i64, align 8
@@ -5046,42 +6054,52 @@ entry:
   store i64 %"arguments[1].index", ptr %index, align 8
   %0 = load ptr, ptr %instance, align 8
   %1 = icmp ne ptr %0, null
-  br i1 %1, label %condition_success, label %condition_fail
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %condition_success, label %condition_fail
 
 condition_success:                                ; preds = %entry
-  %2 = load i64, ptr %index, align 8
-  %3 = load ptr, ptr %instance, align 8
-  %4 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %3, i32 0, i32 1
-  %5 = load i64, ptr %4, align 8
-  %6 = icmp ult i64 %2, %5
-  br i1 %6, label %condition_success1, label %condition_fail2
+  %4 = load i64, ptr %index, align 8
+  %5 = load ptr, ptr %instance, align 8
+  %6 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %5, i32 0, i32 1
+  %7 = load i64, ptr %6, align 8
+  %8 = icmp ult i64 %4, %7
+  %9 = zext i1 %8 to i8
+  %10 = trunc i8 %9 to i1
+  br i1 %10, label %condition_success1, label %condition_fail2
 
 condition_fail:                                   ; preds = %entry
-  %7 = call i32 @puts(ptr @function_contract_error_string.4)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %11 = call i32 @fputs(ptr @iris_error_string.4, ptr %stderr_pointer)
+  %12 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 condition_success1:                               ; preds = %condition_success
-  %8 = load i64, ptr %index, align 8
-  %9 = load ptr, ptr %instance, align 8
-  %10 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__10870525800499546629, ptr %9, i32 0, i32 0
-  %11 = load ptr, ptr %10, align 8
-  %array_element_pointer = getelementptr i32, ptr %11, i64 %8
-  %12 = load i32, ptr %array_element_pointer, align 4
-  ret i32 %12
+  %13 = load i64, ptr %index, align 8
+  %14 = load ptr, ptr %instance, align 8
+  %15 = getelementptr inbounds %struct.dynamic_array__at__Dynamic_array__at__7430847874973399898, ptr %14, i32 0, i32 0
+  %16 = load ptr, ptr %15, align 8
+  %array_element_pointer = getelementptr i32, ptr %16, i64 %13
+  %17 = load i32, ptr %array_element_pointer, align 4
+  ret i32 %17
 
 condition_fail2:                                  ; preds = %condition_success
-  %13 = call i32 @puts(ptr @function_contract_error_string.5)
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %18 = call i32 @fputs(ptr @iris_error_string.5, ptr %stderr_pointer3)
+  %19 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
-
-declare void @abort()
-
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
 declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+declare i32 @fputs(ptr, ptr)
+
+declare i32 @fflush(ptr)
+
+declare void @abort()
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
@@ -5139,17 +6157,19 @@ entry:
 for_loop_condition:                               ; preds = %for_loop_update_index, %entry
   %0 = load i32, ptr %index, align 4
   %1 = icmp slt i32 %0, 3
-  br i1 %1, label %for_loop_then, label %for_loop_after
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %for_loop_then, label %for_loop_after
 
 for_loop_then:                                    ; preds = %for_loop_condition
-  %2 = load i32, ptr %index, align 4
-  call void @For_loop_expressions_print_integer(i32 noundef %2)
+  %4 = load i32, ptr %index, align 4
+  call void @For_loop_expressions_print_integer(i32 noundef %4)
   br label %for_loop_update_index
 
 for_loop_update_index:                            ; preds = %for_loop_then
-  %3 = load i32, ptr %index, align 4
-  %4 = add i32 %3, 1
-  store i32 %4, ptr %index, align 4
+  %5 = load i32, ptr %index, align 4
+  %6 = add i32 %5, 1
+  store i32 %6, ptr %index, align 4
   br label %for_loop_condition
 
 for_loop_after:                                   ; preds = %for_loop_condition
@@ -5157,19 +6177,21 @@ for_loop_after:                                   ; preds = %for_loop_condition
   br label %for_loop_condition2
 
 for_loop_condition2:                              ; preds = %for_loop_update_index4, %for_loop_after
-  %5 = load i32, ptr %index1, align 4
-  %6 = icmp slt i32 %5, 4
-  br i1 %6, label %for_loop_then3, label %for_loop_after5
+  %7 = load i32, ptr %index1, align 4
+  %8 = icmp slt i32 %7, 4
+  %9 = zext i1 %8 to i8
+  %10 = trunc i8 %9 to i1
+  br i1 %10, label %for_loop_then3, label %for_loop_after5
 
 for_loop_then3:                                   ; preds = %for_loop_condition2
-  %7 = load i32, ptr %index1, align 4
-  call void @For_loop_expressions_print_integer(i32 noundef %7)
+  %11 = load i32, ptr %index1, align 4
+  call void @For_loop_expressions_print_integer(i32 noundef %11)
   br label %for_loop_update_index4
 
 for_loop_update_index4:                           ; preds = %for_loop_then3
-  %8 = load i32, ptr %index1, align 4
-  %9 = add i32 %8, 1
-  store i32 %9, ptr %index1, align 4
+  %12 = load i32, ptr %index1, align 4
+  %13 = add i32 %12, 1
+  store i32 %13, ptr %index1, align 4
   br label %for_loop_condition2
 
 for_loop_after5:                                  ; preds = %for_loop_condition2
@@ -5177,19 +6199,21 @@ for_loop_after5:                                  ; preds = %for_loop_condition2
   br label %for_loop_condition7
 
 for_loop_condition7:                              ; preds = %for_loop_update_index9, %for_loop_after5
-  %10 = load i32, ptr %index6, align 4
-  %11 = icmp sgt i32 %10, 0
-  br i1 %11, label %for_loop_then8, label %for_loop_after10
+  %14 = load i32, ptr %index6, align 4
+  %15 = icmp sgt i32 %14, 0
+  %16 = zext i1 %15 to i8
+  %17 = trunc i8 %16 to i1
+  br i1 %17, label %for_loop_then8, label %for_loop_after10
 
 for_loop_then8:                                   ; preds = %for_loop_condition7
-  %12 = load i32, ptr %index6, align 4
-  call void @For_loop_expressions_print_integer(i32 noundef %12)
+  %18 = load i32, ptr %index6, align 4
+  call void @For_loop_expressions_print_integer(i32 noundef %18)
   br label %for_loop_update_index9
 
 for_loop_update_index9:                           ; preds = %for_loop_then8
-  %13 = load i32, ptr %index6, align 4
-  %14 = add i32 %13, -1
-  store i32 %14, ptr %index6, align 4
+  %19 = load i32, ptr %index6, align 4
+  %20 = add i32 %19, -1
+  store i32 %20, ptr %index6, align 4
   br label %for_loop_condition7
 
 for_loop_after10:                                 ; preds = %for_loop_condition7
@@ -5197,19 +6221,21 @@ for_loop_after10:                                 ; preds = %for_loop_condition7
   br label %for_loop_condition12
 
 for_loop_condition12:                             ; preds = %for_loop_update_index14, %for_loop_after10
-  %15 = load i32, ptr %index11, align 4
-  %16 = icmp sgt i32 %15, 0
-  br i1 %16, label %for_loop_then13, label %for_loop_after15
+  %21 = load i32, ptr %index11, align 4
+  %22 = icmp sgt i32 %21, 0
+  %23 = zext i1 %22 to i8
+  %24 = trunc i8 %23 to i1
+  br i1 %24, label %for_loop_then13, label %for_loop_after15
 
 for_loop_then13:                                  ; preds = %for_loop_condition12
-  %17 = load i32, ptr %index11, align 4
-  call void @For_loop_expressions_print_integer(i32 noundef %17)
+  %25 = load i32, ptr %index11, align 4
+  call void @For_loop_expressions_print_integer(i32 noundef %25)
   br label %for_loop_update_index14
 
 for_loop_update_index14:                          ; preds = %for_loop_then13
-  %18 = load i32, ptr %index11, align 4
-  %19 = add i32 %18, -1
-  store i32 %19, ptr %index11, align 4
+  %26 = load i32, ptr %index11, align 4
+  %27 = add i32 %26, -1
+  store i32 %27, ptr %index11, align 4
   br label %for_loop_condition12
 
 for_loop_after15:                                 ; preds = %for_loop_condition12
@@ -5324,13 +6350,13 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     };
 
     char const* const expected_llvm_ir = R"(
-%struct.function_pointer_through_global__at__Holder__at__16854961200032185695 = type { ptr }
+%struct.function_pointer_through_global__at__Holder__at__14305604589136276772 = type { ptr }
 
-@function_pointer_through_global_identity_hash_u64 = constant ptr @function_pointer_through_global__at__identity_hash__at__6786277289116093716
-@function_pointer_through_global_make_holder_u64 = constant ptr @function_pointer_through_global__at__make_holder__at__12710636169570723101
+@function_pointer_through_global_identity_hash_u64 = constant ptr @function_pointer_through_global__at__identity_hash__at__10897834896415719597
+@function_pointer_through_global_make_holder_u64 = constant ptr @function_pointer_through_global__at__make_holder__at__9296601953994732259
 
 ; Function Attrs: convergent
-define private i64 @function_pointer_through_global__at__identity_hash__at__6786277289116093716(ptr noundef %"arguments[0].key") #0 {
+define private i64 @function_pointer_through_global__at__identity_hash__at__10897834896415719597(ptr noundef %"arguments[0].key") #0 {
 entry:
   %key = alloca ptr, align 8
   store ptr %"arguments[0].key", ptr %key, align 8
@@ -5338,15 +6364,15 @@ entry:
 }
 
 ; Function Attrs: convergent
-define private ptr @function_pointer_through_global__at__make_holder__at__12710636169570723101(ptr noundef %"arguments[0].hash_fn") #0 {
+define private ptr @function_pointer_through_global__at__make_holder__at__9296601953994732259(ptr noundef %"arguments[0].hash_fn") #0 {
 entry:
   %hash_fn = alloca ptr, align 8
-  %0 = alloca %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, align 8
+  %0 = alloca %struct.function_pointer_through_global__at__Holder__at__14305604589136276772, align 8
   store ptr %"arguments[0].hash_fn", ptr %hash_fn, align 8
   %1 = load ptr, ptr %hash_fn, align 8
-  %2 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, i32 0, i32 0
+  %2 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__14305604589136276772, ptr %0, i32 0, i32 0
   store ptr %1, ptr %2, align 8
-  %3 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__14305604589136276772, ptr %0, i32 0, i32 0
   %4 = load ptr, ptr %3, align 8
   ret ptr %4
 }
@@ -5354,29 +6380,32 @@ entry:
 ; Function Attrs: convergent
 define private void @function_pointer_through_global_test_function_pointer_global_passthrough_abi() #0 {
 entry:
-  %0 = alloca %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, align 8
-  %holder = alloca %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, align 8
+  %0 = alloca %struct.function_pointer_through_global__at__Holder__at__14305604589136276772, align 8
+  %holder = alloca %struct.function_pointer_through_global__at__Holder__at__14305604589136276772, align 8
   %x = alloca i64, align 8
   %f = alloca ptr, align 8
   %result = alloca i64, align 8
   %1 = load ptr, ptr @function_pointer_through_global_make_holder_u64, align 8
   %2 = load ptr, ptr @function_pointer_through_global_identity_hash_u64, align 8
   %3 = call ptr %1(ptr noundef %2)
-  %4 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, i32 0, i32 0
+  %4 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__14305604589136276772, ptr %0, i32 0, i32 0
   store ptr %3, ptr %4, align 8
-  %5 = load %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %0, align 8
-  store %struct.function_pointer_through_global__at__Holder__at__16854961200032185695 %5, ptr %holder, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %holder, ptr align 8 %0, i64 8, i1 false)
   store i64 1, ptr %x, align 8
-  %6 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__16854961200032185695, ptr %holder, i32 0, i32 0
-  %7 = load ptr, ptr %6, align 8
-  store ptr %7, ptr %f, align 8
-  %8 = load ptr, ptr %f, align 8
-  %9 = call i64 %8(ptr noundef %x)
-  store i64 %9, ptr %result, align 8
+  %5 = getelementptr inbounds %struct.function_pointer_through_global__at__Holder__at__14305604589136276772, ptr %holder, i32 0, i32 0
+  %6 = load ptr, ptr %5, align 8
+  store ptr %6, ptr %f, align 8
+  %7 = load ptr, ptr %f, align 8
+  %8 = call i64 %7(ptr noundef %x)
+  store i64 %8, ptr %result, align 8
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -5443,16 +6472,20 @@ entry:
   store i32 %"arguments[0].value", ptr %value, align 4
   %0 = load i32, ptr %value, align 4
   %1 = icmp eq i32 %0, 0
-  br i1 %1, label %if_s0_then, label %if_s1_after
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
   call void @If_expressions_print_message(ptr noundef @global_1)
   br label %if_s1_after
 
 if_s1_after:                                      ; preds = %if_s0_then, %entry
-  %2 = load i32, ptr %value, align 4
-  %3 = icmp slt i32 %2, 0
-  br i1 %3, label %if_s0_then1, label %if_s1_else
+  %4 = load i32, ptr %value, align 4
+  %5 = icmp slt i32 %4, 0
+  %6 = zext i1 %5 to i8
+  %7 = trunc i8 %6 to i1
+  br i1 %7, label %if_s0_then1, label %if_s1_else
 
 if_s0_then1:                                      ; preds = %if_s1_after
   call void @If_expressions_print_message(ptr noundef @global_2)
@@ -5463,36 +6496,44 @@ if_s1_else:                                       ; preds = %if_s1_after
   br label %if_s2_after
 
 if_s2_after:                                      ; preds = %if_s1_else, %if_s0_then1
-  %4 = load i32, ptr %value, align 4
-  %5 = icmp slt i32 %4, 0
-  br i1 %5, label %if_s0_then2, label %if_s1_else3
+  %8 = load i32, ptr %value, align 4
+  %9 = icmp slt i32 %8, 0
+  %10 = zext i1 %9 to i8
+  %11 = trunc i8 %10 to i1
+  br i1 %11, label %if_s0_then2, label %if_s1_else3
 
 if_s0_then2:                                      ; preds = %if_s2_after
   call void @If_expressions_print_message(ptr noundef @global_4)
   br label %if_s3_after
 
 if_s1_else3:                                      ; preds = %if_s2_after
-  %6 = load i32, ptr %value, align 4
-  %7 = icmp sgt i32 %6, 0
-  br i1 %7, label %if_s2_then, label %if_s3_after
+  %12 = load i32, ptr %value, align 4
+  %13 = icmp sgt i32 %12, 0
+  %14 = zext i1 %13 to i8
+  %15 = trunc i8 %14 to i1
+  br i1 %15, label %if_s2_then, label %if_s3_after
 
 if_s2_then:                                       ; preds = %if_s1_else3
   call void @If_expressions_print_message(ptr noundef @global_5)
   br label %if_s3_after
 
 if_s3_after:                                      ; preds = %if_s2_then, %if_s1_else3, %if_s0_then2
-  %8 = load i32, ptr %value, align 4
-  %9 = icmp slt i32 %8, 0
-  br i1 %9, label %if_s0_then4, label %if_s1_else5
+  %16 = load i32, ptr %value, align 4
+  %17 = icmp slt i32 %16, 0
+  %18 = zext i1 %17 to i8
+  %19 = trunc i8 %18 to i1
+  br i1 %19, label %if_s0_then4, label %if_s1_else5
 
 if_s0_then4:                                      ; preds = %if_s3_after
   call void @If_expressions_print_message(ptr noundef @global_6)
   br label %if_s4_after
 
 if_s1_else5:                                      ; preds = %if_s3_after
-  %10 = load i32, ptr %value, align 4
-  %11 = icmp sgt i32 %10, 0
-  br i1 %11, label %if_s2_then6, label %if_s3_else
+  %20 = load i32, ptr %value, align 4
+  %21 = icmp sgt i32 %20, 0
+  %22 = zext i1 %21 to i8
+  %23 = trunc i8 %22 to i1
+  br i1 %23, label %if_s2_then6, label %if_s3_else
 
 if_s2_then6:                                      ; preds = %if_s1_else5
   call void @If_expressions_print_message(ptr noundef @global_7)
@@ -5504,18 +6545,20 @@ if_s3_else:                                       ; preds = %if_s1_else5
 
 if_s4_after:                                      ; preds = %if_s3_else, %if_s2_then6, %if_s0_then4
   store i8 1, ptr %c_boolean, align 1
-  %12 = load i8, ptr %c_boolean, align 1
-  %13 = trunc i8 %12 to i1
-  br i1 %13, label %if_s0_then7, label %if_s1_after8
+  %24 = load i8, ptr %c_boolean, align 1
+  %25 = trunc i8 %24 to i1
+  br i1 %25, label %if_s0_then7, label %if_s1_after8
 
 if_s0_then7:                                      ; preds = %if_s4_after
   call void @If_expressions_print_message(ptr noundef @global_9)
   br label %if_s1_after8
 
 if_s1_after8:                                     ; preds = %if_s0_then7, %if_s4_after
-  %14 = load i8, ptr %c_boolean, align 1
-  %15 = icmp eq i8 %14, 0
-  br i1 %15, label %if_s0_then9, label %if_s1_after10
+  %26 = load i8, ptr %c_boolean, align 1
+  %27 = icmp eq i8 %26, 0
+  %28 = zext i1 %27 to i8
+  %29 = trunc i8 %28 to i1
+  br i1 %29, label %if_s0_then9, label %if_s1_after10
 
 if_s0_then9:                                      ; preds = %if_s1_after8
   call void @If_expressions_print_message(ptr noundef @global_10)
@@ -5553,8 +6596,9 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 %struct.If_expressions_2_Container = type { %struct.iris_builtin_Generic_array_slice }
 %struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
-@function_contract_error_string = private unnamed_addr constant [66 x i8] c"Out-of-bounds array slice access in 'If_expressions_2.get_value'!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [66 x i8] c"Out-of-bounds array slice access in 'If_expressions_2.get_value'!\00"
+@iris_error_string = private unnamed_addr constant [96 x i8] c"if_expressions_2.iris:12:16: Out-of-bounds array slice access in 'If_expressions_2.get_value'!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [96 x i8] c"if_expressions_2.iris:16:16: Out-of-bounds array slice access in 'If_expressions_2.get_value'!\0A\00"
 
 ; Function Attrs: convergent
 define private i64 @If_expressions_2_get_value(i64 noundef %"arguments[0].id", ptr noundef %"arguments[1].container") #0 {
@@ -5565,50 +6609,58 @@ entry:
   store ptr %"arguments[1].container", ptr %container, align 8
   %0 = load i64, ptr %id, align 8
   %1 = icmp eq i64 %0, 1
-  br i1 %1, label %if_s0_then, label %if_s1_else
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %if_s0_then, label %if_s1_else
 
 if_s0_then:                                       ; preds = %entry
-  %2 = load ptr, ptr %container, align 8
-  %3 = getelementptr inbounds %struct.If_expressions_2_Container, ptr %2, i32 0, i32 0
-  %4 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 1
-  %5 = load i64, ptr %4, align 8
-  %bounds_check_in_bounds = icmp ult i64 0, %5
+  %4 = load ptr, ptr %container, align 8
+  %5 = getelementptr inbounds %struct.If_expressions_2_Container, ptr %4, i32 0, i32 0
+  %6 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %5, i32 0, i32 1
+  %7 = load i64, ptr %6, align 8
+  %bounds_check_in_bounds = icmp ult i64 0, %7
   br i1 %bounds_check_in_bounds, label %bounds_check_pass, label %bounds_check_fail
 
 if_s1_else:                                       ; preds = %entry
-  %6 = load ptr, ptr %container, align 8
-  %7 = getelementptr inbounds %struct.If_expressions_2_Container, ptr %6, i32 0, i32 0
-  %8 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %7, i32 0, i32 1
-  %9 = load i64, ptr %8, align 8
-  %bounds_check_in_bounds1 = icmp ult i64 1, %9
+  %8 = load ptr, ptr %container, align 8
+  %9 = getelementptr inbounds %struct.If_expressions_2_Container, ptr %8, i32 0, i32 0
+  %10 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %9, i32 0, i32 1
+  %11 = load i64, ptr %10, align 8
+  %bounds_check_in_bounds1 = icmp ult i64 1, %11
   br i1 %bounds_check_in_bounds1, label %bounds_check_pass2, label %bounds_check_fail3
 
 bounds_check_pass:                                ; preds = %if_s0_then
-  %10 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %3, i32 0, i32 0
-  %11 = load ptr, ptr %10, align 8
-  %array_slice_element_pointer = getelementptr i64, ptr %11, i64 0
-  %12 = load i64, ptr %array_slice_element_pointer, align 8
-  ret i64 %12
+  %12 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %5, i32 0, i32 0
+  %13 = load ptr, ptr %12, align 8
+  %array_slice_element_pointer = getelementptr i64, ptr %13, i64 0
+  %14 = load i64, ptr %array_slice_element_pointer, align 8
+  ret i64 %14
 
 bounds_check_fail:                                ; preds = %if_s0_then
-  %13 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %15 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %16 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 bounds_check_pass2:                               ; preds = %if_s1_else
-  %14 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %7, i32 0, i32 0
-  %15 = load ptr, ptr %14, align 8
-  %array_slice_element_pointer4 = getelementptr i64, ptr %15, i64 1
-  %16 = load i64, ptr %array_slice_element_pointer4, align 8
-  ret i64 %16
+  %17 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %9, i32 0, i32 0
+  %18 = load ptr, ptr %17, align 8
+  %array_slice_element_pointer5 = getelementptr i64, ptr %18, i64 1
+  %19 = load i64, ptr %array_slice_element_pointer5, align 8
+  ret i64 %19
 
 bounds_check_fail3:                               ; preds = %if_s1_else
-  %17 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer4 = load ptr, ptr @stderr, align 8
+  %20 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer4)
+  %21 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -5634,7 +6686,9 @@ entry:
   store i32 %"arguments[0].value", ptr %value, align 4
   %0 = load i32, ptr %value, align 4
   %1 = icmp eq i32 %0, 0
-  br i1 %1, label %if_s0_then, label %if_s1_else
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %if_s0_then, label %if_s1_else
 
 if_s0_then:                                       ; preds = %entry
   ret i32 1
@@ -5879,11 +6933,15 @@ entry:
   store i8 0, ptr %c, align 1
   store ptr null, ptr %d, align 8
   store i32 0, ptr %e, align 4
-  store [4 x i32] zeroinitializer, ptr %f, align 4
+  call void @llvm.memset.p0.i64(ptr align 4 %f, i8 0, i64 16, i1 false)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -5912,24 +6970,27 @@ entry:
   %1 = getelementptr inbounds %struct.Load_pointers_My_struct, ptr %0, i32 0, i32 0
   %2 = load ptr, ptr %1, align 8
   %3 = icmp ne ptr %2, null
-  br i1 %3, label %if_s0_then, label %if_s1_after
+  %4 = zext i1 %3 to i8
+  %5 = trunc i8 %4 to i1
+  br i1 %5, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
   br label %if_s1_after
 
 if_s1_after:                                      ; preds = %if_s0_then, %entry
-  %4 = load ptr, ptr %instance, align 8
-  %array_element_pointer = getelementptr %struct.Load_pointers_My_struct, ptr %4, i32 0
+  %6 = load ptr, ptr %instance, align 8
+  %array_element_pointer = getelementptr %struct.Load_pointers_My_struct, ptr %6, i32 0
   store ptr %array_element_pointer, ptr %p0, align 8
-  %5 = load ptr, ptr %instance, align 8
-  %array_element_pointer1 = getelementptr %struct.Load_pointers_My_struct, ptr %5, i32 0
-  %6 = load %struct.Load_pointers_My_struct, ptr %array_element_pointer1, align 8
-  store %struct.Load_pointers_My_struct %6, ptr %v0, align 8
+  %7 = load ptr, ptr %instance, align 8
+  %array_element_pointer1 = getelementptr %struct.Load_pointers_My_struct, ptr %7, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %v0, ptr align 8 %array_element_pointer1, i64 8, i1 false)
   store ptr null, ptr %n, align 8
-  %7 = load ptr, ptr %p0, align 8
-  %8 = load ptr, ptr %n, align 8
-  %9 = icmp eq ptr %7, %8
-  br i1 %9, label %if_s0_then2, label %if_s1_after3
+  %8 = load ptr, ptr %p0, align 8
+  %9 = load ptr, ptr %n, align 8
+  %10 = icmp eq ptr %8, %9
+  %11 = zext i1 %10 to i8
+  %12 = trunc i8 %11 to i1
+  br i1 %12, label %if_s0_then2, label %if_s1_after3
 
 if_s0_then2:                                      ; preds = %if_s1_after
   br label %if_s1_after3
@@ -5938,7 +6999,11 @@ if_s1_after3:                                     ; preds = %if_s0_then2, %if_s1
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -5962,16 +7027,16 @@ entry:
   %p1 = alloca ptr, align 8
   store ptr %"arguments[0].external_pointer", ptr %external_pointer, align 8
   %0 = load ptr, ptr %external_pointer, align 8
-  %1 = call ptr @Merge_functions__at__cast__at__10621281525101525598(ptr noundef %0)
+  %1 = call ptr @Merge_functions__at__cast__at__15354926537351983944(ptr noundef %0)
   store ptr %1, ptr %p0, align 8
   %2 = load ptr, ptr %external_pointer, align 8
-  %3 = call ptr @Merge_functions__at__cast__at__10621281525101525598(ptr noundef %2)
+  %3 = call ptr @Merge_functions__at__cast__at__15354926537351983944(ptr noundef %2)
   store ptr %3, ptr %p1, align 8
   ret void
 }
 
 ; Function Attrs: convergent
-define private ptr @Merge_functions__at__cast__at__10621281525101525598(ptr noundef %"arguments[0].value") #0 {
+define private ptr @Merge_functions__at__cast__at__15354926537351983944(ptr noundef %"arguments[0].value") #0 {
 entry:
   %value = alloca ptr, align 8
   store ptr %"arguments[0].value", ptr %value, align 8
@@ -6079,15 +7144,19 @@ entry:
     #dbg_declare(ptr %parameter, !9, !DIExpression(), !11)
   %0 = load ptr, ptr %parameter, align 8, !dbg !12
   %1 = icmp eq ptr %0, null, !dbg !12
-  br i1 %1, label %if_s0_then, label %if_s1_after, !dbg !12
+  %2 = zext i1 %1 to i8, !dbg !12
+  %3 = trunc i8 %2 to i1, !dbg !12
+  br i1 %3, label %if_s0_then, label %if_s1_after, !dbg !12
 
 if_s0_then:                                       ; preds = %entry
   ret i32 -1, !dbg !13
 
 if_s1_after:                                      ; preds = %entry
-  %2 = load ptr, ptr %parameter, align 8, !dbg !15
-  %3 = icmp ne ptr %2, null, !dbg !15
-  br i1 %3, label %if_s0_then1, label %if_s1_after2, !dbg !15
+  %4 = load ptr, ptr %parameter, align 8, !dbg !15
+  %5 = icmp ne ptr %4, null, !dbg !15
+  %6 = zext i1 %5 to i8, !dbg !15
+  %7 = trunc i8 %6 to i1, !dbg !15
+  br i1 %7, label %if_s0_then1, label %if_s1_after2, !dbg !15
 
 if_s0_then1:                                      ; preds = %if_s1_after
   ret i32 1, !dbg !16
@@ -6527,16 +7596,14 @@ entry:
   store ptr %stack_array, ptr %3, align 8
   %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 %2, ptr %4, align 8
-  %5 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8
-  store %struct.iris_builtin_Generic_array_slice %5, ptr %array_0, align 8
-  %6 = load i64, ptr %length, align 8
-  %stack_array1 = alloca i32, i64 %6, align 16
-  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
-  store ptr %stack_array1, ptr %7, align 8
-  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
-  store i64 %6, ptr %8, align 8
-  %9 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8
-  store %struct.iris_builtin_Generic_array_slice %9, ptr %array_1, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array_0, ptr align 8 %0, i64 16, i1 false)
+  %5 = load i64, ptr %length, align 8
+  %stack_array1 = alloca i32, i64 %5, align 16
+  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  store ptr %stack_array1, ptr %6, align 8
+  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  store i64 %5, ptr %7, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array_1, ptr align 8 %1, i64 16, i1 false)
   call void @llvm.stackrestore.p0(ptr %stack_save_pointer)
   ret void
 }
@@ -6544,11 +7611,15 @@ entry:
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare ptr @llvm.stacksave.p0() #1
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #2
+
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare void @llvm.stackrestore.p0(ptr) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nosync nounwind willreturn }
+attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -6582,27 +7653,27 @@ entry:
   store ptr %stack_array, ptr %3, align 8
   %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
   store i64 %2, ptr %4, align 8
-  %5 = load %struct.iris_builtin_Generic_array_slice, ptr %0, align 8
-  store %struct.iris_builtin_Generic_array_slice %5, ptr %array_0, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array_0, ptr align 8 %0, i64 16, i1 false)
   store i64 1, ptr %index, align 8
   br label %for_loop_condition
 
 for_loop_condition:                               ; preds = %for_loop_update_index, %entry
-  %6 = load i64, ptr %length, align 8
-  %7 = load i64, ptr %index, align 8
-  %8 = icmp ult i64 %7, %6
-  br i1 %8, label %for_loop_then, label %for_loop_after
+  %5 = load i64, ptr %length, align 8
+  %6 = load i64, ptr %index, align 8
+  %7 = icmp ult i64 %6, %5
+  %8 = zext i1 %7 to i8
+  %9 = trunc i8 %8 to i1
+  br i1 %9, label %for_loop_then, label %for_loop_after
 
 for_loop_then:                                    ; preds = %for_loop_condition
-  %9 = load i64, ptr %index, align 8
+  %10 = load i64, ptr %index, align 8
   %stack_save_pointer1 = call ptr @llvm.stacksave.p0()
-  %stack_array2 = alloca i32, i64 %9, align 16
-  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
-  store ptr %stack_array2, ptr %10, align 8
-  %11 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
-  store i64 %9, ptr %11, align 8
-  %12 = load %struct.iris_builtin_Generic_array_slice, ptr %1, align 8
-  store %struct.iris_builtin_Generic_array_slice %12, ptr %array_1, align 8
+  %stack_array2 = alloca i32, i64 %10, align 16
+  %11 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  store ptr %stack_array2, ptr %11, align 8
+  %12 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  store i64 %10, ptr %12, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array_1, ptr align 8 %1, i64 16, i1 false)
   %13 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %array_1, i32 0, i32 0
   %14 = load ptr, ptr %13, align 8
   %array_slice_element_pointer = getelementptr i32, ptr %14, i32 0
@@ -6626,11 +7697,15 @@ for_loop_after:                                   ; preds = %for_loop_condition
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare ptr @llvm.stacksave.p0() #1
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #2
+
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare void @llvm.stackrestore.p0(ptr) #1
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
 attributes #1 = { nocallback nofree nosync nounwind willreturn }
+attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -6760,6 +7835,288 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Switch Case Blocks", "[LLVM_IR]")
+  {
+    char const* const input_file = "switch_case_blocks.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define i32 @Switch_case_blocks_run_switch_with_blocks(i32 noundef %"arguments[0].value") #0 {
+entry:
+  %value = alloca i32, align 4
+  %doubled = alloca i32, align 4
+  %tripled = alloca i32, align 4
+  store i32 %"arguments[0].value", ptr %value, align 4
+  %0 = load i32, ptr %value, align 4
+  switch i32 %0, label %switch_case_default [
+    i32 0, label %switch_case_i0_
+    i32 1, label %switch_case_i1_
+    i32 2, label %switch_case_i2_
+  ]
+
+switch_after:                                     ; preds = %switch_case_i1_
+  %1 = load i32, ptr %value, align 4
+  %2 = icmp sgt i32 %1, 10
+  %3 = zext i1 %2 to i8
+  %4 = trunc i8 %3 to i1
+  br i1 %4, label %if_s0_then, label %if_s1_after
+
+switch_case_i0_:                                  ; preds = %entry
+  %5 = load i32, ptr %value, align 4
+  %6 = mul i32 %5, 2
+  store i32 %6, ptr %doubled, align 4
+  %7 = load i32, ptr %doubled, align 4
+  ret i32 %7
+
+switch_case_i1_:                                  ; preds = %entry
+  br label %switch_after
+
+switch_case_i2_:                                  ; preds = %entry
+  %8 = load i32, ptr %value, align 4
+  %9 = mul i32 %8, 3
+  store i32 %9, ptr %tripled, align 4
+  br label %switch_case_default
+
+switch_case_default:                              ; preds = %switch_case_i2_, %entry
+  ret i32 2
+
+if_s0_then:                                       ; preds = %switch_after
+  ret i32 10
+
+if_s1_after:                                      ; preds = %switch_after
+  ret i32 3
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Access Through Pointer Results", "[LLVM_IR]")
+  {
+    char const* const input_file = "access_through_pointer_results.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Access_through_pointer_results_Holder = type { ptr, i32 }
+
+; Function Attrs: convergent
+define i32 @Access_through_pointer_results_read_through_results(ptr noundef %"arguments[0].holder") #0 {
+entry:
+  %holder = alloca ptr, align 8
+  %through_reinterpret = alloca i32, align 4
+  %through_call = alloca i32, align 4
+  %through_arrow = alloca i32, align 4
+  %through_indirection = alloca i32, align 4
+  store ptr %"arguments[0].holder", ptr %holder, align 8
+  %0 = load ptr, ptr %holder, align 8
+  %1 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %0, i32 0, i32 0
+  %2 = load ptr, ptr %1, align 8
+  %array_element_pointer = getelementptr i32, ptr %2, i32 1
+  %3 = load i32, ptr %array_element_pointer, align 4
+  store i32 %3, ptr %through_reinterpret, align 4
+  %4 = load ptr, ptr %holder, align 8
+  %5 = call ptr @Access_through_pointer_results_values_of(ptr noundef %4)
+  %array_element_pointer1 = getelementptr i32, ptr %5, i32 1
+  %6 = load i32, ptr %array_element_pointer1, align 4
+  store i32 %6, ptr %through_call, align 4
+  %7 = load ptr, ptr %holder, align 8
+  %8 = call ptr @Access_through_pointer_results_identity(ptr noundef %7)
+  %9 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %8, i32 0, i32 1
+  %10 = load i32, ptr %9, align 4
+  store i32 %10, ptr %through_arrow, align 4
+  %11 = load ptr, ptr %holder, align 8
+  %12 = call ptr @Access_through_pointer_results_values_of(ptr noundef %11)
+  %13 = load i32, ptr %12, align 4
+  store i32 %13, ptr %through_indirection, align 4
+  %14 = load ptr, ptr %holder, align 8
+  %15 = call ptr @Access_through_pointer_results_values_of(ptr noundef %14)
+  %array_element_pointer2 = getelementptr i32, ptr %15, i32 0
+  store i32 3, ptr %array_element_pointer2, align 4
+  %16 = load ptr, ptr %holder, align 8
+  %17 = call ptr @Access_through_pointer_results_identity(ptr noundef %16)
+  %18 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %17, i32 0, i32 1
+  store i32 9, ptr %18, align 4
+  %19 = load ptr, ptr %holder, align 8
+  %20 = call ptr @Access_through_pointer_results_values_of(ptr noundef %19)
+  store i32 4, ptr %20, align 4
+  %21 = load i32, ptr %through_reinterpret, align 4
+  %22 = load i32, ptr %through_call, align 4
+  %23 = add i32 %21, %22
+  %24 = load i32, ptr %through_arrow, align 4
+  %25 = add i32 %23, %24
+  %26 = load i32, ptr %through_indirection, align 4
+  %27 = add i32 %25, %26
+  ret i32 %27
+}
+
+; Function Attrs: convergent
+define ptr @Access_through_pointer_results_read_pointers_through_results(ptr noundef %"arguments[0].slots", ptr noundef %"arguments[1].handles") #0 {
+entry:
+  %slots = alloca ptr, align 8
+  %handles = alloca ptr, align 8
+  %through_call = alloca ptr, align 8
+  %through_parenthesis = alloca ptr, align 8
+  %through_variable = alloca ptr, align 8
+  %through_double_indirection = alloca i8, align 1
+  store ptr %"arguments[0].slots", ptr %slots, align 8
+  store ptr %"arguments[1].handles", ptr %handles, align 8
+  %0 = load ptr, ptr %slots, align 8
+  %1 = load ptr, ptr %handles, align 8
+  %2 = call ptr @Access_through_pointer_results_first_slot(ptr noundef %0, ptr noundef %1)
+  %3 = load ptr, ptr %2, align 8
+  store ptr %3, ptr %through_call, align 8
+  %4 = load ptr, ptr %slots, align 8
+  %5 = load ptr, ptr %handles, align 8
+  %6 = call ptr @Access_through_pointer_results_first_slot(ptr noundef %4, ptr noundef %5)
+  %7 = load ptr, ptr %6, align 8
+  store ptr %7, ptr %through_parenthesis, align 8
+  %8 = load ptr, ptr %slots, align 8
+  %9 = load ptr, ptr %8, align 8
+  store ptr %9, ptr %through_variable, align 8
+  %10 = load ptr, ptr %handles, align 8
+  %11 = load ptr, ptr %10, align 8
+  %12 = load i8, ptr %11, align 1
+  store i8 %12, ptr %through_double_indirection, align 1
+  %13 = load ptr, ptr %slots, align 8
+  %14 = load ptr, ptr %handles, align 8
+  %15 = call ptr @Access_through_pointer_results_first_slot(ptr noundef %13, ptr noundef %14)
+  %16 = load ptr, ptr %through_call, align 8
+  store ptr %16, ptr %15, align 8
+  %17 = load ptr, ptr %through_variable, align 8
+  ret ptr %17
+}
+
+; Function Attrs: convergent
+define private ptr @Access_through_pointer_results_values_of(ptr noundef %"arguments[0].holder") #0 {
+entry:
+  %holder = alloca ptr, align 8
+  store ptr %"arguments[0].holder", ptr %holder, align 8
+  %0 = load ptr, ptr %holder, align 8
+  %1 = getelementptr inbounds %struct.Access_through_pointer_results_Holder, ptr %0, i32 0, i32 0
+  %2 = load ptr, ptr %1, align 8
+  ret ptr %2
+}
+
+; Function Attrs: convergent
+define private ptr @Access_through_pointer_results_identity(ptr noundef %"arguments[0].holder") #0 {
+entry:
+  %holder = alloca ptr, align 8
+  store ptr %"arguments[0].holder", ptr %holder, align 8
+  %0 = load ptr, ptr %holder, align 8
+  ret ptr %0
+}
+
+; Function Attrs: convergent
+define private ptr @Access_through_pointer_results_first_slot(ptr noundef %"arguments[0].slots", ptr noundef %"arguments[1].handles") #0 {
+entry:
+  %slots = alloca ptr, align 8
+  %handles = alloca ptr, align 8
+  store ptr %"arguments[0].slots", ptr %slots, align 8
+  store ptr %"arguments[1].handles", ptr %handles, align 8
+  %0 = load ptr, ptr %slots, align 8
+  ret ptr %0
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Constant Array Parameters", "[LLVM_IR]")
+  {
+    char const* const input_file = "constant_array_parameters.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Constant_array_parameters_Pair = type { i32, i32 }
+
+; Function Attrs: convergent
+define float @Constant_array_parameters_pass_arrays_by_value(ptr noundef %"arguments[0].pairs") #0 {
+entry:
+  %pairs = alloca ptr, align 8
+  %values = alloca [8 x float], align 4
+  %first = alloca i32, align 4
+  store ptr %"arguments[0].pairs", ptr %pairs, align 8
+  %array_element_pointer = getelementptr [8 x float], ptr %values, i32 0, i32 0
+  store float 1.000000e+00, ptr %array_element_pointer, align 4
+  %array_element_pointer1 = getelementptr [8 x float], ptr %values, i32 0, i32 1
+  store float 2.000000e+00, ptr %array_element_pointer1, align 4
+  %array_element_pointer2 = getelementptr [8 x float], ptr %values, i32 0, i32 2
+  store float 3.000000e+00, ptr %array_element_pointer2, align 4
+  %array_element_pointer3 = getelementptr [8 x float], ptr %values, i32 0, i32 3
+  store float 4.000000e+00, ptr %array_element_pointer3, align 4
+  %array_element_pointer4 = getelementptr [8 x float], ptr %values, i32 0, i32 4
+  store float 5.000000e+00, ptr %array_element_pointer4, align 4
+  %array_element_pointer5 = getelementptr [8 x float], ptr %values, i32 0, i32 5
+  store float 6.000000e+00, ptr %array_element_pointer5, align 4
+  %array_element_pointer6 = getelementptr [8 x float], ptr %values, i32 0, i32 6
+  store float 7.000000e+00, ptr %array_element_pointer6, align 4
+  %array_element_pointer7 = getelementptr [8 x float], ptr %values, i32 0, i32 7
+  store float 8.000000e+00, ptr %array_element_pointer7, align 4
+  %0 = load ptr, ptr %pairs, align 8
+  %1 = call i32 @Constant_array_parameters_first_of_copy(ptr noundef %0)
+  store i32 %1, ptr %first, align 4
+  %2 = call float @Constant_array_parameters_sum_ends(ptr noundef %values)
+  %3 = load i32, ptr %first, align 4
+  %4 = sitofp i32 %3 to float
+  %5 = fadd float %2, %4
+  ret float %5
+}
+
+; Function Attrs: convergent
+define private float @Constant_array_parameters_sum_ends(ptr noundef %"arguments[0].values") #0 {
+entry:
+  %0 = alloca [8 x float], align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %0, ptr align 4 %"arguments[0].values", i64 32, i1 false)
+  %array_element_pointer = getelementptr [8 x float], ptr %0, i32 0, i32 0
+  %1 = load float, ptr %array_element_pointer, align 4
+  %array_element_pointer1 = getelementptr [8 x float], ptr %0, i32 0, i32 7
+  %2 = load float, ptr %array_element_pointer1, align 4
+  %3 = fadd float %1, %2
+  ret float %3
+}
+
+; Function Attrs: convergent
+define private i32 @Constant_array_parameters_first_of_copy(ptr noundef %"arguments[0].pairs") #0 {
+entry:
+  %0 = alloca [3 x %struct.Constant_array_parameters_Pair], align 4
+  %copy = alloca [3 x %struct.Constant_array_parameters_Pair], align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %0, ptr align 4 %"arguments[0].pairs", i64 24, i1 false)
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %copy, ptr align 4 %0, i64 24, i1 false)
+  %array_element_pointer = getelementptr [3 x %struct.Constant_array_parameters_Pair], ptr %copy, i32 0, i32 0
+  %1 = getelementptr inbounds %struct.Constant_array_parameters_Pair, ptr %array_element_pointer, i32 0, i32 0
+  %array_element_pointer1 = getelementptr [3 x %struct.Constant_array_parameters_Pair], ptr %copy, i32 0, i32 0
+  %2 = getelementptr inbounds %struct.Constant_array_parameters_Pair, ptr %array_element_pointer1, i32 0, i32 0
+  store i32 5, ptr %2, align 4
+  %array_element_pointer2 = getelementptr [3 x %struct.Constant_array_parameters_Pair], ptr %copy, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.Constant_array_parameters_Pair, ptr %array_element_pointer2, i32 0, i32 0
+  %4 = load i32, ptr %3, align 4
+  ret i32 %4
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Ternary Condition Expressions", "[LLVM_IR]")
   {
     char const* const input_file = "ternary_condition_expressions.iris";
@@ -6803,7 +8160,9 @@ ternary_condition_end:                            ; preds = %ternary_condition_e
   store i32 %4, ptr %a, align 4
   %5 = load i8, ptr %first_boolean, align 1
   %6 = icmp eq i8 %5, 0
-  br i1 %6, label %ternary_condition_then1, label %ternary_condition_else2
+  %7 = zext i1 %6 to i8
+  %8 = trunc i8 %7 to i1
+  br i1 %8, label %ternary_condition_then1, label %ternary_condition_else2
 
 ternary_condition_then1:                          ; preds = %ternary_condition_end
   br label %ternary_condition_end3
@@ -6812,11 +8171,13 @@ ternary_condition_else2:                          ; preds = %ternary_condition_e
   br label %ternary_condition_end3
 
 ternary_condition_end3:                           ; preds = %ternary_condition_else2, %ternary_condition_then1
-  %7 = phi i32 [ 1, %ternary_condition_then1 ], [ 0, %ternary_condition_else2 ]
-  store i32 %7, ptr %b, align 4
-  %8 = load i8, ptr %first_boolean, align 1
-  %9 = icmp eq i8 %8, 0
-  br i1 %9, label %ternary_condition_then4, label %ternary_condition_else5
+  %9 = phi i32 [ 1, %ternary_condition_then1 ], [ 0, %ternary_condition_else2 ]
+  store i32 %9, ptr %b, align 4
+  %10 = load i8, ptr %first_boolean, align 1
+  %11 = icmp eq i8 %10, 0
+  %12 = zext i1 %11 to i8
+  %13 = trunc i8 %12 to i1
+  br i1 %13, label %ternary_condition_then4, label %ternary_condition_else5
 
 ternary_condition_then4:                          ; preds = %ternary_condition_end3
   br label %ternary_condition_end6
@@ -6825,26 +8186,26 @@ ternary_condition_else5:                          ; preds = %ternary_condition_e
   br label %ternary_condition_end6
 
 ternary_condition_end6:                           ; preds = %ternary_condition_else5, %ternary_condition_then4
-  %10 = phi i32 [ 1, %ternary_condition_then4 ], [ 0, %ternary_condition_else5 ]
-  store i32 %10, ptr %c, align 4
-  %11 = load i8, ptr %first_boolean, align 1
-  %12 = trunc i8 %11 to i1
-  br i1 %12, label %ternary_condition_then7, label %ternary_condition_else8
+  %14 = phi i32 [ 1, %ternary_condition_then4 ], [ 0, %ternary_condition_else5 ]
+  store i32 %14, ptr %c, align 4
+  %15 = load i8, ptr %first_boolean, align 1
+  %16 = trunc i8 %15 to i1
+  br i1 %16, label %ternary_condition_then7, label %ternary_condition_else8
 
 ternary_condition_then7:                          ; preds = %ternary_condition_end6
-  %13 = load i8, ptr %second_boolean, align 1
-  %14 = trunc i8 %13 to i1
-  br i1 %14, label %ternary_condition_then10, label %ternary_condition_else11
+  %17 = load i8, ptr %second_boolean, align 1
+  %18 = trunc i8 %17 to i1
+  br i1 %18, label %ternary_condition_then10, label %ternary_condition_else11
 
 ternary_condition_else8:                          ; preds = %ternary_condition_end6
   br label %ternary_condition_end9
 
 ternary_condition_end9:                           ; preds = %ternary_condition_else8, %ternary_condition_end12
-  %15 = phi i32 [ %18, %ternary_condition_end12 ], [ 0, %ternary_condition_else8 ]
-  store i32 %15, ptr %d, align 4
-  %16 = load i8, ptr %first_boolean, align 1
-  %17 = trunc i8 %16 to i1
-  br i1 %17, label %ternary_condition_then13, label %ternary_condition_else14
+  %19 = phi i32 [ %22, %ternary_condition_end12 ], [ 0, %ternary_condition_else8 ]
+  store i32 %19, ptr %d, align 4
+  %20 = load i8, ptr %first_boolean, align 1
+  %21 = trunc i8 %20 to i1
+  br i1 %21, label %ternary_condition_then13, label %ternary_condition_else14
 
 ternary_condition_then10:                         ; preds = %ternary_condition_then7
   br label %ternary_condition_end12
@@ -6853,25 +8214,25 @@ ternary_condition_else11:                         ; preds = %ternary_condition_t
   br label %ternary_condition_end12
 
 ternary_condition_end12:                          ; preds = %ternary_condition_else11, %ternary_condition_then10
-  %18 = phi i32 [ 2, %ternary_condition_then10 ], [ 1, %ternary_condition_else11 ]
+  %22 = phi i32 [ 2, %ternary_condition_then10 ], [ 1, %ternary_condition_else11 ]
   br label %ternary_condition_end9
 
 ternary_condition_then13:                         ; preds = %ternary_condition_end9
   br label %ternary_condition_end15
 
 ternary_condition_else14:                         ; preds = %ternary_condition_end9
-  %19 = load i8, ptr %second_boolean, align 1
-  %20 = trunc i8 %19 to i1
-  br i1 %20, label %ternary_condition_then16, label %ternary_condition_else17
+  %23 = load i8, ptr %second_boolean, align 1
+  %24 = trunc i8 %23 to i1
+  br i1 %24, label %ternary_condition_then16, label %ternary_condition_else17
 
 ternary_condition_end15:                          ; preds = %ternary_condition_end18, %ternary_condition_then13
-  %21 = phi i32 [ 2, %ternary_condition_then13 ], [ %24, %ternary_condition_end18 ]
-  store i32 %21, ptr %e, align 4
+  %25 = phi i32 [ 2, %ternary_condition_then13 ], [ %28, %ternary_condition_end18 ]
+  store i32 %25, ptr %e, align 4
   store i32 0, ptr %first, align 4
   store i32 1, ptr %second, align 4
-  %22 = load i8, ptr %first_boolean, align 1
-  %23 = trunc i8 %22 to i1
-  br i1 %23, label %ternary_condition_then19, label %ternary_condition_else20
+  %26 = load i8, ptr %first_boolean, align 1
+  %27 = trunc i8 %26 to i1
+  br i1 %27, label %ternary_condition_then19, label %ternary_condition_else20
 
 ternary_condition_then16:                         ; preds = %ternary_condition_else14
   br label %ternary_condition_end18
@@ -6880,24 +8241,24 @@ ternary_condition_else17:                         ; preds = %ternary_condition_e
   br label %ternary_condition_end18
 
 ternary_condition_end18:                          ; preds = %ternary_condition_else17, %ternary_condition_then16
-  %24 = phi i32 [ 1, %ternary_condition_then16 ], [ 0, %ternary_condition_else17 ]
+  %28 = phi i32 [ 1, %ternary_condition_then16 ], [ 0, %ternary_condition_else17 ]
   br label %ternary_condition_end15
 
 ternary_condition_then19:                         ; preds = %ternary_condition_end15
-  %25 = load i32, ptr %first, align 4
+  %29 = load i32, ptr %first, align 4
   br label %ternary_condition_end21
 
 ternary_condition_else20:                         ; preds = %ternary_condition_end15
-  %26 = load i32, ptr %second, align 4
+  %30 = load i32, ptr %second, align 4
   br label %ternary_condition_end21
 
 ternary_condition_end21:                          ; preds = %ternary_condition_else20, %ternary_condition_then19
-  %27 = phi i32 [ %25, %ternary_condition_then19 ], [ %26, %ternary_condition_else20 ]
-  store i32 %27, ptr %f, align 4
+  %31 = phi i32 [ %29, %ternary_condition_then19 ], [ %30, %ternary_condition_else20 ]
+  store i32 %31, ptr %f, align 4
   store i8 1, ptr %c_boolean, align 1
-  %28 = load i8, ptr %c_boolean, align 1
-  %29 = trunc i8 %28 to i1
-  br i1 %29, label %ternary_condition_then22, label %ternary_condition_else23
+  %32 = load i8, ptr %c_boolean, align 1
+  %33 = trunc i8 %32 to i1
+  br i1 %33, label %ternary_condition_then22, label %ternary_condition_else23
 
 ternary_condition_then22:                         ; preds = %ternary_condition_end21
   br label %ternary_condition_end24
@@ -6906,8 +8267,8 @@ ternary_condition_else23:                         ; preds = %ternary_condition_e
   br label %ternary_condition_end24
 
 ternary_condition_end24:                          ; preds = %ternary_condition_else23, %ternary_condition_then22
-  %30 = phi i32 [ 1, %ternary_condition_then22 ], [ 0, %ternary_condition_else23 ]
-  store i32 %30, ptr %g, align 4
+  %34 = phi i32 [ 1, %ternary_condition_then22 ], [ 0, %ternary_condition_else23 ]
+  store i32 %34, ptr %g, align 4
   ret void
 }
 
@@ -6987,15 +8348,30 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 @global_14 = internal constant [7 x i8] c"' vs '\00"
 @global_15 = internal constant [3 x i8] c"'\0A\00"
 @global_16 = internal constant [5 x i8] c"null\00"
-@global_17 = internal constant [3 x i8] c"??\00"
-@global_18 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
-@global_19 = internal constant [7 x i8] c"' vs '\00"
-@global_20 = internal constant [3 x i8] c"'\0A\00"
-@global_21 = internal constant [5 x i8] c"null\00"
-@global_22 = internal constant [3 x i8] c"??\00"
-@global_23 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
-@global_24 = internal constant [7 x i8] c"' vs '\00"
-@global_25 = internal constant [3 x i8] c"'\0A\00"
+@global_17 = internal constant [2 x i8] c"\22\00"
+@global_18 = internal constant [2 x i8] c"A\00"
+@global_19 = internal constant [2 x i8] c"\22\00"
+@global_20 = internal constant [2 x i8] c"\22\00"
+@global_21 = internal constant [2 x i8] c"B\00"
+@global_22 = internal constant [2 x i8] c"\22\00"
+@global_23 = internal constant [3 x i8] c"%d\00"
+@global_24 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
+@global_25 = internal constant [7 x i8] c"' vs '\00"
+@global_26 = internal constant [3 x i8] c"'\0A\00"
+@global_27 = internal constant [5 x i8] c"null\00"
+@global_28 = internal constant [2 x i8] c"\22\00"
+@global_29 = internal constant [4 x i8] c"Red\00"
+@global_30 = internal constant [2 x i8] c"\22\00"
+@global_31 = internal constant [2 x i8] c"\22\00"
+@global_32 = internal constant [6 x i8] c"Green\00"
+@global_33 = internal constant [2 x i8] c"\22\00"
+@global_34 = internal constant [2 x i8] c"\22\00"
+@global_35 = internal constant [5 x i8] c"Blue\00"
+@global_36 = internal constant [2 x i8] c"\22\00"
+@global_37 = internal constant [3 x i8] c"%d\00"
+@global_38 = internal constant [61 x i8] c"Expected vs Actual (Right-hand side vs Left-hand side)\0A    '\00"
+@global_39 = internal constant [7 x i8] c"' vs '\00"
+@global_40 = internal constant [3 x i8] c"'\0A\00"
 
 ; Function Attrs: convergent
 declare i32 @Test_framework_external_get_color() #0
@@ -7008,6 +8384,9 @@ declare i32 @fprintf(ptr noundef, ptr noundef, ...) #0
 
 ; Function Attrs: convergent
 declare i32 @snprintf(ptr noundef, i64 noundef, ptr noundef, ...) #0
+
+; Function Attrs: convergent
+declare i32 @memcpy_s(ptr noundef, i64 noundef, ptr noundef, i64 noundef) #0
 
 ; Function Attrs: convergent
 declare i64 @strlen(ptr noundef) #0
@@ -7036,89 +8415,101 @@ define void @Test_framework_test_addition() #0 {{
 entry:
   %__lhs = alloca i32, align 4
   %__rhs = alloca i32, align 4
-  %__condition = alloca i1, align 1
+  %__condition = alloca i8, align 1
   %__lhs1 = alloca i32, align 4
   %__rhs2 = alloca i32, align 4
-  %__condition3 = alloca i1, align 1
+  %__condition3 = alloca i8, align 1
   %__lhs6 = alloca i32, align 4
   %__rhs7 = alloca i32, align 4
-  %__condition8 = alloca i1, align 1
+  %__condition8 = alloca i8, align 1
   %__lhs11 = alloca i32, align 4
   %__rhs12 = alloca i32, align 4
-  %__condition13 = alloca i1, align 1
+  %__condition13 = alloca i8, align 1
   %0 = call i32 @Test_framework_add(i32 noundef 1, i32 noundef 2)
   store i32 %0, ptr %__lhs, align 4
   store i32 3, ptr %__rhs, align 4
   %1 = load i32, ptr %__lhs, align 4
   %2 = load i32, ptr %__rhs, align 4
   %3 = icmp eq i32 %1, %2
-  store i1 %3, ptr %__condition, align 1
-  %4 = load i8, ptr %__condition, align 1
-  %5 = trunc i8 %4 to i1
-  call void @iris_test_check(i1 noundef zeroext %5, ptr noundef @iris_test_source_file_path, i64 noundef 24)
-  %6 = load i8, ptr %__condition, align 1
-  %7 = icmp eq i8 %6, 0
-  br i1 %7, label %if_s0_then, label %if_s1_after
+  %4 = zext i1 %3 to i8
+  store i8 %4, ptr %__condition, align 1
+  %5 = load i8, ptr %__condition, align 1
+  %6 = trunc i8 %5 to i1
+  call void @iris_test_check(i1 noundef zeroext %6, ptr noundef @iris_test_source_file_path, i64 noundef 24)
+  %7 = load i8, ptr %__condition, align 1
+  %8 = icmp eq i8 %7, 0
+  %9 = zext i1 %8 to i8
+  %10 = trunc i8 %9 to i1
+  br i1 %10, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
-  call void @iris.json__at__print_json_difference__at__16983553210230134252(ptr noundef %__lhs, ptr noundef %__rhs)
+  call void @iris.json__at__print_json_difference__at__6754230003147186507(ptr noundef %__lhs, ptr noundef %__rhs)
   br label %if_s1_after
 
 if_s1_after:                                      ; preds = %if_s0_then, %entry
-  %8 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
-  store i32 %8, ptr %__lhs1, align 4
+  %11 = call i32 @Test_framework_add(i32 noundef 2, i32 noundef 3)
+  store i32 %11, ptr %__lhs1, align 4
   store i32 5, ptr %__rhs2, align 4
-  %9 = load i32, ptr %__lhs1, align 4
-  %10 = load i32, ptr %__rhs2, align 4
-  %11 = icmp eq i32 %9, %10
-  store i1 %11, ptr %__condition3, align 1
-  %12 = load i8, ptr %__condition3, align 1
-  %13 = trunc i8 %12 to i1
-  call void @iris_test_check(i1 noundef zeroext %13, ptr noundef @iris_test_source_file_path, i64 noundef 25)
-  %14 = load i8, ptr %__condition3, align 1
-  %15 = icmp eq i8 %14, 0
-  br i1 %15, label %if_s0_then4, label %if_s1_after5
+  %12 = load i32, ptr %__lhs1, align 4
+  %13 = load i32, ptr %__rhs2, align 4
+  %14 = icmp eq i32 %12, %13
+  %15 = zext i1 %14 to i8
+  store i8 %15, ptr %__condition3, align 1
+  %16 = load i8, ptr %__condition3, align 1
+  %17 = trunc i8 %16 to i1
+  call void @iris_test_check(i1 noundef zeroext %17, ptr noundef @iris_test_source_file_path, i64 noundef 25)
+  %18 = load i8, ptr %__condition3, align 1
+  %19 = icmp eq i8 %18, 0
+  %20 = zext i1 %19 to i8
+  %21 = trunc i8 %20 to i1
+  br i1 %21, label %if_s0_then4, label %if_s1_after5
 
 if_s0_then4:                                      ; preds = %if_s1_after
-  call void @iris.json__at__print_json_difference__at__16983553210230134252(ptr noundef %__lhs1, ptr noundef %__rhs2)
+  call void @iris.json__at__print_json_difference__at__6754230003147186507(ptr noundef %__lhs1, ptr noundef %__rhs2)
   br label %if_s1_after5
 
 if_s1_after5:                                     ; preds = %if_s0_then4, %if_s1_after
-  %16 = call i32 @Test_framework_selection()
-  store i32 %16, ptr %__lhs6, align 4
+  %22 = call i32 @Test_framework_selection()
+  store i32 %22, ptr %__lhs6, align 4
   store i32 0, ptr %__rhs7, align 4
-  %17 = load i32, ptr %__lhs6, align 4
-  %18 = load i32, ptr %__rhs7, align 4
-  %19 = icmp eq i32 %17, %18
-  store i1 %19, ptr %__condition8, align 1
-  %20 = load i8, ptr %__condition8, align 1
-  %21 = trunc i8 %20 to i1
-  call void @iris_test_check(i1 noundef zeroext %21, ptr noundef @iris_test_source_file_path, i64 noundef 26)
-  %22 = load i8, ptr %__condition8, align 1
-  %23 = icmp eq i8 %22, 0
-  br i1 %23, label %if_s0_then9, label %if_s1_after10
+  %23 = load i32, ptr %__lhs6, align 4
+  %24 = load i32, ptr %__rhs7, align 4
+  %25 = icmp eq i32 %23, %24
+  %26 = zext i1 %25 to i8
+  store i8 %26, ptr %__condition8, align 1
+  %27 = load i8, ptr %__condition8, align 1
+  %28 = trunc i8 %27 to i1
+  call void @iris_test_check(i1 noundef zeroext %28, ptr noundef @iris_test_source_file_path, i64 noundef 26)
+  %29 = load i8, ptr %__condition8, align 1
+  %30 = icmp eq i8 %29, 0
+  %31 = zext i1 %30 to i8
+  %32 = trunc i8 %31 to i1
+  br i1 %32, label %if_s0_then9, label %if_s1_after10
 
 if_s0_then9:                                      ; preds = %if_s1_after5
-  call void @iris.json__at__print_json_difference__at__1521435198825465952(ptr noundef %__lhs6, ptr noundef %__rhs7)
+  call void @iris.json__at__print_json_difference__at__4582283641852142328(ptr noundef %__lhs6, ptr noundef %__rhs7)
   br label %if_s1_after10
 
 if_s1_after10:                                    ; preds = %if_s0_then9, %if_s1_after5
-  %24 = call i32 @Test_framework_external_get_color()
-  store i32 %24, ptr %__lhs11, align 4
+  %33 = call i32 @Test_framework_external_get_color()
+  store i32 %33, ptr %__lhs11, align 4
   store i32 1, ptr %__rhs12, align 4
-  %25 = load i32, ptr %__lhs11, align 4
-  %26 = load i32, ptr %__rhs12, align 4
-  %27 = icmp eq i32 %25, %26
-  store i1 %27, ptr %__condition13, align 1
-  %28 = load i8, ptr %__condition13, align 1
-  %29 = trunc i8 %28 to i1
-  call void @iris_test_check(i1 noundef zeroext %29, ptr noundef @iris_test_source_file_path, i64 noundef 27)
-  %30 = load i8, ptr %__condition13, align 1
-  %31 = icmp eq i8 %30, 0
-  br i1 %31, label %if_s0_then14, label %if_s1_after15
+  %34 = load i32, ptr %__lhs11, align 4
+  %35 = load i32, ptr %__rhs12, align 4
+  %36 = icmp eq i32 %34, %35
+  %37 = zext i1 %36 to i8
+  store i8 %37, ptr %__condition13, align 1
+  %38 = load i8, ptr %__condition13, align 1
+  %39 = trunc i8 %38 to i1
+  call void @iris_test_check(i1 noundef zeroext %39, ptr noundef @iris_test_source_file_path, i64 noundef 27)
+  %40 = load i8, ptr %__condition13, align 1
+  %41 = icmp eq i8 %40, 0
+  %42 = zext i1 %41 to i8
+  %43 = trunc i8 %42 to i1
+  br i1 %43, label %if_s0_then14, label %if_s1_after15
 
 if_s0_then14:                                     ; preds = %if_s1_after10
-  call void @iris.json__at__print_json_difference__at__3604989789308031901(ptr noundef %__lhs11, ptr noundef %__rhs12)
+  call void @iris.json__at__print_json_difference__at__6858653900143562679(ptr noundef %__lhs11, ptr noundef %__rhs12)
   br label %if_s1_after15
 
 if_s1_after15:                                    ; preds = %if_s0_then14, %if_s1_after10
@@ -7162,33 +8553,39 @@ entry:
   store i64 %"arguments[1].size_in_bytes", ptr %size_in_bytes, align 8
   %0 = load i32, ptr %kind, align 4
   %1 = icmp eq i32 %0, 0
-  br i1 %1, label %if_s0_then, label %if_s1_else
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %if_s0_then, label %if_s1_else
 
 if_s0_then:                                       ; preds = %entry
-  %2 = load i64, ptr %size_in_bytes, align 8
-  switch i64 %2, label %switch_case_default [
+  %4 = load i64, ptr %size_in_bytes, align 8
+  switch i64 %4, label %switch_case_default [
     i64 1, label %switch_case_i0_
     i64 2, label %switch_case_i1_
     i64 4, label %switch_case_i2_
   ]
 
 if_s1_else:                                       ; preds = %entry
-  %3 = load i32, ptr %kind, align 4
-  %4 = icmp eq i32 %3, 1
-  br i1 %4, label %if_s2_then, label %if_s3_else
+  %5 = load i32, ptr %kind, align 4
+  %6 = icmp eq i32 %5, 1
+  %7 = zext i1 %6 to i8
+  %8 = trunc i8 %7 to i1
+  br i1 %8, label %if_s2_then, label %if_s3_else
 
 if_s2_then:                                       ; preds = %if_s1_else
-  %5 = load i64, ptr %size_in_bytes, align 8
-  switch i64 %5, label %switch_case_default5 [
+  %9 = load i64, ptr %size_in_bytes, align 8
+  switch i64 %9, label %switch_case_default5 [
     i64 1, label %switch_case_i0_2
     i64 2, label %switch_case_i1_3
     i64 4, label %switch_case_i2_4
   ]
 
 if_s3_else:                                       ; preds = %if_s1_else
-  %6 = load i32, ptr %kind, align 4
-  %7 = icmp eq i32 %6, 2
-  br i1 %7, label %if_s4_then, label %if_s5_after
+  %10 = load i32, ptr %kind, align 4
+  %11 = icmp eq i32 %10, 2
+  %12 = zext i1 %11 to i8
+  %13 = trunc i8 %12 to i1
+  br i1 %13, label %if_s4_then, label %if_s5_after
 
 if_s4_then:                                       ; preds = %if_s3_else
   ret ptr @global_9
@@ -7247,39 +8644,41 @@ for_loop_condition:                               ; preds = %for_loop_update_ind
   %6 = load i64, ptr %length, align 8
   %7 = load i64, ptr %index, align 8
   %8 = icmp ult i64 %7, %6
-  br i1 %8, label %for_loop_then, label %for_loop_after
+  %9 = zext i1 %8 to i8
+  %10 = trunc i8 %9 to i1
+  br i1 %10, label %for_loop_then, label %for_loop_after
 
 for_loop_then:                                    ; preds = %for_loop_condition
-  %9 = load i64, ptr %index, align 8
-  %10 = add i64 1, %9
-  %11 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
-)" R"(  %12 = load ptr, ptr %11, align 8
-  %array_slice_element_pointer1 = getelementptr i8, ptr %12, i64 %10
-  %13 = load i64, ptr %index, align 8
-  %14 = load ptr, ptr %specifier, align 8
-  %array_element_pointer = getelementptr i8, ptr %14, i64 %13
-  %15 = load i8, ptr %array_element_pointer, align 1
-  store i8 %15, ptr %array_slice_element_pointer1, align 1
+  %11 = load i64, ptr %index, align 8
+  %12 = add i64 1, %11
+  %13 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %14 = load ptr, ptr %13, align 8
+  %array_slice_element_pointer1 = getelementptr i8, ptr %14, i64 %12
+  %15 = load i64, ptr %index, align 8
+  %16 = load ptr, ptr %specifier, align 8
+  %array_element_pointer = getelementptr i8, ptr %16, i64 %15
+  %17 = load i8, ptr %array_element_pointer, align 1
+  store i8 %17, ptr %array_slice_element_pointer1, align 1
   br label %for_loop_update_index
 
 for_loop_update_index:                            ; preds = %for_loop_then
-  %16 = load i64, ptr %index, align 8
-  %17 = add i64 %16, 1
-  store i64 %17, ptr %index, align 8
+  %18 = load i64, ptr %index, align 8
+  %19 = add i64 %18, 1
+  store i64 %19, ptr %index, align 8
   br label %for_loop_condition
 
 for_loop_after:                                   ; preds = %for_loop_condition
-  %18 = load i64, ptr %length, align 8
-  %19 = add i64 1, %18
-  %20 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
-  %21 = load ptr, ptr %20, align 8
-  %array_slice_element_pointer2 = getelementptr i8, ptr %21, i64 %19
+  %20 = load i64, ptr %length, align 8
+  %21 = add i64 1, %20
+  %22 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %buffer, i32 0, i32 0
+  %23 = load ptr, ptr %22, align 8
+  %array_slice_element_pointer2 = getelementptr i8, ptr %23, i64 %21
   store i8 0, ptr %array_slice_element_pointer2, align 1
   ret void
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json__at__to_json__at__3489948734076117284(ptr noundef %"arguments[0].stream", ptr noundef %"arguments[1].value") #0 {{
+define private void @iris.json__at__to_json__at__14337162453210386423(ptr noundef %"arguments[0].stream", ptr noundef %"arguments[1].value") #0 {{
 entry:
   %0 = alloca %struct.iris_json_Write_stream, align 8
   %value = alloca ptr, align 8
@@ -7292,37 +8691,39 @@ entry:
   store ptr %"arguments[1].value", ptr %value, align 8
   %3 = load ptr, ptr %value, align 8
   %4 = icmp eq ptr %3, null
-  br i1 %4, label %if_s0_then, label %if_s1_after
+  %5 = zext i1 %4 to i8
+  %6 = trunc i8 %5 to i1
+  br i1 %6, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
-  %5 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
-  %6 = load ptr, ptr %5, align 8
-  call void %6(ptr noundef @global_11)
+  %7 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %8 = load ptr, ptr %7, align 8
+  call void %8(ptr noundef @global_11)
   ret void
 
 if_s1_after:                                      ; preds = %entry
-  store [16 x i8] zeroinitializer, ptr %format_specifier_buffer, align 1
+  call void @llvm.memset.p0.i64(ptr align 1 %format_specifier_buffer, i8 0, i64 16, i1 false)
   %data_pointer = getelementptr [16 x i8], ptr %format_specifier_buffer, i32 0, i32 0
-  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
-  store ptr %data_pointer, ptr %7, align 8
-  %8 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
-  store i64 16, ptr %8, align 8
-  %9 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 0
-  %10 = load ptr, ptr %9, align 8
-  %11 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 1
-  %12 = load i64, ptr %11, align 8
-  %13 = call ptr @iris.json.create_format_specifier(ptr %10, i64 %12, i32 noundef 0, i64 noundef 4)
-  store ptr %13, ptr %format_specifier, align 8
-  store [64 x i8] zeroinitializer, ptr %format_buffer, align 1
+  %9 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  store ptr %data_pointer, ptr %9, align 8
+  %10 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  store i64 16, ptr %10, align 8
+)" R"(  %11 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 0
+  %12 = load ptr, ptr %11, align 8
+  %13 = getelementptr inbounds {{ ptr, i64 }}, ptr %1, i32 0, i32 1
+  %14 = load i64, ptr %13, align 8
+  %15 = call ptr @iris.json.create_format_specifier(ptr %12, i64 %14, i32 noundef 0, i64 noundef 4)
+  store ptr %15, ptr %format_specifier, align 8
+  call void @llvm.memset.p0.i64(ptr align 1 %format_buffer, i8 0, i64 64, i1 false)
   %array_element_pointer = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
-  %14 = load ptr, ptr %value, align 8
-  %15 = load ptr, ptr %format_specifier, align 8
-  %16 = load i32, ptr %14, align 4
-  %17 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 64, ptr noundef %15, i32 noundef %16)
-  %18 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
-  %19 = load ptr, ptr %18, align 8
+  %16 = load ptr, ptr %value, align 8
+  %17 = load ptr, ptr %format_specifier, align 8
+  %18 = load i32, ptr %16, align 4
+  %19 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 64, ptr noundef %17, i32 noundef %18)
+  %20 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %21 = load ptr, ptr %20, align 8
   %array_element_pointer1 = getelementptr [64 x i8], ptr %format_buffer, i32 0, i32 0
-  call void %19(ptr noundef %array_element_pointer1)
+  call void %21(ptr noundef %array_element_pointer1)
   ret void
 }}
 
@@ -7338,7 +8739,7 @@ entry:
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json__at__print_json__at__9753731967319569499(ptr noundef %"arguments[0].value") #0 {{
+define private void @iris.json__at__print_json__at__11944091517957075316(ptr noundef %"arguments[0].value") #0 {{
 entry:
   %value = alloca ptr, align 8
   %stream = alloca %struct.iris_json_Write_stream, align 8
@@ -7348,12 +8749,12 @@ entry:
   %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
   %2 = load ptr, ptr %1, align 8
   %3 = load ptr, ptr %value, align 8
-  call void @iris.json__at__to_json__at__3489948734076117284(ptr noundef %2, ptr noundef %3)
+  call void @iris.json__at__to_json__at__14337162453210386423(ptr noundef %2, ptr noundef %3)
   ret void
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json__at__print_json_difference__at__16983553210230134252(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
+define private void @iris.json__at__print_json_difference__at__6754230003147186507(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
 entry:
   %lhs = alloca ptr, align 8
   %rhs = alloca ptr, align 8
@@ -7362,11 +8763,11 @@ entry:
   %0 = call ptr @__acrt_iob_func(i32 noundef 2)
   %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_13)
   %2 = load ptr, ptr %rhs, align 8
-  call void @iris.json__at__print_json__at__9753731967319569499(ptr noundef %2)
+  call void @iris.json__at__print_json__at__11944091517957075316(ptr noundef %2)
   %3 = call ptr @__acrt_iob_func(i32 noundef 2)
   %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_14)
   %5 = load ptr, ptr %lhs, align 8
-  call void @iris.json__at__print_json__at__9753731967319569499(ptr noundef %5)
+  call void @iris.json__at__print_json__at__11944091517957075316(ptr noundef %5)
   %6 = call ptr @__acrt_iob_func(i32 noundef 2)
   %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_15)
   %8 = call ptr @__acrt_iob_func(i32 noundef 2)
@@ -7375,32 +8776,122 @@ entry:
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json__at__to_json__at__3070122814526398097(ptr noundef %"arguments[0].stream", ptr noundef %"arguments[1].value") #0 {{
+define private void @iris.json__at__to_json__at__8151882517873470480(ptr noundef %"arguments[0].stream", ptr noundef %"arguments[1].value") #0 {{
 entry:
   %0 = alloca %struct.iris_json_Write_stream, align 8
   %value = alloca ptr, align 8
+  %raw_value = alloca i32, align 4
+  %named = alloca i8, align 1
+  %buffer = alloca [16 x i8], align 1
   %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
   store ptr %"arguments[0].stream", ptr %1, align 8
   store ptr %"arguments[1].value", ptr %value, align 8
   %2 = load ptr, ptr %value, align 8
   %3 = icmp eq ptr %2, null
-  br i1 %3, label %if_s0_then, label %if_s1_after
+  %4 = zext i1 %3 to i8
+  %5 = trunc i8 %4 to i1
+  br i1 %5, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
-  %4 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
-  %5 = load ptr, ptr %4, align 8
-  call void %5(ptr noundef @global_16)
+  %6 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %7 = load ptr, ptr %6, align 8
+  call void %7(ptr noundef @global_16)
   ret void
 
 if_s1_after:                                      ; preds = %entry
-  %6 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
-  %7 = load ptr, ptr %6, align 8
-  call void %7(ptr noundef @global_17)
+  store i32 0, ptr %raw_value, align 4
+  %8 = load ptr, ptr %value, align 8
+  %9 = call i32 @memcpy_s(ptr noundef %raw_value, i64 noundef 4, ptr noundef %8, i64 noundef 4)
+  store i8 0, ptr %named, align 1
+  %10 = load i8, ptr %named, align 1
+  %11 = icmp eq i8 %10, 0
+  %12 = zext i1 %11 to i8
+  %13 = trunc i8 %12 to i1
+  br i1 %13, label %logical_and_rhs, label %logical_and_end
+
+if_s0_then1:                                      ; preds = %logical_and_end
+  %14 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %15 = load ptr, ptr %14, align 8
+  call void %15(ptr noundef @global_17)
+  %16 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %17 = load ptr, ptr %16, align 8
+  call void %17(ptr noundef @global_18)
+  %18 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %19 = load ptr, ptr %18, align 8
+  call void %19(ptr noundef @global_19)
+  store i8 1, ptr %named, align 1
+  br label %if_s1_after2
+
+if_s1_after2:                                     ; preds = %if_s0_then1, %logical_and_end
+  %20 = load i8, ptr %named, align 1
+  %21 = icmp eq i8 %20, 0
+  %22 = zext i1 %21 to i8
+  %23 = trunc i8 %22 to i1
+  br i1 %23, label %logical_and_rhs5, label %logical_and_end6
+
+logical_and_rhs:                                  ; preds = %if_s1_after
+  %24 = load i32, ptr %raw_value, align 4
+  %25 = icmp eq i32 %24, 0
+  %26 = zext i1 %25 to i8
+  %27 = trunc i8 %26 to i1
+  br label %logical_and_end
+
+logical_and_end:                                  ; preds = %logical_and_rhs, %if_s1_after
+  %28 = phi i1 [ false, %if_s1_after ], [ %27, %logical_and_rhs ]
+  %29 = zext i1 %28 to i8
+  %30 = trunc i8 %29 to i1
+  br i1 %30, label %if_s0_then1, label %if_s1_after2
+
+if_s0_then3:                                      ; preds = %logical_and_end6
+  %31 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %32 = load ptr, ptr %31, align 8
+  call void %32(ptr noundef @global_20)
+  %33 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %34 = load ptr, ptr %33, align 8
+  call void %34(ptr noundef @global_21)
+  %35 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %36 = load ptr, ptr %35, align 8
+  call void %36(ptr noundef @global_22)
+  store i8 1, ptr %named, align 1
+  br label %if_s1_after4
+
+if_s1_after4:                                     ; preds = %if_s0_then3, %logical_and_end6
+  %37 = load i8, ptr %named, align 1
+  %38 = icmp eq i8 %37, 0
+  %39 = zext i1 %38 to i8
+  %40 = trunc i8 %39 to i1
+  br i1 %40, label %if_s0_then7, label %if_s1_after8
+
+logical_and_rhs5:                                 ; preds = %if_s1_after2
+  %41 = load i32, ptr %raw_value, align 4
+  %42 = icmp eq i32 %41, 1
+  %43 = zext i1 %42 to i8
+  %44 = trunc i8 %43 to i1
+  br label %logical_and_end6
+
+logical_and_end6:                                 ; preds = %logical_and_rhs5, %if_s1_after2
+  %45 = phi i1 [ false, %if_s1_after2 ], [ %44, %logical_and_rhs5 ]
+  %46 = zext i1 %45 to i8
+  %47 = trunc i8 %46 to i1
+  br i1 %47, label %if_s0_then3, label %if_s1_after4
+
+if_s0_then7:                                      ; preds = %if_s1_after4
+  call void @llvm.memset.p0.i64(ptr align 1 %buffer, i8 0, i64 16, i1 false)
+  %array_element_pointer = getelementptr [16 x i8], ptr %buffer, i32 0, i32 0
+  %48 = load i32, ptr %raw_value, align 4
+  %49 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 16, ptr noundef @global_23, i32 noundef %48)
+  %50 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %51 = load ptr, ptr %50, align 8
+  %array_element_pointer9 = getelementptr [16 x i8], ptr %buffer, i32 0, i32 0
+  call void %51(ptr noundef %array_element_pointer9)
+  br label %if_s1_after8
+
+if_s1_after8:                                     ; preds = %if_s0_then7, %if_s1_after4
   ret void
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json__at__print_json__at__1614900316607571923(ptr noundef %"arguments[0].value") #0 {{
+define private void @iris.json__at__print_json__at__10499524753118937461(ptr noundef %"arguments[0].value") #0 {{
 entry:
   %value = alloca ptr, align 8
   %stream = alloca %struct.iris_json_Write_stream, align 8
@@ -7410,59 +8901,182 @@ entry:
   %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
   %2 = load ptr, ptr %1, align 8
   %3 = load ptr, ptr %value, align 8
-  call void @iris.json__at__to_json__at__3070122814526398097(ptr noundef %2, ptr noundef %3)
+  call void @iris.json__at__to_json__at__8151882517873470480(ptr noundef %2, ptr noundef %3)
   ret void
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json__at__print_json_difference__at__1521435198825465952(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
+define private void @iris.json__at__print_json_difference__at__4582283641852142328(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
 entry:
   %lhs = alloca ptr, align 8
   %rhs = alloca ptr, align 8
   store ptr %"arguments[0].lhs", ptr %lhs, align 8
   store ptr %"arguments[1].rhs", ptr %rhs, align 8
   %0 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_18)
+  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_24)
   %2 = load ptr, ptr %rhs, align 8
-  call void @iris.json__at__print_json__at__1614900316607571923(ptr noundef %2)
+  call void @iris.json__at__print_json__at__10499524753118937461(ptr noundef %2)
   %3 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_19)
+  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_25)
   %5 = load ptr, ptr %lhs, align 8
-  call void @iris.json__at__print_json__at__1614900316607571923(ptr noundef %5)
+  call void @iris.json__at__print_json__at__10499524753118937461(ptr noundef %5)
   %6 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_20)
+  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_26)
   %8 = call ptr @__acrt_iob_func(i32 noundef 2)
   %9 = call i32 @fflush(ptr noundef %8)
   ret void
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json__at__to_json__at__18195985199602530421(ptr noundef %"arguments[0].stream", ptr noundef %"arguments[1].value") #0 {{
+define private void @iris.json__at__to_json__at__7919454934508618499(ptr noundef %"arguments[0].stream", ptr noundef %"arguments[1].value") #0 {{
 entry:
   %0 = alloca %struct.iris_json_Write_stream, align 8
   %value = alloca ptr, align 8
+  %raw_value = alloca i32, align 4
+  %named = alloca i8, align 1
+  %buffer = alloca [16 x i8], align 1
   %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
   store ptr %"arguments[0].stream", ptr %1, align 8
   store ptr %"arguments[1].value", ptr %value, align 8
   %2 = load ptr, ptr %value, align 8
   %3 = icmp eq ptr %2, null
-  br i1 %3, label %if_s0_then, label %if_s1_after
+  %4 = zext i1 %3 to i8
+  %5 = trunc i8 %4 to i1
+  br i1 %5, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
-  %4 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
-  %5 = load ptr, ptr %4, align 8
-  call void %5(ptr noundef @global_21)
+  %6 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %7 = load ptr, ptr %6, align 8
+  call void %7(ptr noundef @global_27)
   ret void
 
 if_s1_after:                                      ; preds = %entry
-  %6 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
-  %7 = load ptr, ptr %6, align 8
-  call void %7(ptr noundef @global_22)
+  store i32 0, ptr %raw_value, align 4
+  %8 = load ptr, ptr %value, align 8
+  %9 = call i32 @memcpy_s(ptr noundef %raw_value, i64 noundef 4, ptr noundef %8, i64 noundef 4)
+  store i8 0, ptr %named, align 1
+  %10 = load i8, ptr %named, align 1
+  %11 = icmp eq i8 %10, 0
+  %12 = zext i1 %11 to i8
+  %13 = trunc i8 %12 to i1
+  br i1 %13, label %logical_and_rhs, label %logical_and_end
+
+if_s0_then1:                                      ; preds = %logical_and_end
+  %14 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %15 = load ptr, ptr %14, align 8
+  call void %15(ptr noundef @global_28)
+  %16 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %17 = load ptr, ptr %16, align 8
+  call void %17(ptr noundef @global_29)
+  %18 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %19 = load ptr, ptr %18, align 8
+  call void %19(ptr noundef @global_30)
+  store i8 1, ptr %named, align 1
+  br label %if_s1_after2
+
+if_s1_after2:                                     ; preds = %if_s0_then1, %logical_and_end
+  %20 = load i8, ptr %named, align 1
+  %21 = icmp eq i8 %20, 0
+  %22 = zext i1 %21 to i8
+  %23 = trunc i8 %22 to i1
+  br i1 %23, label %logical_and_rhs5, label %logical_and_end6
+
+logical_and_rhs:                                  ; preds = %if_s1_after
+  %24 = load i32, ptr %raw_value, align 4
+  %25 = icmp eq i32 %24, 0
+  %26 = zext i1 %25 to i8
+  %27 = trunc i8 %26 to i1
+  br label %logical_and_end
+
+logical_and_end:                                  ; preds = %logical_and_rhs, %if_s1_after
+  %28 = phi i1 [ false, %if_s1_after ], [ %27, %logical_and_rhs ]
+  %29 = zext i1 %28 to i8
+  %30 = trunc i8 %29 to i1
+  br i1 %30, label %if_s0_then1, label %if_s1_after2
+
+if_s0_then3:                                      ; preds = %logical_and_end6
+  %31 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %32 = load ptr, ptr %31, align 8
+  call void %32(ptr noundef @global_31)
+  %33 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %34 = load ptr, ptr %33, align 8
+  call void %34(ptr noundef @global_32)
+  %35 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %36 = load ptr, ptr %35, align 8
+  call void %36(ptr noundef @global_33)
+  store i8 1, ptr %named, align 1
+  br label %if_s1_after4
+
+if_s1_after4:                                     ; preds = %if_s0_then3, %logical_and_end6
+  %37 = load i8, ptr %named, align 1
+  %38 = icmp eq i8 %37, 0
+  %39 = zext i1 %38 to i8
+  %40 = trunc i8 %39 to i1
+  br i1 %40, label %logical_and_rhs9, label %logical_and_end10
+
+logical_and_rhs5:                                 ; preds = %if_s1_after2
+  %41 = load i32, ptr %raw_value, align 4
+  %42 = icmp eq i32 %41, 1
+  %43 = zext i1 %42 to i8
+  %44 = trunc i8 %43 to i1
+  br label %logical_and_end6
+
+logical_and_end6:                                 ; preds = %logical_and_rhs5, %if_s1_after2
+  %45 = phi i1 [ false, %if_s1_after2 ], [ %44, %logical_and_rhs5 ]
+  %46 = zext i1 %45 to i8
+  %47 = trunc i8 %46 to i1
+  br i1 %47, label %if_s0_then3, label %if_s1_after4
+
+if_s0_then7:                                      ; preds = %logical_and_end10
+  %48 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %49 = load ptr, ptr %48, align 8
+  call void %49(ptr noundef @global_34)
+  %50 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %51 = load ptr, ptr %50, align 8
+  call void %51(ptr noundef @global_35)
+  %52 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+  %53 = load ptr, ptr %52, align 8
+  call void %53(ptr noundef @global_36)
+  store i8 1, ptr %named, align 1
+  br label %if_s1_after8
+
+if_s1_after8:                                     ; preds = %if_s0_then7, %logical_and_end10
+  %54 = load i8, ptr %named, align 1
+  %55 = icmp eq i8 %54, 0
+  %56 = zext i1 %55 to i8
+  %57 = trunc i8 %56 to i1
+  br i1 %57, label %if_s0_then11, label %if_s1_after12
+
+logical_and_rhs9:                                 ; preds = %if_s1_after4
+  %58 = load i32, ptr %raw_value, align 4
+  %59 = icmp eq i32 %58, 2
+  %60 = zext i1 %59 to i8
+  %61 = trunc i8 %60 to i1
+  br label %logical_and_end10
+
+logical_and_end10:                                ; preds = %logical_and_rhs9, %if_s1_after4
+  %62 = phi i1 [ false, %if_s1_after4 ], [ %61, %logical_and_rhs9 ]
+  %63 = zext i1 %62 to i8
+  %64 = trunc i8 %63 to i1
+  br i1 %64, label %if_s0_then7, label %if_s1_after8
+
+if_s0_then11:                                     ; preds = %if_s1_after8
+  call void @llvm.memset.p0.i64(ptr align 1 %buffer, i8 0, i64 16, i1 false)
+  %array_element_pointer = getelementptr [16 x i8], ptr %buffer, i32 0, i32 0
+  %65 = load i32, ptr %raw_value, align 4
+  %66 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr noundef %array_element_pointer, i64 noundef 16, ptr noundef @global_37, i32 noundef %65)
+  %67 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %0, i32 0, i32 0
+)" R"(  %68 = load ptr, ptr %67, align 8
+  %array_element_pointer13 = getelementptr [16 x i8], ptr %buffer, i32 0, i32 0
+  call void %68(ptr noundef %array_element_pointer13)
+  br label %if_s1_after12
+
+if_s1_after12:                                    ; preds = %if_s0_then11, %if_s1_after8
   ret void
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json__at__print_json__at__13913982162246209397(ptr noundef %"arguments[0].value") #0 {{
+define private void @iris.json__at__print_json__at__4241145947900897466(ptr noundef %"arguments[0].value") #0 {{
 entry:
   %value = alloca ptr, align 8
   %stream = alloca %struct.iris_json_Write_stream, align 8
@@ -7472,27 +9086,27 @@ entry:
   %1 = getelementptr inbounds %struct.iris_json_Write_stream, ptr %stream, i32 0, i32 0
   %2 = load ptr, ptr %1, align 8
   %3 = load ptr, ptr %value, align 8
-  call void @iris.json__at__to_json__at__18195985199602530421(ptr noundef %2, ptr noundef %3)
+  call void @iris.json__at__to_json__at__7919454934508618499(ptr noundef %2, ptr noundef %3)
   ret void
 }}
 
 ; Function Attrs: convergent
-define private void @iris.json__at__print_json_difference__at__3604989789308031901(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
+define private void @iris.json__at__print_json_difference__at__6858653900143562679(ptr noundef %"arguments[0].lhs", ptr noundef %"arguments[1].rhs") #0 {{
 entry:
   %lhs = alloca ptr, align 8
   %rhs = alloca ptr, align 8
   store ptr %"arguments[0].lhs", ptr %lhs, align 8
   store ptr %"arguments[1].rhs", ptr %rhs, align 8
   %0 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_23)
+  %1 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %0, ptr noundef @global_38)
   %2 = load ptr, ptr %rhs, align 8
-  call void @iris.json__at__print_json__at__13913982162246209397(ptr noundef %2)
+  call void @iris.json__at__print_json__at__4241145947900897466(ptr noundef %2)
   %3 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_24)
+  %4 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %3, ptr noundef @global_39)
   %5 = load ptr, ptr %lhs, align 8
-  call void @iris.json__at__print_json__at__13913982162246209397(ptr noundef %5)
+  call void @iris.json__at__print_json__at__4241145947900897466(ptr noundef %5)
   %6 = call ptr @__acrt_iob_func(i32 noundef 2)
-  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_25)
+  %7 = call i32 (ptr, ptr, ...) @fprintf(ptr noundef %6, ptr noundef @global_40)
   %8 = call ptr @__acrt_iob_func(i32 noundef 2)
   %9 = call i32 @fflush(ptr noundef %8)
   ret void
@@ -7501,10 +9115,14 @@ entry:
 ; Function Attrs: convergent
 declare void @iris_test_check(i1 noundef zeroext, ptr noundef, i64 noundef) #0
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+
 ; Function Attrs: convergent
-)" R"(declare ptr @__acrt_iob_func(i32 noundef) #0
+declare ptr @__acrt_iob_func(i32 noundef) #0
 
 attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
 )", g_test_source_files_path.generic_string(), test_source_file_path.size() + 1, test_source_file_path);
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, {.is_test_mode = true});
@@ -7553,13 +9171,13 @@ entry:
   %my_boolean = alloca i8, align 1
   %my_c_boolean = alloca i8, align 1
   %my_struct = alloca ptr, align 8
-  %not_variable = alloca i1, align 1
+  %not_variable = alloca i8, align 1
   %bitwise_not_variable = alloca i32, align 4
   %minus_variable = alloca i32, align 4
   %my_mutable_integer = alloca i32, align 4
   %address_of_variable = alloca ptr, align 8
   %indirection_variable = alloca i32, align 4
-  %not_c_variable = alloca i1, align 1
+  %not_c_variable = alloca i8, align 1
   %address_of_member = alloca ptr, align 8
   %minus_variable_2 = alloca float, align 4
   store i32 %"arguments[0].my_integer", ptr %my_integer, align 4
@@ -7570,28 +9188,30 @@ entry:
   store ptr %"arguments[3].my_struct", ptr %my_struct, align 8
   %2 = load i8, ptr %my_boolean, align 1
   %3 = icmp eq i8 %2, 0
-  store i1 %3, ptr %not_variable, align 1
-  %4 = load i32, ptr %my_integer, align 4
-  %5 = xor i32 %4, -1
-  store i32 %5, ptr %bitwise_not_variable, align 4
-  %6 = load i32, ptr %my_integer, align 4
-  %7 = sub i32 0, %6
-  store i32 %7, ptr %minus_variable, align 4
+  %4 = zext i1 %3 to i8
+  store i8 %4, ptr %not_variable, align 1
+  %5 = load i32, ptr %my_integer, align 4
+  %6 = xor i32 %5, -1
+  store i32 %6, ptr %bitwise_not_variable, align 4
+  %7 = load i32, ptr %my_integer, align 4
+  %8 = sub i32 0, %7
+  store i32 %8, ptr %minus_variable, align 4
   store i32 1, ptr %my_mutable_integer, align 4
   store ptr %my_mutable_integer, ptr %address_of_variable, align 8
-  %8 = load ptr, ptr %address_of_variable, align 8
-  %9 = load i32, ptr %8, align 4
-  store i32 %9, ptr %indirection_variable, align 4
-  %10 = load i8, ptr %my_c_boolean, align 1
-  %11 = icmp eq i8 %10, 0
-  store i1 %11, ptr %not_c_variable, align 1
-  %12 = load ptr, ptr %my_struct, align 8
-  %13 = getelementptr inbounds %struct.Unary_expressions_My_struct, ptr %12, i32 0, i32 0
-  store ptr %13, ptr %address_of_member, align 8
-  %14 = load i32, ptr %my_integer, align 4
-  %15 = sitofp i32 %14 to float
-  %16 = fneg float %15
-  store float %16, ptr %minus_variable_2, align 4
+  %9 = load ptr, ptr %address_of_variable, align 8
+  %10 = load i32, ptr %9, align 4
+  store i32 %10, ptr %indirection_variable, align 4
+  %11 = load i8, ptr %my_c_boolean, align 1
+  %12 = icmp eq i8 %11, 0
+  %13 = zext i1 %12 to i8
+  store i8 %13, ptr %not_c_variable, align 1
+  %14 = load ptr, ptr %my_struct, align 8
+  %15 = getelementptr inbounds %struct.Unary_expressions_My_struct, ptr %14, i32 0, i32 0
+  store ptr %15, ptr %address_of_member, align 8
+  %16 = load i32, ptr %my_integer, align 4
+  %17 = sitofp i32 %16 to float
+  %18 = fneg float %17
+  store float %18, ptr %minus_variable_2, align 4
   ret void
 }
 
@@ -7621,16 +9241,20 @@ entry:
   store i8 %1, ptr %y, align 1
   %2 = load i8, ptr %x, align 1
   %3 = icmp eq i8 %2, 0
-  br i1 %3, label %logical_and_rhs, label %logical_and_end
+  %4 = zext i1 %3 to i8
+  %5 = trunc i8 %4 to i1
+  br i1 %5, label %logical_and_rhs, label %logical_and_end
 
 logical_and_rhs:                                  ; preds = %entry
-  %4 = load i8, ptr %y, align 1
-  %5 = trunc i8 %4 to i1
+  %6 = load i8, ptr %y, align 1
+  %7 = trunc i8 %6 to i1
   br label %logical_and_end
 
 logical_and_end:                                  ; preds = %logical_and_rhs, %entry
-  %6 = phi i1 [ false, %entry ], [ %5, %logical_and_rhs ]
-  ret i1 %6
+  %8 = phi i1 [ false, %entry ], [ %7, %logical_and_rhs ]
+  %9 = zext i1 %8 to i8
+  %10 = trunc i8 %9 to i1
+  ret i1 %10
 }
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
@@ -7852,43 +9476,53 @@ entry:
   %4 = load i32, ptr %a, align 4
   %5 = load i32, ptr %enum_argument, align 4
   %6 = icmp eq i32 %4, %5
-  br i1 %6, label %if_s0_then, label %if_s1_after
+  %7 = zext i1 %6 to i8
+  %8 = trunc i8 %7 to i1
+  br i1 %8, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
   ret i32 0
 
 if_s1_after:                                      ; preds = %entry
-  %7 = load i32, ptr %b, align 4
-  %8 = load i32, ptr %enum_argument, align 4
-  %9 = icmp ne i32 %7, %8
-  br i1 %9, label %if_s0_then1, label %if_s1_after2
+  %9 = load i32, ptr %b, align 4
+  %10 = load i32, ptr %enum_argument, align 4
+  %11 = icmp ne i32 %9, %10
+  %12 = zext i1 %11 to i8
+  %13 = trunc i8 %12 to i1
+  br i1 %13, label %if_s0_then1, label %if_s1_after2
 
 if_s0_then1:                                      ; preds = %if_s1_after
   ret i32 1
 
 if_s1_after2:                                     ; preds = %if_s1_after
-  %10 = load i32, ptr %enum_argument, align 4
-  %11 = and i32 %10, 1
-  %12 = icmp ugt i32 %11, 0
-  br i1 %12, label %if_s0_then3, label %if_s1_after4
+  %14 = load i32, ptr %enum_argument, align 4
+  %15 = and i32 %14, 1
+  %16 = icmp ugt i32 %15, 0
+  %17 = zext i1 %16 to i8
+  %18 = trunc i8 %17 to i1
+  br i1 %18, label %if_s0_then3, label %if_s1_after4
 
 if_s0_then3:                                      ; preds = %if_s1_after2
   ret i32 2
 
 if_s1_after4:                                     ; preds = %if_s1_after2
-  %13 = load i32, ptr %enum_argument, align 4
-  %14 = and i32 %13, 2
-  %15 = icmp ugt i32 %14, 0
-  br i1 %15, label %if_s0_then5, label %if_s1_after6
+  %19 = load i32, ptr %enum_argument, align 4
+  %20 = and i32 %19, 2
+  %21 = icmp ugt i32 %20, 0
+  %22 = zext i1 %21 to i8
+  %23 = trunc i8 %22 to i1
+  br i1 %23, label %if_s0_then5, label %if_s1_after6
 
 if_s0_then5:                                      ; preds = %if_s1_after4
   ret i32 3
 
 if_s1_after6:                                     ; preds = %if_s1_after4
-  %16 = load i32, ptr %enum_argument, align 4
-  %17 = and i32 %16, 4
-  %18 = icmp ugt i32 %17, 0
-  br i1 %18, label %if_s0_then7, label %if_s1_after8
+  %24 = load i32, ptr %enum_argument, align 4
+  %25 = and i32 %24, 4
+  %26 = icmp ugt i32 %25, 0
+  %27 = zext i1 %26 to i8
+  %28 = trunc i8 %27 to i1
+  br i1 %28, label %if_s0_then7, label %if_s1_after8
 
 if_s0_then7:                                      ; preds = %if_s1_after6
   ret i32 4
@@ -8049,17 +9683,17 @@ entry:
   %a = alloca i32, align 4
   %b = alloca float, align 4
   %c = alloca i32, align 4
-  %0 = call i32 @Function_constructor__at__add__at__10481941949038830817(i32 noundef 1, i32 noundef 2)
+  %0 = call i32 @Function_constructor__at__add__at__17767816870030916945(i32 noundef 1, i32 noundef 2)
   store i32 %0, ptr %a, align 4
-  %1 = call float @Function_constructor__at__add__at__4195550094456234142(float noundef 3.000000e+00, float noundef 4.000000e+00)
+  %1 = call float @Function_constructor__at__add__at__13835038193234868660(float noundef 3.000000e+00, float noundef 4.000000e+00)
   store float %1, ptr %b, align 4
-  %2 = call i32 @Function_constructor__at__add__at__10481941949038830817(i32 noundef 1, i32 noundef 2)
+  %2 = call i32 @Function_constructor__at__add__at__17767816870030916945(i32 noundef 1, i32 noundef 2)
   store i32 %2, ptr %c, align 4
   ret void
 }
 
 ; Function Attrs: convergent
-define private i32 @Function_constructor__at__add__at__10481941949038830817(i32 noundef %"arguments[0].first", i32 noundef %"arguments[1].second") #0 {
+define private i32 @Function_constructor__at__add__at__17767816870030916945(i32 noundef %"arguments[0].first", i32 noundef %"arguments[1].second") #0 {
 entry:
   %first = alloca i32, align 4
   %second = alloca i32, align 4
@@ -8072,7 +9706,7 @@ entry:
 }
 
 ; Function Attrs: convergent
-define private float @Function_constructor__at__add__at__4195550094456234142(float noundef %"arguments[0].first", float noundef %"arguments[1].second") #0 {
+define private float @Function_constructor__at__add__at__13835038193234868660(float noundef %"arguments[0].first", float noundef %"arguments[1].second") #0 {
 entry:
   %first = alloca float, align 4
   %second = alloca float, align 4
@@ -8182,6 +9816,68 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Derived Global Constants", "[LLVM_IR]")
+  {
+    char const* const input_file = "derived_global_constants.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+        { "Derived_global_constants_provider", parse_and_get_file_path(g_test_source_files_path / "derived_global_constants_provider.iris") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+@Derived_global_constants_provider_meters_per_foot = external constant float
+@Derived_global_constants_provider_feet_per_mile = external constant i32
+@Derived_global_constants_meters_per_foot = constant float 0x3FD381D7E0000000
+@Derived_global_constants_seconds_per_round = constant float 6.000000e+00
+@Derived_global_constants_five_feet_in_meters = constant float 0x3FF8624DE0000000
+@Derived_global_constants_speed_30_meters_per_second = constant float 0x3FF8624DE0000000
+@Derived_global_constants_meters_per_round = constant float 0x4019381D80000000
+@Derived_global_constants_negative_meters_per_foot = constant float 0xBFD381D7E0000000
+@Derived_global_constants_rounds_per_minute = constant i32 10
+@Derived_global_constants_rounds_per_two_minutes = constant i32 20
+@Derived_global_constants_half_a_mile_in_feet = constant i32 2640
+@Derived_global_constants_ten_feet_in_meters = constant float 0x4008624DE0000000
+@Derived_global_constants_alias_of_five_feet = constant float 0x3FF8624DE0000000
+@Derived_global_constants_imported_meters_per_foot = constant float 0x3FD381D7E0000000
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Indirect Global Constant", "[LLVM_IR]")
+  {
+    char const* const input_file = "indirect_global_constant.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+        { "Indirect_global_constant_holder", parse_and_get_file_path(g_test_source_files_path / "indirect_global_constant_holder.iris") },
+        { "Indirect_global_constant_provider", parse_and_get_file_path(g_test_source_files_path / "indirect_global_constant_provider.iris") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Indirect_global_constant_holder_Unit = type { float }
+
+@Indirect_global_constant_provider_speed_30_meters_per_second = external constant float
+
+; Function Attrs: convergent
+define float @Indirect_global_constant_use_default() #0 {
+entry:
+  %unit = alloca %struct.Indirect_global_constant_holder_Unit, align 4
+  %0 = load float, ptr @Indirect_global_constant_provider_speed_30_meters_per_second, align 4
+  %1 = getelementptr inbounds %struct.Indirect_global_constant_holder_Unit, ptr %unit, i32 0, i32 0
+  store float %0, ptr %1, align 4
+  %2 = getelementptr inbounds %struct.Indirect_global_constant_holder_Unit, ptr %unit, i32 0, i32 0
+  %3 = load float, ptr %2, align 4
+  ret float %3
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Using Structs", "[LLVM_IR]")
   {
     char const* const input_file = "using_structs.iris";
@@ -8239,84 +9935,74 @@ entry:
   store i32 1, ptr %19, align 4
   %20 = getelementptr inbounds %struct.Structs_My_struct, ptr %1, i32 0, i32 1
   store i32 2, ptr %20, align 4
-  %21 = load %struct.Structs_My_struct, ptr %1, align 4
-  %22 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 0
-  store %struct.Structs_My_struct %21, ptr %22, align 4
-  %23 = getelementptr inbounds %struct.Structs_My_struct, ptr %2, i32 0, i32 0
+  %21 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %21, ptr align 4 %1, i64 8, i1 false)
+  %22 = getelementptr inbounds %struct.Structs_My_struct, ptr %2, i32 0, i32 0
+  store i32 2, ptr %22, align 4
+  %23 = getelementptr inbounds %struct.Structs_My_struct, ptr %2, i32 0, i32 1
   store i32 2, ptr %23, align 4
-  %24 = getelementptr inbounds %struct.Structs_My_struct, ptr %2, i32 0, i32 1
-  store i32 2, ptr %24, align 4
-  %25 = load %struct.Structs_My_struct, ptr %2, align 4
-  %26 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 1
-  store %struct.Structs_My_struct %25, ptr %26, align 4
-  %27 = getelementptr inbounds %struct.Structs_My_struct, ptr %3, i32 0, i32 0
-  store i32 3, ptr %27, align 4
-  %28 = getelementptr inbounds %struct.Structs_My_struct, ptr %3, i32 0, i32 1
-  store i32 4, ptr %28, align 4
-  %29 = load %struct.Structs_My_struct, ptr %3, align 4
-  %30 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 2
-  store %struct.Structs_My_struct %29, ptr %30, align 4
-  %31 = getelementptr inbounds %struct.Structs_My_struct, ptr %4, i32 0, i32 0
+  %24 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 1
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %24, ptr align 4 %2, i64 8, i1 false)
+  %25 = getelementptr inbounds %struct.Structs_My_struct, ptr %3, i32 0, i32 0
+  store i32 3, ptr %25, align 4
+  %26 = getelementptr inbounds %struct.Structs_My_struct, ptr %3, i32 0, i32 1
+  store i32 4, ptr %26, align 4
+  %27 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_2, i32 0, i32 2
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %27, ptr align 4 %3, i64 8, i1 false)
+  %28 = getelementptr inbounds %struct.Structs_My_struct, ptr %4, i32 0, i32 0
+  store i32 1, ptr %28, align 4
+  %29 = getelementptr inbounds %struct.Structs_My_struct, ptr %4, i32 0, i32 1
+  store i32 2, ptr %29, align 4
+  %30 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %30, ptr align 4 %4, i64 8, i1 false)
+  %31 = getelementptr inbounds %struct.Structs_My_struct, ptr %5, i32 0, i32 0
   store i32 1, ptr %31, align 4
-  %32 = getelementptr inbounds %struct.Structs_My_struct, ptr %4, i32 0, i32 1
+  %32 = getelementptr inbounds %struct.Structs_My_struct, ptr %5, i32 0, i32 1
   store i32 2, ptr %32, align 4
-  %33 = load %struct.Structs_My_struct, ptr %4, align 4
-  %34 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 0
-  store %struct.Structs_My_struct %33, ptr %34, align 4
-  %35 = getelementptr inbounds %struct.Structs_My_struct, ptr %5, i32 0, i32 0
+  %33 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 1
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %33, ptr align 4 %5, i64 8, i1 false)
+  %34 = getelementptr inbounds %struct.Structs_My_struct, ptr %6, i32 0, i32 0
+  store i32 0, ptr %34, align 4
+  %35 = getelementptr inbounds %struct.Structs_My_struct, ptr %6, i32 0, i32 1
   store i32 1, ptr %35, align 4
-  %36 = getelementptr inbounds %struct.Structs_My_struct, ptr %5, i32 0, i32 1
-  store i32 2, ptr %36, align 4
-  %37 = load %struct.Structs_My_struct, ptr %5, align 4
-  %38 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 1
-  store %struct.Structs_My_struct %37, ptr %38, align 4
-  %39 = getelementptr inbounds %struct.Structs_My_struct, ptr %6, i32 0, i32 0
-  store i32 0, ptr %39, align 4
-  %40 = getelementptr inbounds %struct.Structs_My_struct, ptr %6, i32 0, i32 1
+  %36 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 2
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %36, ptr align 4 %6, i64 8, i1 false)
+  %37 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 1
+  %38 = getelementptr inbounds %struct.Structs_My_struct, ptr %37, i32 0, i32 0
+  %39 = load i32, ptr %38, align 4
+  store i32 %39, ptr %nested_b_a, align 4
+  %40 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
   store i32 1, ptr %40, align 4
-  %41 = load %struct.Structs_My_struct, ptr %6, align 4
-  %42 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 2
-  store %struct.Structs_My_struct %41, ptr %42, align 4
-  %43 = getelementptr inbounds %struct.Structs_My_struct_2, ptr %instance_3, i32 0, i32 1
-  %44 = getelementptr inbounds %struct.Structs_My_struct, ptr %43, i32 0, i32 0
-  %45 = load i32, ptr %44, align 4
-  store i32 %45, ptr %nested_b_a, align 4
-  %46 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
+  %41 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 1
+  store i32 2, ptr %41, align 4
+  %42 = getelementptr inbounds %struct.Structs_My_struct, ptr %7, i32 0, i32 0
+  store i32 10, ptr %42, align 4
+  %43 = getelementptr inbounds %struct.Structs_My_struct, ptr %7, i32 0, i32 1
+  store i32 11, ptr %43, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_4, ptr align 4 %7, i64 8, i1 false)
+  %44 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
+  %45 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
+  store i32 0, ptr %45, align 4
+  %46 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 0
   store i32 1, ptr %46, align 4
-  %47 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 1
+  %47 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 1
   store i32 2, ptr %47, align 4
-  %48 = getelementptr inbounds %struct.Structs_My_struct, ptr %7, i32 0, i32 0
-  store i32 10, ptr %48, align 4
-  %49 = getelementptr inbounds %struct.Structs_My_struct, ptr %7, i32 0, i32 1
-  store i32 11, ptr %49, align 4
-  %50 = load %struct.Structs_My_struct, ptr %7, align 4
-  store %struct.Structs_My_struct %50, ptr %instance_4, align 4
-  %51 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
-  %52 = getelementptr inbounds %struct.Structs_My_struct, ptr %instance_4, i32 0, i32 0
-  store i32 0, ptr %52, align 4
-  %53 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 0
+  %48 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 0
+  %49 = load i64, ptr %48, align 4
+  call void @Structs_pass_struct(i64 noundef %49)
+  %50 = call i64 @Structs_return_struct()
+  %51 = getelementptr inbounds %struct.Structs_My_struct, ptr %9, i32 0, i32 0
+  store i64 %50, ptr %51, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_5, ptr align 4 %9, i64 8, i1 false)
+  %52 = getelementptr inbounds %struct.Structs_My_struct_3, ptr %instance_6, i32 0, i32 0
+  store i32 4, ptr %52, align 4
+  %53 = getelementptr inbounds %struct.Structs_My_struct, ptr %10, i32 0, i32 0
   store i32 1, ptr %53, align 4
-  %54 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 1
+  %54 = getelementptr inbounds %struct.Structs_My_struct, ptr %10, i32 0, i32 1
   store i32 2, ptr %54, align 4
-  %55 = getelementptr inbounds %struct.Structs_My_struct, ptr %8, i32 0, i32 0
-  %56 = load i64, ptr %55, align 4
-  call void @Structs_pass_struct(i64 noundef %56)
-  %57 = call i64 @Structs_return_struct()
-  %58 = getelementptr inbounds %struct.Structs_My_struct, ptr %9, i32 0, i32 0
-  store i64 %57, ptr %58, align 4
-  %59 = load %struct.Structs_My_struct, ptr %9, align 4
-  store %struct.Structs_My_struct %59, ptr %instance_5, align 4
-  %60 = getelementptr inbounds %struct.Structs_My_struct_3, ptr %instance_6, i32 0, i32 0
-  store i32 4, ptr %60, align 4
-  %61 = getelementptr inbounds %struct.Structs_My_struct, ptr %10, i32 0, i32 0
-  store i32 1, ptr %61, align 4
-  %62 = getelementptr inbounds %struct.Structs_My_struct, ptr %10, i32 0, i32 1
-  store i32 2, ptr %62, align 4
-  %63 = load %struct.Structs_My_struct, ptr %10, align 4
-  store %struct.Structs_My_struct %63, ptr %11, align 4
-  %64 = load %union.Structs_My_Union, ptr %11, align 4
-  %65 = getelementptr inbounds %struct.Structs_My_struct_3, ptr %instance_6, i32 0, i32 1
-  store %union.Structs_My_Union %64, ptr %65, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %11, ptr align 4 %10, i64 8, i1 false)
+  %55 = getelementptr inbounds %struct.Structs_My_struct_3, ptr %instance_6, i32 0, i32 1
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %55, ptr align 4 %11, i64 24, i1 false)
   ret void
 }
 
@@ -8342,7 +10028,11 @@ entry:
   ret i64 %4
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -8357,43 +10047,46 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     };
 
     char const* const expected_llvm_ir = R"(
-%struct.Type_constructor__at__Dynamic_array__at__9266664480299747837 = type { ptr, i64 }
-%struct.Type_constructor__at__Dynamic_array__at__12246575587352456780 = type { ptr, i64 }
-%struct.Type_constructor_My_struct = type { %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487 }
-%struct.Type_constructor__at__Dynamic_array__at__13825035046261308487 = type { ptr, i64 }
-%struct.Type_constructor__at__Dynamic_array__at__11091932333614297595 = type { ptr, i64 }
+%struct.Type_constructor__at__Dynamic_array__at__1921096279545076101 = type { ptr, i64 }
+%struct.Type_constructor__at__Dynamic_array__at__8796008789442667680 = type { ptr, i64 }
+%struct.Type_constructor_My_struct = type { %struct.Type_constructor__at__Dynamic_array__at__3539455473560753142 }
+%struct.Type_constructor__at__Dynamic_array__at__3539455473560753142 = type { ptr, i64 }
+%struct.Type_constructor__at__Dynamic_array__at__3231833810743882593 = type { ptr, i64 }
 
 ; Function Attrs: convergent
 define private void @Type_constructor_run(ptr %"arguments[0].instance_0_0", i64 %"arguments[0].instance_0_1") #0 {
 entry:
-  %instance_0 = alloca %struct.Type_constructor__at__Dynamic_array__at__9266664480299747837, align 8
-  %instance_1 = alloca %struct.Type_constructor__at__Dynamic_array__at__12246575587352456780, align 8
+  %instance_0 = alloca %struct.Type_constructor__at__Dynamic_array__at__1921096279545076101, align 8
+  %instance_1 = alloca %struct.Type_constructor__at__Dynamic_array__at__8796008789442667680, align 8
   %instance_2 = alloca %struct.Type_constructor_My_struct, align 8
-  %0 = alloca %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487, align 8
-  %instance_3 = alloca %struct.Type_constructor__at__Dynamic_array__at__11091932333614297595, align 8
+  %0 = alloca %struct.Type_constructor__at__Dynamic_array__at__3539455473560753142, align 8
+  %instance_3 = alloca %struct.Type_constructor__at__Dynamic_array__at__3231833810743882593, align 8
   %1 = getelementptr inbounds { ptr, i64 }, ptr %instance_0, i32 0, i32 0
   store ptr %"arguments[0].instance_0_0", ptr %1, align 8
   %2 = getelementptr inbounds { ptr, i64 }, ptr %instance_0, i32 0, i32 1
   store i64 %"arguments[0].instance_0_1", ptr %2, align 8
-  %3 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__12246575587352456780, ptr %instance_1, i32 0, i32 0
+  %3 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__8796008789442667680, ptr %instance_1, i32 0, i32 0
   store ptr null, ptr %3, align 8
-  %4 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__12246575587352456780, ptr %instance_1, i32 0, i32 1
+  %4 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__8796008789442667680, ptr %instance_1, i32 0, i32 1
   store i64 0, ptr %4, align 8
-  %5 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487, ptr %0, i32 0, i32 0
+  %5 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__3539455473560753142, ptr %0, i32 0, i32 0
   store ptr null, ptr %5, align 8
-  %6 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487, ptr %0, i32 0, i32 1
+  %6 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__3539455473560753142, ptr %0, i32 0, i32 1
   store i64 0, ptr %6, align 8
-  %7 = load %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487, ptr %0, align 8
-  %8 = getelementptr inbounds %struct.Type_constructor_My_struct, ptr %instance_2, i32 0, i32 0
-  store %struct.Type_constructor__at__Dynamic_array__at__13825035046261308487 %7, ptr %8, align 8
-  %9 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__11091932333614297595, ptr %instance_3, i32 0, i32 0
-  store ptr null, ptr %9, align 8
-  %10 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__11091932333614297595, ptr %instance_3, i32 0, i32 1
-  store i64 0, ptr %10, align 8
+  %7 = getelementptr inbounds %struct.Type_constructor_My_struct, ptr %instance_2, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %7, ptr align 8 %0, i64 16, i1 false)
+  %8 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__3231833810743882593, ptr %instance_3, i32 0, i32 0
+  store ptr null, ptr %8, align 8
+  %9 = getelementptr inbounds %struct.Type_constructor__at__Dynamic_array__at__3231833810743882593, ptr %instance_3, i32 0, i32 1
+  store i64 0, ptr %9, align 8
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -8408,17 +10101,17 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     };
 
     char const* const expected_llvm_ir = R"(
-%struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159 = type { float, float, float }
+%struct.Using_type_constructors_2__at__Vector3__at__3391670476965196533 = type { float, float, float }
 
 ; Function Attrs: convergent
 define { <2 x float>, float } @Using_type_constructors_2_get_one() #0 {
 entry:
-  %0 = alloca %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, align 4
-  %1 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %0, i32 0, i32 0
+  %0 = alloca %struct.Using_type_constructors_2__at__Vector3__at__3391670476965196533, align 4
+  %1 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__3391670476965196533, ptr %0, i32 0, i32 0
   store float 1.000000e+00, ptr %1, align 4
-  %2 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %0, i32 0, i32 1
+  %2 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__3391670476965196533, ptr %0, i32 0, i32 1
   store float 1.000000e+00, ptr %2, align 4
-  %3 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %0, i32 0, i32 2
+  %3 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__3391670476965196533, ptr %0, i32 0, i32 2
   store float 1.000000e+00, ptr %3, align 4
   %4 = load { <2 x float>, float }, ptr %0, align 4
   ret { <2 x float>, float } %4
@@ -8427,13 +10120,13 @@ entry:
 ; Function Attrs: convergent
 define void @Using_type_constructors_2_use(<2 x float> %"arguments[0].value_0", float %"arguments[0].value_1") #0 {
 entry:
-  %value = alloca %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, align 4
+  %value = alloca %struct.Using_type_constructors_2__at__Vector3__at__3391670476965196533, align 4
   %x = alloca float, align 4
   %0 = getelementptr inbounds { <2 x float>, float }, ptr %value, i32 0, i32 0
   store <2 x float> %"arguments[0].value_0", ptr %0, align 4
   %1 = getelementptr inbounds { <2 x float>, float }, ptr %value, i32 0, i32 1
   store float %"arguments[0].value_1", ptr %1, align 4
-  %2 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %value, i32 0, i32 0
+  %2 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__3391670476965196533, ptr %value, i32 0, i32 0
   %3 = load float, ptr %2, align 4
   store float %3, ptr %x, align 4
   ret void
@@ -8446,7 +10139,7 @@ entry:
   %x = alloca float, align 4
   store ptr %"arguments[0].value", ptr %value, align 8
   %0 = load ptr, ptr %value, align 8
-  %1 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__5571078378519863159, ptr %0, i32 0, i32 0
+  %1 = getelementptr inbounds %struct.Using_type_constructors_2__at__Vector3__at__3391670476965196533, ptr %0, i32 0, i32 0
   %2 = load float, ptr %1, align 4
   store float %2, ptr %x, align 4
   ret void
@@ -8533,23 +10226,27 @@ entry:
   store i32 %"arguments[1].my_union_tag", ptr %my_union_tag, align 4
   %7 = load i32, ptr %my_union_tag, align 4
   %8 = icmp eq i32 %7, 0
-  br i1 %8, label %if_s0_then, label %if_s1_else
+  %9 = zext i1 %8 to i8
+  %10 = trunc i8 %9 to i1
+  br i1 %10, label %if_s0_then, label %if_s1_else
 
 if_s0_then:                                       ; preds = %entry
-  %9 = getelementptr inbounds %union.Unions_My_union, ptr %0, i32 0, i32 0
-  %10 = load i32, ptr %9, align 4
-  store i32 %10, ptr %a, align 4
+  %11 = getelementptr inbounds %union.Unions_My_union, ptr %0, i32 0, i32 0
+  %12 = load i32, ptr %11, align 4
+  store i32 %12, ptr %a, align 4
   br label %if_s3_after
 
 if_s1_else:                                       ; preds = %entry
-  %11 = load i32, ptr %my_union_tag, align 4
-  %12 = icmp eq i32 %11, 1
-  br i1 %12, label %if_s2_then, label %if_s3_after
+  %13 = load i32, ptr %my_union_tag, align 4
+  %14 = icmp eq i32 %13, 1
+  %15 = zext i1 %14 to i8
+  %16 = trunc i8 %15 to i1
+  br i1 %16, label %if_s2_then, label %if_s3_after
 
 if_s2_then:                                       ; preds = %if_s1_else
-  %13 = getelementptr inbounds %union.Unions_My_union, ptr %0, i32 0, i32 0
-  %14 = load float, ptr %13, align 4
-  store float %14, ptr %b, align 4
+  %17 = getelementptr inbounds %union.Unions_My_union, ptr %0, i32 0, i32 0
+  %18 = load float, ptr %17, align 4
+  store float %18, ptr %b, align 4
   br label %if_s3_after
 
 if_s3_after:                                      ; preds = %if_s2_then, %if_s1_else, %if_s0_then
@@ -8558,31 +10255,27 @@ if_s3_after:                                      ; preds = %if_s2_then, %if_s1_
   store i32 2, ptr %instance_2, align 4
   store i64 3, ptr %instance_3, align 8
   store i64 3, ptr %instance_4, align 8
-  %15 = getelementptr inbounds %struct.Unions_My_struct, ptr %1, i32 0, i32 0
-  store i32 1, ptr %15, align 4
-  %16 = load %struct.Unions_My_struct, ptr %1, align 4
-  store %struct.Unions_My_struct %16, ptr %instance_5, align 4
-  %17 = getelementptr inbounds %struct.Unions_My_struct, ptr %2, i32 0, i32 0
-  store i32 2, ptr %17, align 4
-  %18 = load %struct.Unions_My_struct, ptr %2, align 4
-  store %struct.Unions_My_struct %18, ptr %instance_6, align 4
-  %19 = getelementptr inbounds %union.Unions_My_union_3, ptr %instance_6, i32 0, i32 0
-  %20 = getelementptr inbounds %struct.Unions_My_struct, ptr %19, i32 0, i32 0
-  %21 = load i32, ptr %20, align 4
-  store i32 %21, ptr %nested_b_a, align 4
+  %19 = getelementptr inbounds %struct.Unions_My_struct, ptr %1, i32 0, i32 0
+  store i32 1, ptr %19, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_5, ptr align 4 %1, i64 4, i1 false)
+  %20 = getelementptr inbounds %struct.Unions_My_struct, ptr %2, i32 0, i32 0
+  store i32 2, ptr %20, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_6, ptr align 4 %2, i64 4, i1 false)
+  %21 = getelementptr inbounds %union.Unions_My_union_3, ptr %instance_6, i32 0, i32 0
+  %22 = getelementptr inbounds %struct.Unions_My_struct, ptr %21, i32 0, i32 0
+  %23 = load i32, ptr %22, align 4
+  store i32 %23, ptr %nested_b_a, align 4
   store i32 1, ptr %instance_7, align 4
   store i32 2, ptr %3, align 4
-  %22 = load %union.Unions_My_union, ptr %3, align 4
-  store %union.Unions_My_union %22, ptr %instance_7, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_7, ptr align 4 %3, i64 4, i1 false)
   store i32 4, ptr %4, align 4
-  %23 = getelementptr inbounds %union.Unions_My_union, ptr %4, i32 0, i32 0
-  %24 = load i32, ptr %23, align 4
-  call void @Unions_pass_union(i32 noundef %24)
-  %25 = call i32 @Unions_return_union()
-  %26 = getelementptr inbounds %union.Unions_My_union, ptr %5, i32 0, i32 0
-  store i32 %25, ptr %26, align 4
-  %27 = load %union.Unions_My_union, ptr %5, align 4
-  store %union.Unions_My_union %27, ptr %instance_8, align 4
+  %24 = getelementptr inbounds %union.Unions_My_union, ptr %4, i32 0, i32 0
+  %25 = load i32, ptr %24, align 4
+  call void @Unions_pass_union(i32 noundef %25)
+  %26 = call i32 @Unions_return_union()
+  %27 = getelementptr inbounds %union.Unions_My_union, ptr %5, i32 0, i32 0
+  store i32 %26, ptr %27, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance_8, ptr align 4 %5, i64 4, i1 false)
   call void @llvm.memset.p0.i64(ptr align 4 %instance_9, i8 0, i64 4, i1 false)
   ret void
 }
@@ -8606,11 +10299,15 @@ entry:
   ret i32 %2
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
-declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #2
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
-attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 )";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
@@ -8672,14 +10369,16 @@ while_loop_condition:                             ; preds = %while_loop_then, %e
   %0 = load i32, ptr %index, align 4
   %1 = load i32, ptr %size, align 4
   %2 = icmp slt i32 %0, %1
-  br i1 %2, label %while_loop_then, label %while_loop_after
+  %3 = zext i1 %2 to i8
+  %4 = trunc i8 %3 to i1
+  br i1 %4, label %while_loop_then, label %while_loop_after
 
 while_loop_then:                                  ; preds = %while_loop_condition
-  %3 = load i32, ptr %index, align 4
-  call void @While_loop_expressions_print_integer(i32 noundef %3)
-  %4 = load i32, ptr %index, align 4
-  %5 = add i32 %4, 1
-  store i32 %5, ptr %index, align 4
+  %5 = load i32, ptr %index, align 4
+  call void @While_loop_expressions_print_integer(i32 noundef %5)
+  %6 = load i32, ptr %index, align 4
+  %7 = add i32 %6, 1
+  store i32 %7, ptr %index, align 4
   br label %while_loop_condition
 
 while_loop_after:                                 ; preds = %while_loop_condition
@@ -8687,16 +10386,20 @@ while_loop_after:                                 ; preds = %while_loop_conditio
   br label %while_loop_condition2
 
 while_loop_condition2:                            ; preds = %if_s1_after6, %if_s0_then, %while_loop_after
-  %6 = load i32, ptr %index1, align 4
-  %7 = load i32, ptr %size, align 4
-  %8 = icmp slt i32 %6, %7
-  br i1 %8, label %while_loop_then3, label %while_loop_after4
+  %8 = load i32, ptr %index1, align 4
+  %9 = load i32, ptr %size, align 4
+  %10 = icmp slt i32 %8, %9
+  %11 = zext i1 %10 to i8
+  %12 = trunc i8 %11 to i1
+  br i1 %12, label %while_loop_then3, label %while_loop_after4
 
 while_loop_then3:                                 ; preds = %while_loop_condition2
-  %9 = load i32, ptr %index1, align 4
-  %10 = srem i32 %9, 2
-  %11 = icmp eq i32 %10, 0
-  br i1 %11, label %if_s0_then, label %if_s1_after
+  %13 = load i32, ptr %index1, align 4
+  %14 = srem i32 %13, 2
+  %15 = icmp eq i32 %14, 0
+  %16 = zext i1 %15 to i8
+  %17 = trunc i8 %16 to i1
+  br i1 %17, label %if_s0_then, label %if_s1_after
 
 while_loop_after4:                                ; preds = %if_s0_then5, %while_loop_condition2
   store i8 1, ptr %c_boolean, align 1
@@ -8706,25 +10409,27 @@ if_s0_then:                                       ; preds = %while_loop_then3
   br label %while_loop_condition2
 
 if_s1_after:                                      ; preds = %while_loop_then3
-  %12 = load i32, ptr %index1, align 4
-  %13 = icmp sgt i32 %12, 5
-  br i1 %13, label %if_s0_then5, label %if_s1_after6
+  %18 = load i32, ptr %index1, align 4
+  %19 = icmp sgt i32 %18, 5
+  %20 = zext i1 %19 to i8
+  %21 = trunc i8 %20 to i1
+  br i1 %21, label %if_s0_then5, label %if_s1_after6
 
 if_s0_then5:                                      ; preds = %if_s1_after
   br label %while_loop_after4
 
 if_s1_after6:                                     ; preds = %if_s1_after
-  %14 = load i32, ptr %index1, align 4
-  call void @While_loop_expressions_print_integer(i32 noundef %14)
-  %15 = load i32, ptr %index1, align 4
-  %16 = add i32 %15, 1
-  store i32 %16, ptr %index1, align 4
+  %22 = load i32, ptr %index1, align 4
+  call void @While_loop_expressions_print_integer(i32 noundef %22)
+  %23 = load i32, ptr %index1, align 4
+  %24 = add i32 %23, 1
+  store i32 %24, ptr %index1, align 4
   br label %while_loop_condition2
 
 while_loop_condition7:                            ; preds = %while_loop_then8, %while_loop_after4
-  %17 = load i8, ptr %c_boolean, align 1
-  %18 = trunc i8 %17 to i1
-  br i1 %18, label %while_loop_then8, label %while_loop_after9
+  %25 = load i8, ptr %c_boolean, align 1
+  %26 = trunc i8 %25 to i1
+  br i1 %26, label %while_loop_then8, label %while_loop_after9
 
 while_loop_then8:                                 ; preds = %while_loop_condition7
   store i8 0, ptr %c_boolean, align 1
@@ -8759,12 +10464,13 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     };
 
     char const* const expected_llvm_ir = R"(
-@function_contract_error_string = private unnamed_addr constant [67 x i8] c"In function 'Function_contracts.run' precondition 'x >= 0' failed!\00"
-@function_contract_error_string.1 = private unnamed_addr constant [67 x i8] c"In function 'Function_contracts.run' precondition 'x <= 8' failed!\00"
-@function_contract_error_string.2 = private unnamed_addr constant [73 x i8] c"In function 'Function_contracts.run' postcondition 'result >= 0' failed!\00"
-@function_contract_error_string.3 = private unnamed_addr constant [74 x i8] c"In function 'Function_contracts.run' postcondition 'result <= 64' failed!\00"
-@function_contract_error_string.4 = private unnamed_addr constant [73 x i8] c"In function 'Function_contracts.run' postcondition 'result >= 0' failed!\00"
-@function_contract_error_string.5 = private unnamed_addr constant [74 x i8] c"In function 'Function_contracts.run' postcondition 'result <= 64' failed!\00"
+@iris_error_string = private unnamed_addr constant [68 x i8] c"In function 'Function_contracts.run' precondition 'x >= 0' failed!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [68 x i8] c"In function 'Function_contracts.run' precondition 'x <= 8' failed!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [104 x i8] c"function_contracts.iris:11:9: In function 'Function_contracts.run' postcondition 'result >= 0' failed!\0A\00"
+@iris_error_string.3 = private unnamed_addr constant [105 x i8] c"function_contracts.iris:11:9: In function 'Function_contracts.run' postcondition 'result <= 64' failed!\0A\00"
+@iris_error_string.4 = private unnamed_addr constant [104 x i8] c"function_contracts.iris:14:5: In function 'Function_contracts.run' postcondition 'result >= 0' failed!\0A\00"
+@iris_error_string.5 = private unnamed_addr constant [105 x i8] c"function_contracts.iris:14:5: In function 'Function_contracts.run' postcondition 'result <= 64' failed!\0A\00"
 
 ; Function Attrs: convergent
 define i32 @Function_contracts_run(i32 noundef %"arguments[0].x") #0 {
@@ -8773,73 +10479,97 @@ entry:
   store i32 %"arguments[0].x", ptr %x, align 4
   %0 = load i32, ptr %x, align 4
   %1 = icmp sge i32 %0, 0
-  br i1 %1, label %condition_success, label %condition_fail
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %condition_success, label %condition_fail
 
 condition_success:                                ; preds = %entry
-  %2 = load i32, ptr %x, align 4
-  %3 = icmp sle i32 %2, 8
-  br i1 %3, label %condition_success1, label %condition_fail2
+  %4 = load i32, ptr %x, align 4
+  %5 = icmp sle i32 %4, 8
+  %6 = zext i1 %5 to i8
+  %7 = trunc i8 %6 to i1
+  br i1 %7, label %condition_success1, label %condition_fail2
 
 condition_fail:                                   ; preds = %entry
-  %4 = call i32 @puts(ptr @function_contract_error_string)
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %8 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %9 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 condition_success1:                               ; preds = %condition_success
-  %5 = load i32, ptr %x, align 4
-  %6 = icmp eq i32 %5, 8
-  br i1 %6, label %if_s0_then, label %if_s1_after
+  %10 = load i32, ptr %x, align 4
+  %11 = icmp eq i32 %10, 8
+  %12 = zext i1 %11 to i8
+  %13 = trunc i8 %12 to i1
+  br i1 %13, label %if_s0_then, label %if_s1_after
 
 condition_fail2:                                  ; preds = %condition_success
-  %7 = call i32 @puts(ptr @function_contract_error_string.1)
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %14 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer3)
+  %15 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
 if_s0_then:                                       ; preds = %condition_success1
-  br i1 true, label %condition_success3, label %condition_fail4
+  br i1 true, label %condition_success4, label %condition_fail5
 
 if_s1_after:                                      ; preds = %condition_success1
-  %8 = load i32, ptr %x, align 4
-  %9 = load i32, ptr %x, align 4
-  %10 = mul i32 %8, %9
-  %11 = icmp sge i32 %10, 0
-  br i1 %11, label %condition_success7, label %condition_fail8
+  %16 = load i32, ptr %x, align 4
+  %17 = load i32, ptr %x, align 4
+  %18 = mul i32 %16, %17
+  %19 = icmp sge i32 %18, 0
+  %20 = zext i1 %19 to i8
+  %21 = trunc i8 %20 to i1
+  br i1 %21, label %condition_success10, label %condition_fail11
 
-condition_success3:                               ; preds = %if_s0_then
-  br i1 true, label %condition_success5, label %condition_fail6
+condition_success4:                               ; preds = %if_s0_then
+  br i1 true, label %condition_success7, label %condition_fail8
 
-condition_fail4:                                  ; preds = %if_s0_then
-  %12 = call i32 @puts(ptr @function_contract_error_string.2)
+condition_fail5:                                  ; preds = %if_s0_then
+  %stderr_pointer6 = load ptr, ptr @stderr, align 8
+  %22 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer6)
+  %23 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
-condition_success5:                               ; preds = %condition_success3
+condition_success7:                               ; preds = %condition_success4
   ret i32 64
 
-condition_fail6:                                  ; preds = %condition_success3
-  %13 = call i32 @puts(ptr @function_contract_error_string.3)
+condition_fail8:                                  ; preds = %condition_success4
+  %stderr_pointer9 = load ptr, ptr @stderr, align 8
+  %24 = call i32 @fputs(ptr @iris_error_string.3, ptr %stderr_pointer9)
+  %25 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
-condition_success7:                               ; preds = %if_s1_after
-  %14 = icmp sle i32 %10, 64
-  br i1 %14, label %condition_success9, label %condition_fail10
+condition_success10:                              ; preds = %if_s1_after
+  %26 = icmp sle i32 %18, 64
+  %27 = zext i1 %26 to i8
+  %28 = trunc i8 %27 to i1
+  br i1 %28, label %condition_success13, label %condition_fail14
 
-condition_fail8:                                  ; preds = %if_s1_after
-  %15 = call i32 @puts(ptr @function_contract_error_string.4)
+condition_fail11:                                 ; preds = %if_s1_after
+  %stderr_pointer12 = load ptr, ptr @stderr, align 8
+  %29 = call i32 @fputs(ptr @iris_error_string.4, ptr %stderr_pointer12)
+  %30 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 
-condition_success9:                               ; preds = %condition_success7
-  ret i32 %10
+condition_success13:                              ; preds = %condition_success10
+  ret i32 %18
 
-condition_fail10:                                 ; preds = %condition_success7
-  %16 = call i32 @puts(ptr @function_contract_error_string.5)
+condition_fail14:                                 ; preds = %condition_success10
+  %stderr_pointer15 = load ptr, ptr @stderr, align 8
+  %31 = call i32 @fputs(ptr @iris_error_string.5, ptr %stderr_pointer15)
+  %32 = call i32 @fflush(ptr null)
   call void @abort()
   unreachable
 }
 
-declare i32 @puts(ptr)
+declare i32 @fputs(ptr, ptr)
+
+declare i32 @fflush(ptr)
 
 declare void @abort()
 
@@ -8865,16 +10595,18 @@ entry:
   store i32 %"arguments[0].x", ptr %x, align 4
   %0 = load i32, ptr %x, align 4
   %1 = icmp eq i32 %0, 8
-  br i1 %1, label %if_s0_then, label %if_s1_after
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %if_s0_then, label %if_s1_after
 
 if_s0_then:                                       ; preds = %entry
   ret i32 64
 
 if_s1_after:                                      ; preds = %entry
-  %2 = load i32, ptr %x, align 4
-  %3 = load i32, ptr %x, align 4
-  %4 = mul i32 %2, %3
-  ret i32 %4
+  %4 = load i32, ptr %x, align 4
+  %5 = load i32, ptr %x, align 4
+  %6 = mul i32 %4, %5
+  ret i32 %6
 }
 
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
@@ -9290,8 +11022,7 @@ entry:
   %result = alloca %struct.c_interoperability_My_struct, align 4
   call void @llvm.memset.p0.i64(ptr align 4 %instance, i8 0, i64 20, i1 false)
   call void @c_interoperability_foo(ptr dead_on_unwind noalias writable sret(%struct.c_interoperability_My_struct) align 4 %0, ptr noundef byval(%struct.c_interoperability_My_struct) align 8 %instance)
-  %1 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %1, ptr %result, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %result, ptr align 4 %0, i64 20, i1 false)
   ret void
 }
 
@@ -9333,8 +11064,7 @@ entry:
   call void @llvm.memset.p0.i64(ptr align 4 %instance, i8 0, i64 20, i1 false)
   call void @llvm.memcpy.p0.p0.i64(ptr align 4 %1, ptr align 4 %instance, i64 20, i1 false)
   call void @c_interoperability_foo(ptr dead_on_unwind noalias writable align 4 %0, ptr noundef %1)
-  %2 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %2, ptr %result, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %result, ptr align 4 %0, i64 20, i1 false)
   ret void
 }
 
@@ -9381,8 +11111,7 @@ entry:
   %0 = alloca %struct.c_interoperability_My_struct, align 4
   %instance = alloca %struct.c_interoperability_My_struct, align 4
   call void @c_interoperability_foo(ptr dead_on_unwind noalias writable sret(%struct.c_interoperability_My_struct) align 4 %0)
-  %1 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %1, ptr %instance, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance, ptr align 4 %0, i64 20, i1 false)
   ret void
 }
 
@@ -9425,8 +11154,7 @@ entry:
   %0 = alloca %struct.c_interoperability_My_struct, align 4
   %instance = alloca %struct.c_interoperability_My_struct, align 4
   call void @c_interoperability_foo(ptr dead_on_unwind noalias writable align 4 %0)
-  %1 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %1, ptr %instance, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance, ptr align 4 %0, i64 20, i1 false)
   ret void
 }
 
@@ -9589,12 +11317,15 @@ entry:
   %1 = call i32 @c_interoperability_foo()
   %2 = getelementptr inbounds %struct.c_interoperability_My_struct, ptr %0, i32 0, i32 0
   store i32 %1, ptr %2, align 1
-  %3 = load %struct.c_interoperability_My_struct, ptr %0, align 1
-  store %struct.c_interoperability_My_struct %3, ptr %instance, align 1
+  call void @llvm.memcpy.p0.p0.i64(ptr align 1 %instance, ptr align 1 %0, i64 4, i1 false)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_c_interoperability_common("c_interoperability_function_return_empty_struct.iris", "x86_64-pc-windows-msvc", expected_llvm_ir);
@@ -9729,12 +11460,15 @@ entry:
   %4 = getelementptr inbounds { i64, i64 }, ptr %0, i32 0, i32 1
   %5 = extractvalue { i64, i64 } %1, 1
   store i64 %5, ptr %4, align 4
-  %6 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %6, ptr %instance, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance, ptr align 4 %0, i64 16, i1 false)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_c_interoperability_common("c_interoperability_function_return_small_struct.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
@@ -9767,8 +11501,7 @@ entry:
   %0 = alloca %struct.c_interoperability_My_struct, align 4
   %instance = alloca %struct.c_interoperability_My_struct, align 4
   call void @c_interoperability_foo(ptr dead_on_unwind noalias writable align 4 %0)
-  %1 = load %struct.c_interoperability_My_struct, ptr %0, align 4
-  store %struct.c_interoperability_My_struct %1, ptr %instance, align 4
+  call void @llvm.memcpy.p0.p0.i64(ptr align 4 %instance, ptr align 4 %0, i64 16, i1 false)
   ret void
 }
 
@@ -9808,22 +11541,25 @@ entry:
   store i32 0, ptr %v0, align 4
   %array_element_pointer = getelementptr [1 x ptr], ptr %array, i32 0, i32 0
   store ptr %v0, ptr %array_element_pointer, align 8
-  %1 = load [1 x ptr], ptr %array, align 8
-  store [1 x ptr] %1, ptr %array1, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array1, ptr align 8 %array, i64 8, i1 false)
   %data_pointer = getelementptr [1 x ptr], ptr %array1, i32 0, i32 0
-  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
-  store ptr %data_pointer, ptr %2, align 8
-  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
-  store i64 1, ptr %3, align 8
-  %4 = getelementptr inbounds { ptr, i64 }, ptr %0, i32 0, i32 0
-  %5 = load ptr, ptr %4, align 8
-  %6 = getelementptr inbounds { ptr, i64 }, ptr %0, i32 0, i32 1
-  %7 = load i64, ptr %6, align 8
-  call void @c_interoperability_take(ptr %5, i64 %7)
+  %1 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  store ptr %data_pointer, ptr %1, align 8
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  store i64 1, ptr %2, align 8
+  %3 = getelementptr inbounds { ptr, i64 }, ptr %0, i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  %5 = getelementptr inbounds { ptr, i64 }, ptr %0, i32 0, i32 1
+  %6 = load i64, ptr %5, align 8
+  call void @c_interoperability_take(ptr %4, i64 %6)
   ret void
 }
 
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
 attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 )";
 
     test_c_interoperability_common("c_interoperability_function_with_array_slice.iris", "x86_64-pc-linux-gnu", expected_llvm_ir);
@@ -9851,13 +11587,12 @@ entry:
   store i32 0, ptr %v0, align 4
   %array_element_pointer = getelementptr [1 x ptr], ptr %array, i32 0, i32 0
   store ptr %v0, ptr %array_element_pointer, align 8
-  %2 = load [1 x ptr], ptr %array, align 8
-  store [1 x ptr] %2, ptr %array1, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %array1, ptr align 8 %array, i64 8, i1 false)
   %data_pointer = getelementptr [1 x ptr], ptr %array1, i32 0, i32 0
-  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
-  store ptr %data_pointer, ptr %3, align 8
-  %4 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
-  store i64 1, ptr %4, align 8
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  store ptr %data_pointer, ptr %2, align 8
+  %3 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  store i64 1, ptr %3, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %1, ptr align 8 %0, i64 16, i1 false)
   call void @c_interoperability_take(ptr noundef %1)
   ret void
@@ -10195,10 +11930,10 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
     };
 
     char const* const expected_llvm_ir = R"(
-@Function_constructor_global_consumer_bar = constant ptr @Function_constructor_global_provider__at__to_json__at__7179855141281402803
+@Function_constructor_global_consumer_bar = constant ptr @Function_constructor_global_provider__at__to_json__at__8678210880236116575
 
 ; Function Attrs: convergent
-define private void @Function_constructor_global_provider__at__to_json__at__7179855141281402803(ptr noundef %"arguments[0].value") #0 {
+define private void @Function_constructor_global_provider__at__to_json__at__8678210880236116575(ptr noundef %"arguments[0].value") #0 {
 entry:
   %value = alloca ptr, align 8
   store ptr %"arguments[0].value", ptr %value, align 8
@@ -10343,5 +12078,699 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
     CHECK_THROWS(unescape(R"([\d])"));
     CHECK_THROWS(unescape(R"(trailing\)"));
+  }
+
+  TEST_CASE("Compile Lambda No Captures", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_no_captures.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_no_captures_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define void @Lambda_no_captures_main() #0 {
+entry:
+  %cmp = alloca %struct.Lambda_no_captures_Comparator, align 8
+  store { ptr, ptr } { ptr @Lambda_no_captures_main__lambda0, ptr null }, ptr %cmp, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_no_captures_main__lambda0(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = sub i32 %0, %1
+  ret i32 %2
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda With Captures", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_with_captures.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_with_captures_main__lambda0__environment = type { i32 }
+%struct.Lambda_with_captures_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define void @Lambda_with_captures_main() #0 {
+entry:
+  %offset = alloca i32, align 4
+  %main__lambda0__environment = alloca %struct.Lambda_with_captures_main__lambda0__environment, align 4
+  %cmp = alloca %struct.Lambda_with_captures_Comparator, align 8
+  store i32 10, ptr %offset, align 4
+  %0 = load i32, ptr %offset, align 4
+  %1 = getelementptr inbounds nuw %struct.Lambda_with_captures_main__lambda0__environment, ptr %main__lambda0__environment, i32 0, i32 0
+  store i32 %0, ptr %1, align 4
+  %2 = insertvalue { ptr, ptr } { ptr @Lambda_with_captures_main__lambda0, ptr undef }, ptr %main__lambda0__environment, 1
+  store { ptr, ptr } %2, ptr %cmp, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_with_captures_main__lambda0(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  %offset = alloca i32, align 4
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load ptr, ptr %user_data, align 8
+  %1 = getelementptr inbounds %struct.Lambda_with_captures_main__lambda0__environment, ptr %0, i32 0, i32 0
+  %2 = load i32, ptr %1, align 4
+  store i32 %2, ptr %offset, align 4
+  %3 = load i32, ptr %a, align 4
+  %4 = load i32, ptr %b, align 4
+  %5 = sub i32 %3, %4
+  %6 = load i32, ptr %offset, align 4
+  %7 = add i32 %5, %6
+  ret i32 %7
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Call", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_call.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_call_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define i32 @Lambda_call_apply(ptr %"arguments[0].cmp_0", ptr %"arguments[0].cmp_1", i32 noundef %"arguments[1].x", i32 noundef %"arguments[2].y") #0 {
+entry:
+  %cmp = alloca %struct.Lambda_call_Comparator, align 8
+  %x = alloca i32, align 4
+  %y = alloca i32, align 4
+  %0 = getelementptr inbounds { ptr, ptr }, ptr %cmp, i32 0, i32 0
+  store ptr %"arguments[0].cmp_0", ptr %0, align 8
+  %1 = getelementptr inbounds { ptr, ptr }, ptr %cmp, i32 0, i32 1
+  store ptr %"arguments[0].cmp_1", ptr %1, align 8
+  store i32 %"arguments[1].x", ptr %x, align 4
+  store i32 %"arguments[2].y", ptr %y, align 4
+  %2 = load %struct.Lambda_call_Comparator, ptr %cmp, align 8
+  %lambda_function_pointer = extractvalue %struct.Lambda_call_Comparator %2, 0
+  %lambda_user_data = extractvalue %struct.Lambda_call_Comparator %2, 1
+  %3 = load i32, ptr %x, align 4
+  %4 = load i32, ptr %y, align 4
+  %5 = call i32 %lambda_function_pointer(i32 noundef %3, i32 noundef %4, ptr noundef %lambda_user_data)
+  ret i32 %5
+}
+
+; Function Attrs: convergent
+define void @Lambda_call_main() #0 {
+entry:
+  %cmp = alloca %struct.Lambda_call_Comparator, align 8
+  %result = alloca i32, align 4
+  store { ptr, ptr } { ptr @Lambda_call_main__lambda0, ptr null }, ptr %cmp, align 8
+  %0 = getelementptr inbounds { ptr, ptr }, ptr %cmp, i32 0, i32 0
+  %1 = load ptr, ptr %0, align 8
+  %2 = getelementptr inbounds { ptr, ptr }, ptr %cmp, i32 0, i32 1
+  %3 = load ptr, ptr %2, align 8
+  %4 = call i32 @Lambda_call_apply(ptr %1, ptr %3, i32 noundef 10, i32 noundef 3)
+  store i32 %4, ptr %result, align 4
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_call_main__lambda0(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = sub i32 %0, %1
+  ret i32 %2
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Named Type", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_named_type.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_named_type_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define void @Lambda_named_type_main() #0 {
+entry:
+  %cmp = alloca %struct.Lambda_named_type_Comparator, align 8
+  %x = alloca %struct.Lambda_named_type_Comparator, align 8
+  store { ptr, ptr } { ptr @Lambda_named_type_main__lambda0, ptr null }, ptr %cmp, align 8
+  %0 = getelementptr inbounds %struct.Lambda_named_type_Comparator, ptr %x, i32 0, i32 0
+  store ptr null, ptr %0, align 8
+  %1 = getelementptr inbounds %struct.Lambda_named_type_Comparator, ptr %x, i32 0, i32 1
+  store ptr null, ptr %1, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_named_type_main__lambda0(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = sub i32 %0, %1
+  ret i32 %2
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Multiple", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_multiple.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_multiple_Comparator = type { ptr, ptr }
+%struct.Lambda_multiple_Mapper = type { ptr, ptr }
+
+; Function Attrs: convergent
+define void @Lambda_multiple_main() #0 {
+entry:
+  %cmp1 = alloca %struct.Lambda_multiple_Comparator, align 8
+  %cmp2 = alloca %struct.Lambda_multiple_Comparator, align 8
+  %mapper1 = alloca %struct.Lambda_multiple_Mapper, align 8
+  %mapper2 = alloca %struct.Lambda_multiple_Mapper, align 8
+  store { ptr, ptr } { ptr @Lambda_multiple_main__lambda0, ptr null }, ptr %cmp1, align 8
+  store { ptr, ptr } { ptr @Lambda_multiple_main__lambda1, ptr null }, ptr %cmp2, align 8
+  store { ptr, ptr } { ptr @Lambda_multiple_main__lambda2, ptr null }, ptr %mapper1, align 8
+  store { ptr, ptr } { ptr @Lambda_multiple_main__lambda3, ptr null }, ptr %mapper2, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_multiple_main__lambda0(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = sub i32 %0, %1
+  ret i32 %2
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_multiple_main__lambda1(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = add i32 %0, %1
+  ret i32 %2
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_multiple_main__lambda2(i32 noundef %"arguments[0].x", ptr noundef %"arguments[1].user_data") #0 {
+entry:
+  %x = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store ptr %"arguments[1].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %x, align 4
+  %1 = mul i32 %0, 2
+  ret i32 %1
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_multiple_main__lambda3(i32 noundef %"arguments[0].x", ptr noundef %"arguments[1].user_data") #0 {
+entry:
+  %x = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store ptr %"arguments[1].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %x, align 4
+  %1 = add i32 %0, 1
+  ret i32 %1
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Nested", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_nested.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_nested_Outer = type { ptr, ptr }
+%struct.Lambda_nested_main__lambda0__lambda0__environment = type { i32 }
+%struct.Lambda_nested_Inner = type { ptr, ptr }
+
+; Function Attrs: convergent
+define void @Lambda_nested_main() #0 {
+entry:
+  %outer = alloca %struct.Lambda_nested_Outer, align 8
+  store { ptr, ptr } { ptr @Lambda_nested_main__lambda0, ptr null }, ptr %outer, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_nested_main__lambda0(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  %main__lambda0__lambda0__environment = alloca %struct.Lambda_nested_main__lambda0__lambda0__environment, align 4
+  %inner = alloca %struct.Lambda_nested_Inner, align 8
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %a, align 4
+  %1 = getelementptr inbounds nuw %struct.Lambda_nested_main__lambda0__lambda0__environment, ptr %main__lambda0__lambda0__environment, i32 0, i32 0
+  store i32 %0, ptr %1, align 4
+  %2 = insertvalue { ptr, ptr } { ptr @Lambda_nested_main__lambda0__lambda0, ptr undef }, ptr %main__lambda0__lambda0__environment, 1
+  store { ptr, ptr } %2, ptr %inner, align 8
+  %3 = load %struct.Lambda_nested_Inner, ptr %inner, align 8
+  %lambda_function_pointer = extractvalue %struct.Lambda_nested_Inner %3, 0
+  %lambda_user_data = extractvalue %struct.Lambda_nested_Inner %3, 1
+  %4 = load i32, ptr %b, align 4
+  %5 = call i32 %lambda_function_pointer(i32 noundef %4, ptr noundef %lambda_user_data)
+  ret i32 %5
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_nested_main__lambda0__lambda0(i32 noundef %"arguments[0].x", ptr noundef %"arguments[1].user_data") #0 {
+entry:
+  %x = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  %a = alloca i32, align 4
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store ptr %"arguments[1].user_data", ptr %user_data, align 8
+  %0 = load ptr, ptr %user_data, align 8
+  %1 = getelementptr inbounds %struct.Lambda_nested_main__lambda0__lambda0__environment, ptr %0, i32 0, i32 0
+  %2 = load i32, ptr %1, align 4
+  store i32 %2, ptr %a, align 4
+  %3 = load i32, ptr %x, align 4
+  %4 = load i32, ptr %a, align 4
+  %5 = add i32 %3, %4
+  ret i32 %5
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Return Lambda", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_return_lambda.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_return_lambda_Mapper = type { ptr, ptr }
+
+; Function Attrs: convergent
+define { ptr, ptr } @Lambda_return_lambda_create_mapper() #0 {
+entry:
+  %0 = alloca %struct.Lambda_return_lambda_Mapper, align 8
+  store { ptr, ptr } { ptr @Lambda_return_lambda_create_mapper__lambda0, ptr null }, ptr %0, align 8
+  %1 = load { ptr, ptr }, ptr %0, align 8
+  ret { ptr, ptr } %1
+}
+
+; Function Attrs: convergent
+define void @Lambda_return_lambda_main() #0 {
+entry:
+  %0 = alloca %struct.Lambda_return_lambda_Mapper, align 8
+  %mapper = alloca %struct.Lambda_return_lambda_Mapper, align 8
+  %1 = call { ptr, ptr } @Lambda_return_lambda_create_mapper()
+  %2 = getelementptr inbounds { ptr, ptr }, ptr %0, i32 0, i32 0
+  %3 = extractvalue { ptr, ptr } %1, 0
+  store ptr %3, ptr %2, align 8
+  %4 = getelementptr inbounds { ptr, ptr }, ptr %0, i32 0, i32 1
+  %5 = extractvalue { ptr, ptr } %1, 1
+  store ptr %5, ptr %4, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %mapper, ptr align 8 %0, i64 16, i1 false)
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_return_lambda_create_mapper__lambda0(i32 noundef %"arguments[0].x", ptr noundef %"arguments[1].user_data") #0 {
+entry:
+  %x = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store ptr %"arguments[1].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %x, align 4
+  %1 = mul i32 %0, 2
+  ret i32 %1
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Block Body", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_block_body.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_block_body_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define void @Lambda_block_body_main() #0 {
+entry:
+  %cmp = alloca %struct.Lambda_block_body_Comparator, align 8
+  store { ptr, ptr } { ptr @Lambda_block_body_main__lambda0, ptr null }, ptr %cmp, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_block_body_main__lambda0(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = sub i32 %0, %1
+  ret i32 %2
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Inline Body", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_inline_body.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_inline_body_Comparator = type { ptr, ptr }
+%struct.Lambda_inline_body_Mapper = type { ptr, ptr }
+
+; Function Attrs: convergent
+define void @Lambda_inline_body_main() #0 {
+entry:
+  %cmp = alloca %struct.Lambda_inline_body_Comparator, align 8
+  %mapper = alloca %struct.Lambda_inline_body_Mapper, align 8
+  store { ptr, ptr } { ptr @Lambda_inline_body_main__lambda0, ptr null }, ptr %cmp, align 8
+  store { ptr, ptr } { ptr @Lambda_inline_body_main__lambda1, ptr null }, ptr %mapper, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_inline_body_main__lambda0(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = sub i32 %0, %1
+  ret i32 %2
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_inline_body_main__lambda1(i32 noundef %"arguments[0].x", ptr noundef %"arguments[1].user_data") #0 {
+entry:
+  %x = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store ptr %"arguments[1].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %x, align 4
+  %1 = mul i32 %0, 2
+  ret i32 %1
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Explicit Types", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_explicit_types.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_explicit_types_Comparator = type { ptr, ptr }
+
+; Function Attrs: convergent
+define void @Lambda_explicit_types_main() #0 {
+entry:
+  %mapper = alloca { ptr, ptr }, align 8
+  %identity = alloca { ptr, ptr }, align 8
+  %cmp = alloca %struct.Lambda_explicit_types_Comparator, align 8
+  store { ptr, ptr } { ptr @Lambda_explicit_types_main__lambda0, ptr null }, ptr %mapper, align 8
+  store { ptr, ptr } { ptr @Lambda_explicit_types_main__lambda1, ptr null }, ptr %identity, align 8
+  store { ptr, ptr } { ptr @Lambda_explicit_types_main__lambda2, ptr null }, ptr %cmp, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_explicit_types_main__lambda0(i32 noundef %"arguments[0].x", ptr noundef %"arguments[1].user_data") #0 {
+entry:
+  %x = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].x", ptr %x, align 4
+  store ptr %"arguments[1].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %x, align 4
+  %1 = mul i32 %0, 2
+  ret i32 %1
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_explicit_types_main__lambda1(i32 noundef %"arguments[0].value", ptr noundef %"arguments[1].user_data") #0 {
+entry:
+  %value = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].value", ptr %value, align 4
+  store ptr %"arguments[1].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %value, align 4
+  ret i32 %0
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_explicit_types_main__lambda2(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %a, align 4
+  %1 = load i32, ptr %b, align 4
+  %2 = sub i32 %0, %1
+  ret i32 %2
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Mixed", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_mixed.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Lambda_mixed_Comparator = type { ptr, ptr }
+%struct.Lambda_mixed_main__lambda0__environment = type { i32 }
+%struct.Lambda_mixed_Mapper = type { ptr, ptr }
+
+; Function Attrs: convergent
+define i32 @Lambda_mixed_apply(ptr %"arguments[0].cmp_0", ptr %"arguments[0].cmp_1", i32 noundef %"arguments[1].x", i32 noundef %"arguments[2].y") #0 {
+entry:
+  %cmp = alloca %struct.Lambda_mixed_Comparator, align 8
+  %x = alloca i32, align 4
+  %y = alloca i32, align 4
+  %0 = getelementptr inbounds { ptr, ptr }, ptr %cmp, i32 0, i32 0
+  store ptr %"arguments[0].cmp_0", ptr %0, align 8
+  %1 = getelementptr inbounds { ptr, ptr }, ptr %cmp, i32 0, i32 1
+  store ptr %"arguments[0].cmp_1", ptr %1, align 8
+  store i32 %"arguments[1].x", ptr %x, align 4
+  store i32 %"arguments[2].y", ptr %y, align 4
+  %2 = load %struct.Lambda_mixed_Comparator, ptr %cmp, align 8
+  %lambda_function_pointer = extractvalue %struct.Lambda_mixed_Comparator %2, 0
+  %lambda_user_data = extractvalue %struct.Lambda_mixed_Comparator %2, 1
+  %3 = load i32, ptr %x, align 4
+  %4 = load i32, ptr %y, align 4
+  %5 = call i32 %lambda_function_pointer(i32 noundef %3, i32 noundef %4, ptr noundef %lambda_user_data)
+  ret i32 %5
+}
+
+; Function Attrs: convergent
+define void @Lambda_mixed_main() #0 {
+entry:
+  %base = alloca i32, align 4
+  %main__lambda0__environment = alloca %struct.Lambda_mixed_main__lambda0__environment, align 4
+  %cmp = alloca %struct.Lambda_mixed_Comparator, align 8
+  %mapped = alloca %struct.Lambda_mixed_Mapper, align 8
+  %result = alloca i32, align 4
+  store i32 100, ptr %base, align 4
+  %0 = load i32, ptr %base, align 4
+  %1 = getelementptr inbounds nuw %struct.Lambda_mixed_main__lambda0__environment, ptr %main__lambda0__environment, i32 0, i32 0
+  store i32 %0, ptr %1, align 4
+  %2 = insertvalue { ptr, ptr } { ptr @Lambda_mixed_main__lambda0, ptr undef }, ptr %main__lambda0__environment, 1
+  store { ptr, ptr } %2, ptr %cmp, align 8
+  store { ptr, ptr } { ptr @Lambda_mixed_main__lambda1, ptr null }, ptr %mapped, align 8
+  %3 = getelementptr inbounds { ptr, ptr }, ptr %cmp, i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  %5 = getelementptr inbounds { ptr, ptr }, ptr %cmp, i32 0, i32 1
+  %6 = load ptr, ptr %5, align 8
+  %7 = call i32 @Lambda_mixed_apply(ptr %4, ptr %6, i32 noundef 10, i32 noundef 3)
+  store i32 %7, ptr %result, align 4
+  ret void
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_mixed_main__lambda0(i32 noundef %"arguments[0].a", i32 noundef %"arguments[1].b", ptr noundef %"arguments[2].user_data") #0 {
+entry:
+  %a = alloca i32, align 4
+  %b = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  %base = alloca i32, align 4
+  store i32 %"arguments[0].a", ptr %a, align 4
+  store i32 %"arguments[1].b", ptr %b, align 4
+  store ptr %"arguments[2].user_data", ptr %user_data, align 8
+  %0 = load ptr, ptr %user_data, align 8
+  %1 = getelementptr inbounds %struct.Lambda_mixed_main__lambda0__environment, ptr %0, i32 0, i32 0
+  %2 = load i32, ptr %1, align 4
+  store i32 %2, ptr %base, align 4
+  %3 = load i32, ptr %a, align 4
+  %4 = load i32, ptr %b, align 4
+  %5 = sub i32 %3, %4
+  %6 = load i32, ptr %base, align 4
+  %7 = add i32 %5, %6
+  ret i32 %7
+}
+
+; Function Attrs: convergent
+define private i32 @Lambda_mixed_main__lambda1(i32 noundef %"arguments[0].v", ptr noundef %"arguments[1].user_data") #0 {
+entry:
+  %v = alloca i32, align 4
+  %user_data = alloca ptr, align 8
+  store i32 %"arguments[0].v", ptr %v, align 4
+  store ptr %"arguments[1].user_data", ptr %user_data, align 8
+  %0 = load i32, ptr %v, align 4
+  %1 = mul i32 %0, 2
+  ret i32 %1
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Lambda Declaration Only", "[LLVM_IR][Lambda]")
+  {
+    char const* const input_file = "lambda_declaration.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"()";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 }

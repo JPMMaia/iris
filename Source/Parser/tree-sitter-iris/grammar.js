@@ -10,6 +10,8 @@
 module.exports = grammar({
   name: "iris",
 
+  extras: $ => [/\s/, $.Comment],
+
   conflicts: $ => [
     //[$.Expression_binary, $.Expression_instance_call],
     //[$.Expression_binary, $.Expression_instance_call, $.Expression_unary],
@@ -18,15 +20,16 @@ module.exports = grammar({
 
   rules: {
     Module: $ => seq($.Module_declaration, repeat($.Import), repeat($.Declaration)),
-    Module_declaration: $ => seq(optional($.Comment), "module", $.Module_name, ";"),
+    Module_declaration: $ => seq("module", $.Module_name, ";"),
     Module_name: $ => $.Identifier_with_dots,
-    Import: $ => seq(optional($.Comment), "import", $.Import_name, "as", $.Import_alias, ";"),
+    Import: $ => seq("import", $.Import_name, "as", $.Import_alias, ";"),
     Import_name: $ => $.Identifier_with_dots,
     Import_alias: $ => $.Identifier,
-    Declaration: $ => seq(optional($.Comment), repeat($.Declaration_attribute), optional("export"), choice(
+    Declaration: $ => seq(repeat($.Declaration_attribute), optional("export"), choice(
       $.Alias,
       $.Enum,
       $.Global_variable,
+      $.Lambda,
       $.Struct,
       $.Union,
       $.Function,
@@ -42,6 +45,7 @@ module.exports = grammar({
       $.Soa_array_type,
       $.Soa_array_view_type,
       $.Array_slice_type,
+      $.Optional_type,
       $.Function_pointer_type,
       $.Type_instance_type
     ),
@@ -51,6 +55,7 @@ module.exports = grammar({
     Module_type_type_name: $ => $.Identifier,
     Pointer_type: $ => prec(13, seq("*", optional("mutable"), $.Type)),
     Array_slice_type: $ => seq("Array_slice", "::<", optional("mutable"), $.Type, ">"),
+    Optional_type: $ => seq("Optional", "::<", $.Type, ">"),
     Constant_array_type: $ => seq("Constant_array", "::<", $.Type, ",", $.Constant_array_length, ">"),
     Constant_array_length: $ => $.Number,
     Soa_array_type: $ => seq("Soa_array", "::<", $.Type, ",", $.Soa_array_length, ">"),
@@ -67,7 +72,7 @@ module.exports = grammar({
     Enum: $ => seq("enum", $.Enum_name, $.Enum_values),
     Enum_name: $ => $.Identifier,
     Enum_values: $ => seq("{", repeat($.Enum_value), "}"),
-    Enum_value: $ => seq(optional($.Comment), $.Enum_value_name, optional(seq("=", $.Generic_expression)), ","),
+    Enum_value: $ => seq($.Enum_value_name, optional(seq("=", $.Generic_expression)), ","),
     Enum_value_name: $ => $.Identifier,
     Global_variable: $ => seq($.Global_variable_type, $.Global_variable_name, optional(seq(":", $.Type)), "=", $.Generic_expression_or_instantiate, ";"),
     Global_variable_name: $ => $.Identifier,
@@ -75,15 +80,20 @@ module.exports = grammar({
     Struct: $ => seq("struct", $.Struct_name, $.Struct_members),
     Struct_name: $ => $.Identifier,
     Struct_members: $ => seq("{", repeat($.Struct_member), "}"),
-    Struct_member: $ => seq(optional($.Comment), $.Struct_member_name, ":", $.Struct_member_type, optional(seq(":", $.Integer_without_suffix)), "=", $.Generic_expression_or_instantiate, ";"),
+    Struct_member: $ => seq($.Struct_member_name, ":", $.Struct_member_type, optional(seq(":", $.Integer_without_suffix)), "=", $.Generic_expression_or_instantiate, ";"),
     Struct_member_name: $ => $.Identifier,
     Struct_member_type: $ => $.Type,
     Union: $ => seq("union", $.Union_name, $.Union_members),
     Union_name: $ => $.Identifier,
     Union_members: $ => seq("{", repeat($.Union_member), "}"),
-    Union_member: $ => seq(optional($.Comment), $.Union_member_name, ":", $.Union_member_type, ";"),
+    Union_member: $ => seq($.Union_member_name, ":", $.Union_member_type, ";"),
     Union_member_name: $ => $.Identifier,
     Union_member_type: $ => $.Type,
+    Lambda: $ => seq("lambda", $.Lambda_name, $.Lambda_input_parameters, "->", $.Lambda_output_parameters, ";"),
+    Lambda_name: $ => $.Identifier,
+    Lambda_input_parameters: $ => seq("(", optional(seq($.Lambda_parameter, repeat(seq(",", $.Lambda_parameter)))), ")"),
+    Lambda_output_parameters: $ => seq("(", optional(seq($.Lambda_parameter, repeat(seq(",", $.Lambda_parameter)))), ")"),
+    Lambda_parameter: $ => seq($.Identifier, optional(seq(":", $.Type))),
     Function: $ => seq($.Function_declaration, choice($.Function_definition, ";")),
     Function_declaration: $ => seq("function", $.Function_name, $.Function_input_parameters, "->", $.Function_output_parameters, repeat($.Function_precondition), repeat($.Function_postcondition)),
     Function_name: $ => $.Identifier,
@@ -113,7 +123,6 @@ module.exports = grammar({
       $.Expression_block,
       seq($.Expression_break, ";"),
       seq($.Expression_call, ";"),
-      $.Expression_comment,
       $.Expression_compile_time,
       seq($.Expression_continue, ";"),
       $.Expression_defer,
@@ -136,6 +145,7 @@ module.exports = grammar({
       $.Expression_dereference_and_access,
       $.Expression_function,
       $.Expression_instance_call,
+      $.Expression_lambda,
       $.Expression_null_pointer,
       $.Expression_parenthesis,
       $.Expression_reflection_call,
@@ -182,7 +192,6 @@ module.exports = grammar({
     Expression_call: $ => prec.left(13, seq($.Generic_expression, $.Expression_call_arguments)),
     Expression_call_arguments: $ => seq("(", optional(seq($.Generic_expression_or_instantiate, repeat(seq(",", $.Generic_expression_or_instantiate)))), ")"),
     Expression_cast: $ => prec(11, seq($.Generic_expression, "as", $.Expression_type)),
-    Expression_comment: $ => $.Comment,
     Expression_compile_time: $ => seq("compile_time", $.Expression_compile_time_statements),
     Expression_compile_time_statements: $ => choice(
       seq($.Expression_variable_declaration, ";"),
@@ -218,6 +227,15 @@ module.exports = grammar({
       $.Expression_variable
     ),
     Expression_for_loop_statements: $ => seq("{", repeat($.Statement), "}"),
+    Expression_lambda: $ => prec.right(0, seq(
+        "lambda",
+        $.Lambda_literal_input_parameters,
+        optional(seq("->", choice($.Lambda_output_parameters, $.Type))),
+        "=>",
+        choice($.Expression_block, $.Generic_expression)
+    )),
+    Lambda_literal_input_parameters: $ => seq("(", optional(seq($.Lambda_literal_parameter, repeat(seq(",", $.Lambda_literal_parameter)))), ")"),
+    Lambda_literal_parameter: $ => seq($.Identifier, optional(seq(":", $.Type))),
     Expression_function: $ => seq("function", $.Function_input_parameters, "->", $.Function_output_parameters, repeat($.Function_precondition), repeat($.Function_postcondition), $.Block),
     Expression_instance_call: $ => prec.left(13, seq($.Generic_expression, seq("::<", optional(seq($.Expression_instance_call_parameter, repeat(seq(",", $.Expression_instance_call_parameter)))), ">"))),
     Expression_instance_call_parameter: $ => choice(
@@ -227,7 +245,7 @@ module.exports = grammar({
     ),
     Expression_instantiate: $ => seq(optional(choice("explicit", "uninitialized", "zero_initialized")), $.Expression_instantiate_members),
     Expression_instantiate_members: $ => seq("{", optional(seq($.Expression_instantiate_member, repeat(seq(",", $.Expression_instantiate_member)))), "}"),
-    Expression_instantiate_member: $ => seq(optional($.Comment), $.Expression_instantiate_member_name, ":", $.Generic_expression_or_instantiate),
+    Expression_instantiate_member: $ => seq($.Expression_instantiate_member_name, ":", $.Generic_expression_or_instantiate),
     Expression_instantiate_member_name: $ => $.Identifier,
     Expression_if: $ => seq("if", $.Generic_expression, $.Expression_if_statements, optional($.Expression_if_else)),
     Expression_if_else: $ => choice(
@@ -279,6 +297,6 @@ module.exports = grammar({
       /"(?:\\.|[^"\\\n])*"[a-z0-9]*/
     )),
     Char: $ => /'(\\[\\'\'ntr]|[^\\'])'/,
-    Comment: $ => prec.left(0, repeat1(token(seq("//", /.*/)))),
+    Comment: $ => token(seq("//", /.*/)),
   }
 });

@@ -1,0 +1,7 @@
+module my_plugin;
+
+@unique_name("my_plugin_answer")
+export function answer() -> (value: Int32)
+{
+    return 42;
+}
