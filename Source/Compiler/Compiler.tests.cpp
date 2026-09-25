@@ -9861,6 +9861,34 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Global Struct Member Defaults", "[LLVM_IR]")
+  {
+    char const* const input_file = "global_struct_member_defaults.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+        { "Global_struct_member_defaults_provider", parse_and_get_file_path(g_test_source_files_path / "global_struct_member_defaults_provider.iris") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Global_struct_member_defaults_Rules = type { i32, i64, i8 }
+%struct.Global_struct_member_defaults_provider_Unit = type { float, i32 }
+%struct.Global_struct_member_defaults_Outer = type { i32, %struct.Global_struct_member_defaults_Rules }
+
+@Global_struct_member_defaults_constant_braces = constant %struct.Global_struct_member_defaults_Rules { i32 16, i64 5000000, i8 1 }
+@Global_struct_member_defaults_constant_partial = constant %struct.Global_struct_member_defaults_Rules { i32 3, i64 5000000, i8 1 }
+@Global_struct_member_defaults_constant_zero = constant %struct.Global_struct_member_defaults_Rules zeroinitializer
+@Global_struct_member_defaults_mutable_braces = global %struct.Global_struct_member_defaults_Rules { i32 16, i64 5000000, i8 1 }
+@Global_struct_member_defaults_mutable_partial = global %struct.Global_struct_member_defaults_Rules { i32 3, i64 5000000, i8 1 }
+@Global_struct_member_defaults_mutable_zero = global %struct.Global_struct_member_defaults_Rules zeroinitializer
+@Global_struct_member_defaults_provider_default_speed = external constant float
+@Global_struct_member_defaults_imported_braces = constant %struct.Global_struct_member_defaults_provider_Unit { float 3.000000e+01, i32 2 }
+@Global_struct_member_defaults_nested_braces = constant %struct.Global_struct_member_defaults_Outer { i32 1, %struct.Global_struct_member_defaults_Rules { i32 8, i64 5000000, i8 1 } }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Derived Global Constants", "[LLVM_IR]")
   {
     char const* const input_file = "derived_global_constants.iris";

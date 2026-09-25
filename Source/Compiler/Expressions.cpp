@@ -5674,16 +5674,14 @@ namespace iris::compiler
         Statement const& statement,
         Instantiate_expression const& expression,
         Expression_parameters const& parameters,
+        std::string_view const module_name,
         Struct_declaration const& struct_declaration,
         llvm::Type* const llvm_struct_type
     )
     {
-        // If there are no explicit member values we can return a
-        // zero‑initialized aggregate immediately.  This covers both the
-        // "default" and "zero_initialized"/"uninitialized" cases at
-        // compile time because globals are guaranteed to be zeroed by
-        // the loader.
-        if (expression.members.empty())
+        // Globals are zeroed by the loader, so "zero_initialized" and "uninitialized" fold to zero.
+        // "default" must still use the member defaults declared by the struct.
+        if (expression.type == Instantiate_expression_type::Zero_initialized || expression.type == Instantiate_expression_type::Uninitialized)
         {
             return llvm::Constant::getNullValue(llvm_struct_type);
         }
@@ -5719,10 +5717,27 @@ namespace iris::compiler
 
                 element_value = convert_constant(llvm_context, llvm_builder, storage_type, storage_size_bits, source_value, source_type, source_size_bits);
             }
+            else if (expression.type == Instantiate_expression_type::Default)
+            {
+                // The default is written in the module that declares the struct.
+                iris::Module const& struct_core_module =
+                    module_name == parameters.core_module.name ?
+                    parameters.core_module :
+                    *parameters.core_module_dependencies.at(module_name.data());
+                Expression_parameters new_parameters = set_core_module(parameters, struct_core_module);
+                new_parameters.expression_type = member_type;
+
+                llvm::Constant* const source_value = fold_statement_constant(struct_declaration.member_default_values[member_index], new_parameters);
+                llvm::Type* const source_type = source_value->getType();
+
+                unsigned const storage_size_bits = parameters.llvm_data_layout.getTypeSizeInBits(storage_type);
+                unsigned const source_size_bits = parameters.llvm_data_layout.getTypeSizeInBits(source_type);
+
+                element_value = convert_constant(llvm_context, llvm_builder, storage_type, storage_size_bits, source_value, source_type, source_size_bits);
+            }
             else
             {
-                // No initializer for this member -> zero initialize.
-                element_value = llvm::Constant::getNullValue(storage_type);
+                throw Compile_error{ std::format("The struct member '{}' of struct '{}.{}' is not explicitly initialized!", member_name, module_name, struct_declaration.name), parameters.source_position };
             }
 
             struct_value = llvm_builder.CreateInsertValue(struct_value, element_value, member_index);
@@ -5755,6 +5770,7 @@ namespace iris::compiler
                 statement,
                 expression,
                 parameters,
+                module_name,
                 struct_declaration,
                 llvm_struct_type
             );
