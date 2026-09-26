@@ -7577,9 +7577,23 @@ define private void @Reinterpret_as_run(ptr noundef %"arguments[0].data") #0 {
 entry:
   %data = alloca ptr, align 8
   %converted = alloca ptr, align 8
+  %address = alloca i64, align 8
+  %pointer = alloca ptr, align 8
+  %bits = alloca i32, align 4
+  %number = alloca float, align 4
   store ptr %"arguments[0].data", ptr %data, align 8
   %0 = load ptr, ptr %data, align 8
   store ptr %0, ptr %converted, align 8
+  %1 = load ptr, ptr %data, align 8
+  %2 = ptrtoint ptr %1 to i64
+  store i64 %2, ptr %address, align 8
+  %3 = load i64, ptr %address, align 8
+  %4 = inttoptr i64 %3 to ptr
+  store ptr %4, ptr %pointer, align 8
+  store i32 1065353216, ptr %bits, align 4
+  %5 = load i32, ptr %bits, align 4
+  %6 = bitcast i32 %5 to float
+  store float %6, ptr %number, align 4
   ret void
 }
 

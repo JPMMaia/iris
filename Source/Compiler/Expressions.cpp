@@ -33,6 +33,32 @@ namespace iris::compiler
 
     // Type mismatches reaching code generation are always worth naming: validation has already
     // approved the expression, so the message is the only clue about which rule the two disagree on.
+    // Reinterprets the bits of `value` as `destination_type`. Integers and pointers need an
+    // explicit conversion instruction even though they share a representation.
+    static llvm::Value* reinterpret_llvm_value(
+        llvm::IRBuilder<>& llvm_builder,
+        llvm::Value* const value,
+        llvm::Type* const destination_type
+    )
+    {
+        llvm::Type* const source_type = value->getType();
+        if (source_type == destination_type)
+            return value;
+
+        if (source_type->isIntegerTy() && destination_type->isPointerTy())
+            return llvm_builder.CreateIntToPtr(value, destination_type);
+
+        if (source_type->isPointerTy() && destination_type->isIntegerTy())
+            return llvm_builder.CreatePtrToInt(value, destination_type);
+
+        bool const is_source_scalar = source_type->isIntegerTy() || source_type->isFloatingPointTy();
+        bool const is_destination_scalar = destination_type->isIntegerTy() || destination_type->isFloatingPointTy();
+        if (is_source_scalar && is_destination_scalar && source_type->getPrimitiveSizeInBits() == destination_type->getPrimitiveSizeInBits())
+            return llvm_builder.CreateBitCast(value, destination_type);
+
+        return value;
+    }
+
     static std::string format_type_mismatch_error(
         std::string_view const message,
         iris::Module const& core_module,
@@ -3905,10 +3931,17 @@ namespace iris::compiler
                     Value_and_type const loaded_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, parameters);
                     Value_and_type const destination_type_value = create_statement_value(instance_call_expression.arguments[0], parameters);
 
+                    llvm::Type* const destination_llvm_type = type_reference_to_llvm_type(
+                        parameters.llvm_context,
+                        parameters.llvm_data_layout,
+                        destination_type_value.type.value(),
+                        parameters.type_database
+                    );
+
                     return Value_and_type
                     {
                         .name = "",
-                        .value = loaded_value.value,
+                        .value = reinterpret_llvm_value(parameters.llvm_builder, loaded_value.value, destination_llvm_type),
                         .type = destination_type_value.type
                     };
                 }
