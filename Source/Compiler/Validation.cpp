@@ -134,6 +134,19 @@ namespace iris::compiler
             return first_pointer_type.type == second_pointer_type.type;
         }
 
+        // Elements are compared through their aliases, so Constant_array::<Seconds, N> and
+        // Constant_array::<Decimal7, N> agree when Seconds is an alias of Decimal7.
+        if (std::holds_alternative<iris::Constant_array_type>(first_underlying_type->data) && std::holds_alternative<iris::Constant_array_type>(second_underlying_type->data))
+        {
+            iris::Constant_array_type const& first_array_type = std::get<iris::Constant_array_type>(first_underlying_type->data);
+            iris::Constant_array_type const& second_array_type = std::get<iris::Constant_array_type>(second_underlying_type->data);
+            if (first_array_type.size != second_array_type.size)
+                return false;
+            if (first_array_type.value_type.empty() || second_array_type.value_type.empty())
+                return first_array_type.value_type.empty() && second_array_type.value_type.empty();
+            return are_compatible_types(declaration_database, first_array_type.value_type[0], second_array_type.value_type[0]);
+        }
+
         return first_underlying_type == second_underlying_type;
     }
 
@@ -245,6 +258,17 @@ namespace iris::compiler
 
                 return can_assign_type(declaration_database, destination_array_slice_type.element_type[0], constant_array_type.value_type[0]);
             }
+        }
+
+        if (std::holds_alternative<iris::Constant_array_type>(destination_type.data) && std::holds_alternative<iris::Constant_array_type>(source_type.data))
+        {
+            iris::Constant_array_type const& destination_array_type = std::get<iris::Constant_array_type>(destination_type.data);
+            iris::Constant_array_type const& source_array_type = std::get<iris::Constant_array_type>(source_type.data);
+            if (destination_array_type.size != source_array_type.size)
+                return false;
+            if (destination_array_type.value_type.empty() || source_array_type.value_type.empty())
+                return destination_array_type.value_type.empty() && source_array_type.value_type.empty();
+            return are_compatible_types(declaration_database, destination_array_type.value_type[0], source_array_type.value_type[0]);
         }
 
         if (std::holds_alternative<iris::Soa_array_view_type>(destination_type.data))

@@ -540,6 +540,35 @@ var my_global_1: Int32 = 2.0f32;
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates constant arrays whose element type is an alias", "[Validation][Alias]")
+    {
+        std::string_view const input = R"(module Test;
+
+using Seconds = Decimal7;
+
+function run() -> ()
+{
+    var matching: Constant_array::<Seconds, 2> = [0.5d7, 1.5d7];
+    var too_short: Constant_array::<Seconds, 3> = [0.5d7, 1.5d7];
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(8, 51, 8, 65),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Expression type 'Constant_array::<Decimal7, 2>' does not match expected type 'Constant_array::<Seconds, 3>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that expression only uses compile time expressions", "[Validation][Global_variable]")
     {
         std::string_view const input = R"(module Test;
