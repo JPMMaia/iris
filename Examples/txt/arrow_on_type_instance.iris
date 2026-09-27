@@ -1,0 +1,32 @@
+module Arrow_on_type_instance;
+
+type_constructor Vector3(Value_type: Type)
+{
+    return struct
+    {
+        x: Value_type = 0 as Value_type;
+        y: Value_type = 0 as Value_type;
+        z: Value_type = 0 as Value_type;
+    };
+}
+
+type_constructor Transform(Value_type: Type)
+{
+    return struct
+    {
+        translation: Vector3::<Value_type> = {};
+    };
+}
+
+using Transformi32 = Transform::<Int32>;
+
+export function write_through_instance_pointers(transform: *mutable Transformi32) -> (sum: Int32)
+{
+    mutable vector: Vector3::<Int32> = {};
+    var through_instance = &vector;
+    through_instance->x = 3;
+
+    var through_member = &transform->translation;
+    through_member->y = through_member->x + through_instance->x;
+    return through_member->y;
+}

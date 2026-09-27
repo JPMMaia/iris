@@ -8091,6 +8091,61 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Arrow On Type Instance", "[LLVM_IR]")
+  {
+    char const* const input_file = "arrow_on_type_instance.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464 = type { i32, i32, i32 }
+%struct.Arrow_on_type_instance__at__Transform__at__17243084838792866685 = type { %struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464 }
+
+; Function Attrs: convergent
+define i32 @Arrow_on_type_instance_write_through_instance_pointers(ptr noundef %"arguments[0].transform") #0 {
+entry:
+  %transform = alloca ptr, align 8
+  %vector = alloca %struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464, align 4
+  %through_instance = alloca ptr, align 8
+  %through_member = alloca ptr, align 8
+  store ptr %"arguments[0].transform", ptr %transform, align 8
+  %0 = getelementptr inbounds %struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464, ptr %vector, i32 0, i32 0
+  store i32 0, ptr %0, align 4
+  %1 = getelementptr inbounds %struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464, ptr %vector, i32 0, i32 1
+  store i32 0, ptr %1, align 4
+  %2 = getelementptr inbounds %struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464, ptr %vector, i32 0, i32 2
+  store i32 0, ptr %2, align 4
+  store ptr %vector, ptr %through_instance, align 8
+  %3 = load ptr, ptr %through_instance, align 8
+  %4 = getelementptr inbounds %struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464, ptr %3, i32 0, i32 0
+  store i32 3, ptr %4, align 4
+  %5 = load ptr, ptr %transform, align 8
+  %6 = getelementptr inbounds %struct.Arrow_on_type_instance__at__Transform__at__17243084838792866685, ptr %5, i32 0, i32 0
+  store ptr %6, ptr %through_member, align 8
+  %7 = load ptr, ptr %through_member, align 8
+  %8 = getelementptr inbounds %struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464, ptr %7, i32 0, i32 1
+  %9 = load ptr, ptr %through_member, align 8
+  %10 = getelementptr inbounds %struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464, ptr %9, i32 0, i32 0
+  %11 = load i32, ptr %10, align 4
+  %12 = load ptr, ptr %through_instance, align 8
+  %13 = getelementptr inbounds %struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464, ptr %12, i32 0, i32 0
+  %14 = load i32, ptr %13, align 4
+  %15 = add i32 %11, %14
+  store i32 %15, ptr %8, align 4
+  %16 = load ptr, ptr %through_member, align 8
+  %17 = getelementptr inbounds %struct.Arrow_on_type_instance__at__Vector3__at__4573223021152224464, ptr %16, i32 0, i32 1
+  %18 = load i32, ptr %17, align 4
+  ret i32 %18
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Constant Array Parameters", "[LLVM_IR]")
   {
     char const* const input_file = "constant_array_parameters.iris";
