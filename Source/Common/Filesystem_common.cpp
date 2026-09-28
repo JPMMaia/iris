@@ -110,6 +110,11 @@ namespace iris::common
         return get_share_path("visualizers").lexically_normal();
     }
 
+    std::filesystem::path get_builtins_library_directory()
+    {
+        return get_share_path("lib").lexically_normal();
+    }
+
     static size_t write_callback(void* contents, size_t size, size_t nmemb, std::pmr::string* out)
     {
         size_t const total_size = size * nmemb;

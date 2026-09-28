@@ -164,6 +164,18 @@ namespace iris::binary_serializer
     }
 
     template <>
+    void serialize(Serializer& serializer, Optional_type const& value)
+    {
+        serialize(serializer, value.value_type);
+    }
+
+    template <>
+    void deserialize(Deserializer& deserializer, Optional_type& value)
+    {
+        deserialize(deserializer, value.value_type);
+    }
+
+    template <>
     void serialize(Serializer& serializer, Pointer_type const& value)
     {
         serialize(serializer, value.element_type);
@@ -269,6 +281,20 @@ namespace iris::binary_serializer
     void deserialize(Deserializer& deserializer, Parameter_type& value)
     {
         deserialize(deserializer, value.name);
+    }
+
+    template <>
+    void serialize(Serializer& serializer, Lambda_type const& value)
+    {
+        serialize(serializer, value.input_parameter_types);
+        serialize(serializer, value.output_parameter_types);
+    }
+
+    template <>
+    void deserialize(Deserializer& deserializer, Lambda_type& value)
+    {
+        deserialize(deserializer, value.input_parameter_types);
+        deserialize(deserializer, value.output_parameter_types);
     }
 
     template <>
@@ -519,6 +545,58 @@ namespace iris::binary_serializer
         deserialize(deserializer, value.source_location);
         deserialize(deserializer, value.input_parameter_source_positions);
         deserialize(deserializer, value.output_parameter_source_positions);
+    }
+
+    template <>
+    void serialize(Serializer& serializer, Lambda_declaration const& value)
+    {
+        serialize(serializer, value.name);
+        serialize(serializer, value.unique_name);
+        serialize(serializer, value.input_parameter_types);
+        serialize(serializer, value.output_parameter_types);
+        serialize(serializer, value.input_parameter_names);
+        serialize(serializer, value.output_parameter_names);
+        serialize(serializer, value.comment);
+        serialize(serializer, value.source_location);
+    }
+
+    template <>
+    void deserialize(Deserializer& deserializer, Lambda_declaration& value)
+    {
+        deserialize(deserializer, value.name);
+        deserialize(deserializer, value.unique_name);
+        deserialize(deserializer, value.input_parameter_types);
+        deserialize(deserializer, value.output_parameter_types);
+        deserialize(deserializer, value.input_parameter_names);
+        deserialize(deserializer, value.output_parameter_names);
+        deserialize(deserializer, value.comment);
+        deserialize(deserializer, value.source_location);
+    }
+
+    template <>
+    void serialize(Serializer& serializer, Lambda_expression const& value)
+    {
+        serialize(serializer, value.parameter_names);
+        serialize(serializer, value.parameter_types);
+        serialize(serializer, value.parameter_source_positions);
+        serialize(serializer, value.input_parameters_source_range);
+        serialize(serializer, value.return_type);
+        serialize(serializer, value.body);
+        serialize(serializer, value.captured_variables);
+        serialize(serializer, value.source_range);
+    }
+
+    template <>
+    void deserialize(Deserializer& deserializer, Lambda_expression& value)
+    {
+        deserialize(deserializer, value.parameter_names);
+        deserialize(deserializer, value.parameter_types);
+        deserialize(deserializer, value.parameter_source_positions);
+        deserialize(deserializer, value.input_parameters_source_range);
+        deserialize(deserializer, value.return_type);
+        deserialize(deserializer, value.body);
+        deserialize(deserializer, value.captured_variables);
+        deserialize(deserializer, value.source_range);
     }
 
     template <>
@@ -1251,6 +1329,7 @@ namespace iris::binary_serializer
         serialize(serializer, value.function_declarations);
         serialize(serializer, value.function_constructors);
         serialize(serializer, value.type_constructors);
+        serialize(serializer, value.lambda_declarations);
     }
 
     template <>
@@ -1265,6 +1344,7 @@ namespace iris::binary_serializer
         deserialize(deserializer, value.function_declarations);
         deserialize(deserializer, value.function_constructors);
         deserialize(deserializer, value.type_constructors);
+        deserialize(deserializer, value.lambda_declarations);
     }
 
     template <>

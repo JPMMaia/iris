@@ -56,7 +56,31 @@ function run() -> ()
 }
 ```
 
-The range bounds must be compile-time constants. The index variable is a `Uint64`.
+The range bounds must be compile-time constants.
+
+As in a runtime `for` loop, the index has the type of the range begin. With `0u64` the index is
+substituted as `Uint64` constants, so compare it against literals of the same type:
+
+```iris
+compile_time for index in 0u64 to 3u64
+{
+    compile_time if index > 0u64
+    {
+        separator();
+    }
+}
+```
+
+The substitution reaches the type arguments of a call, so the index can drive reflection that
+produces a type:
+
+```iris
+compile_time for index in 0u64 to @member_count::<T>()
+{
+    var member_value = @member_access::<T>(*value, index);
+    to_json::<@member_type::<T>(index)>(stream, &member_value);
+}
+```
 
 ## `compile_time var`
 

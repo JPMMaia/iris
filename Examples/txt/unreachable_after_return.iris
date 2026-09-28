@@ -1,0 +1,9 @@
+module Unreachable_after_return;
+
+function run(value: Int32) -> (result: Int32)
+{
+    {
+        return value;
+    }
+    return 0;
+}

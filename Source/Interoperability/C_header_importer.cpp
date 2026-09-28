@@ -15,6 +15,7 @@ import iris.core;
 import iris.core.declarations;
 import iris.core.expressions;
 import iris.core.types;
+import iris.parser.type_name_parser;
 
 namespace iris::c
 {
@@ -129,6 +130,9 @@ namespace iris::c
         std::pmr::string module_name;
         std::pmr::string declaration_name;
         std::pmr::string kind;
+        std::optional<std::pmr::string> data;
+        // Members that were a plain *T in Iris. Every other pointer member is rebuilt as Optional::<*T>.
+        std::pmr::vector<std::pmr::string> raw_pointer_members;
     };
 
     std::optional<std::string_view> find_iris_meta_field(
@@ -157,6 +161,71 @@ namespace iris::c
         return raw_comment.substr(value_begin, value_end - value_begin);
     }
 
+    // `raw_pointer_members=` holds a space-separated list, so unlike the single-valued fields it runs
+    // to `data=` (always written last) or to the end of the comment.
+    std::pmr::vector<std::pmr::string> find_iris_meta_raw_pointer_members(
+        std::string_view const raw_comment
+    )
+    {
+        std::pmr::vector<std::pmr::string> result;
+
+        constexpr std::string_view key = "raw_pointer_members=";
+        std::size_t const start = raw_comment.find(key);
+        if (start == std::string_view::npos)
+            return result;
+
+        std::string_view value = raw_comment.substr(start + key.size());
+
+        std::size_t const data_offset = value.find(" data=");
+        if (data_offset != std::string_view::npos)
+            value = value.substr(0, data_offset);
+
+        std::size_t const comment_end = value.rfind("*/");
+        if (comment_end != std::string_view::npos)
+            value = value.substr(0, comment_end);
+
+        std::size_t offset = 0;
+        while (offset < value.size())
+        {
+            while (offset < value.size() && std::isspace(static_cast<unsigned char>(value[offset])))
+                offset += 1;
+
+            std::size_t const name_begin = offset;
+            while (offset < value.size() && !std::isspace(static_cast<unsigned char>(value[offset])))
+                offset += 1;
+
+            if (offset > name_begin)
+                result.push_back(std::pmr::string{value.substr(name_begin, offset - name_begin)});
+        }
+
+        return result;
+    }
+
+    // `data=` is the last field of the comment and its value contains spaces, so unlike the other
+    // fields it runs to the end of the comment rather than to the next space.
+    std::optional<std::string_view> find_iris_meta_data_field(
+        std::string_view const raw_comment
+    )
+    {
+        std::size_t const start = raw_comment.find("data=");
+        if (start == std::string_view::npos)
+            return std::nullopt;
+
+        std::string_view value = raw_comment.substr(start + 5);
+
+        std::size_t const comment_end = value.rfind("*/");
+        if (comment_end != std::string_view::npos)
+            value = value.substr(0, comment_end);
+
+        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back())))
+            value.remove_suffix(1);
+
+        if (value.empty())
+            return std::nullopt;
+
+        return value;
+    }
+
     std::optional<Iris_meta_comment> parse_iris_meta_comment(CXCursor const cursor)
     {
         String const raw_comment_string = clang_Cursor_getRawCommentText(cursor);
@@ -170,11 +239,15 @@ namespace iris::c
         if (!module_name.has_value() || !declaration_name.has_value() || !kind.has_value())
             return std::nullopt;
 
+        std::optional<std::string_view> const data = find_iris_meta_data_field(raw_comment);
+
         return Iris_meta_comment
         {
             .module_name = std::pmr::string{*module_name},
             .declaration_name = std::pmr::string{*declaration_name},
-            .kind = std::pmr::string{*kind}
+            .kind = std::pmr::string{*kind},
+            .data = data.has_value() ? std::optional<std::pmr::string>{std::pmr::string{*data}} : std::nullopt,
+            .raw_pointer_members = find_iris_meta_raw_pointer_members(raw_comment)
         };
     }
 
@@ -1488,7 +1561,188 @@ namespace iris::c
         return std::pmr::string{ std::format("anonymous_{}", anonymous_member_count) };
     }
 
+    // Parses the Iris signature carried in a lambda's `data=` metadata, for example
+    // `(a: Int32, b: Int32) -> (result: Int32)`. The C struct underneath it is only the ABI: it
+    // cannot say whether an `int32_t` was written as `Int32` or `C_int`, so the signature is read
+    // from the metadata rather than reconstructed from the fields.
+    static std::optional<iris::Type_reference> parse_lambda_parameter_type(
+        std::string_view const module_name,
+        std::string_view type_name
+    )
+    {
+        if (type_name.starts_with("*"))
+        {
+            type_name.remove_prefix(1);
+
+            bool const is_mutable = type_name.starts_with("mutable ");
+            if (is_mutable)
+                type_name.remove_prefix(8);
+
+            std::optional<iris::Type_reference> const element_type = parse_lambda_parameter_type(module_name, type_name);
+
+            std::pmr::vector<iris::Type_reference> element_types;
+            if (element_type.has_value())
+                element_types.push_back(element_type.value());
+
+            return iris::create_pointer_type_type_reference(std::move(element_types), is_mutable);
+        }
+
+        return iris::parser::parse_type_name(module_name, type_name, {});
+    }
+
+    struct Lambda_signature
+    {
+        std::pmr::vector<std::pmr::string> input_parameter_names;
+        std::pmr::vector<iris::Type_reference> input_parameter_types;
+        std::pmr::vector<std::pmr::string> output_parameter_names;
+        std::pmr::vector<iris::Type_reference> output_parameter_types;
+    };
+
+    static std::string_view trim(std::string_view value)
+    {
+        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front())))
+            value.remove_prefix(1);
+
+        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back())))
+            value.remove_suffix(1);
+
+        return value;
+    }
+
+    // Reads one `(name: Type, ...)` list starting at `index`, which must be at its `(`, and leaves
+    // `index` just past the matching `)`.
+    static bool parse_lambda_parameter_list(
+        std::string_view const module_name,
+        std::string_view const signature,
+        std::size_t& index,
+        std::pmr::vector<std::pmr::string>& parameter_names,
+        std::pmr::vector<iris::Type_reference>& parameter_types
+    )
+    {
+        if (index >= signature.size() || signature[index] != '(')
+            return false;
+
+        index += 1;
+
+        std::size_t depth = 0;
+        std::size_t parameter_start = index;
+
+        auto const add_parameter = [&](std::string_view const parameter) -> bool
+        {
+            std::string_view const trimmed = trim(parameter);
+            if (trimmed.empty())
+                return true;
+
+            std::size_t const separator = trimmed.find(':');
+            if (separator == std::string_view::npos)
+                return false;
+
+            std::optional<iris::Type_reference> const parameter_type = parse_lambda_parameter_type(module_name, trim(trimmed.substr(separator + 1)));
+            if (!parameter_type.has_value())
+                return false;
+
+            parameter_names.push_back(std::pmr::string{trim(trimmed.substr(0, separator))});
+            parameter_types.push_back(parameter_type.value());
+            return true;
+        };
+
+        while (index < signature.size())
+        {
+            char const character = signature[index];
+
+            if (character == '(')
+            {
+                depth += 1;
+            }
+            else if (character == ')')
+            {
+                if (depth == 0)
+                {
+                    if (!add_parameter(signature.substr(parameter_start, index - parameter_start)))
+                        return false;
+
+                    index += 1;
+                    return true;
+                }
+
+                depth -= 1;
+            }
+            else if (character == ',' && depth == 0)
+            {
+                if (!add_parameter(signature.substr(parameter_start, index - parameter_start)))
+                    return false;
+
+                parameter_start = index + 1;
+            }
+
+            index += 1;
+        }
+
+        return false;
+    }
+
+    static std::optional<Lambda_signature> parse_lambda_signature(
+        std::string_view const module_name,
+        std::string_view const signature
+    )
+    {
+        Lambda_signature result;
+
+        std::size_t index = 0;
+        while (index < signature.size() && std::isspace(static_cast<unsigned char>(signature[index])))
+            index += 1;
+
+        if (!parse_lambda_parameter_list(module_name, signature, index, result.input_parameter_names, result.input_parameter_types))
+            return std::nullopt;
+
+        std::string_view const remainder = trim(signature.substr(index));
+        if (!remainder.starts_with("->"))
+            return std::nullopt;
+
+        index = signature.size() - remainder.size() + 2;
+        while (index < signature.size() && std::isspace(static_cast<unsigned char>(signature[index])))
+            index += 1;
+
+        if (!parse_lambda_parameter_list(module_name, signature, index, result.output_parameter_names, result.output_parameter_types))
+            return std::nullopt;
+
+        return result;
+    }
+
+    static std::optional<iris::Lambda_declaration> create_lambda_declaration(
+        CXCursor const cursor,
+        Iris_meta_comment const& metadata
+    )
+    {
+        if (!metadata.data.has_value())
+            return std::nullopt;
+
+        std::optional<Lambda_signature> signature = parse_lambda_signature(metadata.module_name, metadata.data.value());
+        if (!signature.has_value())
+            return std::nullopt;
+
+        Header_source_location const cursor_location = get_cursor_source_location(cursor);
+
+        return iris::Lambda_declaration
+        {
+            .name = metadata.declaration_name,
+            .unique_name = metadata.declaration_name,
+            .input_parameter_types = std::move(signature->input_parameter_types),
+            .output_parameter_types = std::move(signature->output_parameter_types),
+            .input_parameter_names = std::move(signature->input_parameter_names),
+            .output_parameter_names = std::move(signature->output_parameter_names),
+            .comment = std::nullopt,
+            .source_location = cursor_location.source_location,
+        };
+    }
+
     iris::Union_declaration create_union_declaration(C_declarations& declarations, CXCursor const cursor);
+
+    void wrap_pointer_members_as_optional(
+        std::span<std::pmr::string const> const member_names,
+        std::span<iris::Type_reference> const member_types,
+        std::span<std::pmr::string const> const raw_pointer_members
+    );
 
     iris::Struct_declaration create_struct_declaration(C_declarations& declarations, CXCursor const cursor)
     {
@@ -1576,6 +1830,9 @@ namespace iris::c
                 {
                     std::pmr::string member_name = create_member_name_that_has_unnamed_type(current_cursor, parent, data->struct_declaration->member_names);
                     data->struct_declaration->member_names.push_back(std::move(member_name));
+
+                    Header_source_location const nested_cursor_location = get_cursor_source_location(current_cursor);
+                    data->struct_declaration->member_source_positions->push_back(get_source_position(nested_cursor_location));
                 }
 
                 iris::Custom_type_reference reference
@@ -1599,6 +1856,9 @@ namespace iris::c
                 {
                     std::pmr::string member_name = create_member_name_that_has_unnamed_type(current_cursor, parent, data->struct_declaration->member_names);
                     data->struct_declaration->member_names.push_back(std::move(member_name));
+
+                    Header_source_location const nested_cursor_location = get_cursor_source_location(current_cursor);
+                    data->struct_declaration->member_source_positions->push_back(get_source_position(nested_cursor_location));
                 }
 
                 iris::Custom_type_reference reference
@@ -1650,7 +1910,47 @@ namespace iris::c
         assert(struct_declaration.member_names.size() == struct_declaration.member_types.size());
         assert(struct_declaration.member_names.size() == struct_declaration.member_bit_fields.size());
 
+        if (declarations.wrap_pointers_as_optional)
+        {
+            std::optional<Iris_meta_comment> const meta_comment = parse_iris_meta_comment(cursor);
+            wrap_pointer_members_as_optional(
+                struct_declaration.member_names,
+                struct_declaration.member_types,
+                meta_comment.has_value() ? std::span<std::pmr::string const>{meta_comment->raw_pointer_members} : std::span<std::pmr::string const>{}
+            );
+        }
+
         return struct_declaration;
+    }
+
+    // C spells both a nullable pointer and a never-null one as `T*`. Iris now reads `T*` as
+    // Optional::<*T> by default; a member listed in the header's `raw_pointer_members=` metadata
+    // (written by our own exporter for members that really were a plain *T) keeps its bare pointer.
+    void wrap_pointer_members_as_optional(
+        std::span<std::pmr::string const> const member_names,
+        std::span<iris::Type_reference> const member_types,
+        std::span<std::pmr::string const> const raw_pointer_members
+    )
+    {
+        for (std::size_t member_index = 0; member_index < member_types.size(); ++member_index)
+        {
+            if (!std::holds_alternative<iris::Pointer_type>(member_types[member_index].data))
+                continue;
+
+            if (member_index < member_names.size())
+            {
+                bool const is_raw_pointer = std::find(
+                    raw_pointer_members.begin(),
+                    raw_pointer_members.end(),
+                    member_names[member_index]
+                ) != raw_pointer_members.end();
+
+                if (is_raw_pointer)
+                    continue;
+            }
+
+            member_types[member_index] = iris::create_optional_type_reference({ member_types[member_index] });
+        }
     }
 
     iris::Union_declaration create_union_declaration(C_declarations& declarations, CXCursor const cursor)
@@ -1712,6 +2012,12 @@ namespace iris::c
                 {
                     std::pmr::string member_name = create_member_name_that_has_unnamed_type(current_cursor, parent, data->union_declaration->member_names);
                     data->union_declaration->member_names.push_back(std::move(member_name));
+
+                    // This member name is pushed here instead of in the FieldDecl branch, so its
+                    // source position has to be pushed here too: otherwise
+                    // member_source_positions ends up shorter than member_names.
+                    Header_source_location const nested_cursor_location = get_cursor_source_location(current_cursor);
+                    data->union_declaration->member_source_positions->push_back(get_source_position(nested_cursor_location));
                 }
 
                 iris::Custom_type_reference reference
@@ -1734,6 +2040,9 @@ namespace iris::c
                 {
                     std::pmr::string member_name = create_member_name_that_has_unnamed_type(current_cursor, parent, data->union_declaration->member_names);
                     data->union_declaration->member_names.push_back(std::move(member_name));
+
+                    Header_source_location const nested_cursor_location = get_cursor_source_location(current_cursor);
+                    data->union_declaration->member_source_positions->push_back(get_source_position(nested_cursor_location));
                 }
                 
                 iris::Custom_type_reference reference
@@ -1778,6 +2087,16 @@ namespace iris::c
         );
 
         assert(union_declaration.member_names.size() == union_declaration.member_types.size());
+
+        if (declarations.wrap_pointers_as_optional)
+        {
+            std::optional<Iris_meta_comment> const meta_comment = parse_iris_meta_comment(cursor);
+            wrap_pointer_members_as_optional(
+                union_declaration.member_names,
+                union_declaration.member_types,
+                meta_comment.has_value() ? std::span<std::pmr::string const>{meta_comment->raw_pointer_members} : std::span<std::pmr::string const>{}
+            );
+        }
 
         return union_declaration;
     }
@@ -1941,6 +2260,20 @@ namespace iris::c
             iris::Pointer_type& data = std::get<iris::Pointer_type>(type.data);
 
             for (iris::Type_reference& reference : data.element_type)
+            {
+                convert_typedef_to_integer_type_if_necessary(
+                    reference,
+                    alias_type_declarations,
+                    integer_alias_names,
+                    integer_alias_indices
+                );
+            }
+        }
+        else if (std::holds_alternative<iris::Optional_type>(type.data))
+        {
+            iris::Optional_type& data = std::get<iris::Optional_type>(type.data);
+
+            for (iris::Type_reference& reference : data.value_type)
             {
                 convert_typedef_to_integer_type_if_necessary(
                     reference,
@@ -2218,6 +2551,15 @@ namespace iris::c
             add_expression(statement, iris::create_null_pointer_expression());
             return;
         }
+        else if (std::holds_alternative<iris::Optional_type>(value_type.data))
+        {
+            // An empty Optional: a null pointer for the pointer representation, `{}` otherwise.
+            if (iris::is_optional_represented_as_pointer(value_type))
+                add_expression(statement, iris::create_null_pointer_expression());
+            else
+                add_expression(statement, iris::Expression{ .data = iris::Instantiate_expression{} });
+            return;
+        }
 
         throw std::runtime_error{ "create_default_value() did not handle Type_reference type!" };
     }
@@ -2348,6 +2690,66 @@ namespace iris::c
         return unit;
     }
 
+    struct Inclusion_visitor_data
+    {
+        std::pmr::vector<std::filesystem::path>* included_files;
+    };
+
+    static std::filesystem::path normalize_included_file_path(
+        std::filesystem::path const& path
+    )
+    {
+        std::error_code error_code;
+        std::filesystem::path const absolute_path = std::filesystem::absolute(path, error_code);
+        if (error_code)
+            return path.lexically_normal();
+
+        return absolute_path.lexically_normal();
+    }
+
+    static void visit_inclusion(
+        CXFile const included_file,
+        CXSourceLocation* const,
+        unsigned const,
+        CXClientData const client_data
+    )
+    {
+        Inclusion_visitor_data const* const data = static_cast<Inclusion_visitor_data const*>(client_data);
+
+        std::optional<String> file_name = clang_File_tryGetRealPathName(included_file);
+        if (!file_name.has_value() || file_name->string_view().empty())
+            file_name = clang_getFileName(included_file);
+
+        std::string_view const file_name_view = file_name->string_view();
+        if (file_name_view.empty())
+            return;
+
+        data->included_files->push_back(normalize_included_file_path(std::filesystem::path{file_name_view}));
+    }
+
+    static std::pmr::vector<std::filesystem::path> collect_included_files(
+        CXTranslationUnit const unit,
+        std::filesystem::path const& header_path,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::vector<std::filesystem::path> included_files{output_allocator};
+
+        Inclusion_visitor_data data
+        {
+            .included_files = &included_files,
+        };
+
+        clang_getInclusions(unit, visit_inclusion, &data);
+
+        included_files.push_back(normalize_included_file_path(header_path));
+
+        std::sort(included_files.begin(), included_files.end());
+        included_files.erase(std::unique(included_files.begin(), included_files.end()), included_files.end());
+
+        return included_files;
+    }
+
     bool is_public_declaration(std::string_view const declaration_name, std::span<std::pmr::string const> const public_prefixes)
     {
         if (public_prefixes.empty())
@@ -2428,6 +2830,13 @@ namespace iris::c
                 export_declarations.function_declarations.push_back(declaration);
             else
                 internal_declarations.function_declarations.push_back(declaration);
+        }
+
+        // A lambda only ever comes from an IRIS_META comment, which names the module that already
+        // exports it. This header re-declares it so its types resolve here; it does not own it.
+        for (iris::Lambda_declaration const& declaration : declarations.lambda_declarations)
+        {
+            internal_declarations.lambda_declarations.push_back(declaration);
         }
     }
 
@@ -2923,6 +3332,19 @@ namespace iris::c
             {
                 if (clang_isCursorDefinition(current_cursor))
                 {
+                    // A lambda reaches C as the struct that carries its ABI. The IRIS_META comment is
+                    // the sole criterion: a struct that merely has the same shape stays a struct.
+                    std::optional<Iris_meta_comment> const metadata = parse_iris_meta_comment(current_cursor);
+                    if (metadata.has_value() && metadata->kind == "lambda")
+                    {
+                        std::optional<iris::Lambda_declaration> lambda_declaration = create_lambda_declaration(current_cursor, metadata.value());
+                        if (lambda_declaration.has_value())
+                        {
+                            declarations->lambda_declarations.push_back(std::move(lambda_declaration.value()));
+                            return CXChildVisit_Continue;
+                        }
+                    }
+
                     declarations->struct_declarations.push_back(create_struct_declaration(*declarations, current_cursor));
                 }
                 else
@@ -2953,6 +3375,7 @@ namespace iris::c
 
         C_declarations declarations;
         declarations.module_name = header_name;
+        declarations.wrap_pointers_as_optional = options.wrap_pointers_as_optional;
         Macro_replacement_text_entries_cache macro_replacement_text_entries_cache;
 
         Import_visitor_context visitor_context
@@ -2980,6 +3403,7 @@ namespace iris::c
         remove_redundant_forward_declarations(declarations);
 
         C_declarations declarations_with_fixed_width_integers = convert_fixed_width_integers_typedefs_to_integer_types(declarations);
+        declarations_with_fixed_width_integers.wrap_pointers_as_optional = declarations.wrap_pointers_as_optional;
         transform_names(declarations_with_fixed_width_integers, options.remove_prefixes);
         resolve_declaration_name_collisions(declarations_with_fixed_width_integers);
 
@@ -2992,6 +3416,7 @@ namespace iris::c
             declarations_with_fixed_width_integers.enum_declarations,
             declarations_with_fixed_width_integers.forward_declarations,
             declarations_with_fixed_width_integers.global_variable_declarations,
+            {},
             declarations_with_fixed_width_integers.struct_declarations,
             declarations_with_fixed_width_integers.union_declarations,
             declarations_with_fixed_width_integers.function_declarations,
@@ -3045,23 +3470,46 @@ namespace iris::c
         return header_module;
     }
 
+    std::optional<Imported_header> import_header_with_includes(
+        std::string_view const header_name,
+        std::filesystem::path const& header_path,
+        Options const& options,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        CXIndex index = clang_createIndex(0, 0);
+        std::optional<CXTranslationUnit> unit = create_translation_unit(index, header_path, true, options);
+        if (!unit.has_value())
+        {
+            clang_disposeIndex(index);
+            return std::nullopt;
+        }
+
+        iris::Module header_module = import_header(header_name, header_path, options, index, *unit);
+
+        std::pmr::vector<std::filesystem::path> included_files = collect_included_files(*unit, header_path, output_allocator);
+
+        clang_disposeTranslationUnit(*unit);
+        clang_disposeIndex(index);
+
+        return Imported_header
+        {
+            .core_module = std::move(header_module),
+            .included_files = std::move(included_files),
+        };
+    }
+
     std::optional<iris::Module> import_header(
         std::string_view const header_name,
         std::filesystem::path const& header_path,
         Options const& options
     )
     {
-        CXIndex index = clang_createIndex(0, 0);
-        std::optional<CXTranslationUnit> unit = create_translation_unit(index, header_path, true, options);
-        if (!unit.has_value())
+        std::optional<Imported_header> imported_header = import_header_with_includes(header_name, header_path, options, {});
+        if (!imported_header.has_value())
             return std::nullopt;
 
-        iris::Module header_module = import_header(header_name, header_path, options, index, *unit);
-
-        clang_disposeTranslationUnit(*unit);
-        clang_disposeIndex(index);
-
-        return header_module;
+        return std::move(imported_header->core_module);
     }
 
     std::optional<iris::Module> import_header_and_write_to_file(std::string_view const header_name, std::filesystem::path const& header_path, std::filesystem::path const& output_path, Options const& options)

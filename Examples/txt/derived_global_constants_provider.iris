@@ -1,0 +1,5 @@
+module Derived_global_constants_provider;
+
+export var meters_per_foot = 0.3048f32;
+
+export var feet_per_mile = 5280u32;

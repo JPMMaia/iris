@@ -1,0 +1,9 @@
+{
+    "name": "Reflection_json",
+    "artifacts": [
+        {
+            "name": "reflection_json",
+            "location": "app/iris_artifact.json"
+        }
+    ]
+}

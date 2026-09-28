@@ -1,0 +1,34 @@
+module Switch_case_blocks;
+
+export function run_switch_with_blocks(value: Int32) -> (result: Int32)
+{
+    switch value
+    {
+    case 0:
+    {
+        var doubled = value * 2;
+        return doubled;
+    }
+    case 1:
+    {
+        {
+            break;
+        }
+    }
+    case 2:
+    {
+        var tripled = value * 3;
+    }
+    default:
+        return 2;
+    }
+
+    if value > 10
+    {
+        {
+            return 10;
+        }
+    }
+
+    return 3;
+}

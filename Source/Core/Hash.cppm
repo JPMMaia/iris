@@ -80,7 +80,25 @@ namespace iris
 
     void update_hash(
         XXH64_state_t* const state,
+        iris::Lambda_declaration const& declaration
+    );
+
+    void update_hash(
+        XXH64_state_t* const state,
+        iris::Lambda_type const& lambda_type
+    );
+
+    void update_hash(
+        XXH64_state_t* const state,
         Type_instance const& type_instance
+    );
+
+    export std::uint64_t hash_bytes(
+        std::span<std::byte const> const bytes
+    );
+
+    export std::uint64_t hash_string(
+        std::string_view const value
     );
 
     export XXH64_hash_t hash_alias_type_declaration(
@@ -106,6 +124,16 @@ namespace iris
     export XXH64_hash_t hash_function_declaration(
         XXH64_state_t* const state,
         iris::Function_declaration const& declaration
+    );
+
+    export XXH64_hash_t hash_lambda_declaration(
+        XXH64_state_t* const state,
+        iris::Lambda_declaration const& declaration
+    );
+
+    export XXH64_hash_t hash_lambda_type(
+        XXH64_state_t* const state,
+        iris::Lambda_type const& lambda_type
     );
 
     export XXH64_hash_t hash_type_instance(

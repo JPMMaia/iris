@@ -64,17 +64,36 @@ namespace iris::parser
         return Parse_node{current_node};
     }
 
+    static bool is_comment_node(
+        TSNode const node
+    )
+    {
+        return std::string_view{ts_node_grammar_type(node)} == "Comment";
+    }
+
     std::optional<Parse_node> get_child_node(
         Parse_tree const& tree,
         Parse_node const& node,
         std::uint32_t const child_index
     )
     {
-        TSNode const child_node = ts_node_child(node.ts_node, child_index);
-        if (ts_node_is_null(child_node))
-            return std::nullopt;
+        std::uint32_t const child_count = ts_node_child_count(node.ts_node);
 
-        return Parse_node{ .ts_node = child_node };
+        std::uint32_t current_index = 0;
+
+        for (std::uint32_t index = 0; index < child_count; ++index)
+        {
+            TSNode const child_node = ts_node_child(node.ts_node, index);
+            if (is_comment_node(child_node))
+                continue;
+
+            if (current_index == child_index)
+                return Parse_node{ .ts_node = child_node };
+
+            ++current_index;
+        }
+
+        return std::nullopt;
     }
 
     std::optional<Parse_node> get_child_node(
@@ -103,11 +122,17 @@ namespace iris::parser
     )
     {
         std::uint32_t const child_count = ts_node_child_count(node.ts_node);
-        if (child_count == 0)
-            return std::nullopt;
 
-        TSNode const child_node = ts_node_child(node.ts_node, child_count - 1);
-        return Parse_node{ .ts_node = child_node };
+        for (std::uint32_t index = child_count; index > 0; --index)
+        {
+            TSNode const child_node = ts_node_child(node.ts_node, index - 1);
+            if (is_comment_node(child_node))
+                continue;
+
+            return Parse_node{ .ts_node = child_node };
+        }
+
+        return std::nullopt;
     }
 
     std::pmr::vector<Parse_node> get_child_nodes(
@@ -117,16 +142,19 @@ namespace iris::parser
     )
     {
         std::pmr::vector<Parse_node> output{output_allocator};
-        
+
         std::uint32_t const child_count = ts_node_child_count(node.ts_node);
-        output.resize(child_count);
+        output.reserve(child_count);
 
         for (std::uint32_t child_index = 0; child_index < child_count; ++child_index)
         {
             TSNode const child_node = ts_node_child(node.ts_node, child_index);
-            output[child_index] = {.ts_node = child_node};
+            if (is_comment_node(child_node))
+                continue;
+
+            output.push_back({.ts_node = child_node});
         }
-        
+
         return output;
     }
 
@@ -163,16 +191,83 @@ namespace iris::parser
     )
     {
         std::pmr::vector<Parse_node> output{output_allocator};
-        
+
+        std::uint32_t const named_child_count = ts_node_named_child_count(node.ts_node);
+        output.reserve(named_child_count);
+
+        for (std::uint32_t child_index = 0; child_index < named_child_count; ++child_index)
+        {
+            TSNode const child_node = ts_node_named_child(node.ts_node, child_index);
+            if (is_comment_node(child_node))
+                continue;
+
+            output.push_back({.ts_node = child_node});
+        }
+
+        return output;
+    }
+
+    std::pmr::vector<Parse_node> get_named_child_nodes_with_comments(
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::vector<Parse_node> output{output_allocator};
+
         std::uint32_t const named_child_count = ts_node_named_child_count(node.ts_node);
         output.resize(named_child_count);
-        
+
         for (std::uint32_t child_index = 0; child_index < named_child_count; ++child_index)
         {
             TSNode const child_node = ts_node_named_child(node.ts_node, child_index);
             output[child_index] = {.ts_node = child_node};
         }
-        
+
+        return output;
+    }
+
+    // Collects the run of Comment nodes that immediately precedes `node`, in source
+    // order. Because comments are extras, tree-sitter hoists them out of the
+    // construct that follows them and makes them preceding siblings at the enclosing
+    // level, so the walk goes backwards through siblings and then ascends while the
+    // parent starts at the same byte, which means nothing real intervenes.
+    std::pmr::vector<Parse_node> get_preceding_comment_nodes(
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    )
+    {
+        std::pmr::vector<Parse_node> output{output_allocator};
+
+        TSNode current = node.ts_node;
+
+        while (true)
+        {
+            TSNode previous = ts_node_prev_sibling(current);
+
+            while (!ts_node_is_null(previous) && is_comment_node(previous))
+            {
+                output.push_back({.ts_node = previous});
+                current = previous;
+                previous = ts_node_prev_sibling(current);
+            }
+
+            if (!ts_node_is_null(previous))
+                break;
+
+            TSNode const parent = ts_node_parent(current);
+            if (ts_node_is_null(parent))
+                break;
+
+            if (ts_node_start_byte(parent) != ts_node_start_byte(current))
+                break;
+
+            current = parent;
+        }
+
+        std::reverse(output.begin(), output.end());
+
         return output;
     }
 
@@ -203,12 +298,18 @@ namespace iris::parser
 
         std::uint32_t const child_count = ts_node_child_count(parent->ts_node);
 
+        std::uint32_t current_index = 0;
+
         for (std::uint32_t child_index = 0; child_index < child_count; ++child_index)
         {
             TSNode const child_node = ts_node_child(parent->ts_node, child_index);
+            if (is_comment_node(child_node))
+                continue;
 
             if (child_node.id == node.ts_node.id)
-                return child_index;
+                return current_index;
+
+            ++current_index;
         }
 
         return std::nullopt;
@@ -218,7 +319,11 @@ namespace iris::parser
         Parse_node const& node
     )
     {
-        TSNode const sibling = ts_node_next_sibling(node.ts_node);
+        TSNode sibling = ts_node_next_sibling(node.ts_node);
+
+        while (!ts_node_is_null(sibling) && is_comment_node(sibling))
+            sibling = ts_node_next_sibling(sibling);
+
         if (ts_node_is_null(sibling))
             return std::nullopt;
 
@@ -229,7 +334,11 @@ namespace iris::parser
         Parse_node const& node
     )
     {
-        TSNode const sibling = ts_node_prev_sibling(node.ts_node);
+        TSNode sibling = ts_node_prev_sibling(node.ts_node);
+
+        while (!ts_node_is_null(sibling) && is_comment_node(sibling))
+            sibling = ts_node_prev_sibling(sibling);
+
         if (ts_node_is_null(sibling))
             return std::nullopt;
 
@@ -245,7 +354,11 @@ namespace iris::parser
 
         for (std::uint32_t index = 0; index < degree; ++index)
         {
-            TSNode const sibling = ts_node_prev_sibling(current);
+            TSNode sibling = ts_node_prev_sibling(current);
+
+            while (!ts_node_is_null(sibling) && is_comment_node(sibling))
+                sibling = ts_node_prev_sibling(sibling);
+
             if (ts_node_is_null(sibling))
                 return std::nullopt;
 

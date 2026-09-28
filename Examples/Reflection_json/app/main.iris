@@ -1,0 +1,108 @@
+module reflection_json;
+
+import c.stdio as cstdio;
+import c.string as cstring;
+import iris.json as json;
+
+// Non-contiguous on purpose: Defensive is implicit (7) and Passive jumps to 20, so a writer that
+// assumed declaration order would disagree with codegen.
+enum Stance
+{
+    Aggressive = 6,
+    Defensive,
+    Passive = 20,
+}
+
+struct Health
+{
+    current: Int32 = 100;
+    maximum: Int32 = 100;
+}
+
+struct Combat
+{
+    stance: Stance = Stance.Defensive;
+    health: Health = {};
+    can_attack: Bool = true;
+}
+
+function capacity() -> (result: Uint64) { return 256u64; }
+
+mutable g_buffer: Constant_array::<C_char, 256> = [];
+mutable g_length: Uint64 = 0u64;
+
+function append_to_buffer(value: *C_char) -> ()
+{
+    var length = cstring.strlen(value) as Uint64;
+    for index in 0u64 to length
+    {
+        if (g_length + 1u64) < capacity()
+        {
+            g_buffer[g_length] = value[index];
+            g_length = g_length + 1u64;
+        }
+    }
+    g_buffer[g_length] = 0 as C_char;
+}
+
+function_constructor render(value_type: Type)
+{
+    return function(value: *value_type) -> (result: *C_char)
+    {
+        g_length = 0u64;
+        g_buffer[0] = 0 as C_char;
+
+        var stream: json.Write_stream = explicit {
+            write: append_to_buffer
+        };
+        json.to_json::<value_type>(stream, value);
+
+        return &g_buffer[0];
+    };
+}
+
+function equals(left: *C_char, right: *C_char) -> (result: Bool)
+{
+    return cstring.strcmp(left, right) == 0ci;
+}
+
+@test
+function test_struct_members_are_written_by_name() -> ()
+{
+    var health: Health = {};
+    check(equals(render::<Health>(&health), "{\"current\":100,\"maximum\":100}"c));
+}
+
+@test
+function test_enum_uses_its_declared_name() -> ()
+{
+    var defensive = Stance.Defensive;
+    check(equals(render::<Stance>(&defensive), "\"Defensive\""c));
+
+    var passive = Stance.Passive;
+    check(equals(render::<Stance>(&passive), "\"Passive\""c));
+}
+
+@test
+function test_enum_value_outside_the_declaration_falls_back_to_a_number() -> ()
+{
+    mutable undeclared = Stance.Aggressive;
+    cstring.memset(&undeclared, 0 as C_int, 4 as cstring.rsize_t);
+    check(equals(render::<Stance>(&undeclared), "0"c));
+}
+
+@test
+function test_nested_struct_recurses() -> ()
+{
+    var combat: Combat = {};
+    check(equals(render::<Combat>(&combat), "{\"stance\":\"Defensive\",\"health\":{\"current\":100,\"maximum\":100},\"can_attack\":true}"c));
+}
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    var combat: Combat = {};
+    cstdio.fprintf(cstdio.stdout, "%s\n"c, render::<Combat>(&combat));
+    cstdio.fflush(cstdio.stdout);
+    return 0;
+}

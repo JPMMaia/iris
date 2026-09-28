@@ -46,6 +46,27 @@ namespace iris::compiler
         profiler->durations.push_back(std::make_pair(std::pmr::string{key}, duration));
     }
 
+    export void add_duration(
+        Profiler* const profiler,
+        std::string_view const key,
+        std::chrono::nanoseconds const duration
+    )
+    {
+        if (profiler == nullptr)
+            return;
+
+        Duration const clock_duration = std::chrono::duration_cast<Duration>(duration);
+
+        auto const duration_location = std::find_if(profiler->durations.begin(), profiler->durations.end(), [&](auto const& pair) -> bool { return pair.first == key; });
+        if (duration_location != profiler->durations.end())
+        {
+            duration_location->second += clock_duration;
+            return;
+        }
+
+        profiler->durations.push_back(std::make_pair(std::pmr::string{key}, clock_duration));
+    }
+
     export void print_profiler_timings(
         Profiler const* const profiler
     )

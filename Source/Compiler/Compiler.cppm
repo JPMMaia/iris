@@ -6,6 +6,7 @@ import llvm;
 import iris.core;
 import iris.core.declarations;
 import iris.compiler.clang_data;
+import iris.compiler.lambda_database;
 import iris.compiler.diagnostic;
 import iris.compiler.expressions;
 import iris.compiler.types;
@@ -68,6 +69,7 @@ namespace iris::compiler
         bool output_debug_code_view = false;
         Contract_options contract_options = Contract_options::Log_error_and_abort;
         bool enable_bounds_checks = true;
+        bool enable_decimal_overflow_checks = false;
         bool is_test_mode = false;
     };
 
@@ -117,7 +119,8 @@ namespace iris::compiler
 
     export void print_diagnostics_and_exit_if_needed(
         std::span<iris::compiler::Diagnostic const> const diagnostics,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator,
+        std::string_view const failure_summary = "Validation failed."
     );
 
     export struct Compilation_database
@@ -175,6 +178,7 @@ namespace iris::compiler
         std::pmr::vector<iris::Module> transformed_core_modules;
         std::pmr::vector<iris::Module const*> sorted_modules;
         Declaration_database declaration_database;
+        Lambda_database lambda_database;
     };
 
     export Preprocessed_modules preprocess_modules(
@@ -192,6 +196,7 @@ namespace iris::compiler
         std::span<iris::Module const* const> const all_sorted_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         Declaration_database const& declaration_database,
+        Lambda_database const& lambda_database,
         Compilation_options const& compilation_options
     );
 }

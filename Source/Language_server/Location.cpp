@@ -2,6 +2,7 @@ module;
 
 #include <functional>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <variant>
 
@@ -10,6 +11,7 @@ module;
 module iris.language_server.location;
 
 import iris.compiler.analysis;
+import iris.compiler.validation;
 import iris.core;
 import iris.core.declarations;
 import iris.core.types;
@@ -91,7 +93,9 @@ namespace iris::language_server
         if (!type.source_range.has_value())
             return std::nullopt;
 
-        if (!range_contains_position(type.source_range.value(), source_position))
+        // Inclusive: a cursor sitting immediately after an identifier is still on that identifier,
+        // which is how an editor reports the caret at the end of a word.
+        if (!range_contains_position_inclusive(type.source_range.value(), source_position))
             return std::nullopt;
 
         iris::Type_reference const* best = &type;
@@ -100,7 +104,7 @@ namespace iris::language_server
         {
             if (current.source_range.has_value())
             {
-                if (range_contains_position(current.source_range.value(), source_position))
+                if (range_contains_position_inclusive(current.source_range.value(), source_position))
                 {
                     best = &current;
                 }
@@ -167,6 +171,85 @@ namespace iris::language_server
         return nullptr;
     }
 
+    void visit_statements_using_scope_including_lambda_bodies(
+        Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Function_declaration const* const function_declaration,
+        iris::compiler::Scope& scope,
+        std::span<iris::Statement const> const statements,
+        std::function<void(iris::Statement const&, iris::compiler::Scope const&)> const& callback
+    )
+    {
+        auto const process_statement = [&](iris::Statement const& statement, iris::compiler::Scope const& statement_scope) -> void
+        {
+            callback(statement, statement_scope);
+
+            for (std::size_t index = 0; index < statement.expressions.size(); ++index)
+            {
+                iris::Expression const& expression = statement.expressions[index];
+                if (!std::holds_alternative<iris::Lambda_expression>(expression.data))
+                    continue;
+
+                iris::Lambda_expression const& lambda_expression = std::get<iris::Lambda_expression>(expression.data);
+
+                std::optional<iris::Type_reference> const expected_type = iris::compiler::get_expected_expression_type(
+                    core_module.name,
+                    function_declaration,
+                    statement_scope,
+                    declaration_database,
+                    statement,
+                    std::nullopt,
+                    index
+                );
+
+                std::optional<iris::compiler::Type_info> const type_info = iris::compiler::get_expression_type_info(
+                    core_module.name,
+                    function_declaration,
+                    statement_scope,
+                    statement,
+                    expression,
+                    expected_type,
+                    declaration_database
+                );
+                if (!type_info.has_value())
+                    continue;
+
+                std::optional<iris::Lambda_type> const lambda_type = iris::compiler::resolve_lambda_type(declaration_database, type_info->type);
+                if (!lambda_type.has_value() || lambda_type->input_parameter_types.size() != lambda_expression.parameter_names.size())
+                    continue;
+
+                iris::compiler::Scope lambda_scope = statement_scope;
+
+                iris::compiler::add_parameters_to_scope(
+                    lambda_scope,
+                    lambda_expression.parameter_names,
+                    lambda_type->input_parameter_types,
+                    std::nullopt
+                );
+
+                iris::Statement const& body = lambda_expression.body;
+
+                visit_statements_using_scope_including_lambda_bodies(
+                    declaration_database,
+                    core_module,
+                    function_declaration,
+                    lambda_scope,
+                    {&body, 1},
+                    callback
+                );
+            }
+        };
+
+        iris::compiler::visit_statements_using_scope(
+            core_module.name,
+            function_declaration,
+            scope,
+            statements,
+            declaration_database,
+            process_statement
+        );
+    }
+
     void visit_expressions_that_contain_position(
         Declaration_database const& declaration_database,
         iris::Module const& core_module,
@@ -219,12 +302,12 @@ namespace iris::language_server
                 function->declaration->input_parameter_source_positions
             );
 
-            iris::compiler::visit_statements_using_scope(
-                core_module.name,
+            visit_statements_using_scope_including_lambda_bodies(
+                declaration_database,
+                core_module,
                 function->declaration,
                 scope,
                 function->definition->statements,
-                declaration_database,
                 process_statement
             );
         }

@@ -1,0 +1,14 @@
+module Lambda_call;
+
+lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function apply(cmp: Comparator, x: Int32, y: Int32) -> (result: Int32)
+{
+    return cmp(x, y);
+}
+
+export function main() -> ()
+{
+    var cmp: Comparator = lambda(a, b) => a - b;
+    var result = apply(cmp, 10, 3);
+}

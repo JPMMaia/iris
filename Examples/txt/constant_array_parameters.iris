@@ -1,0 +1,26 @@
+module Constant_array_parameters;
+
+struct Pair
+{
+    a: Int32 = 0i32;
+    b: Int32 = 0i32;
+}
+
+function sum_ends(values: Constant_array::<Float32, 8>) -> (sum: Float32)
+{
+    return values[0] + values[7];
+}
+
+function first_of_copy(pairs: Constant_array::<Pair, 3>) -> (first: Int32)
+{
+    mutable copy = pairs;
+    copy[0].a = 5i32;
+    return copy[0].a;
+}
+
+export function pass_arrays_by_value(pairs: *Constant_array::<Pair, 3>) -> (sum: Float32)
+{
+    var values: Constant_array::<Float32, 8> = [1.0f32, 2.0f32, 3.0f32, 4.0f32, 5.0f32, 6.0f32, 7.0f32, 8.0f32];
+    var first = first_of_copy(*pairs);
+    return sum_ends(values) + (first as Float32);
+}

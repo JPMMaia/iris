@@ -26,5 +26,7 @@ namespace iris::common
 
     export std::pmr::vector<std::string_view> split_string(std::string_view const value, char const seperator, std::pmr::polymorphic_allocator<> const& output_allocator);
 
+    export void print_stacktrace();
+
     export void install_abort_handlers();
 }

@@ -1,0 +1,9 @@
+module Decimal_constant_overflow;
+
+// 90 / 0.02 is 4500, whose scaled Decimal6 representation is 4_500_000_000 -- past the Int32
+// backing. Both operands are literals, so the intermediate folds to a constant and no runtime
+// check could ever fire; this has to be rejected at compile time instead.
+export function constant_overflow() -> ()
+{
+    var steps: Decimal6 = 90.0d6 / 0.02d6;
+}

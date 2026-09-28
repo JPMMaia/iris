@@ -53,11 +53,15 @@ namespace iris::compiler
         bool const is_address_of
     );
 
-    export llvm::StoreInst* create_store_instruction(
+    export llvm::Value* create_store_instruction(
         llvm::IRBuilder<>& llvm_builder,
         llvm::DataLayout const& llvm_data_layout,
         llvm::Value* const value,
         llvm::Value* const pointer
+    );
+
+    export void erase_dead_aggregate_loads(
+        llvm::Module& llvm_module
     );
 
     export llvm::Value* create_memcpy_call(
@@ -66,7 +70,7 @@ namespace iris::compiler
         llvm::Module& llvm_module,
         llvm::Value* const destination_pointer,
         llvm::Value* const source_pointer,
-        unsigned const size_in_bits,
+        std::uint64_t const size_in_bytes,
         llvm::Align const alignment = {}
     );
 
@@ -82,6 +86,12 @@ namespace iris::compiler
         llvm::IRBuilder<>& llvm_builder,
         llvm::Value* const llvm_value,
         std::optional<iris::Type_reference> const& type
+    );
+
+    export llvm::Value* convert_from_boolean(
+        llvm::LLVMContext& llvm_context,
+        llvm::IRBuilder<>& llvm_builder,
+        llvm::Value* const llvm_value
     );
 
     export llvm::Value* create_null_terminated_string_value(

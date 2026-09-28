@@ -182,10 +182,64 @@ See [Dependencies](./dependencies.md) for the full reference.
 |---|---|---|---|
 | `name` | string | ✓ | Unique name within the repository |
 | `version` | string | ✓ | Semantic version (`"major.minor.patch"`) |
-| `type` | string | ✓ | `"executable"` or `"library"` |
+| `type` | string | ✓ | `"executable"`, `"library"` or `"dynamic_library"` |
 | `dependencies` | array | — | Artifacts this one depends on (by name) |
 | `sources` | array | ✓ | One or more source groups |
 | `executable` | object | When `type == "executable"` | Entry-point configuration |
+| `dynamic_library` | object | When `type == "dynamic_library"` | Exported symbol names |
+
+### Artifact Types
+
+| `type` value | Output | Notes |
+|---|---|---|
+| `"executable"` | `bin/<name>.exe` | Needs an `executable` block naming the entry point |
+| `"library"` | `lib/<name>.lib` (`.a`) | Statically linked into whatever depends on it |
+| `"dynamic_library"` | `bin/<name>.dll` (`.so`) | Loaded at runtime, not linked against |
+
+### Dynamic Libraries
+
+A `dynamic_library` artifact is built to be loaded at run time. Name every symbol callers resolve
+in the `exports` list — nothing else is exported:
+
+```json
+{
+    "name": "my_plugin",
+    "version": "0.1.0",
+    "type": "dynamic_library",
+    "sources": [
+        { "type": "iris", "include": ["./**/*.iris"] }
+    ],
+    "dynamic_library": {
+        "exports": ["my_plugin_answer"]
+    }
+}
+```
+
+An export must be the symbol's linkage name, which for an Iris function is what `@unique_name`
+gives it:
+
+```iris
+@unique_name("my_plugin_answer")
+export function answer() -> (value: Int32)
+{
+    return 42;
+}
+```
+
+Loading one needs no special language support — SDL's `SDL_LoadObject` / `SDL_LoadFunction`, or any
+other C loader, works. Cast the resolved symbol by writing the function type inline; a `using`
+alias of a function type does not carry its signature through:
+
+```iris
+var answer = reinterpret_as::<function<() -> (value: Int32)>>(symbol);
+```
+
+A dynamic library links its static dependencies into itself, so a host and a plugin that both
+depend on the same static library each get their own copy of it — and therefore their own copy of
+any global state it owns. Keep the boundary a narrow C ABI and pass allocators and handles across
+it explicitly rather than relying on shared globals.
+
+`Examples/Load_dynamic_library` is a complete host-and-plugin pair.
 
 ### Source Group Types
 
@@ -194,7 +248,7 @@ See [Dependencies](./dependencies.md) for the full reference.
 | `"iris"` | Compile all matched `.iris` files as Iris modules |
 | `"export_c_header"` | Additionally emit a C header for each matched module |
 | `"import_c_header"` | Parse a C header and make it importable as an Iris module |
-| `"cpp"` | Compile C++ source files (linked with the artifact) |
+| `"c++"` | Compile C++ source files (linked with the artifact) |
 
 ### `include` Glob Patterns
 

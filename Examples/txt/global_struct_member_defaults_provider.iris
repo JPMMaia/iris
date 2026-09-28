@@ -1,0 +1,9 @@
+module Global_struct_member_defaults_provider;
+
+export var default_speed = 30.0f32;
+
+export struct Unit
+{
+    speed: Float32 = default_speed;
+    count: Int32 = 2i32;
+}

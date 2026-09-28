@@ -1,0 +1,8 @@
+module Indirect_global_constant_holder;
+
+import Indirect_global_constant_provider as Provider;
+
+export struct Unit
+{
+    speed_meters_per_second: Float32 = Provider.speed_30_meters_per_second;
+}

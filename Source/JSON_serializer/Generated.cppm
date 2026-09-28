@@ -419,6 +419,20 @@ namespace iris::json
     }
 
     EXPORT template <>
+    JSON to_json(Optional_type const& value)
+    {
+        JSON data;
+        data["value_type"] = to_json(value.value_type);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Optional_type& value)
+    {
+        if (data.contains("value_type")) from_json(data.at("value_type"), value.value_type);
+    }
+
+    EXPORT template <>
     JSON to_json(Pointer_type const& value)
     {
         JSON data;
@@ -540,6 +554,22 @@ namespace iris::json
     void from_json(JSON const& data, Parameter_type& value)
     {
         from_json(data.at("name"), value.name);
+    }
+
+    EXPORT template <>
+    JSON to_json(Lambda_type const& value)
+    {
+        JSON data;
+        data["input_parameter_types"] = to_json(value.input_parameter_types);
+        data["output_parameter_types"] = to_json(value.output_parameter_types);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Lambda_type& value)
+    {
+        if (data.contains("input_parameter_types")) from_json(data.at("input_parameter_types"), value.input_parameter_types);
+        if (data.contains("output_parameter_types")) from_json(data.at("output_parameter_types"), value.output_parameter_types);
     }
 
     EXPORT template <>
@@ -814,6 +844,62 @@ namespace iris::json
         if (data.contains("source_location")) from_json(data.at("source_location"), value.source_location);
         if (data.contains("input_parameter_source_positions")) from_json(data.at("input_parameter_source_positions"), value.input_parameter_source_positions);
         if (data.contains("output_parameter_source_positions")) from_json(data.at("output_parameter_source_positions"), value.output_parameter_source_positions);
+    }
+
+    EXPORT template <>
+    JSON to_json(Lambda_declaration const& value)
+    {
+        JSON data;
+        data["name"] = to_json(value.name);
+        if (value.unique_name.has_value()) data["unique_name"] = to_json(value.unique_name);
+        data["input_parameter_types"] = to_json(value.input_parameter_types);
+        data["output_parameter_types"] = to_json(value.output_parameter_types);
+        data["input_parameter_names"] = to_json(value.input_parameter_names);
+        data["output_parameter_names"] = to_json(value.output_parameter_names);
+        if (value.comment.has_value()) data["comment"] = to_json(value.comment);
+        if (value.source_location.has_value()) data["source_location"] = to_json(value.source_location);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Lambda_declaration& value)
+    {
+        from_json(data.at("name"), value.name);
+        if (data.contains("unique_name")) from_json(data.at("unique_name"), value.unique_name);
+        if (data.contains("input_parameter_types")) from_json(data.at("input_parameter_types"), value.input_parameter_types);
+        if (data.contains("output_parameter_types")) from_json(data.at("output_parameter_types"), value.output_parameter_types);
+        if (data.contains("input_parameter_names")) from_json(data.at("input_parameter_names"), value.input_parameter_names);
+        if (data.contains("output_parameter_names")) from_json(data.at("output_parameter_names"), value.output_parameter_names);
+        if (data.contains("comment")) from_json(data.at("comment"), value.comment);
+        if (data.contains("source_location")) from_json(data.at("source_location"), value.source_location);
+    }
+
+    EXPORT template <>
+    JSON to_json(Lambda_expression const& value)
+    {
+        JSON data;
+        data["parameter_names"] = to_json(value.parameter_names);
+        data["parameter_types"] = to_json(value.parameter_types);
+        data["parameter_source_positions"] = to_json(value.parameter_source_positions);
+        if (value.input_parameters_source_range.has_value()) data["input_parameters_source_range"] = to_json(value.input_parameters_source_range);
+        if (value.return_type.has_value()) data["return_type"] = to_json(value.return_type);
+        data["body"] = to_json(value.body);
+        if (value.captured_variables.has_value()) data["captured_variables"] = to_json(value.captured_variables);
+        if (value.source_range.has_value()) data["source_range"] = to_json(value.source_range);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Lambda_expression& value)
+    {
+        if (data.contains("parameter_names")) from_json(data.at("parameter_names"), value.parameter_names);
+        if (data.contains("parameter_types")) from_json(data.at("parameter_types"), value.parameter_types);
+        if (data.contains("parameter_source_positions")) from_json(data.at("parameter_source_positions"), value.parameter_source_positions);
+        if (data.contains("input_parameters_source_range")) from_json(data.at("input_parameters_source_range"), value.input_parameters_source_range);
+        if (data.contains("return_type")) from_json(data.at("return_type"), value.return_type);
+        from_json(data.at("body"), value.body);
+        if (data.contains("captured_variables")) from_json(data.at("captured_variables"), value.captured_variables);
+        if (data.contains("source_range")) from_json(data.at("source_range"), value.source_range);
     }
 
     EXPORT template <>
@@ -1647,6 +1733,7 @@ namespace iris::json
         data["function_declarations"] = to_json(value.function_declarations);
         data["function_constructors"] = to_json(value.function_constructors);
         data["type_constructors"] = to_json(value.type_constructors);
+        data["lambda_declarations"] = to_json(value.lambda_declarations);
         return data;
     }
 
@@ -1662,6 +1749,7 @@ namespace iris::json
         if (data.contains("function_declarations")) from_json(data.at("function_declarations"), value.function_declarations);
         if (data.contains("function_constructors")) from_json(data.at("function_constructors"), value.function_constructors);
         if (data.contains("type_constructors")) from_json(data.at("type_constructors"), value.type_constructors);
+        if (data.contains("lambda_declarations")) from_json(data.at("lambda_declarations"), value.lambda_declarations);
     }
 
     EXPORT template <>
