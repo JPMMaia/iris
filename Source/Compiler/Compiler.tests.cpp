@@ -4744,6 +4744,51 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Decimal Casts From Unsigned Integers", "[LLVM_IR]")
+  {
+    char const* const input_file = "decimal_unsigned_casts.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define void @Decimal_unsigned_casts_decimal_unsigned_casts(i8 noundef zeroext %"arguments[0].u8_value", i32 noundef %"arguments[1].u32_value", i64 noundef %"arguments[2].u64_value") #0 {
+entry:
+  %u8_value = alloca i8, align 1
+  %u32_value = alloca i32, align 4
+  %u64_value = alloca i64, align 8
+  %u8_to_d7 = alloca i64, align 8
+  %u32_to_d4 = alloca i32, align 4
+  %u32_to_d7 = alloca i64, align 8
+  %u64_to_d7 = alloca i64, align 8
+  store i8 %"arguments[0].u8_value", ptr %u8_value, align 1
+  store i32 %"arguments[1].u32_value", ptr %u32_value, align 4
+  store i64 %"arguments[2].u64_value", ptr %u64_value, align 8
+  %0 = load i8, ptr %u8_value, align 1
+  %1 = zext i8 %0 to i64
+  %2 = mul i64 %1, 10000000
+  store i64 %2, ptr %u8_to_d7, align 8
+  %3 = load i32, ptr %u32_value, align 4
+  %4 = mul i32 %3, 10000
+  store i32 %4, ptr %u32_to_d4, align 4
+  %5 = load i32, ptr %u32_value, align 4
+  %6 = zext i32 %5 to i64
+  %7 = mul i64 %6, 10000000
+  store i64 %7, ptr %u32_to_d7, align 8
+  %8 = load i64, ptr %u64_value, align 8
+  %9 = mul i64 %8, 10000000
+  store i64 %9, ptr %u64_to_d7, align 8
+  ret void
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Decimal Overflow Checks Disabled", "[LLVM_IR]")
   {
     char const* const input_file = "decimal_overflow_checks.iris";

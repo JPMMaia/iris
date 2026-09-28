@@ -4695,8 +4695,10 @@ namespace iris::compiler
 
             if (source_llvm_type->isIntegerTy())
             {
-                // Integer -> Decimal(N): extend/trunc source, then multiply by 10^N
-                llvm::Value* const src_extended = llvm_builder.CreateSExtOrTrunc(source.value, destination_llvm);
+                // Integer -> Decimal(N): extend/trunc source (zero-extending unsigned sources), then multiply by 10^N
+                llvm::Value* const src_extended = is_signed_integer(source_type)
+                    ? llvm_builder.CreateSExtOrTrunc(source.value, destination_llvm)
+                    : llvm_builder.CreateZExtOrTrunc(source.value, destination_llvm);
                 llvm::APInt const scale_ap{ destination_bits, static_cast<std::uint64_t>(scale_val), true };
                 llvm::Value* const scale_const = llvm::ConstantInt::get(destination_llvm, scale_ap);
                 llvm::Value* const result = llvm_builder.CreateMul(src_extended, scale_const);
