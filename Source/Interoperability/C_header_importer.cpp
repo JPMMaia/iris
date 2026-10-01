@@ -381,6 +381,23 @@ namespace iris::c
 
     std::optional<iris::Type_reference> create_type_reference(C_declarations const& declarations, CXCursor cursor, CXType type);
 
+    std::optional<iris::Type_reference> create_array_parameter_type_reference(C_declarations const& declarations, CXCursor const cursor, CXType const array_type)
+    {
+        CXType const element_type = clang_getArrayElementType(array_type);
+        std::optional<iris::Type_reference> element_type_reference = create_type_reference(declarations, cursor, element_type);
+
+        iris::Pointer_type pointer_type
+        {
+            .element_type = element_type_reference.has_value() ? std::pmr::vector<iris::Type_reference>{std::move(*element_type_reference)} : std::pmr::vector<iris::Type_reference>{},
+            .is_mutable = !clang_isConstQualifiedType(element_type)
+        };
+
+        return iris::Type_reference
+        {
+            .data = std::move(pointer_type)
+        };
+    }
+
     iris::Function_type create_function_type(C_declarations const& declarations, CXCursor const cursor, CXType const function_type)
     {
         CXType const result_type = clang_getResultType(function_type);
@@ -399,7 +416,12 @@ namespace iris::c
         {
             CXType const argument_type = clang_getArgType(function_type, argument_index);
 
-            std::optional<iris::Type_reference> parameter_type = create_type_reference(declarations, cursor, argument_type);
+            // In C, a parameter declared as an array is a pointer to its first element, so the
+            // callee writes through it into the caller's array.
+            std::optional<iris::Type_reference> parameter_type =
+                argument_type.kind == CXType_ConstantArray ?
+                create_array_parameter_type_reference(declarations, cursor, argument_type) :
+                create_type_reference(declarations, cursor, argument_type);
             if (!parameter_type.has_value())
             {
                 throw std::runtime_error{ "Parameter type is void which is invalid!" };

@@ -1650,6 +1650,47 @@ typedef int(*function_pointer_type)(int a, int b);
         }
     }
 
+    TEST_CASE("Imports array parameters as pointers to their first element")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "array_parameters";
+        std::filesystem::create_directories(root_directory_path);
+
+        std::string const header_content = R"(
+int edit_color(char const* label, float color[3], int flags);
+void set_constants(float const constants[4]);
+typedef struct Holder { float values[3]; } Holder;
+)";
+
+        std::filesystem::path const header_file_path = root_directory_path / "array_parameters.h";
+        iris::common::write_to_file(header_file_path, header_content);
+
+        std::optional<iris::Module> const header_module_optional = iris::c::import_header("c.array_parameters", header_file_path, {});
+        REQUIRE(header_module_optional.has_value());
+        iris::Module const& header_module = header_module_optional.value();
+
+        iris::Type_reference const float_type{ .data = iris::Fundamental_type::Float32 };
+
+        {
+            iris::Function_declaration const& actual = iris::c::find_function_declaration(header_module, "edit_color");
+            REQUIRE(actual.type.input_parameter_types.size() == 3);
+            iris::Type_reference const expected{ .data = iris::Pointer_type{ .element_type = {float_type}, .is_mutable = true } };
+            CHECK(actual.type.input_parameter_types[1] == expected);
+        }
+
+        {
+            iris::Function_declaration const& actual = iris::c::find_function_declaration(header_module, "set_constants");
+            REQUIRE(actual.type.input_parameter_types.size() == 1);
+            iris::Type_reference const expected{ .data = iris::Pointer_type{ .element_type = {float_type}, .is_mutable = false } };
+            CHECK(actual.type.input_parameter_types[0] == expected);
+        }
+
+        {
+            iris::Struct_declaration const& actual = header_module.export_declarations.struct_declarations[0];
+            REQUIRE(actual.member_types.size() == 1);
+            CHECK(std::holds_alternative<iris::Constant_array_type>(actual.member_types[0].data));
+        }
+    }
+
     TEST_CASE("Handles bit fields")
     {
         std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_header_importer" / "bit_fields";
