@@ -5080,6 +5080,11 @@ namespace iris::compiler
         };
     }
 
+    std::optional<Type_reference> common_value_type(
+        Type_reference const& then_type,
+        Type_reference const& else_type
+    );
+
     Value_and_type create_constant_array_expression_value(
         Constant_array_expression const& expression,
         Statement const& statement,
@@ -5174,13 +5179,33 @@ namespace iris::compiler
             };
         }
 
+        // Each element expects the element type of the list's own expected type, never the list's
+        // type: an element `name` of constant array type would otherwise turn into a slice.
+        Expression_parameters element_parameters = parameters;
+        element_parameters.expression_type = std::nullopt;
+        if (parameters.expression_type.has_value())
+        {
+            if (std::holds_alternative<Array_slice_type>(parameters.expression_type->data))
+            {
+                Array_slice_type const& slice_type = std::get<Array_slice_type>(parameters.expression_type->data);
+                if (!slice_type.element_type.empty())
+                    element_parameters.expression_type = slice_type.element_type[0];
+            }
+            else if (std::holds_alternative<Constant_array_type>(parameters.expression_type->data))
+            {
+                Constant_array_type const& array_type = std::get<Constant_array_type>(parameters.expression_type->data);
+                if (!array_type.value_type.empty())
+                    element_parameters.expression_type = array_type.value_type[0];
+            }
+        }
+
         std::pmr::vector<Value_and_type> array_data_values;
         array_data_values.resize(expression.array_data.size());
         for (std::size_t index = 0; index < expression.array_data.size(); ++index)
         {
             array_data_values[index] = create_loaded_statement_value(
                 expression.array_data[index],
-                parameters
+                element_parameters
             );
         }
 
@@ -5189,8 +5214,14 @@ namespace iris::compiler
 
         for (std::size_t index = 1; index < array_data_values.size(); ++index)
         {
-            if (array_data_values[0].type != array_data_values[index].type)
+            if (!array_data_values[index].type.has_value())
                 throw Compile_error{ "Type mismatch between elements of the initializer list.", parameters.source_position };
+
+            std::optional<Type_reference> common = common_value_type(array_data_values[0].type.value(), array_data_values[index].type.value());
+            if (!common.has_value())
+                throw Compile_error{ format_type_mismatch_error("Type mismatch between elements of the initializer list.", parameters.core_module, array_data_values[0].type, array_data_values[index].type), parameters.source_position };
+
+            array_data_values[0].type = std::move(common);
         }
 
         if (parameters.expression_type.has_value() && !is_array_slice_type_reference(parameters.expression_type.value()))
@@ -6600,6 +6631,38 @@ namespace iris::compiler
         };
     }
 
+    // The type two values meet as, in the arms of a ternary condition or the elements of an
+    // initializer list. Two pointers to the same type, one of which
+    // may be mutable, meet as the non-mutable pointer; a pointer and null meet as the pointer.
+    std::optional<Type_reference> common_value_type(
+        Type_reference const& then_type,
+        Type_reference const& else_type
+    )
+    {
+        if (then_type == else_type)
+            return then_type;
+
+        if (std::holds_alternative<Pointer_type>(then_type.data) && is_null_pointer_type(else_type))
+            return then_type;
+
+        if (is_null_pointer_type(then_type) && std::holds_alternative<Pointer_type>(else_type.data))
+            return else_type;
+
+        if (std::holds_alternative<Pointer_type>(then_type.data) && std::holds_alternative<Pointer_type>(else_type.data))
+        {
+            Pointer_type const& then_pointer = std::get<Pointer_type>(then_type.data);
+            Pointer_type const& else_pointer = std::get<Pointer_type>(else_type.data);
+            if (then_pointer.element_type == else_pointer.element_type)
+            {
+                Type_reference common = then_type;
+                std::get<Pointer_type>(common.data).is_mutable = false;
+                return common;
+            }
+        }
+
+        return std::nullopt;
+    }
+
     Value_and_type create_ternary_condition_expression_value(
         Ternary_condition_expression const& expression,
         Statement const& statement,
@@ -6637,8 +6700,13 @@ namespace iris::compiler
         llvm_builder.CreateBr(end_block);
         llvm::BasicBlock* const else_end_block = llvm_builder.GetInsertBlock();
 
-        if (then_value.type.has_value() && else_value.type.has_value() && then_value.type.value() != else_value.type.value())
-            throw Compile_error{ "Ternary condition then and else statements must have the same type!", parameters.source_position };
+        std::optional<Type_reference> result_type = then_value.type;
+        if (then_value.type.has_value() && else_value.type.has_value())
+        {
+            result_type = common_value_type(then_value.type.value(), else_value.type.value());
+            if (!result_type.has_value())
+                throw Compile_error{ "Ternary condition then and else statements must have the same type!", parameters.source_position };
+        }
 
         // End:
         llvm_builder.SetInsertPoint(end_block);
@@ -6660,7 +6728,7 @@ namespace iris::compiler
         {
             .name = "",
             .value = phi_node,
-            .type = then_value.type
+            .type = result_type
         };
     }
 

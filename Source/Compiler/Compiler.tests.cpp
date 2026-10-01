@@ -8437,6 +8437,267 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Ternary Condition Pointers Differing In Mutability", "[LLVM_IR]")
+  {
+    char const* const input_file = "ternary_condition_pointer_mutability.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Ternary_condition_pointer_mutability_Text = type { [4 x i8] }
+%struct.Ternary_condition_pointer_mutability_Storage = type { ptr }
+%struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
+
+@global_0 = internal constant [1 x i8] zeroinitializer
+@global_1 = internal constant [1 x i8] zeroinitializer
+@global_2 = internal constant [5 x i8] c"text\00"
+@global_3 = internal constant [5 x i8] c"text\00"
+
+; Function Attrs: convergent
+define ptr @Ternary_condition_pointer_mutability_choose(i1 noundef zeroext %"arguments[0].use_text") #0 {
+entry:
+  %use_text = alloca i8, align 1
+  %text = alloca %struct.Ternary_condition_pointer_mutability_Text, align 1
+  %0 = alloca [4 x i8], align 1
+  %chosen = alloca ptr, align 8
+  %1 = zext i1 %"arguments[0].use_text" to i8
+  store i8 %1, ptr %use_text, align 1
+  call void @llvm.memset.p0.i64(ptr align 1 %0, i8 0, i64 4, i1 false)
+  %2 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Text, ptr %text, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 1 %2, ptr align 1 %0, i64 4, i1 false)
+  %3 = load i8, ptr %use_text, align 1
+  %4 = trunc i8 %3 to i1
+  br i1 %4, label %ternary_condition_then, label %ternary_condition_else
+
+ternary_condition_then:                           ; preds = %entry
+  %5 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Text, ptr %text, i32 0, i32 0
+  %array_element_pointer = getelementptr [4 x i8], ptr %5, i32 0, i64 0
+  br label %ternary_condition_end
+
+ternary_condition_else:                           ; preds = %entry
+  br label %ternary_condition_end
+
+ternary_condition_end:                            ; preds = %ternary_condition_else, %ternary_condition_then
+  %6 = phi ptr [ %array_element_pointer, %ternary_condition_then ], [ @global_0, %ternary_condition_else ]
+  store ptr %6, ptr %chosen, align 8
+  %7 = load ptr, ptr %chosen, align 8
+  ret ptr %7
+}
+
+; Function Attrs: convergent
+define ptr @Ternary_condition_pointer_mutability_choose_or_null(i1 noundef zeroext %"arguments[0].use_text") #0 {
+entry:
+  %use_text = alloca i8, align 1
+  %text = alloca %struct.Ternary_condition_pointer_mutability_Text, align 1
+  %0 = alloca [4 x i8], align 1
+  %first = alloca ptr, align 8
+  %second = alloca ptr, align 8
+  %1 = zext i1 %"arguments[0].use_text" to i8
+  store i8 %1, ptr %use_text, align 1
+  call void @llvm.memset.p0.i64(ptr align 1 %0, i8 0, i64 4, i1 false)
+  %2 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Text, ptr %text, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 1 %2, ptr align 1 %0, i64 4, i1 false)
+  %3 = load i8, ptr %use_text, align 1
+  %4 = trunc i8 %3 to i1
+  br i1 %4, label %ternary_condition_then, label %ternary_condition_else
+
+ternary_condition_then:                           ; preds = %entry
+  %5 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Text, ptr %text, i32 0, i32 0
+  %array_element_pointer = getelementptr [4 x i8], ptr %5, i32 0, i64 0
+  br label %ternary_condition_end
+
+ternary_condition_else:                           ; preds = %entry
+  br label %ternary_condition_end
+
+ternary_condition_end:                            ; preds = %ternary_condition_else, %ternary_condition_then
+  %6 = phi ptr [ %array_element_pointer, %ternary_condition_then ], [ null, %ternary_condition_else ]
+  store ptr %6, ptr %first, align 8
+  %7 = load i8, ptr %use_text, align 1
+  %8 = trunc i8 %7 to i1
+  br i1 %8, label %ternary_condition_then1, label %ternary_condition_else2
+
+ternary_condition_then1:                          ; preds = %ternary_condition_end
+  br label %ternary_condition_end3
+
+ternary_condition_else2:                          ; preds = %ternary_condition_end
+  %9 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Text, ptr %text, i32 0, i32 0
+  %array_element_pointer4 = getelementptr [4 x i8], ptr %9, i32 0, i64 0
+  br label %ternary_condition_end3
+
+ternary_condition_end3:                           ; preds = %ternary_condition_else2, %ternary_condition_then1
+  %10 = phi ptr [ null, %ternary_condition_then1 ], [ %array_element_pointer4, %ternary_condition_else2 ]
+  store ptr %10, ptr %second, align 8
+  %11 = load ptr, ptr %first, align 8
+  %12 = icmp ne ptr %11, null
+  %13 = zext i1 %12 to i8
+  %14 = trunc i8 %13 to i1
+  br i1 %14, label %ternary_condition_then5, label %ternary_condition_else6
+
+ternary_condition_then5:                          ; preds = %ternary_condition_end3
+  %15 = load ptr, ptr %first, align 8
+  br label %ternary_condition_end7
+
+ternary_condition_else6:                          ; preds = %ternary_condition_end3
+  %16 = load ptr, ptr %second, align 8
+  br label %ternary_condition_end7
+
+ternary_condition_end7:                           ; preds = %ternary_condition_else6, %ternary_condition_then5
+  %17 = phi ptr [ %15, %ternary_condition_then5 ], [ %16, %ternary_condition_else6 ]
+  ret ptr %17
+}
+
+; Function Attrs: convergent
+define ptr @Ternary_condition_pointer_mutability_first_of_list(i1 noundef zeroext %"arguments[0].use_text") #0 {
+entry:
+  %use_text = alloca i8, align 1
+  %text = alloca %struct.Ternary_condition_pointer_mutability_Text, align 1
+  %0 = alloca [4 x i8], align 1
+  %array = alloca [2 x ptr], align 8
+  %list = alloca [2 x ptr], align 8
+  %1 = zext i1 %"arguments[0].use_text" to i8
+  store i8 %1, ptr %use_text, align 1
+  call void @llvm.memset.p0.i64(ptr align 1 %0, i8 0, i64 4, i1 false)
+  %2 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Text, ptr %text, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 1 %2, ptr align 1 %0, i64 4, i1 false)
+  %3 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Text, ptr %text, i32 0, i32 0
+  %array_element_pointer = getelementptr [4 x i8], ptr %3, i32 0, i64 0
+  %array_element_pointer1 = getelementptr [2 x ptr], ptr %array, i32 0, i32 0
+  store ptr %array_element_pointer, ptr %array_element_pointer1, align 8
+  %array_element_pointer2 = getelementptr [2 x ptr], ptr %array, i32 0, i32 1
+  store ptr @global_1, ptr %array_element_pointer2, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %list, ptr align 8 %array, i64 16, i1 false)
+  %array_element_pointer3 = getelementptr [2 x ptr], ptr %list, i32 0, i64 0
+  %4 = load ptr, ptr %array_element_pointer3, align 8
+  ret ptr %4
+}
+
+; Function Attrs: convergent
+define ptr @Ternary_condition_pointer_mutability_list_of_storage(ptr noundef %"arguments[0].storage") #0 {
+entry:
+  %0 = alloca %struct.Ternary_condition_pointer_mutability_Storage, align 8
+  %name = alloca [8 x i8], align 1
+  %array = alloca [2 x ptr], align 8
+  %list = alloca [2 x ptr], align 8
+  %array3 = alloca [2 x ptr], align 8
+  %mixed = alloca [2 x ptr], align 8
+  %1 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Storage, ptr %0, i32 0, i32 0
+  store ptr %"arguments[0].storage", ptr %1, align 8
+  call void @llvm.memset.p0.i64(ptr align 1 %name, i8 0, i64 8, i1 false)
+  %2 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Storage, ptr %0, i32 0, i32 0
+  %3 = load ptr, ptr %2, align 8
+  %array_element_pointer = getelementptr [8 x i8], ptr %name, i32 0, i64 0
+  %array_element_pointer1 = getelementptr [2 x ptr], ptr %array, i32 0, i32 0
+  store ptr %3, ptr %array_element_pointer1, align 8
+  %array_element_pointer2 = getelementptr [2 x ptr], ptr %array, i32 0, i32 1
+  store ptr %array_element_pointer, ptr %array_element_pointer2, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %list, ptr align 8 %array, i64 16, i1 false)
+  %4 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Storage, ptr %0, i32 0, i32 0
+  %5 = load ptr, ptr %4, align 8
+  %array_element_pointer4 = getelementptr [2 x ptr], ptr %array3, i32 0, i32 0
+  store ptr %5, ptr %array_element_pointer4, align 8
+  %array_element_pointer5 = getelementptr [2 x ptr], ptr %array3, i32 0, i32 1
+  store ptr @global_2, ptr %array_element_pointer5, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %mixed, ptr align 8 %array3, i64 16, i1 false)
+  %array_element_pointer6 = getelementptr [2 x ptr], ptr %list, i32 0, i64 0
+  %6 = load ptr, ptr %array_element_pointer6, align 8
+  %7 = icmp ne ptr %6, null
+  %8 = zext i1 %7 to i8
+  %9 = trunc i8 %8 to i1
+  br i1 %9, label %ternary_condition_then, label %ternary_condition_else
+
+ternary_condition_then:                           ; preds = %entry
+  %array_element_pointer7 = getelementptr [2 x ptr], ptr %list, i32 0, i64 1
+  %10 = load ptr, ptr %array_element_pointer7, align 8
+  br label %ternary_condition_end
+
+ternary_condition_else:                           ; preds = %entry
+  %array_element_pointer8 = getelementptr [2 x ptr], ptr %mixed, i32 0, i64 1
+  %11 = load ptr, ptr %array_element_pointer8, align 8
+  br label %ternary_condition_end
+
+ternary_condition_end:                            ; preds = %ternary_condition_else, %ternary_condition_then
+  %12 = phi ptr [ %10, %ternary_condition_then ], [ %11, %ternary_condition_else ]
+  ret ptr %12
+}
+
+; Function Attrs: convergent
+define i64 @Ternary_condition_pointer_mutability_count_storage(ptr noundef %"arguments[0].storage") #0 {
+entry:
+  %0 = alloca %struct.Ternary_condition_pointer_mutability_Storage, align 8
+  %name = alloca [8 x i8], align 1
+  %array = alloca [2 x ptr], align 8
+  %1 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %array3 = alloca [2 x ptr], align 8
+  %2 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %3 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Storage, ptr %0, i32 0, i32 0
+  store ptr %"arguments[0].storage", ptr %3, align 8
+  call void @llvm.memset.p0.i64(ptr align 1 %name, i8 0, i64 8, i1 false)
+  %4 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Storage, ptr %0, i32 0, i32 0
+  %5 = load ptr, ptr %4, align 8
+  %array_element_pointer = getelementptr [8 x i8], ptr %name, i32 0, i64 0
+  %array_element_pointer1 = getelementptr [2 x ptr], ptr %array, i32 0, i32 0
+  store ptr %5, ptr %array_element_pointer1, align 8
+  %array_element_pointer2 = getelementptr [2 x ptr], ptr %array, i32 0, i32 1
+  store ptr %array_element_pointer, ptr %array_element_pointer2, align 8
+  %data_pointer = getelementptr [2 x ptr], ptr %array, i32 0, i32 0
+  %6 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 0
+  store ptr %data_pointer, ptr %6, align 8
+  %7 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %1, i32 0, i32 1
+  store i64 2, ptr %7, align 8
+  %8 = getelementptr inbounds { ptr, i64 }, ptr %1, i32 0, i32 0
+  %9 = load ptr, ptr %8, align 8
+  %10 = getelementptr inbounds { ptr, i64 }, ptr %1, i32 0, i32 1
+  %11 = load i64, ptr %10, align 8
+  %12 = call i64 @Ternary_condition_pointer_mutability_count_texts(ptr %9, i64 %11)
+  %13 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Storage, ptr %0, i32 0, i32 0
+  %14 = load ptr, ptr %13, align 8
+  %array_element_pointer4 = getelementptr [2 x ptr], ptr %array3, i32 0, i32 0
+  store ptr %14, ptr %array_element_pointer4, align 8
+  %array_element_pointer5 = getelementptr [2 x ptr], ptr %array3, i32 0, i32 1
+  store ptr @global_3, ptr %array_element_pointer5, align 8
+  %data_pointer6 = getelementptr [2 x ptr], ptr %array3, i32 0, i32 0
+  %15 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 0
+  store ptr %data_pointer6, ptr %15, align 8
+  %16 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 1
+  store i64 2, ptr %16, align 8
+  %17 = getelementptr inbounds { ptr, i64 }, ptr %2, i32 0, i32 0
+  %18 = load ptr, ptr %17, align 8
+  %19 = getelementptr inbounds { ptr, i64 }, ptr %2, i32 0, i32 1
+  %20 = load i64, ptr %19, align 8
+  %21 = call i64 @Ternary_condition_pointer_mutability_count_texts(ptr %18, i64 %20)
+  %22 = add i64 %12, %21
+  ret i64 %22
+}
+
+; Function Attrs: convergent
+define private i64 @Ternary_condition_pointer_mutability_count_texts(ptr %"arguments[0].texts_0", i64 %"arguments[0].texts_1") #0 {
+entry:
+  %texts = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %0 = getelementptr inbounds { ptr, i64 }, ptr %texts, i32 0, i32 0
+  store ptr %"arguments[0].texts_0", ptr %0, align 8
+  %1 = getelementptr inbounds { ptr, i64 }, ptr %texts, i32 0, i32 1
+  store i64 %"arguments[0].texts_1", ptr %1, align 8
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %texts, i32 0, i32 1
+  %3 = load i64, ptr %2, align 8
+  ret i64 %3
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #2
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
+attributes #2 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Test Framework Non Test Mode", "[LLVM_IR]")
   {
     char const* const input_file = "test_framework.iris";

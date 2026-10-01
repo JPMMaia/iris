@@ -4229,6 +4229,46 @@ function run(pair: *mutable Pair) -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that a parenthesized indirection keeps the pointer's mutability", "[Validation][Mutability]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run(values: *mutable Constant_array::<Int32, 4>) -> ()
+{
+    (*values)[0u64] = 1;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a parenthesized indirection of a non-mutable pointer cannot be assigned", "[Validation][Mutability]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run(values: *Constant_array::<Int32, 4>) -> ()
+{
+    (*values)[0u64] = 1;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 5, 5, 24),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot modify non-mutable value.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that member_access cannot assign through a non-mutable pointer", "[Validation][Mutability]")
     {
         std::string_view const input = R"(module Test;

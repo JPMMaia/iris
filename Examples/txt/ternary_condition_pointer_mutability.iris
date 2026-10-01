@@ -1,0 +1,52 @@
+module Ternary_condition_pointer_mutability;
+
+struct Text
+{
+    characters: Constant_array::<C_char, 4> = zero_initialized {};
+}
+
+export function choose(use_text: Bool) -> (result: *C_char)
+{
+    mutable text: Text = {};
+    var chosen = use_text ? &text.characters[0u64] : ""c;
+    return chosen;
+}
+
+export function choose_or_null(use_text: Bool) -> (result: *C_char)
+{
+    var text: Text = {};
+    var first = use_text ? &text.characters[0u64] : null;
+    var second = use_text ? null : &text.characters[0u64];
+    return first != null ? first : second;
+}
+
+export function first_of_list(use_text: Bool) -> (result: *C_char)
+{
+    mutable text: Text = {};
+    var list = [&text.characters[0u64], ""c];
+    return list[0u64];
+}
+
+struct Storage
+{
+    data: *mutable C_char = null;
+}
+
+export function list_of_storage(storage: Storage) -> (result: *C_char)
+{
+    mutable name: Constant_array::<C_char, 8> = zero_initialized {};
+    var list = [storage.data, &name[0u64]];
+    var mixed = [storage.data, "text"c];
+    return list[0u64] != null ? list[1u64] : mixed[1u64];
+}
+
+function count_texts(texts: Array_slice::<*C_char>) -> (count: Uint64)
+{
+    return texts.length;
+}
+
+export function count_storage(storage: Storage) -> (count: Uint64)
+{
+    mutable name: Constant_array::<C_char, 8> = zero_initialized {};
+    return count_texts([storage.data, &name[0u64]]) + count_texts([storage.data, "text"c]);
+}

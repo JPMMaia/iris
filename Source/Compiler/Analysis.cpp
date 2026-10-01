@@ -2464,15 +2464,7 @@ namespace iris::compiler
         else if (std::holds_alternative<iris::Parenthesis_expression>(expression.data))
         {
             Parenthesis_expression const& data = std::get<iris::Parenthesis_expression>(expression.data);
-            std::optional<iris::Type_reference> type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
-            if (!type.has_value())
-                return std::nullopt;
-
-            return Type_info
-            {
-                .type = std::move(type.value()),
-                .is_mutable = false,
-            };
+            return get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
         }
         else if (std::holds_alternative<iris::Reflection_expression>(expression.data))
         {
