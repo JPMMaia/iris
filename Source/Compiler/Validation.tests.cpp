@@ -5666,6 +5666,23 @@ function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Allows taking the address of a dereferenced place", "[Validation][Unary_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+function run(values: *mutable Constant_array::<Int32, 4>, value: *mutable Int32) -> ()
+{
+    var element = &(*values)[1];
+    var same = &*value;
+    var parenthesized = &(*value);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates unary operations related to pointers", "[Validation][Unary_expression]")
     {
         std::string_view const input = R"(module Test;

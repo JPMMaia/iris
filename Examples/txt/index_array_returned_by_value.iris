@@ -1,0 +1,20 @@
+module Index_array_returned_by_value;
+
+function small_flags() -> (values: Constant_array::<Bool, 4>)
+{
+    var values: Constant_array::<Bool, 4> = [false, true, false, true];
+    return values;
+}
+
+export function large_flags(first: Uint64) -> (values: Constant_array::<Bool, 64>)
+{
+    mutable values: Constant_array::<Bool, 64> = zero_initialized {};
+    values[first] = true;
+    return values;
+}
+
+export function flag_at(index: Uint64) -> (flag: Bool)
+{
+    var copy = small_flags();
+    return copy[index] && small_flags()[index] && large_flags(index)[index];
+}

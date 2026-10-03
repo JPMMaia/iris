@@ -1963,6 +1963,30 @@ namespace iris::compiler
             }
         }
 
+        if ((source_llvm_type->isArrayTy() || destination_llvm_type->isArrayTy()) && !source_llvm_type->isPointerTy() && !destination_llvm_type->isPointerTy())
+        {
+            // The C ABI passes and returns a small array as an integer or a vector of the same bytes.
+            std::uint64_t const source_size = llvm_data_layout.getTypeAllocSize(source_llvm_type);
+            std::uint64_t const destination_size = llvm_data_layout.getTypeAllocSize(destination_llvm_type);
+            llvm::Type* const storage_llvm_type = source_size >= destination_size ? source_llvm_type : destination_llvm_type;
+            llvm::AllocaInst* const storage = create_alloca_instruction(llvm_builder, llvm_data_layout, llvm_parent_function, storage_llvm_type);
+            llvm::Align const storage_alignment = storage->getAlign();
+            if (source_llvm_value->getType()->isPointerTy())
+            {
+                llvm::Align const source_alignment = llvm_data_layout.getABITypeAlign(source_llvm_type);
+                llvm_builder.CreateMemCpy(storage, storage_alignment, source_llvm_value, source_alignment, source_size);
+            }
+            else
+            {
+                llvm_builder.CreateAlignedStore(source_llvm_value, storage, storage_alignment);
+            }
+
+            if (convertion_type == Convertion_type::From_original_to_abi)
+                return llvm_builder.CreateAlignedLoad(destination_llvm_type, storage, storage_alignment);
+
+            return storage;
+        }
+
         std::string description;
         llvm::raw_string_ostream stream{description};
         stream << "read_from_different_type not implemented yet! From ";

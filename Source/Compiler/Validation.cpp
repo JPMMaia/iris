@@ -4768,6 +4768,15 @@ namespace iris::compiler
             iris::Expression const& left_expression = statement.expressions[access_expression.expression.expression_index];
             return can_take_address_of_expression(statement, left_expression);
         }
+        else if (std::holds_alternative<iris::Parenthesis_expression>(expression.data))
+        {
+            iris::Parenthesis_expression const& parenthesis_expression = std::get<iris::Parenthesis_expression>(expression.data);
+            return can_take_address_of_expression(statement, statement.expressions[parenthesis_expression.expression.expression_index]);
+        }
+        else if (std::holds_alternative<iris::Unary_expression>(expression.data))
+        {
+            return std::get<iris::Unary_expression>(expression.data).operation == iris::Unary_operation::Indirection;
+        }
         else if (std::holds_alternative<iris::Variable_expression>(expression.data))
         {
             return true;

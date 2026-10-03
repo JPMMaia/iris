@@ -1931,10 +1931,18 @@ namespace iris::compiler
             element_type.value() :
             *left_hand_side_expression_value.type;
         llvm::Type* const array_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, type_reference_to_use, type_database);
-        llvm::Value* const array_pointer =
+        llvm::Value* array_pointer =
             using_pointer ?
             load_if_needed(left_hand_side_expression_value, expression.expression.expression_index, statement, parameters).value :
             left_hand_side_expression_value.value;
+
+        // An array returned by value from a call is a value, not a place: give it one to index.
+        if (!using_pointer && !array_pointer->getType()->isPointerTy())
+        {
+            llvm::AllocaInst* const temporary = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, array_llvm_type, "array_value");
+            create_store_instruction(llvm_builder, llvm_data_layout, array_pointer, temporary);
+            array_pointer = temporary;
+        }
         
         llvm::Value* const element_pointer = llvm_builder.CreateGEP(
             array_llvm_type,
@@ -6924,9 +6932,15 @@ namespace iris::compiler
 
             // Try access expressions:
             {
-                iris::Expression const& expression_to_get_address_of = statement.expressions[expression.expression.expression_index];
+                iris::Expression const* expression_to_get_address_of = &statement.expressions[expression.expression.expression_index];
+                while (std::holds_alternative<iris::Parenthesis_expression>(expression_to_get_address_of->data))
+                    expression_to_get_address_of = &statement.expressions[std::get<iris::Parenthesis_expression>(expression_to_get_address_of->data).expression.expression_index];
 
-                if (std::holds_alternative<iris::Access_expression>(expression_to_get_address_of.data) || std::holds_alternative<iris::Access_array_expression>(expression_to_get_address_of.data) || std::holds_alternative<iris::Dereference_and_access_expression>(expression_to_get_address_of.data))
+                bool const is_indirection =
+                    std::holds_alternative<iris::Unary_expression>(expression_to_get_address_of->data)
+                    && std::get<iris::Unary_expression>(expression_to_get_address_of->data).operation == iris::Unary_operation::Indirection;
+
+                if (is_indirection || std::holds_alternative<iris::Access_expression>(expression_to_get_address_of->data) || std::holds_alternative<iris::Access_array_expression>(expression_to_get_address_of->data) || std::holds_alternative<iris::Dereference_and_access_expression>(expression_to_get_address_of->data))
                 {
                     std::pmr::vector<Type_reference> element_type;
                     if (value_expression.type.has_value())

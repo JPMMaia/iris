@@ -13209,6 +13209,140 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Address Of Dereferenced Place", "[LLVM_IR]")
+  {
+    char const* const input_file = "address_of_dereferenced_place.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define ptr @Address_of_dereferenced_place_set_second(ptr noundef %"arguments[0].values", ptr noundef %"arguments[1].value") #0 {
+entry:
+  %values = alloca ptr, align 8
+  %value = alloca ptr, align 8
+  %element = alloca ptr, align 8
+  %parenthesized = alloca ptr, align 8
+  store ptr %"arguments[0].values", ptr %values, align 8
+  store ptr %"arguments[1].value", ptr %value, align 8
+  %0 = load ptr, ptr %values, align 8
+  %array_element_pointer = getelementptr [4 x i32], ptr %0, i32 0, i32 1
+  store ptr %array_element_pointer, ptr %element, align 8
+  %1 = load ptr, ptr %element, align 8
+  store i32 5, ptr %1, align 4
+  %2 = load ptr, ptr %value, align 8
+  store ptr %2, ptr %parenthesized, align 8
+  %3 = load ptr, ptr %parenthesized, align 8
+  store i32 6, ptr %3, align 4
+  %4 = load ptr, ptr %value, align 8
+  ret ptr %4
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Index Array Returned By Value", "[LLVM_IR]")
+  {
+    char const* const input_file = "index_array_returned_by_value.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define [64 x i8] @Index_array_returned_by_value_large_flags(i64 noundef %"arguments[0].first") #0 {
+entry:
+  %first = alloca i64, align 8
+  %values = alloca [64 x i8], align 1
+  store i64 %"arguments[0].first", ptr %first, align 8
+  call void @llvm.memset.p0.i64(ptr align 1 %values, i8 0, i64 64, i1 false)
+  %0 = load i64, ptr %first, align 8
+  %array_element_pointer = getelementptr [64 x i8], ptr %values, i32 0, i64 %0
+  store i8 1, ptr %array_element_pointer, align 1
+  %1 = load [64 x i8], ptr %values, align 1
+  ret [64 x i8] %1
+}
+
+; Function Attrs: convergent
+define i1 @Index_array_returned_by_value_flag_at(i64 noundef %"arguments[0].index") #0 {
+entry:
+  %index = alloca i64, align 8
+  %copy = alloca [4 x i8], align 1
+  %array_value = alloca [4 x i8], align 1
+  %array_value4 = alloca [64 x i8], align 1
+  store i64 %"arguments[0].index", ptr %index, align 8
+  %0 = call [4 x i8] @Index_array_returned_by_value_small_flags()
+  store [4 x i8] %0, ptr %copy, align 1
+  %1 = load i64, ptr %index, align 8
+  %array_element_pointer = getelementptr [4 x i8], ptr %copy, i32 0, i64 %1
+  %2 = load i8, ptr %array_element_pointer, align 1
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %logical_and_rhs1, label %logical_and_end2
+
+logical_and_rhs:                                  ; preds = %logical_and_end2
+  %4 = load i64, ptr %index, align 8
+  %5 = load i64, ptr %index, align 8
+  %6 = call [64 x i8] @Index_array_returned_by_value_large_flags(i64 noundef %5)
+  store [64 x i8] %6, ptr %array_value4, align 1
+  %array_element_pointer5 = getelementptr [64 x i8], ptr %array_value4, i32 0, i64 %4
+  %7 = load i8, ptr %array_element_pointer5, align 1
+  %8 = trunc i8 %7 to i1
+  br label %logical_and_end
+
+logical_and_end:                                  ; preds = %logical_and_rhs, %logical_and_end2
+  %9 = phi i1 [ false, %logical_and_end2 ], [ %8, %logical_and_rhs ]
+  %10 = zext i1 %9 to i8
+  %11 = trunc i8 %10 to i1
+  ret i1 %11
+
+logical_and_rhs1:                                 ; preds = %entry
+  %12 = load i64, ptr %index, align 8
+  %13 = call [4 x i8] @Index_array_returned_by_value_small_flags()
+  store [4 x i8] %13, ptr %array_value, align 1
+  %array_element_pointer3 = getelementptr [4 x i8], ptr %array_value, i32 0, i64 %12
+  %14 = load i8, ptr %array_element_pointer3, align 1
+  %15 = trunc i8 %14 to i1
+  br label %logical_and_end2
+
+logical_and_end2:                                 ; preds = %logical_and_rhs1, %entry
+  %16 = phi i1 [ false, %entry ], [ %15, %logical_and_rhs1 ]
+  %17 = zext i1 %16 to i8
+  %18 = trunc i8 %17 to i1
+  br i1 %18, label %logical_and_rhs, label %logical_and_end
+}
+
+; Function Attrs: convergent
+define private [4 x i8] @Index_array_returned_by_value_small_flags() #0 {
+entry:
+  %values = alloca [4 x i8], align 1
+  %array_element_pointer = getelementptr [4 x i8], ptr %values, i32 0, i32 0
+  store i8 0, ptr %array_element_pointer, align 1
+  %array_element_pointer1 = getelementptr [4 x i8], ptr %values, i32 0, i32 1
+  store i8 1, ptr %array_element_pointer1, align 1
+  %array_element_pointer2 = getelementptr [4 x i8], ptr %values, i32 0, i32 2
+  store i8 0, ptr %array_element_pointer2, align 1
+  %array_element_pointer3 = getelementptr [4 x i8], ptr %values, i32 0, i32 3
+  store i8 1, ptr %array_element_pointer3, align 1
+  %0 = load [4 x i8], ptr %values, align 1
+  ret [4 x i8] %0
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .target_triple = "x86_64-pc-windows-msvc" });
+  }
+
   TEST_CASE("Compile Lambda Declaration Only", "[LLVM_IR][Lambda]")
   {
     char const* const input_file = "lambda_declaration.iris";
