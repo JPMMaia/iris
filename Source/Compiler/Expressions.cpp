@@ -194,14 +194,16 @@ namespace iris::compiler
 
             iris::compiler::Scope scope{};
 
-            std::optional<iris::Type_reference> type = get_expression_type(
-                global_variable_module.name,
-                parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
-                scope,
-                global_variable_declaration.initial_value,
-                global_variable_declaration.type,
-                parameters.declaration_database
-            );
+            std::optional<iris::Type_reference> type = global_variable_declaration.type.has_value() ?
+                global_variable_declaration.type :
+                get_expression_type(
+                    global_variable_module.name,
+                    parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
+                    scope,
+                    global_variable_declaration.initial_value,
+                    global_variable_declaration.type,
+                    parameters.declaration_database
+                );
 
             if (llvm_global_value == nullptr)
             {
@@ -7701,6 +7703,14 @@ namespace iris::compiler
         return global_variable->getValueType()->isArrayTy();
     }
 
+    // Indexing a global array with a constant index folds into a constant getelementptr expression
+    // rather than an instruction (or into the global itself for the first element), but it is still
+    // the address of the element.
+    static bool is_constant_element_address(llvm::Value* const value)
+    {
+        return llvm::isa<llvm::GEPOperator>(value) && llvm::isa<llvm::Constant>(value);
+    }
+
     static bool is_indirection_expression(
         Statement const& statement,
         iris::Expression const& expression
@@ -7752,9 +7762,9 @@ namespace iris::compiler
                 };
             }
 
-            if (llvm::AllocaInst::classof(value.value) || llvm::GetElementPtrInst::classof(value.value) || llvm::GlobalVariable::classof(value.value))
+            if (llvm::AllocaInst::classof(value.value) || llvm::GetElementPtrInst::classof(value.value) || llvm::GlobalVariable::classof(value.value) || is_constant_element_address(value.value))
             {
-                if (iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression) || is_reinterpret_as_expression(statement, expression) || is_global_array_variable(value.value))
+                if (iris::is_expression_address_of(expression) || iris::is_offset_pointer(statement, expression) || is_reinterpret_as_expression(statement, expression) || (is_global_array_variable(value.value) && !std::holds_alternative<Access_array_expression>(expression.data)))
                 {
                     return value;
                 }

@@ -8136,6 +8136,242 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Access Through Global Pointer", "[LLVM_IR]")
+  {
+    char const* const input_file = "access_through_global_pointer.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Access_through_global_pointer_Pair = type { i32, i32 }
+
+@Access_through_global_pointer_g_pair = global ptr null
+
+; Function Attrs: convergent
+define i32 @Access_through_global_pointer_read_second() #0 {
+entry:
+  %0 = load ptr, ptr @Access_through_global_pointer_g_pair, align 8
+  %1 = getelementptr inbounds %struct.Access_through_global_pointer_Pair, ptr %0, i32 0, i32 1
+  %2 = load i32, ptr %1, align 4
+  ret i32 %2
+}
+
+; Function Attrs: convergent
+define i32 @Access_through_global_pointer_address_of_second() #0 {
+entry:
+  %0 = load ptr, ptr @Access_through_global_pointer_g_pair, align 8
+  %1 = getelementptr inbounds %struct.Access_through_global_pointer_Pair, ptr %0, i32 0, i32 1
+  %2 = call i32 @Access_through_global_pointer_value_of(ptr noundef %1)
+  ret i32 %2
+}
+
+; Function Attrs: convergent
+define i1 @Access_through_global_pointer_is_set() #0 {
+entry:
+  %0 = load ptr, ptr @Access_through_global_pointer_g_pair, align 8
+  %1 = icmp ne ptr %0, null
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  ret i1 %3
+}
+
+; Function Attrs: convergent
+define private i32 @Access_through_global_pointer_value_of(ptr noundef %"arguments[0].value") #0 {
+entry:
+  %value = alloca ptr, align 8
+  store ptr %"arguments[0].value", ptr %value, align 8
+  %0 = load ptr, ptr %value, align 8
+  %1 = load i32, ptr %0, align 4
+  ret i32 %1
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Compare Global Array Element", "[LLVM_IR]")
+  {
+    char const* const input_file = "compare_global_array_element.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+@Compare_global_array_element_g_text = global [8 x i8] zeroinitializer
+@Compare_global_array_element_g_numbers = global [4 x i32] zeroinitializer
+
+; Function Attrs: convergent
+define i1 @Compare_global_array_element_text_is_empty() #0 {
+entry:
+  %0 = load i8, ptr @Compare_global_array_element_g_text, align 1
+  %1 = icmp eq i8 %0, 0
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  ret i1 %3
+}
+
+; Function Attrs: convergent
+define i1 @Compare_global_array_element_second_is_positive() #0 {
+entry:
+  %0 = load i32, ptr getelementptr ([4 x i32], ptr @Compare_global_array_element_g_numbers, i32 0, i64 1), align 4
+  %1 = icmp sgt i32 %0, 0
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  ret i1 %3
+}
+
+; Function Attrs: convergent
+define ptr @Compare_global_array_element_first_text() #0 {
+entry:
+  ret ptr @Compare_global_array_element_g_text
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Return Global Struct Small Fields", "[LLVM_IR]")
+  {
+    char const* const input_file = "return_global_struct_small_fields.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Return_global_struct_small_fields_Flags = type { i8, i8, i16 }
+
+@Return_global_struct_small_fields_g_flags = global %struct.Return_global_struct_small_fields_Flags zeroinitializer
+
+; Function Attrs: convergent
+define i1 @Return_global_struct_small_fields_enabled() #0 {
+entry:
+  %0 = load i8, ptr @Return_global_struct_small_fields_g_flags, align 1
+  %1 = trunc i8 %0 to i1
+  ret i1 %1
+}
+
+; Function Attrs: convergent
+define i8 @Return_global_struct_small_fields_level() #0 {
+entry:
+  %0 = load i8, ptr getelementptr inbounds (%struct.Return_global_struct_small_fields_Flags, ptr @Return_global_struct_small_fields_g_flags, i32 0, i32 1), align 1
+  ret i8 %0
+}
+
+; Function Attrs: convergent
+define i16 @Return_global_struct_small_fields_offset() #0 {
+entry:
+  %0 = load i16, ptr getelementptr inbounds (%struct.Return_global_struct_small_fields_Flags, ptr @Return_global_struct_small_fields_g_flags, i32 0, i32 2), align 2
+  ret i16 %0
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  TEST_CASE("Compile Ternary Aggregate Argument", "[LLVM_IR]")
+  {
+    char const* const input_file = "ternary_aggregate_argument.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Ternary_aggregate_argument_Quad = type { double, double, double, double }
+
+; Function Attrs: convergent
+define double @Ternary_aggregate_argument_pass_chosen(i1 noundef zeroext %"arguments[0].first") #0 {
+entry:
+  %first = alloca i8, align 1
+  %fallback = alloca %struct.Ternary_aggregate_argument_Quad, align 8
+  %0 = alloca %struct.Ternary_aggregate_argument_Quad, align 8
+  %1 = alloca %struct.Ternary_aggregate_argument_Quad, align 8
+  %2 = zext i1 %"arguments[0].first" to i8
+  store i8 %2, ptr %first, align 1
+  %3 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %fallback, i32 0, i32 0
+  store double 0.000000e+00, ptr %3, align 8
+  %4 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %fallback, i32 0, i32 1
+  store double 0.000000e+00, ptr %4, align 8
+  %5 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %fallback, i32 0, i32 2
+  store double 0.000000e+00, ptr %5, align 8
+  %6 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %fallback, i32 0, i32 3
+  store double 0.000000e+00, ptr %6, align 8
+  %7 = load i8, ptr %first, align 1
+  %8 = trunc i8 %7 to i1
+  br i1 %8, label %ternary_condition_then, label %ternary_condition_else
+
+ternary_condition_then:                           ; preds = %entry
+  call void @Ternary_aggregate_argument_make(ptr dead_on_unwind noalias writable sret(%struct.Ternary_aggregate_argument_Quad) align 8 %0, double noundef 1.000000e+00)
+  %9 = load %struct.Ternary_aggregate_argument_Quad, ptr %0, align 8
+  br label %ternary_condition_end
+
+ternary_condition_else:                           ; preds = %entry
+  %10 = load %struct.Ternary_aggregate_argument_Quad, ptr %fallback, align 8
+  br label %ternary_condition_end
+
+ternary_condition_end:                            ; preds = %ternary_condition_else, %ternary_condition_then
+  %11 = phi %struct.Ternary_aggregate_argument_Quad [ %9, %ternary_condition_then ], [ %10, %ternary_condition_else ]
+  store %struct.Ternary_aggregate_argument_Quad %11, ptr %1, align 8
+  %12 = call double @Ternary_aggregate_argument_sum(ptr noundef byval(%struct.Ternary_aggregate_argument_Quad) align 8 %1)
+  ret double %12
+}
+
+; Function Attrs: convergent
+define private double @Ternary_aggregate_argument_sum(ptr noundef byval(%struct.Ternary_aggregate_argument_Quad) align 8 %"arguments[0].value") #0 {
+entry:
+  %0 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %"arguments[0].value", i32 0, i32 0
+  %1 = load double, ptr %0, align 8
+  %2 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %"arguments[0].value", i32 0, i32 1
+  %3 = load double, ptr %2, align 8
+  %4 = fadd double %1, %3
+  %5 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %"arguments[0].value", i32 0, i32 2
+  %6 = load double, ptr %5, align 8
+  %7 = fadd double %4, %6
+  %8 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %"arguments[0].value", i32 0, i32 3
+  %9 = load double, ptr %8, align 8
+  %10 = fadd double %7, %9
+  ret double %10
+}
+
+; Function Attrs: convergent
+define private void @Ternary_aggregate_argument_make(ptr dead_on_unwind noalias writable sret(%struct.Ternary_aggregate_argument_Quad) align 8 %return.value, double noundef %"arguments[0].a") #0 {
+entry:
+  %a = alloca double, align 8
+  %0 = alloca %struct.Ternary_aggregate_argument_Quad, align 8
+  store double %"arguments[0].a", ptr %a, align 8
+  %1 = load double, ptr %a, align 8
+  %2 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %0, i32 0, i32 0
+  store double %1, ptr %2, align 8
+  %3 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %0, i32 0, i32 1
+  store double 0.000000e+00, ptr %3, align 8
+  %4 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %0, i32 0, i32 2
+  store double 0.000000e+00, ptr %4, align 8
+  %5 = getelementptr inbounds %struct.Ternary_aggregate_argument_Quad, ptr %0, i32 0, i32 3
+  store double 0.000000e+00, ptr %5, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return.value, ptr align 8 %0, i64 32, i1 false)
+  ret void
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Arrow On Type Instance", "[LLVM_IR]")
   {
     char const* const input_file = "arrow_on_type_instance.iris";
@@ -8447,13 +8683,15 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
 
     char const* const expected_llvm_ir = R"(
 %struct.Ternary_condition_pointer_mutability_Text = type { [4 x i8] }
+%struct.Ternary_condition_pointer_mutability_Name = type { [4 x i8] }
 %struct.Ternary_condition_pointer_mutability_Storage = type { ptr }
 %struct.iris_builtin_Generic_array_slice = type { ptr, i64 }
 
 @global_0 = internal constant [1 x i8] zeroinitializer
-@global_1 = internal constant [1 x i8] zeroinitializer
-@global_2 = internal constant [5 x i8] c"text\00"
+@global_1 = internal constant [5 x i8] c"none\00"
+@global_2 = internal constant [1 x i8] zeroinitializer
 @global_3 = internal constant [5 x i8] c"text\00"
+@global_4 = internal constant [5 x i8] c"text\00"
 
 ; Function Attrs: convergent
 define ptr @Ternary_condition_pointer_mutability_choose(i1 noundef zeroext %"arguments[0].use_text") #0 {
@@ -8484,6 +8722,36 @@ ternary_condition_end:                            ; preds = %ternary_condition_e
   store ptr %6, ptr %chosen, align 8
   %7 = load ptr, ptr %chosen, align 8
   ret ptr %7
+}
+
+; Function Attrs: convergent
+define ptr @Ternary_condition_pointer_mutability_choose_literal_first(ptr noundef %"arguments[0].name") #0 {
+entry:
+  %name = alloca ptr, align 8
+  %current = alloca ptr, align 8
+  store ptr %"arguments[0].name", ptr %name, align 8
+  %0 = load ptr, ptr %name, align 8
+  %1 = getelementptr inbounds %struct.Ternary_condition_pointer_mutability_Name, ptr %0, i32 0, i32 0
+  %array_element_pointer = getelementptr [4 x i8], ptr %1, i32 0, i64 0
+  store ptr %array_element_pointer, ptr %current, align 8
+  %2 = load ptr, ptr %current, align 8
+  %array_element_pointer1 = getelementptr i8, ptr %2, i64 0
+  %3 = load i8, ptr %array_element_pointer1, align 1
+  %4 = icmp eq i8 %3, 0
+  %5 = zext i1 %4 to i8
+  %6 = trunc i8 %5 to i1
+  br i1 %6, label %ternary_condition_then, label %ternary_condition_else
+
+ternary_condition_then:                           ; preds = %entry
+  br label %ternary_condition_end
+
+ternary_condition_else:                           ; preds = %entry
+  %7 = load ptr, ptr %current, align 8
+  br label %ternary_condition_end
+
+ternary_condition_end:                            ; preds = %ternary_condition_else, %ternary_condition_then
+  %8 = phi ptr [ @global_1, %ternary_condition_then ], [ %7, %ternary_condition_else ]
+  ret ptr %8
 }
 
 ; Function Attrs: convergent
@@ -8566,7 +8834,7 @@ entry:
   %array_element_pointer1 = getelementptr [2 x ptr], ptr %array, i32 0, i32 0
   store ptr %array_element_pointer, ptr %array_element_pointer1, align 8
   %array_element_pointer2 = getelementptr [2 x ptr], ptr %array, i32 0, i32 1
-  store ptr @global_1, ptr %array_element_pointer2, align 8
+  store ptr @global_2, ptr %array_element_pointer2, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %list, ptr align 8 %array, i64 16, i1 false)
   %array_element_pointer3 = getelementptr [2 x ptr], ptr %list, i32 0, i64 0
   %4 = load ptr, ptr %array_element_pointer3, align 8
@@ -8598,7 +8866,7 @@ entry:
   %array_element_pointer4 = getelementptr [2 x ptr], ptr %array3, i32 0, i32 0
   store ptr %5, ptr %array_element_pointer4, align 8
   %array_element_pointer5 = getelementptr [2 x ptr], ptr %array3, i32 0, i32 1
-  store ptr @global_2, ptr %array_element_pointer5, align 8
+  store ptr @global_3, ptr %array_element_pointer5, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %mixed, ptr align 8 %array3, i64 16, i1 false)
   %array_element_pointer6 = getelementptr [2 x ptr], ptr %list, i32 0, i64 0
   %6 = load ptr, ptr %array_element_pointer6, align 8
@@ -8656,7 +8924,7 @@ entry:
   %array_element_pointer4 = getelementptr [2 x ptr], ptr %array3, i32 0, i32 0
   store ptr %14, ptr %array_element_pointer4, align 8
   %array_element_pointer5 = getelementptr [2 x ptr], ptr %array3, i32 0, i32 1
-  store ptr @global_3, ptr %array_element_pointer5, align 8
+  store ptr @global_4, ptr %array_element_pointer5, align 8
   %data_pointer6 = getelementptr [2 x ptr], ptr %array3, i32 0, i32 0
   %15 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %2, i32 0, i32 0
   store ptr %data_pointer6, ptr %15, align 8

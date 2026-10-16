@@ -150,6 +150,30 @@ namespace iris::compiler
         return first_underlying_type == second_underlying_type;
     }
 
+    // Two pointers to the same type, either of which may be mutable: the arms of a ternary condition
+    // meet as the non-mutable pointer.
+    bool are_pointers_differing_in_mutability(
+        Declaration_database const& declaration_database,
+        std::optional<iris::Type_reference> const& first,
+        std::optional<iris::Type_reference> const& second
+    )
+    {
+        if (!first.has_value() || !second.has_value())
+            return false;
+
+        std::optional<iris::Type_reference> const first_underlying_type = get_underlying_type(declaration_database, first.value());
+        std::optional<iris::Type_reference> const second_underlying_type = get_underlying_type(declaration_database, second.value());
+        if (!first_underlying_type.has_value() || !second_underlying_type.has_value())
+            return false;
+
+        if (!std::holds_alternative<iris::Pointer_type>(first_underlying_type->data) || !std::holds_alternative<iris::Pointer_type>(second_underlying_type->data))
+            return false;
+
+        iris::Pointer_type const& first_pointer = std::get<iris::Pointer_type>(first_underlying_type->data);
+        iris::Pointer_type const& second_pointer = std::get<iris::Pointer_type>(second_underlying_type->data);
+        return first_pointer.element_type == second_pointer.element_type;
+    }
+
     bool can_assign_type(
         Declaration_database const& declaration_database,
         std::optional<iris::Type_reference> const& destination,
@@ -4723,7 +4747,7 @@ namespace iris::compiler
             parameters.declaration_database
         );
 
-        if (!are_compatible_types(parameters.declaration_database, then_type_optional, else_type_optional))
+        if (!are_compatible_types(parameters.declaration_database, then_type_optional, else_type_optional) && !are_pointers_differing_in_mutability(parameters.declaration_database, then_type_optional, else_type_optional))
         {
             std::pmr::string const then_type_name = iris::format_type_reference(parameters.core_module.dependencies, then_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);
             std::pmr::string const else_type_name = iris::format_type_reference(parameters.core_module.dependencies, else_type_optional, parameters.temporaries_allocator, parameters.temporaries_allocator);

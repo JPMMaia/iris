@@ -1152,6 +1152,14 @@ namespace iris::compiler
         }
     }
 
+    llvm::Value* create_alloca_and_store_if_not_pointer(
+        llvm::IRBuilder<>& llvm_builder,
+        llvm::DataLayout const& llvm_data_layout,
+        llvm::Function& llvm_parent_function,
+        llvm::Value* const llvm_value,
+        llvm::Type* const llvm_type
+    );
+
     Transformed_arguments transform_arguments(
         std::pmr::vector<bool> const& is_expression_address_of,
         std::span<std::optional<Type_reference> const> const original_argument_types,
@@ -1276,10 +1284,11 @@ namespace iris::compiler
 
                     if (argument_info.info.getIndirectByVal())
                     {
-                        llvm::Value* const original_argument = original_arguments[argument_index];
-                        
                         iris::Type_reference const& original_argument_type = function_type.input_parameter_types[argument_index];
                         llvm::Type* const original_argument_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, original_argument_type, type_database);
+
+                        // An aggregate computed as a value, such as a ternary's result, has no address yet.
+                        llvm::Value* const original_argument = create_alloca_and_store_if_not_pointer(llvm_builder, llvm_data_layout, llvm_parent_function, original_arguments[argument_index], original_argument_llvm_type);
 
                         std::pmr::vector<llvm::Attribute> attributes
                         {
@@ -1300,15 +1309,24 @@ namespace iris::compiler
                         
                         llvm::AllocaInst* const alloca_instruction = create_alloca_instruction(llvm_builder, llvm_data_layout, llvm_parent_function, original_argument_llvm_type);
 
-                        create_memcpy_call(
-                            llvm_context,
-                            llvm_builder,
-                            llvm_module,
-                            alloca_instruction,
-                            original_arguments[argument_index],
-                            original_argument_size_in_bytes,
-                            original_argument_alignment
-                        );
+                        llvm::Value* const original_argument = original_arguments[argument_index];
+                        if (original_argument->getType()->isPointerTy())
+                        {
+                            create_memcpy_call(
+                                llvm_context,
+                                llvm_builder,
+                                llvm_module,
+                                alloca_instruction,
+                                original_argument,
+                                original_argument_size_in_bytes,
+                                original_argument_alignment
+                            );
+                        }
+                        else
+                        {
+                            // An aggregate computed as a value, such as a ternary's result, has no address to copy from.
+                            llvm_builder.CreateAlignedStore(original_argument, alloca_instruction, original_argument_alignment);
+                        }
 
                         transformed_arguments.values.push_back(alloca_instruction);
                         transformed_arguments.attributes.push_back(std::pmr::vector<llvm::Attribute>{{ llvm::Attribute::get(llvm_context, llvm::Attribute::NoUndef) }});
@@ -1947,8 +1965,10 @@ namespace iris::compiler
         {
             if (abi_argument_info.isExtend())
             {
+                // An integer read from memory arrives as its address: an alloca, a GEP instruction, or a
+                // constant GEP into a global.
                 llvm::Value* const loaded_value =
-                    (llvm::AllocaInst::classof(source_llvm_value) || llvm::GetElementPtrInst::classof(source_llvm_value)) ?
+                    source_llvm_value->getType()->isPointerTy() ?
                     llvm_builder.CreateAlignedLoad(source_llvm_type, source_llvm_value, llvm_data_layout.getABITypeAlign(source_llvm_type)) :
                     source_llvm_value;
 

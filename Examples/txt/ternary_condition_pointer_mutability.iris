@@ -12,6 +12,17 @@ export function choose(use_text: Bool) -> (result: *C_char)
     return chosen;
 }
 
+struct Name
+{
+    text: Constant_array::<C_char, 4> = zero_initialized {};
+}
+
+export function choose_literal_first(name: *mutable Name) -> (result: *C_char)
+{
+    var current = &name->text[0u64];
+    return current[0u64] == (0 as C_char) ? "none"c : current;
+}
+
 export function choose_or_null(use_text: Bool) -> (result: *C_char)
 {
     var text: Text = {};

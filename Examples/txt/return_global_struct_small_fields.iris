@@ -1,0 +1,25 @@
+module Return_global_struct_small_fields;
+
+struct Flags
+{
+    enabled: Bool = false;
+    level: Uint8 = 0u8;
+    offset: Int16 = 0i16;
+}
+
+mutable g_flags: Flags = zero_initialized {};
+
+export function enabled() -> (result: Bool)
+{
+    return g_flags.enabled;
+}
+
+export function level() -> (result: Uint8)
+{
+    return g_flags.level;
+}
+
+export function offset() -> (result: Int16)
+{
+    return g_flags.offset;
+}
