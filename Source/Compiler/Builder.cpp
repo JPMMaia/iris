@@ -1119,6 +1119,7 @@ namespace iris::compiler
 
     static std::optional<iris::Module> parse_c_header_and_cache(
         Builder const& builder,
+        Task_context& context,
         std::span<std::filesystem::path const> const header_search_paths,
         C_header const& c_header,
         Import_c_header_source_group const& source_group,
@@ -1173,13 +1174,13 @@ namespace iris::compiler
             }
         }
 
-        ::printf("Importing c header \"%s\"\n    output is \"%s\"\n", header_path->generic_string().c_str(), output_header_module_path.generic_string().c_str());
+        write_task_output(context, "Importing c header \"{}\"\n    output is \"{}\"\n", header_path->generic_string(), output_header_module_path.generic_string());
         if (!options.include_directories.empty())
         {
-            ::printf("    header search paths\n");
+            write_task_output(context, "    header search paths\n");
             for (std::filesystem::path const& include_directory : options.include_directories)
             {
-                ::printf("    - \"%s\"\n", include_directory.generic_string().c_str());
+                write_task_output(context, "    - \"{}\"\n", include_directory.generic_string());
             }
         }
 
@@ -1276,32 +1277,39 @@ namespace iris::compiler
         return std::pmr::unordered_map<std::pmr::string, std::filesystem::path>{output_header_paths, output_allocator};
     }
 
+    static bool is_c_header_file_up_to_date(
+        iris::Module const& core_module,
+        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& output_header_paths,
+        Module_input_times& input_times
+    )
+    {
+        std::filesystem::path const& output_c_header_path = output_header_paths.at(core_module.name);
+        std::filesystem::path const output_cpp_header_path = std::filesystem::path{output_c_header_path}.replace_extension("hpp");
+
+        if (!std::filesystem::exists(output_cpp_header_path))
+            return false;
+
+        return is_output_up_to_date(input_times, core_module.name, output_c_header_path);
+    }
+
     static void generate_c_header_file(
+        Task_context& context,
         iris::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& output_header_paths,
         iris::Declaration_database const& declaration_database,
-        Module_input_times& input_times,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         std::filesystem::path const& output_c_header_path = output_header_paths.at(core_module.name);
         std::filesystem::path const output_cpp_header_path = std::filesystem::path{output_c_header_path}.replace_extension("hpp");
 
-        if (std::filesystem::exists(output_cpp_header_path))
-        {
-            if (is_output_up_to_date(input_times, core_module.name, output_c_header_path))
-            {
-                return;
-            }
-        }
-
         create_directory_if_it_does_not_exist(output_c_header_path.parent_path());
-        
-        ::printf("Generating c header \"%s\"\n", output_c_header_path.generic_string().c_str());
+
+        write_task_output(context, "Generating c header \"{}\"\n", output_c_header_path.generic_string());
         iris::c::Exported_c_header const c_header = iris::c::export_module_as_c_header(core_module, declaration_database, output_header_paths, temporaries_allocator, temporaries_allocator);
         iris::common::write_to_file(output_c_header_path, c_header.content);
 
-        ::printf("Generating c++ header \"%s\"\n", output_cpp_header_path.generic_string().c_str());
+        write_task_output(context, "Generating c++ header \"{}\"\n", output_cpp_header_path.generic_string());
         iris::c::Exported_cpp_header const cpp_header = iris::c::export_module_as_cpp_header(core_module, output_c_header_path, temporaries_allocator, temporaries_allocator);
         iris::common::write_to_file(output_cpp_header_path, cpp_header.content);
     }
@@ -1510,7 +1518,7 @@ namespace iris::compiler
         std::pmr::vector<iris::Module> header_modules{output_allocator};
         header_modules.resize(c_header_groups.c_headers.size());
 
-        std::chrono::steady_clock::duration c_header_cache_duration{0};
+        std::pmr::vector<std::size_t> node_indices_to_process{temporaries_allocator};
 
         for (Source_file_graph_rank_range const rank : graph.ranks)
         {
@@ -1526,7 +1534,9 @@ namespace iris::compiler
                 }
             }
 
-            // TODO can be done in parallel
+            // Checking what is out of date fills the cache in input_times, so it happens before any
+            // work is handed to other threads.
+            node_indices_to_process.clear();
             for (std::size_t index = 0; index < rank.count; ++index)
             {
                 std::size_t const node_index = rank.start_index + index;
@@ -1535,37 +1545,68 @@ namespace iris::compiler
                 if (node.type == Source_file_node_type::Export_c_header)
                 {
                     iris::Module const& core_module = core_modules[node.index];
-                    
-                    generate_c_header_file(
-                        core_module,
-                        output_header_paths,
-                        declaration_database,
-                        input_times,
-                        temporaries_allocator
-                    );
+                    if (!is_c_header_file_up_to_date(core_module, output_header_paths, input_times))
+                        node_indices_to_process.push_back(node_index);
                 }
                 else if (node.type == Source_file_node_type::Import_c_header)
                 {
-                    C_header const& c_header = c_header_groups.c_headers[node.index];
-                    std::span<std::filesystem::path const> const header_search_paths = c_header_groups.header_search_paths[node.index];
-                    Import_c_header_source_group const& source_group = *c_header_groups.source_groups[node.index];
-
-                    std::chrono::steady_clock::time_point const start_time_point = std::chrono::steady_clock::now();
-
-                    std::optional<iris::Module> header_module = parse_c_header_and_cache(
-                        builder,
-                        header_search_paths,
-                        c_header,
-                        source_group,
-                        force_allow_errors
-                    );
-
-                    c_header_cache_duration += std::chrono::steady_clock::now() - start_time_point;
-
-                    if (header_module.has_value())
-                        header_modules[node.index] = std::move(header_module.value());
+                    node_indices_to_process.push_back(node_index);
                 }
             }
+
+            // Nodes of a rank only depend on earlier ranks, whose declarations are already in the
+            // database, so they can run in parallel. The database is only read until the rank ends.
+            parallel_for_each(
+                get_parallel_options(builder),
+                std::span<std::size_t const>{ node_indices_to_process },
+                [&](std::size_t const node_index, Task_context& context) -> void
+                {
+                    // temporaries_allocator may not be safe to share between threads.
+                    std::pmr::polymorphic_allocator<> const task_allocator;
+
+                    Source_file_node const node = graph.nodes[node_index];
+
+                    if (node.type == Source_file_node_type::Export_c_header)
+                    {
+                        iris::Module const& core_module = core_modules[node.index];
+
+                        generate_c_header_file(
+                            context,
+                            core_module,
+                            output_header_paths,
+                            declaration_database,
+                            task_allocator
+                        );
+                    }
+                    else if (node.type == Source_file_node_type::Import_c_header)
+                    {
+                        C_header const& c_header = c_header_groups.c_headers[node.index];
+                        std::span<std::filesystem::path const> const header_search_paths = c_header_groups.header_search_paths[node.index];
+                        Import_c_header_source_group const& source_group = *c_header_groups.source_groups[node.index];
+
+                        std::chrono::steady_clock::time_point const start_time_point = std::chrono::steady_clock::now();
+
+                        std::optional<iris::Module> header_module = parse_c_header_and_cache(
+                            builder,
+                            context,
+                            header_search_paths,
+                            c_header,
+                            source_group,
+                            force_allow_errors
+                        );
+
+                        add_duration(
+                            context.profiler,
+                            "parse_c_header_and_cache",
+                            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start_time_point)
+                        );
+
+                        // Each node owns its own slot, so tasks never write the same element.
+                        if (header_module.has_value())
+                            header_modules[node.index] = std::move(header_module.value());
+                    }
+                }
+            );
 
             for (std::size_t index = 0; index < rank.count; ++index)
             {
@@ -1579,12 +1620,6 @@ namespace iris::compiler
                 }
             }
         }
-
-        add_duration(
-            get_profiler(builder),
-            "parse_c_header_and_cache",
-            std::chrono::duration_cast<std::chrono::nanoseconds>(c_header_cache_duration)
-        );
 
         std::pmr::vector<iris::Module const*> sorted_modules{output_allocator};
         sorted_modules.resize(graph.nodes.size());
