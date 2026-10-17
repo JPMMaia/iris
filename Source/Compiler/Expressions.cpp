@@ -2037,6 +2037,106 @@ namespace iris::compiler
         };
     }
 
+    Value_and_type create_instantiate_expression_value(
+        Instantiate_expression const& expression,
+        Statement const& statement,
+        Expression_parameters const& parameters,
+        llvm::Value* const destination
+    );
+
+    // Whether a value of `type` can be built in place through a pointer to it. Bit-fields are integers or
+    // enums, so excluding primitives and enums leaves only types whose storage is addressable.
+    static bool can_instantiate_in_place(Declaration_database const& declaration_database, Type_reference const& type)
+    {
+        std::optional<Type_reference> const underlying_type = get_underlying_type(declaration_database, type);
+
+        return
+            underlying_type.has_value() &&
+            !is_primitive_type(underlying_type.value()) &&
+            !is_enum_type(declaration_database, underlying_type.value());
+    }
+
+    static Expression_parameters set_source_position(Expression_parameters const& parameters, Expression const& expression)
+    {
+        Expression_parameters new_parameters = parameters;
+        if (expression.source_range.has_value())
+            new_parameters.source_position = expression.source_range->start;
+        return new_parameters;
+    }
+
+    // `x = {}` and `x = zero_initialized {}` build the value straight into `x`. With no member values
+    // given, nothing on the right can read `x`, so the temporary the value would be copied from is skipped.
+    static bool can_instantiate_into_assignee(
+        Assignment_expression const& expression,
+        Statement const& statement,
+        Expression_parameters const& parameters
+    )
+    {
+        if (expression.additional_operation.has_value() || parameters.llvm_parent_function == nullptr)
+            return false;
+
+        Expression const& right_hand_side_expression = statement.expressions[expression.right_hand_side.expression_index];
+        if (!std::holds_alternative<Instantiate_expression>(right_hand_side_expression.data))
+            return false;
+
+        Instantiate_expression const& instantiate_expression = std::get<Instantiate_expression>(right_hand_side_expression.data);
+        bool const reads_nothing =
+            instantiate_expression.members.empty() &&
+            (instantiate_expression.type == Instantiate_expression_type::Default || instantiate_expression.type == Instantiate_expression_type::Zero_initialized);
+        if (!reads_nothing)
+            return false;
+
+        Scope const scope = create_type_analysis_scope(parameters);
+        auto const type_of = [&](std::size_t const expression_index) -> std::optional<Type_reference>
+        {
+            return get_expression_type(
+                parameters.core_module.name,
+                parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
+                scope,
+                statement,
+                statement.expressions[expression_index],
+                std::nullopt,
+                parameters.declaration_database
+            );
+        };
+
+        Expression const& left_hand_side_expression = statement.expressions[expression.left_hand_side.expression_index];
+        if (std::holds_alternative<Access_array_expression>(left_hand_side_expression.data))
+        {
+            // An element of a structure of arrays is spread over several arrays: it has no storage to build into.
+            std::optional<Type_reference> const array_type = type_of(std::get<Access_array_expression>(left_hand_side_expression.data).expression.expression_index);
+            if (!array_type.has_value() || std::holds_alternative<Soa_array_type>(array_type->data) || std::holds_alternative<Soa_array_view_type>(array_type->data))
+                return false;
+        }
+
+        std::optional<Type_reference> const left_hand_side_type = type_of(expression.left_hand_side.expression_index);
+        return left_hand_side_type.has_value() && can_instantiate_in_place(parameters.declaration_database, left_hand_side_type.value());
+    }
+
+    static void instantiate_into_assignee(
+        Assignment_expression const& expression,
+        Statement const& statement,
+        Expression_parameters const& parameters,
+        Value_and_type const& left_hand_side
+    )
+    {
+        Expression const& right_hand_side_expression = statement.expressions[expression.right_hand_side.expression_index];
+        Expression_parameters right_hand_side_parameters = set_source_position(parameters, right_hand_side_expression);
+        right_hand_side_parameters.expression_type = left_hand_side.type;
+
+        Value_and_type const built = create_instantiate_expression_value(
+            std::get<Instantiate_expression>(right_hand_side_expression.data),
+            statement,
+            right_hand_side_parameters,
+            left_hand_side.value
+        );
+        if (built.value != left_hand_side.value)
+        {
+            Value_and_type const loaded = load_if_needed(built, expression.right_hand_side.expression_index, statement, right_hand_side_parameters);
+            create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, loaded.value, left_hand_side.value);
+        }
+    }
+
     Value_and_type create_assignment_expression_value(
         Assignment_expression const& expression,
         Statement const& statement,
@@ -2046,7 +2146,20 @@ namespace iris::compiler
         llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
         llvm::DataLayout const& llvm_data_layout = parameters.llvm_data_layout;
 
+        bool const instantiate_in_place = can_instantiate_into_assignee(expression, statement, parameters);
+
         Value_and_type const left_hand_side = create_expression_value(expression.left_hand_side.expression_index, statement, parameters);
+
+        if (instantiate_in_place && left_hand_side.value != nullptr && left_hand_side.value->getType()->isPointerTy())
+        {
+            instantiate_into_assignee(expression, statement, parameters, left_hand_side);
+            return
+            {
+                .name = "",
+                .value = nullptr,
+                .type = std::nullopt
+            };
+        }
         
         Value_and_type const result = create_assignment_additional_operation_instruction(
             expression.left_hand_side,
@@ -5822,13 +5935,76 @@ namespace iris::compiler
         return struct_value;
     }
 
+    // Stores the value of the member `member_name`, given by expression `value_expression_index` of
+    // `value_statement`. A member value that is itself an instantiate expression is built straight into
+    // the member's storage, so that it needs no temporary of its own to be copied from: nested defaults
+    // would otherwise keep one temporary per nesting level alive in the frame.
+    static void store_instantiated_member_value(
+        Statement const& value_statement,
+        std::size_t const value_expression_index,
+        Expression_parameters const& member_parameters,
+        llvm::Value* const struct_pointer,
+        std::string_view const member_name,
+        std::string_view const module_name,
+        Struct_declaration const& struct_declaration,
+        Type_reference const& member_type
+    )
+    {
+        Expression const& value_expression = value_statement.expressions[value_expression_index];
+
+        if (std::holds_alternative<Instantiate_expression>(value_expression.data) && can_instantiate_in_place(member_parameters.declaration_database, member_type))
+        {
+            Value_and_type const member_pointer = generate_load_struct_member_instructions(
+                member_parameters.clang_module_data,
+                member_parameters.llvm_context,
+                member_parameters.llvm_builder,
+                member_parameters.llvm_data_layout,
+                struct_pointer,
+                member_name,
+                module_name,
+                struct_declaration,
+                member_parameters.type_database
+            );
+
+            Value_and_type const built = create_instantiate_expression_value(
+                std::get<Instantiate_expression>(value_expression.data),
+                value_statement,
+                set_source_position(member_parameters, value_expression),
+                member_pointer.value
+            );
+            if (built.value == member_pointer.value)
+                return;
+
+            Value_and_type const loaded = load_if_needed(built, value_expression_index, value_statement, member_parameters);
+            create_store_instruction(member_parameters.llvm_builder, member_parameters.llvm_data_layout, loaded.value, member_pointer.value);
+            return;
+        }
+
+        Value_and_type const member_value = create_loaded_expression_value(value_expression_index, value_statement, member_parameters);
+
+        generate_store_struct_member_instructions(
+            member_parameters.clang_module_data,
+            member_parameters.llvm_context,
+            member_parameters.llvm_builder,
+            member_parameters.llvm_data_layout,
+            struct_pointer,
+            member_name,
+            module_name,
+            struct_declaration,
+            member_value,
+            member_parameters.type_database
+        );
+    }
+
+    // Builds the struct into `destination` when it is given, and into a new temporary otherwise.
     Value_and_type create_instantiate_struct_expression_value(
         Statement const& statement,
         Instantiate_expression const& expression,
         Expression_parameters const& parameters,
         std::string_view const module_name,
         Struct_declaration const& struct_declaration,
-        Type_reference const& struct_type_reference
+        Type_reference const& struct_type_reference,
+        llvm::Value* const destination
     )
     {
         llvm::LLVMContext& llvm_context = parameters.llvm_context;
@@ -5859,7 +6035,9 @@ namespace iris::compiler
             };
         }
 
-        llvm::AllocaInst* const struct_alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, llvm_struct_type);
+        llvm::Value* const struct_alloca = destination != nullptr ?
+            destination :
+            create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, llvm_struct_type);
 
         if (expression.type == Instantiate_expression_type::Default)
         {
@@ -5874,19 +6052,16 @@ namespace iris::compiler
                 {
                     Expression_parameters new_parameters = parameters;
                     new_parameters.expression_type = member_type;
-                    Value_and_type const member_value = create_loaded_expression_value(expression_pair_location->value.expression_index, statement, new_parameters);
 
-                    generate_store_struct_member_instructions(
-                        parameters.clang_module_data,
-                        parameters.llvm_context,
-                        parameters.llvm_builder,
-                        parameters.llvm_data_layout,
+                    store_instantiated_member_value(
+                        statement,
+                        expression_pair_location->value.expression_index,
+                        new_parameters,
                         struct_alloca,
                         member_name,
                         module_name,
                         struct_declaration,
-                        member_value,
-                        parameters.type_database
+                        member_type
                     );
                 }
                 else
@@ -5898,19 +6073,15 @@ namespace iris::compiler
                     Expression_parameters new_parameters = set_core_module(parameters, struct_core_module);
                     new_parameters.expression_type = member_type;
 
-                    Value_and_type const member_value = create_loaded_statement_value(struct_declaration.member_default_values[member_index], new_parameters);
-
-                    generate_store_struct_member_instructions(
-                        parameters.clang_module_data,
-                        parameters.llvm_context,
-                        parameters.llvm_builder,
-                        parameters.llvm_data_layout,
+                    store_instantiated_member_value(
+                        struct_declaration.member_default_values[member_index],
+                        0,
+                        new_parameters,
                         struct_alloca,
                         member_name,
                         module_name,
                         struct_declaration,
-                        member_value,
-                        parameters.type_database
+                        member_type
                     );
                 }
             }
@@ -5939,19 +6110,16 @@ namespace iris::compiler
 
                 Expression_parameters new_parameters = parameters;
                 new_parameters.expression_type = member_type;
-                Value_and_type const member_value = create_loaded_expression_value(pair.value.expression_index, statement, new_parameters);
 
-                generate_store_struct_member_instructions(
-                    parameters.clang_module_data,
-                    parameters.llvm_context,
-                    parameters.llvm_builder,
-                    parameters.llvm_data_layout,
+                store_instantiated_member_value(
+                    statement,
+                    pair.value.expression_index,
+                    new_parameters,
                     struct_alloca,
                     member_name,
                     module_name,
                     struct_declaration,
-                    member_value,
-                    parameters.type_database
+                    member_type
                 );
             }
 
@@ -6222,10 +6390,13 @@ namespace iris::compiler
         }
     }
 
+    // Builds the value into `destination` when it is given and the type allows it: the returned value
+    // is then `destination` itself. Otherwise the value is built into a new temporary.
     Value_and_type create_instantiate_expression_value(
         Instantiate_expression const& expression,
         Statement const& statement,
-        Expression_parameters const& parameters
+        Expression_parameters const& parameters,
+        llvm::Value* const destination
     )
     {
         Declaration_database const& declaration_database = parameters.declaration_database;
@@ -6330,7 +6501,7 @@ namespace iris::compiler
             std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(type_reference);
 
             if (struct_declaration.has_value())
-                return create_instantiate_struct_expression_value(statement, expression, parameters, "iris.builtin", struct_declaration.value(), type_reference);
+                return create_instantiate_struct_expression_value(statement, expression, parameters, "iris.builtin", struct_declaration.value(), type_reference, destination);
         }
 
         if (is_primitive_type(type_reference) || is_constant_array_type_reference(type_reference) || is_enum_type(declaration_database, type_reference))
@@ -6344,7 +6515,10 @@ namespace iris::compiler
             Type_database const& type_database = parameters.type_database;
 
             llvm::Type* const llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, type_reference, type_database);
-            llvm::AllocaInst* const alloca = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, llvm_type);
+            bool const build_in_destination = destination != nullptr && std::holds_alternative<iris::Constant_array_type>(type_reference.data);
+            llvm::Value* const alloca = build_in_destination ?
+                destination :
+                create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, llvm_type);
 
             if (expression.type != Instantiate_expression_type::Uninitialized)
             {
@@ -6385,7 +6559,7 @@ namespace iris::compiler
                 Lambda_declaration const& lambda_declaration = *std::get<Lambda_declaration const*>(declaration->data);
                 iris::Struct_declaration const struct_declaration = create_lambda_struct_declaration(lambda_declaration);
 
-                return create_instantiate_struct_expression_value(statement, expression, parameters, declaration->module_name, struct_declaration, type_reference);
+                return create_instantiate_struct_expression_value(statement, expression, parameters, declaration->module_name, struct_declaration, type_reference, destination);
             }
         }
 
@@ -6404,7 +6578,7 @@ namespace iris::compiler
         if (std::holds_alternative<Struct_declaration const*>(declaration.data))
         {
             Struct_declaration const& struct_declaration = *std::get<Struct_declaration const*>(declaration.data);
-            return create_instantiate_struct_expression_value(statement, expression, parameters, declaration_module_name, struct_declaration, type_reference);
+            return create_instantiate_struct_expression_value(statement, expression, parameters, declaration_module_name, struct_declaration, type_reference, destination);
         }
         else if (std::holds_alternative<Union_declaration const*>(declaration.data))
         {
@@ -7610,7 +7784,7 @@ namespace iris::compiler
         else if (std::holds_alternative<Instantiate_expression>(expression.data))
         {
             Instantiate_expression const& data = std::get<Instantiate_expression>(expression.data);
-            return create_instantiate_expression_value(data, statement, new_parameters);
+            return create_instantiate_expression_value(data, statement, new_parameters, nullptr);
         }
         else if (std::holds_alternative<Lambda_expression>(expression.data))
         {
