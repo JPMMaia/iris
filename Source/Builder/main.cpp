@@ -156,6 +156,19 @@ argparse::Argument& add_output_llvm_ir_argument(argparse::ArgumentParser& comman
         .flag();
 }
 
+argparse::Argument& add_jobs_argument(argparse::ArgumentParser& command)
+{
+    return command.add_argument("-j", "--jobs")
+        .help("Number of parallel build jobs. 0 means one per hardware thread.")
+        .default_value(0u)
+        .scan<'u', unsigned int>();
+}
+
+std::uint32_t get_jobs_argument(argparse::ArgumentParser const& subprogram)
+{
+    return subprogram.get<unsigned int>("--jobs");
+}
+
 argparse::Argument& add_function_contract_options_argument(argparse::ArgumentParser& command)
 {
     return command.add_argument("--function-contracts")
@@ -689,6 +702,7 @@ static int run_subcommand(argparse::ArgumentParser& program, int const argc, cha
         {
             .output_llvm_ir = get_effective_output_llvm_ir_argument(subprogram, presets),
             .environment_variables = environment_variables,
+            .job_count = get_jobs_argument(subprogram),
         };
 
         iris::compiler::Builder builder = iris::compiler::create_builder(
@@ -728,6 +742,7 @@ static int run_subcommand(argparse::ArgumentParser& program, int const argc, cha
         {
             .output_llvm_ir = false,
             .environment_variables = environment_variables,
+            .job_count = get_jobs_argument(subprogram),
         };
 
         iris::compiler::Builder builder = iris::compiler::create_builder(
@@ -783,6 +798,7 @@ static int run_subcommand(argparse::ArgumentParser& program, int const argc, cha
             .output_llvm_ir = get_effective_output_llvm_ir_argument(subprogram, presets),
             .is_test_mode = true,
             .environment_variables = environment_variables,
+            .job_count = get_jobs_argument(subprogram),
         };
 
         iris::compiler::Builder builder = iris::compiler::create_builder(
@@ -823,6 +839,7 @@ static int run_subcommand(argparse::ArgumentParser& program, int const argc, cha
             .output_llvm_ir = get_effective_output_llvm_ir_argument(subprogram, presets),
             .is_test_mode = true,
             .environment_variables = environment_variables,
+            .job_count = get_jobs_argument(subprogram),
         };
 
         iris::compiler::Builder builder = iris::compiler::create_builder(
@@ -1054,6 +1071,7 @@ int main(int const argc, char const* const* argv)
     add_decimal_overflow_checks_arguments(build_command);
     add_output_llvm_ir_argument(build_command);
     add_function_contract_options_argument(build_command);
+    add_jobs_argument(build_command);
     program.add_subparser(build_command);
     
     // iris build-tests [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
@@ -1070,6 +1088,7 @@ int main(int const argc, char const* const* argv)
     add_decimal_overflow_checks_arguments(build_tests_command);
     add_output_llvm_ir_argument(build_tests_command);
     add_function_contract_options_argument(build_tests_command);
+    add_jobs_argument(build_tests_command);
     program.add_subparser(build_tests_command);
 
     // iris test [artifact_name] [--build-directory=<build_directory>] [--header-search-path=<header-search-path>]... [--repository=<repository_path>]...
@@ -1086,6 +1105,7 @@ int main(int const argc, char const* const* argv)
     add_decimal_overflow_checks_arguments(test_command);
     add_output_llvm_ir_argument(test_command);
     add_function_contract_options_argument(test_command);
+    add_jobs_argument(test_command);
     test_command.add_argument("--test-name")
         .help("Run only the test with this name (repeatable). Names are '<module>.<test>'.")
         .default_value<std::vector<std::string>>({})
@@ -1121,6 +1141,7 @@ int main(int const argc, char const* const* argv)
     add_no_bounds_checks_argument(install_command);
     add_decimal_overflow_checks_arguments(install_command);
     add_function_contract_options_argument(install_command);
+    add_jobs_argument(install_command);
     program.add_subparser(install_command);
 
     // iris list [--build-directory=<build_directory>]
@@ -1206,6 +1227,14 @@ int main(int const argc, char const* const* argv)
     try
     {
         return run_subcommand(program, argc, argv);
+    }
+    catch (iris::common::Build_error const& error)
+    {
+        // Matches what print_message_and_exit prints and returns when it is not inside a build task.
+        std::fflush(stdout);
+        std::fprintf(stderr, "%s\n", error.what());
+        std::fflush(stderr);
+        return -1;
     }
     catch (Cli_error const& error)
     {

@@ -8,6 +8,7 @@ import iris.compiler.lambda_database;
 import iris.compiler;
 import iris.compiler.artifact;
 import iris.compiler.project;
+import iris.compiler.parallel;
 import iris.compiler.profiler;
 import iris.compiler.presets;
 import iris.compiler.repository;
@@ -21,6 +22,8 @@ namespace iris::compiler
         bool is_test_mode = false;
         bool track_compiler_binary_identity = true;
         Environment_variables environment_variables = {};
+        // 0 means one job per hardware thread.
+        std::uint32_t job_count = 1;
     };
 
     export struct Build_identity
@@ -48,6 +51,7 @@ namespace iris::compiler
         std::pmr::vector<Project_dependency> dependencies;
         bool track_compiler_binary_identity = true;
         Build_identity build_identity = {};
+        std::uint32_t job_count = 1;
     };
 
     export Builder create_builder(
@@ -58,6 +62,11 @@ namespace iris::compiler
         iris::compiler::Compilation_options const& compilation_options,
         Builder_options const& builder_options,
         std::pmr::polymorphic_allocator<> output_allocator
+    );
+
+    // Options for running build work with parallel_for: the builder's job count and profiler.
+    export Parallel_options get_parallel_options(
+        Builder& builder
     );
 
     export void build_artifact(
@@ -160,7 +169,6 @@ namespace iris::compiler
         Builder& builder,
         std::span<iris::Module const> const core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        LLVM_data& llvm_data,
         std::span<iris::Module const* const> const all_sorted_modules,
         Declaration_database const& declaration_database,
         Lambda_database const& lambda_database,

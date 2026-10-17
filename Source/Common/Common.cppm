@@ -4,6 +4,24 @@ import std;
 
 namespace iris::common
 {
+    // A fatal error raised by print_message_and_exit while an Exit_as_build_error_scope is active.
+    // The top-level handler prints the message and exits, exactly as print_message_and_exit would have.
+    export struct Build_error : std::runtime_error
+    {
+        using std::runtime_error::runtime_error;
+    };
+
+    // While alive, print_message_and_exit on this thread throws Build_error instead of exiting.
+    // Build tasks run under one so that a fatal error on a worker thread does not tear the process
+    // down while other threads are still writing files.
+    export struct Exit_as_build_error_scope
+    {
+        Exit_as_build_error_scope();
+        Exit_as_build_error_scope(Exit_as_build_error_scope const&) = delete;
+        Exit_as_build_error_scope& operator=(Exit_as_build_error_scope const&) = delete;
+        ~Exit_as_build_error_scope();
+    };
+
     export void print_message_and_exit(std::string const& message);
     export void print_message_and_exit(char const* const message);
 

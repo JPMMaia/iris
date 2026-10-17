@@ -45,7 +45,7 @@ namespace iris::compiler
     LLVM_data::LLVM_data(
         llvm::Triple target_triple,
         llvm::Target const* target,
-        llvm::TargetMachine* target_machine,
+        std::unique_ptr<llvm::TargetMachine> target_machine,
         llvm::DataLayout data_layout,
         std::unique_ptr<llvm::LLVMContext> context,
         Optimization_managers optimization_managers,
@@ -53,7 +53,7 @@ namespace iris::compiler
     ) :
         target_triple(std::move(target_triple)),
         target(target),
-        target_machine(target_machine),
+        target_machine(std::move(target_machine)),
         data_layout(std::move(data_layout)),
         context(std::move(context)),
         optimization_managers(std::move(optimization_managers)),
@@ -1321,12 +1321,16 @@ namespace iris::compiler
         Compilation_options const& options
     )
     {
-        // Initialize the target registry:
-        llvm::InitializeAllTargetInfos();
-        llvm::InitializeAllTargets();
-        llvm::InitializeAllTargetMCs();
-        llvm::InitializeAllAsmParsers();
-        llvm::InitializeAllAsmPrinters();
+        // Initialize the target registry. Registration is not thread-safe, so it happens once.
+        static std::once_flag targets_initialized;
+        std::call_once(targets_initialized, []() -> void
+        {
+            llvm::InitializeAllTargetInfos();
+            llvm::InitializeAllTargets();
+            llvm::InitializeAllTargetMCs();
+            llvm::InitializeAllAsmParsers();
+            llvm::InitializeAllAsmPrinters();
+        });
 
         llvm::Triple target_triple = options.target_triple.has_value() ? llvm::Triple{llvm::StringRef{*options.target_triple}} : llvm::Triple{llvm::sys::getDefaultTargetTriple()};
 
@@ -1352,7 +1356,7 @@ namespace iris::compiler
         llvm::TargetOptions const target_options;
         std::optional<llvm::Reloc::Model> const code_model;
         // TODO investigate JIT argument to createTargetMachine
-        llvm::TargetMachine* target_machine = target.createTargetMachine(target_triple, cpu, features, target_options, code_model);
+        std::unique_ptr<llvm::TargetMachine> target_machine{ target.createTargetMachine(target_triple, cpu, features, target_options, code_model) };
 
         // TODO set according to optimization level
         target_machine->setOptLevel(llvm::CodeGenOptLevel::Default);
@@ -1401,7 +1405,7 @@ namespace iris::compiler
         return LLVM_data(
             std::move(target_triple),
             &target,
-            target_machine,
+            std::move(target_machine),
             std::move(llvm_data_layout),
             std::move(llvm_context),
             std::move(opt_managers),

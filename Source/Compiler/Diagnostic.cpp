@@ -25,12 +25,6 @@ namespace iris::compiler
 
     namespace
     {
-        struct Compilation_breadcrumb
-        {
-            std::string kind;
-            std::string name;
-        };
-
         std::vector<Compilation_breadcrumb>& get_compilation_breadcrumbs()
         {
             static thread_local std::vector<Compilation_breadcrumb> breadcrumbs;
@@ -84,6 +78,41 @@ namespace iris::compiler
         }
 
         return output;
+    }
+
+    std::size_t get_compilation_breadcrumb_count()
+    {
+        return get_compilation_breadcrumbs().size();
+    }
+
+    std::vector<Compilation_breadcrumb> take_compilation_breadcrumbs(
+        std::size_t const start_count
+    )
+    {
+        std::vector<Compilation_breadcrumb>& breadcrumbs = get_compilation_breadcrumbs();
+
+        std::vector<Compilation_breadcrumb> taken;
+        if (start_count < breadcrumbs.size())
+        {
+            taken.assign(
+                std::make_move_iterator(breadcrumbs.begin() + start_count),
+                std::make_move_iterator(breadcrumbs.end())
+            );
+            breadcrumbs.resize(start_count);
+        }
+
+        g_breadcrumbs_frozen = false;
+
+        return taken;
+    }
+
+    void restore_compilation_breadcrumbs(
+        std::span<Compilation_breadcrumb const> const breadcrumbs
+    )
+    {
+        std::vector<Compilation_breadcrumb>& current = get_compilation_breadcrumbs();
+        current.insert(current.end(), breadcrumbs.begin(), breadcrumbs.end());
+        g_breadcrumbs_frozen = true;
     }
 
     Diagnostic create_error_diagnostic(

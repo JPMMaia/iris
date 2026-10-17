@@ -1,6 +1,7 @@
 import iris.common;
 import iris.common.filesystem;
 import iris.compiler;
+import iris.compiler.artifact;
 import iris.compiler.builder;
 import iris.compiler.project;
 import iris.compiler.compile_commands_generator;
@@ -1180,6 +1181,128 @@ namespace iris::compiler
 
         CHECK(std::filesystem::last_write_time(app_bitcode_path) == first_app_time);
         CHECK(std::filesystem::last_write_time(library_bitcode_path) == first_library_time);
+    }
+
+    static void write_library_artifact_file(
+        std::filesystem::path const& artifact_file_path,
+        std::string_view const name,
+        std::string_view const include
+    )
+    {
+        write_source_file(
+            artifact_file_path,
+            std::format(
+                "{{\n"
+                "    \"name\": \"{}\",\n"
+                "    \"version\": \"0.1.0\",\n"
+                "    \"type\": \"library\",\n"
+                "    \"sources\": [ {{ \"type\": \"iris\", \"include\": [ \"{}\" ] }} ]\n"
+                "}}\n",
+                name,
+                include
+            )
+        );
+    }
+
+    // Regression test: a file that one artifact picks up through a glob and another names through a
+    // relative path used to be parsed into two modules with the same name. The instantiate pass only
+    // completed the first of them, so whether the build worked depended on which one was compiled.
+    TEST_CASE("A source file listed by several artifacts is only included once", "[Builder]")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "builder_shared_source_file";
+
+        std::filesystem::remove_all(root_directory_path);
+        std::filesystem::create_directories(root_directory_path / "library" / "shared");
+        std::filesystem::create_directories(root_directory_path / "other");
+
+        write_library_artifact_file(root_directory_path / "library" / "iris_artifact.json", "library", "./**/*.iris");
+        write_library_artifact_file(root_directory_path / "other" / "iris_artifact.json", "other", "../library/shared/shared.iris");
+        write_source_file(
+            root_directory_path / "library" / "shared" / "shared.iris",
+            "module shared;\n"
+            "\n"
+            "export function get_value() -> (result: Int32)\n"
+            "{\n"
+            "    return 1;\n"
+            "}\n"
+        );
+
+        std::pmr::vector<std::filesystem::path> const artifact_file_paths
+        {
+            root_directory_path / "library" / "iris_artifact.json",
+            root_directory_path / "other" / "iris_artifact.json",
+        };
+
+        std::pmr::vector<Artifact> const artifacts = get_sorted_artifacts(artifact_file_paths, {}, false, {}, {});
+        REQUIRE(artifacts.size() == 2);
+
+        auto const count_shared_files = [](std::span<std::filesystem::path const> const paths) -> std::size_t
+        {
+            return std::count_if(
+                paths.begin(),
+                paths.end(),
+                [](std::filesystem::path const& path) -> bool { return path.filename() == "shared.iris"; }
+            );
+        };
+
+        // Each artifact finds the file on its own...
+        for (Artifact const& artifact : artifacts)
+            REQUIRE(count_shared_files(get_artifact_iris_source_files(artifact, {}, {})) == 1);
+
+        // ...but the build only includes it once.
+        std::pmr::vector<std::filesystem::path> const source_file_paths = get_artifacts_source_files(artifacts, false, {}, {});
+        CHECK(count_shared_files(source_file_paths) == 1);
+    }
+
+    TEST_CASE("Two source files that declare the same module are an error", "[Builder]")
+    {
+        std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "builder_duplicate_module_name";
+        std::filesystem::path const build_directory_path = root_directory_path / "build";
+
+        std::filesystem::remove_all(root_directory_path);
+        std::filesystem::create_directories(root_directory_path / "source");
+        std::filesystem::create_directories(build_directory_path / "artifacts");
+
+        std::string_view const source_content =
+            "module duplicate;\n"
+            "\n"
+            "export function get_value() -> (result: Int32)\n"
+            "{\n"
+            "    return 1;\n"
+            "}\n";
+
+        std::pmr::vector<std::filesystem::path> const source_file_paths
+        {
+            root_directory_path / "source" / "first.iris",
+            root_directory_path / "source" / "second.iris",
+        };
+        for (std::filesystem::path const& source_file_path : source_file_paths)
+            write_source_file(source_file_path, source_content);
+
+        Builder builder = create_builder(
+            iris::compiler::get_default_target(),
+            build_directory_path,
+            {},
+            {},
+            iris::compiler::Compilation_options{},
+            iris::compiler::Builder_options{},
+            {}
+        );
+
+        iris::common::Exit_as_build_error_scope const exit_scope;
+
+        try
+        {
+            parse_source_files_and_cache(builder, source_file_paths, {}, {});
+            FAIL("Expected a Build_error.");
+        }
+        catch (iris::common::Build_error const& error)
+        {
+            std::string_view const message = error.what();
+            CHECK(message.find("Module 'duplicate' is defined by both") != std::string_view::npos);
+            CHECK(message.find("first.iris") != std::string_view::npos);
+            CHECK(message.find("second.iris") != std::string_view::npos);
+        }
     }
 
     // Sets up a copy of 'Import_c_header_with_dependency' in which 'module_b.h' pulls its struct in

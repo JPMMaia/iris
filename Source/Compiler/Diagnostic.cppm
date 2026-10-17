@@ -84,6 +84,28 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 
+    export struct Compilation_breadcrumb
+    {
+        std::string kind;
+        std::string name;
+    };
+
+    // Number of breadcrumbs on this thread, so that a task can later take only the ones it pushed.
+    export std::size_t get_compilation_breadcrumb_count();
+
+    // Removes and returns this thread's breadcrumbs past `start_count`, and unfreezes the trail.
+    // Called after catching an exception on a worker thread, whose trail would otherwise never
+    // reach the thread that reports the error.
+    export std::vector<Compilation_breadcrumb> take_compilation_breadcrumbs(
+        std::size_t const start_count
+    );
+
+    // Appends breadcrumbs taken on another thread and freezes the trail, as if the exception about
+    // to be rethrown had unwound through those scopes on this thread.
+    export void restore_compilation_breadcrumbs(
+        std::span<Compilation_breadcrumb const> const breadcrumbs
+    );
+
     export Diagnostic create_error_diagnostic(
         std::optional<std::filesystem::path> const source_file_path,
         std::optional<Source_range> const range,

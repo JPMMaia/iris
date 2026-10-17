@@ -43,6 +43,7 @@ target_sources(Iris_compiler
          "Instructions.cppm"
          "Lambda_database.cppm"
          "Linker.cppm"
+         "Parallel.cppm"
          "Profiler.cppm"
          "Test_framework.cppm"
          "Types.cppm"
@@ -70,6 +71,7 @@ target_sources(Iris_compiler
       "Expressions.cpp"
       "Instructions.cpp"
       "Lambda_database.cpp"
+      "Parallel.cpp"
       "Test_framework.cpp"
       "Types.cpp"
       "Validation.cpp"
@@ -193,6 +195,16 @@ if(BUILD_TESTING)
       "Analysis.tests.cpp"
    )
    catch_discover_tests(Iris_analysis_tests)
+
+   # Parallel tests
+   add_executable(Iris_parallel_tests)
+   target_link_libraries(Iris_parallel_tests PRIVATE ${iris_test_link_libraries} Iris::Common)
+   target_compile_definitions(Iris_parallel_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_parallel_tests PRIVATE
+      "main.tests.cpp"
+      "Parallel.tests.cpp"
+   )
+   catch_discover_tests(Iris_parallel_tests)
 
    # Core Hash tests
    add_executable(Iris_hash_tests)

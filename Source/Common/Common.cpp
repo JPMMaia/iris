@@ -17,6 +17,21 @@ import std.compat;
 
 namespace iris::common
 {
+    namespace
+    {
+        thread_local int g_exit_as_build_error_depth = 0;
+    }
+
+    Exit_as_build_error_scope::Exit_as_build_error_scope()
+    {
+        ++g_exit_as_build_error_depth;
+    }
+
+    Exit_as_build_error_scope::~Exit_as_build_error_scope()
+    {
+        --g_exit_as_build_error_depth;
+    }
+
     void print_message_and_exit(std::string const& message)
     {
         print_message_and_exit(message.c_str());
@@ -24,6 +39,9 @@ namespace iris::common
 
     void print_message_and_exit(char const* const message)
     {
+        if (g_exit_as_build_error_depth > 0)
+            throw Build_error{ message };
+
         std::fflush(stdout);
         std::fprintf(stderr, "%s\n", message);
         std::fflush(stderr);

@@ -34,7 +34,7 @@ namespace iris::compiler
         LLVM_data(
             llvm::Triple target_triple,
             llvm::Target const* target,
-            llvm::TargetMachine* target_machine,
+            std::unique_ptr<llvm::TargetMachine> target_machine,
             llvm::DataLayout data_layout,
             std::unique_ptr<llvm::LLVMContext> context,
             Optimization_managers optimization_managers,
@@ -48,7 +48,7 @@ namespace iris::compiler
 
         llvm::Triple target_triple;
         llvm::Target const* target;
-        llvm::TargetMachine* target_machine;
+        std::unique_ptr<llvm::TargetMachine> target_machine;
         llvm::DataLayout data_layout;
         std::unique_ptr<llvm::LLVMContext> context;
         Optimization_managers optimization_managers;
@@ -81,6 +81,9 @@ namespace iris::compiler
         std::filesystem::path const& path
     );
 
+    // Creates a new LLVM context, target machine, pass pipeline and clang instance. None of these
+    // may be used from two threads at once, so concurrent work needs one LLVM_data per thread.
+    // Safe to call from several threads.
     export LLVM_data initialize_llvm(
         Compilation_options const& compilation_options
     );
