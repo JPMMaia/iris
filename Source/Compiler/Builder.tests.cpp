@@ -335,6 +335,34 @@ namespace iris::compiler
         test_builder("Mix_with_cpp", {"my_app/iris_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
+    TEST_CASE("Build Mix_with_cpp with several jobs", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Mix_with_cpp" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "my_app.cpp_implementation.bc",
+            std::filesystem::path{"artifacts"} / "my_app.bc",
+            std::filesystem::path{"artifacts/C_interface.irisb"},
+            std::filesystem::path{"bin"} / get_binary_name("my_app", target)
+        };
+
+        test_builder(
+            "Mix_with_cpp",
+            {"my_app/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "Mix_with_cpp_parallel",
+            {.job_count = 4}
+        );
+    }
+
     TEST_CASE("Build Mix_with_cpp compile commands", "[Builder]")
     {
         std::string_view const project_name = "Mix_with_cpp";
@@ -551,6 +579,37 @@ namespace iris::compiler
         };
 
         test_builder("Test_framework", {"my_library/iris_artifact.json", "my_app/iris_artifact.json"}, target, repository_paths, expected_output_paths, "Test_framework_2", {.is_test_mode = true});
+    }
+
+    TEST_CASE("Build Test_framework my_library and my_app in test mode with several jobs", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Test_framework" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"artifacts"} / "my_library.bc",
+            std::filesystem::path{"artifacts"} / "my_library.test.bc",
+            std::filesystem::path{"artifacts"} / "my_library.generated_tests_information.test.bc",
+            std::filesystem::path{"artifacts"} / "my_app.test.bc",
+            std::filesystem::path{"artifacts"} / "my_app.generated_tests_information.test.bc",
+            std::filesystem::path{"bin"} / get_binary_name("my_library.iris.test", target),
+            std::filesystem::path{"bin"} / get_binary_name("my_app.iris.test", target)
+        };
+
+        test_builder(
+            "Test_framework",
+            {"my_library/iris_artifact.json", "my_app/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "Test_framework_parallel",
+            {.is_test_mode = true, .job_count = 4}
+        );
     }
 
     TEST_CASE("Build Test_framework empty_app in test mode", "[Builder]")

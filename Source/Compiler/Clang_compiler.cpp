@@ -177,6 +177,11 @@ namespace iris::compiler
         return arguments;
     }
 
+    std::filesystem::path get_compile_cpp_output_log_path(std::filesystem::path const& output_file_path)
+    {
+        return std::filesystem::path{output_file_path}.concat(".log");
+    }
+
     bool compile_cpp(
         Clang_data const& clang_data,
         std::string_view const target_triple,
@@ -188,14 +193,17 @@ namespace iris::compiler
         std::span<std::pmr::string const> const additional_flags,
         bool const use_clang_cl,
         bool const debug,
+        std::pmr::string& output,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
-        clang::CompilerInstance& clang_compiler_instance = get_compiler_instance(clang_data);
+        // The driver's own diagnostics, e.g. an unknown flag.
+        std::string driver_output;
+        llvm::raw_string_ostream driver_output_stream{driver_output};
 
         llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> diagnostic_ids{new clang::DiagnosticIDs{}};
         clang::DiagnosticOptions diagnostic_options{};
-        clang::TextDiagnosticPrinter diagnostic_printer{llvm::outs(), diagnostic_options};
+        clang::TextDiagnosticPrinter diagnostic_printer{driver_output_stream, diagnostic_options};
         clang::DiagnosticsEngine diagnostics_engine{diagnostic_ids, diagnostic_options, &diagnostic_printer, false};
 
         std::filesystem::path const clang_path = find_clang(use_clang_cl);
@@ -213,22 +221,43 @@ namespace iris::compiler
             temporaries_allocator
         );
 
-        std::printf("Compiling \"%s\"\n  Output is \"%s\"\n  Command line: ", source_file_path.generic_string().c_str(), output_file_path.generic_string().c_str());
+        output.append(std::format("Compiling \"{}\"\n  Output is \"{}\"\n  Command line: ", source_file_path.generic_string(), output_file_path.generic_string()));
         for (std::size_t index = 0; index < arguments.size(); ++index)
         {
-            std::fputs(arguments[index].c_str(), stdout);
-            std::fputs(" ", stdout);
+            output.append(arguments[index]);
+            output.append(" ");
         }
-        std::fputs("\n", stdout);
-        std::fflush(stdout);
+        output.append("\n");
 
         std::pmr::vector<char const*> c_string_arguments = to_c_string_vector(arguments);
 
+        // The clang process writes its stdout and stderr to this file, which is then appended to output.
+        std::filesystem::path const clang_output_file_path = get_compile_cpp_output_log_path(output_file_path);
+        std::string const clang_output_file_path_string = clang_output_file_path.string();
+
         clang::driver::Driver clang_driver{clang_path.generic_string(), target_triple, diagnostics_engine};
-        clang::driver::Compilation* const compilation = clang_driver.BuildCompilation(c_string_arguments);
+        std::unique_ptr<clang::driver::Compilation> const compilation{clang_driver.BuildCompilation(c_string_arguments)};
+
+        std::array<std::optional<llvm::StringRef>, 3> const redirects
+        {
+            std::optional<llvm::StringRef>{""},
+            std::optional<llvm::StringRef>{clang_output_file_path_string},
+            std::optional<llvm::StringRef>{clang_output_file_path_string},
+        };
+        compilation->Redirect(redirects);
 
         llvm::SmallVector<std::pair<int, const clang::driver::Command *>, 4> failing_commands;
         int const result = clang_driver.ExecuteCompilation(*compilation, failing_commands);
+
+        output.append(driver_output);
+
+        std::optional<std::pmr::string> const clang_output = iris::common::get_file_contents(clang_output_file_path);
+        if (clang_output.has_value())
+            output.append(*clang_output);
+
+        std::error_code error_code;
+        std::filesystem::remove(clang_output_file_path, error_code);
+
         return result == 0;
     }
 }

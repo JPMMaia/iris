@@ -1749,6 +1749,24 @@ namespace iris::compiler
         return true;
     }
 
+    namespace
+    {
+        struct Cpp_compile_job
+        {
+            std::filesystem::path source_file_path;
+            std::filesystem::path output_assembly_file;
+            std::optional<std::filesystem::path> output_llvm_ir_file;
+            std::filesystem::path output_dependency_file;
+            std::span<std::pmr::string const> include_directories;
+            std::span<std::pmr::string const> additional_flags;
+        };
+
+        // Thrown by a task to stop the batch the way the serial loop stopped at the first failure.
+        struct Cpp_compile_failed
+        {
+        };
+    }
+
     bool compile_cpp_and_write_to_bitcode_files(
         Builder& builder,
         std::span<Artifact const> const artifacts,
@@ -1765,10 +1783,23 @@ namespace iris::compiler
 
         bool const use_clang_cl = builder.target.operating_system == "windows";
 
+        // Owns the include directories that the jobs point into, one entry per artifact.
+        std::pmr::list<std::pmr::vector<std::pmr::string>> include_directories_per_artifact{temporaries_allocator};
+
+        static std::array<std::pmr::string, 1> const tests_main_additional_flags
+        {
+            "-std=c++20",
+        };
+
+        // Decide what to compile first, serially. It only reads dependency files.
+        std::pmr::vector<Cpp_compile_job> jobs{temporaries_allocator};
+
         for (Artifact const& artifact : artifacts)
         {
             std::pmr::vector<std::filesystem::path> const public_include_directories = get_public_include_directories(artifact, artifacts, temporaries_allocator, temporaries_allocator);
-            std::pmr::vector<std::pmr::string> const public_include_directories_strings = iris::common::convert_path_to_string(public_include_directories, temporaries_allocator);
+            std::pmr::vector<std::pmr::string> const& public_include_directories_strings = include_directories_per_artifact.emplace_back(
+                iris::common::convert_path_to_string(public_include_directories, temporaries_allocator)
+            );
 
             for (Source_group const& group : artifact.sources)
             {
@@ -1791,86 +1822,105 @@ namespace iris::compiler
                     if (is_compiled_cpp_up_to_date(output_dependency_file, builder.build_identity.codegen_floor))
                         continue;
 
-                    if (builder.output_llvm_ir)
+                    jobs.push_back(Cpp_compile_job
                     {
-                        std::filesystem::path const output_file_path = build_directory_path / std::format("{}.{}.{}", artifact.name, source_file_path.stem().generic_string(), "ll");
-                        bool const success = compile_cpp(
-                            *llvm_data.clang_data,
-                            llvm_data.target_triple.str(),
-                            source_file_path,
-                            output_llvm_ir_file,
-                            std::nullopt,
-                            build_directory_path,
-                            public_include_directories_strings,
-                            group.additional_flags,
-                            use_clang_cl,
-                            compilation_options.debug,
-                            temporaries_allocator
-                        );
-                        if (!success)
-                        {
-                            end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
-                            return false;
-                        } 
-                    }
-
-                    bool const success = compile_cpp(
-                        *llvm_data.clang_data,
-                        llvm_data.target_triple.str(),
-                        source_file_path,
-                        output_assembly_file,
-                        output_dependency_file,
-                        build_directory_path,
-                        public_include_directories_strings,
-                        group.additional_flags,
-                        use_clang_cl,
-                        compilation_options.debug,
-                        temporaries_allocator
-                    );
-                    if (!success)
-                    {
-                        end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
-                        return false;
-                    }
+                        .source_file_path = source_file_path,
+                        .output_assembly_file = output_assembly_file,
+                        .output_llvm_ir_file = builder.output_llvm_ir ? std::optional<std::filesystem::path>{output_llvm_ir_file} : std::nullopt,
+                        .output_dependency_file = output_dependency_file,
+                        .include_directories = public_include_directories_strings,
+                        .additional_flags = group.additional_flags,
+                    });
                 }
             }
         }
 
         if (builder.is_test_mode)
         {
-            std::filesystem::path const tests_main_file_path = iris::common::get_tests_main_file_path();
-
-            std::filesystem::path const output_assembly_file = build_directory_path / std::format("iris.tests_main.{}", extension);
             std::filesystem::path const output_dependency_file = build_directory_path / std::format("iris.tests_main.d");
 
             if (!is_compiled_cpp_up_to_date(output_dependency_file, builder.build_identity.codegen_floor))
             {
-                std::array<std::pmr::string, 1> const additional_flags
+                jobs.push_back(Cpp_compile_job
                 {
-                    "-std=c++20",
-                };
-
-                bool const success = compile_cpp(
-                    *llvm_data.clang_data,
-                    llvm_data.target_triple.str(),
-                    tests_main_file_path,
-                    output_assembly_file,
-                    output_dependency_file,
-                    build_directory_path,
-                    {},
-                    additional_flags,
-                    use_clang_cl,
-                    compilation_options.debug,
-                    temporaries_allocator
-                );
-                if (!success)
-                {
-                    end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
-                    return false;
-                }
+                    .source_file_path = iris::common::get_tests_main_file_path(),
+                    .output_assembly_file = build_directory_path / std::format("iris.tests_main.{}", extension),
+                    .output_llvm_ir_file = std::nullopt,
+                    .output_dependency_file = output_dependency_file,
+                    .include_directories = {},
+                    .additional_flags = tests_main_additional_flags,
+                });
             }
         }
 
+        std::string const target_triple = llvm_data.target_triple.str();
+
+        // Every clang process has exited by now, so nothing holds the logs open anymore.
+        auto const remove_output_logs = [&]() -> void
+        {
+            for (Cpp_compile_job const& job : jobs)
+            {
+                std::error_code error_code;
+                if (job.output_llvm_ir_file.has_value())
+                    std::filesystem::remove(get_compile_cpp_output_log_path(*job.output_llvm_ir_file), error_code);
+                std::filesystem::remove(get_compile_cpp_output_log_path(job.output_assembly_file), error_code);
+            }
+        };
+
+        // Each file is compiled by its own clang process, so the jobs share nothing.
+        try
+        {
+            parallel_for_each(
+                get_parallel_options(builder),
+                std::span<Cpp_compile_job const>{jobs},
+                [&](Cpp_compile_job const& job, Task_context& context) -> void
+                {
+                    // temporaries_allocator may not be safe to share between threads.
+                    std::pmr::polymorphic_allocator<> const task_allocator;
+
+                    auto const compile = [&](std::filesystem::path const& output_file_path, std::optional<std::filesystem::path> const& output_dependency_file_path) -> bool
+                    {
+                        std::pmr::string output{task_allocator};
+
+                        bool const success = compile_cpp(
+                            *llvm_data.clang_data,
+                            target_triple,
+                            job.source_file_path,
+                            output_file_path,
+                            output_dependency_file_path,
+                            build_directory_path,
+                            job.include_directories,
+                            job.additional_flags,
+                            use_clang_cl,
+                            compilation_options.debug,
+                            output,
+                            task_allocator
+                        );
+
+                        write_task_output(context, output);
+
+                        return success;
+                    };
+
+                    if (job.output_llvm_ir_file.has_value())
+                    {
+                        if (!compile(*job.output_llvm_ir_file, std::nullopt))
+                            throw Cpp_compile_failed{};
+                    }
+
+                    if (!compile(job.output_assembly_file, job.output_dependency_file))
+                        throw Cpp_compile_failed{};
+                }
+            );
+        }
+        catch (Cpp_compile_failed const&)
+        {
+            remove_output_logs();
+            end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
+            return false;
+        }
+
+        remove_output_logs();
         end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
         return true;
     }
@@ -1912,120 +1962,145 @@ namespace iris::compiler
         std::pmr::vector<iris::Module> core_modules{output_allocator};
         core_modules.resize(source_files_paths.size(), iris::Module{});
 
-        iris::parser::Parser parser = iris::parser::create_parser();
+        // Read every module name first. It is cheap, and checking for duplicates before parsing means two
+        // tasks never write the same cached module.
+        std::pmr::vector<std::pmr::string> module_names{temporaries_allocator};
+        module_names.reserve(source_files_paths.size());
 
-        std::pmr::vector<iris::compiler::Diagnostic> parser_diagnostics{temporaries_allocator};
-
-        for (std::size_t index = 0; index < source_files_paths.size(); ++index)
+        for (std::filesystem::path const& source_file_path : source_files_paths)
         {
-            std::filesystem::path const& source_file_path = source_files_paths[index];
-
-            std::optional<std::pmr::string> const module_name = iris::parser::read_module_name(source_file_path);
+            std::optional<std::pmr::string> module_name = iris::parser::read_module_name(source_file_path);
             if (!module_name.has_value())
                 iris::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
 
-            std::filesystem::path const output_module_filename = std::format("{}.irisb", module_name.value());
-            std::filesystem::path const output_module_path = get_hl_build_directory(builder.build_directory_path) / output_module_filename;
-
-            if (std::filesystem::exists(output_module_path))
-            {
-                if (is_file_newer_than(output_module_path, source_file_path) && is_at_or_after_floor(output_module_path, builder.build_identity.parse_floor))
-                {
-                    std::optional<Module> core_module = iris::binary_serializer::read_module_from_file(output_module_path);
-                    if (!core_module.has_value())
-                        iris::common::print_message_and_exit(std::format("Failed to read cached module {}.", output_module_path.generic_string()));
-
-                    core_modules[index] = std::move(core_module.value());
-
-                    continue;
-                }
-            }
-
-            std::optional<std::pmr::string> const source_content = iris::common::get_file_contents(source_file_path);
-            if (!source_content.has_value())
-                iris::common::print_message_and_exit(std::format("Could not read source file {}.", source_file_path.generic_string()));
-
-            std::pmr::u8string const utf_8_source_content{reinterpret_cast<char8_t const*>(source_content->data()), source_content->size(), temporaries_allocator};
-            iris::parser::Parse_tree parse_tree = iris::parser::parse(parser, std::move(utf_8_source_content));
-
-            iris::parser::Parse_node const root = get_root_node(parse_tree);
-
-            {
-                std::pmr::vector<iris::compiler::Diagnostic> file_diagnostics = create_parser_diagnostics(
-                    source_file_path,
-                    parse_tree,
-                    temporaries_allocator,
-                    temporaries_allocator
-                );
-
-                if (!file_diagnostics.empty())
-                {
-                    parser_diagnostics.insert(
-                        parser_diagnostics.end(),
-                        std::make_move_iterator(file_diagnostics.begin()),
-                        std::make_move_iterator(file_diagnostics.end())
-                    );
-
-                    // Nothing is written to the cache for a file that did not parse.
-                    iris::parser::destroy_tree(std::move(parse_tree));
-                    continue;
-                }
-            }
-
-            std::optional<iris::Module> core_module = iris::parser::parse_node_to_module(
-                parse_tree,
-                root,
-                source_file_path,
-                output_allocator,
-                temporaries_allocator
-            );
-            if (!core_module.has_value())
-                iris::common::print_message_and_exit(std::format("Could not parse source file {}.", source_file_path.generic_string()));
-
-            iris::binary_serializer::write_module_to_file(output_module_path, core_module.value(), {});
-
-            if (builder.output_module_json)
-            {
-                std::filesystem::path const output_module_json_filename = std::format("{}.irisb.json", module_name.value());
-                std::filesystem::path const output_module_json_path = get_hl_build_directory(builder.build_directory_path) / output_module_json_filename;
-                iris::json::write_module_to_file(output_module_json_path, core_module.value());
-            }
-
-            core_modules[index] = std::move(core_module.value());
-
-            iris::parser::destroy_tree(std::move(parse_tree));
-        }
-
-        iris::parser::destroy_parser(std::move(parser));
-
-        if (!parser_diagnostics.empty())
-        {
-            sort_diagnostics(parser_diagnostics);
-            print_diagnostics_and_exit_if_needed(parser_diagnostics, temporaries_allocator, "Parsing failed.");
+            module_names.push_back(std::move(module_name.value()));
         }
 
         // Modules are found and their outputs are written by name, so two files cannot share one.
         {
             std::pmr::unordered_map<std::string_view, std::size_t> module_name_to_index{temporaries_allocator};
-            module_name_to_index.reserve(core_modules.size());
+            module_name_to_index.reserve(module_names.size());
 
-            for (std::size_t index = 0; index < core_modules.size(); ++index)
+            for (std::size_t index = 0; index < module_names.size(); ++index)
             {
-                std::string_view const module_name = core_modules[index].name;
-                if (module_name.empty())
-                    continue;
-
-                auto const [location, inserted] = module_name_to_index.insert(std::make_pair(module_name, index));
+                auto const [location, inserted] = module_name_to_index.insert(std::make_pair(std::string_view{module_names[index]}, index));
                 if (!inserted)
                 {
                     iris::common::print_message_and_exit(std::format(
                         "Module '{}' is defined by both \"{}\" and \"{}\".",
-                        module_name,
+                        module_names[index],
                         source_files_paths[location->second].generic_string(),
                         source_files_paths[index].generic_string()
                     ));
                 }
             }
+        }
+
+        // One entry per file, so tasks never share a vector.
+        std::pmr::vector<std::pmr::vector<iris::compiler::Diagnostic>> parser_diagnostics_per_file{temporaries_allocator};
+        parser_diagnostics_per_file.resize(source_files_paths.size());
+
+        parallel_for(
+            get_parallel_options(builder),
+            source_files_paths.size(),
+            [&](Task_context& context) -> void
+            {
+                std::size_t const index = context.index;
+                std::filesystem::path const& source_file_path = source_files_paths[index];
+
+                // The caller's allocators may not be safe to share between threads.
+                std::pmr::polymorphic_allocator<> const task_allocator;
+
+                std::string_view const module_name = module_names[index];
+
+                std::filesystem::path const output_module_filename = std::format("{}.irisb", module_name);
+                std::filesystem::path const output_module_path = get_hl_build_directory(builder.build_directory_path) / output_module_filename;
+
+                if (std::filesystem::exists(output_module_path))
+                {
+                    if (is_file_newer_than(output_module_path, source_file_path) && is_at_or_after_floor(output_module_path, builder.build_identity.parse_floor))
+                    {
+                        std::optional<Module> core_module = iris::binary_serializer::read_module_from_file(output_module_path);
+                        if (!core_module.has_value())
+                            iris::common::print_message_and_exit(std::format("Failed to read cached module {}.", output_module_path.generic_string()));
+
+                        core_modules[index] = std::move(core_module.value());
+
+                        return;
+                    }
+                }
+
+                std::optional<std::pmr::string> const source_content = iris::common::get_file_contents(source_file_path);
+                if (!source_content.has_value())
+                    iris::common::print_message_and_exit(std::format("Could not read source file {}.", source_file_path.generic_string()));
+
+                // A tree-sitter parser must not be used by two threads at once, and creating one is cheap.
+                iris::parser::Parser parser = iris::parser::create_parser();
+
+                std::pmr::u8string const utf_8_source_content{reinterpret_cast<char8_t const*>(source_content->data()), source_content->size(), task_allocator};
+                iris::parser::Parse_tree parse_tree = iris::parser::parse(parser, std::move(utf_8_source_content));
+
+                iris::parser::Parse_node const root = get_root_node(parse_tree);
+
+                {
+                    std::pmr::vector<iris::compiler::Diagnostic> file_diagnostics = create_parser_diagnostics(
+                        source_file_path,
+                        parse_tree,
+                        task_allocator,
+                        task_allocator
+                    );
+
+                    if (!file_diagnostics.empty())
+                    {
+                        parser_diagnostics_per_file[index] = std::move(file_diagnostics);
+
+                        // Nothing is written to the cache for a file that did not parse.
+                        iris::parser::destroy_tree(std::move(parse_tree));
+                        iris::parser::destroy_parser(std::move(parser));
+                        return;
+                    }
+                }
+
+                std::optional<iris::Module> core_module = iris::parser::parse_node_to_module(
+                    parse_tree,
+                    root,
+                    source_file_path,
+                    task_allocator,
+                    task_allocator
+                );
+                if (!core_module.has_value())
+                    iris::common::print_message_and_exit(std::format("Could not parse source file {}.", source_file_path.generic_string()));
+
+                iris::binary_serializer::write_module_to_file(output_module_path, core_module.value(), {});
+
+                if (builder.output_module_json)
+                {
+                    std::filesystem::path const output_module_json_filename = std::format("{}.irisb.json", module_name);
+                    std::filesystem::path const output_module_json_path = get_hl_build_directory(builder.build_directory_path) / output_module_json_filename;
+                    iris::json::write_module_to_file(output_module_json_path, core_module.value());
+                }
+
+                core_modules[index] = std::move(core_module.value());
+
+                iris::parser::destroy_tree(std::move(parse_tree));
+                iris::parser::destroy_parser(std::move(parser));
+            }
+        );
+
+        std::pmr::vector<iris::compiler::Diagnostic> parser_diagnostics{temporaries_allocator};
+        for (std::pmr::vector<iris::compiler::Diagnostic>& file_diagnostics : parser_diagnostics_per_file)
+        {
+            parser_diagnostics.insert(
+                parser_diagnostics.end(),
+                std::make_move_iterator(file_diagnostics.begin()),
+                std::make_move_iterator(file_diagnostics.end())
+            );
+        }
+
+        if (!parser_diagnostics.empty())
+        {
+            sort_diagnostics(parser_diagnostics);
+            print_diagnostics_and_exit_if_needed(parser_diagnostics, temporaries_allocator, "Parsing failed.");
         }
 
         for (iris::Module& core_module : core_modules)
