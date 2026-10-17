@@ -18,7 +18,8 @@ namespace iris::compiler
     export enum Artifact_type
     {
         Executable,
-        Library
+        Library,
+        Dynamic_library
     };
 
     export struct Dependency
@@ -32,6 +33,7 @@ namespace iris::compiler
         std::pmr::string header;
         std::pmr::vector<std::pmr::string> dependencies;
         std::optional<bool> allow_errors;
+        std::optional<bool> wrap_pointers_as_optional;
     };
 
     export struct Export_c_header_source_group
@@ -45,6 +47,7 @@ namespace iris::compiler
         std::pmr::vector<std::filesystem::path> search_paths;
         std::pmr::vector<std::pmr::string> public_prefixes;
         std::pmr::vector<std::pmr::string> remove_prefixes;
+        std::optional<bool> wrap_pointers_as_optional;
     };
 
 
@@ -81,11 +84,32 @@ namespace iris::compiler
         std::pmr::unordered_multimap<std::pmr::string, std::pmr::string> external_libraries;
     };
 
+    export struct Dynamic_library_info
+    {
+        std::pmr::vector<std::pmr::string> exports;
+    };
+
+    export enum class Copy_when
+    {
+        Always,
+        Build,
+        Install
+    };
+
     export struct Copy_entry
     {
         std::filesystem::path source;
         std::filesystem::path destination;
+        Copy_when when = Copy_when::Always;
+        std::pmr::vector<std::pmr::string> exclude;
     };
+
+    // Matches a path relative to a copied directory against an exclude pattern. '**' matches any
+    // run of characters including separators, '*' any run without a separator and '?' one
+    // character other than a separator.
+    export bool matches_copy_pattern(std::string_view const pattern, std::string_view const relative_path);
+
+    export bool is_copy_excluded(Copy_entry const& entry, std::string_view const relative_path);
 
     export struct Artifact
     {
@@ -96,7 +120,7 @@ namespace iris::compiler
         std::pmr::vector<Dependency> dependencies;
         std::pmr::vector<Source_group> sources;
         std::pmr::vector<std::filesystem::path> public_include_directories;
-        std::optional<std::variant<Executable_info, Library_info>> info;
+        std::optional<std::variant<Executable_info, Library_info, Dynamic_library_info>> info;
         std::pmr::vector<Copy_entry> copy_entries;
     };
 

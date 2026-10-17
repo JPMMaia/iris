@@ -1,0 +1,51 @@
+module Optional_type_codegen;
+
+export function use_value(a: Optional::<Int32>) -> (result: Int32)
+{
+    if a.has_value
+    {
+        return a.value;
+    }
+
+    return 0;
+}
+
+export function use_pointer(a: Optional::<*Int32>) -> (result: Bool)
+{
+    return a.has_value;
+}
+
+export function make() -> (result: Optional::<Int32>)
+{
+    return create_optional(1);
+}
+
+export function make_empty() -> (result: Optional::<Int32>)
+{
+    return create_optional::<Int32>();
+}
+
+export function_constructor first(value_type: Type)
+{
+    return function (values: Array_slice::<value_type>) -> (result: Optional::<value_type>)
+    {
+        if values.length == 0u64
+        {
+            return create_optional::<value_type>();
+        }
+
+        return create_optional(values[0]);
+    };
+}
+
+export function use_generic(values: Array_slice::<Int32>) -> (result: Int32)
+{
+    var found = first::<Int32>(values);
+
+    if found.has_value
+    {
+        return found.value;
+    }
+
+    return 0;
+}

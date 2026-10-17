@@ -23,20 +23,14 @@ union My_union
     (Module_name
       (Identifier_with_dots
         (Identifier))))
+  (Comment)
+  (Comment)
   (Declaration
-    (Comment)
     (Union
       (Union_name
         (Identifier))
       (Union_members
-        (Union_member
-          (Comment)
-          (Union_member_name
-            (Identifier))
-          (Union_member_type
-            (Type
-              (Type_name
-                (Identifier)))))
+        (Comment)
         (Union_member
           (Union_member_name
             (Identifier))
@@ -45,7 +39,15 @@ union My_union
               (Type_name
                 (Identifier)))))
         (Union_member
-          (Comment)
+          (Union_member_name
+            (Identifier))
+          (Union_member_type
+            (Type
+              (Type_name
+                (Identifier)))))
+        (Comment)
+        (Comment)
+        (Union_member
           (Union_member_name
             (Identifier))
           (Union_member_type

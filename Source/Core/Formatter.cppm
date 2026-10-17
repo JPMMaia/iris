@@ -76,6 +76,12 @@ namespace iris
         Format_options const& options
     );
 
+    void add_format_lambda_declaration(
+        String_buffer& buffer,
+        Lambda_declaration const& lambda_declaration,
+        Format_options const& options
+    );
+
     void add_format_struct_declaration(
         String_buffer& buffer,
         Struct_declaration const& struct_declaration,

@@ -1,0 +1,13 @@
+{
+    "name": "Load_dynamic_library",
+    "artifacts": [
+        {
+            "name": "my_plugin",
+            "location": "my_plugin/iris_artifact.json"
+        },
+        {
+            "name": "my_host",
+            "location": "my_host/iris_artifact.json"
+        }
+    ]
+}

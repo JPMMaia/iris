@@ -41,6 +41,8 @@ Division is performed by 10^N*a/b
 
 Int64 must be used for multiplication and division intermediate results if the backing storage is Int32. Int128 must be used instead if the backing storage is Int64.
 
+The wide intermediate protects the computation, not the result: the final narrowing back to the backing storage can still overflow (90.0d6 / 0.02d6 is 4500, which does not fit Decimal6's Int32). When both operands are constant this is a compile error. Otherwise it is caught at runtime, and the program aborts, if decimal overflow checks are enabled; with them disabled the result is silently truncated. `iris build` enables them in debug builds only, overridable with --decimal-overflow-checks / --no-decimal-overflow-checks. Only multiplication, division, decimal-to-decimal conversion and decimal-to-integer conversion are checked; addition and subtraction happen in the backing type and cannot overflow the intermediate.
+
 ### Casting operations
 
 Decimals can be casted from and to different numeric types (like Float32 or Int64).

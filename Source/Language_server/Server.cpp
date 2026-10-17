@@ -36,6 +36,7 @@ import iris.language_server.completion;
 import iris.language_server.core;
 import iris.language_server.diagnostics;
 import iris.language_server.go_to_location;
+import iris.language_server.hover;
 import iris.language_server.inlay_hints;
 import iris.language_server.signature_help;
 import iris.parser.convertor;
@@ -122,6 +123,10 @@ namespace iris::language_server
         {
         };
 
+        lsp::HoverOptions const hover_options
+        {
+        };
+
         lsp::TextDocumentSyncOptions const text_document_sync_server_capabilities
         {
             .openClose = true,
@@ -156,6 +161,7 @@ namespace iris::language_server
             {
                 .textDocumentSync = text_document_sync_server_capabilities,
                 .completionProvider = completion_options,
+                .hoverProvider = hover_options,
                 .signatureHelpProvider = signature_help_options,
                 .definitionProvider = definition_options,
                 .inlayHintProvider = inlay_hint_options,
@@ -978,6 +984,29 @@ namespace iris::language_server
             workspace_data.core_module_parse_trees[core_module_index],
             workspace_data.core_modules[core_module_index],
             position
+        );
+    }
+
+    lsp::TextDocument_HoverResult compute_text_document_hover(
+        Server& server,
+        lsp::HoverParams const& parameters
+    )
+    {
+        std::optional<std::pair<Workspace_data&, std::size_t>> const workspace_core_module_pair = find_workspace_core_module_index(
+            server,
+            parameters.textDocument.uri
+        );
+        if (!workspace_core_module_pair.has_value())
+            return nullptr;
+
+        Workspace_data const& workspace_data = workspace_core_module_pair->first;
+        std::size_t const core_module_index = workspace_core_module_pair->second;
+
+        return compute_hover(
+            workspace_data.declaration_database,
+            workspace_data.core_module_parse_trees[core_module_index],
+            workspace_data.core_modules[core_module_index],
+            parameters.position
         );
     }
 

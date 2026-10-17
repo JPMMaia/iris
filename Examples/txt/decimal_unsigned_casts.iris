@@ -1,0 +1,13 @@
+module Decimal_unsigned_casts;
+
+export function decimal_unsigned_casts(
+    u8_value: Uint8,
+    u32_value: Uint32,
+    u64_value: Uint64
+) -> ()
+{
+    var u8_to_d7: Decimal7 = u8_value as Decimal7;
+    var u32_to_d4: Decimal4 = u32_value as Decimal4;
+    var u32_to_d7: Decimal7 = u32_value as Decimal7;
+    var u64_to_d7: Decimal7 = u64_value as Decimal7;
+}

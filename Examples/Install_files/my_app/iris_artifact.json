@@ -1,0 +1,42 @@
+{
+    "name": "my_app",
+    "version": "0.1.0",
+    "type": "executable",
+    "dependencies": [
+        {
+            "name": "my_library"
+        }
+    ],
+    "sources": [
+        {
+            "type": "iris",
+            "include": [
+                "./**/*.iris"
+            ]
+        }
+    ],
+    "copy": [
+        {
+            "source": "build_manifest.txt",
+            "destination": "manifest.txt",
+            "when": "build"
+        },
+        {
+            "source": "install_manifest.txt",
+            "destination": "manifest.txt",
+            "when": "install"
+        },
+        {
+            "source": "content",
+            "destination": "data",
+            "when": "install",
+            "exclude": [
+                "**/*.world/cache/**",
+                "*.tmp"
+            ]
+        }
+    ],
+    "executable": {
+        "source": "my_app.iris"
+    }
+}

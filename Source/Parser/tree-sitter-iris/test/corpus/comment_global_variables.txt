@@ -15,8 +15,9 @@ export var My_global_variable = 1.0f32;
     (Module_name
       (Identifier_with_dots
         (Identifier))))
+  (Comment)
+  (Comment)
   (Declaration
-    (Comment)
     (Global_variable
       (Global_variable_type)
       (Global_variable_name

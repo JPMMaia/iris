@@ -1,0 +1,13 @@
+{
+    "name": "Decimal_arithmetic",
+    "artifacts": [
+        {
+            "name": "decimal_app",
+            "location": "decimal_app/iris_artifact.json"
+        },
+        {
+            "name": "decimal_overflow_app",
+            "location": "decimal_overflow_app/iris_artifact.json"
+        }
+    ]
+}

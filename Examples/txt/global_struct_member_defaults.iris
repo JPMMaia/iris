@@ -1,0 +1,27 @@
+module Global_struct_member_defaults;
+
+import Global_struct_member_defaults_provider as Provider;
+
+export struct Rules
+{
+    hours: Int32 = 16i32;
+    rate: Decimal7 = 0.5d7;
+    flag: Bool = true;
+}
+
+export struct Outer
+{
+    value: Int32 = 1i32;
+    inner: Rules = { hours: 8i32 };
+}
+
+export var constant_braces: Rules = {};
+export var constant_partial: Rules = { hours: 3i32 };
+export var constant_zero: Rules = zero_initialized {};
+
+export mutable mutable_braces: Rules = {};
+export mutable mutable_partial: Rules = { hours: 3i32 };
+export mutable mutable_zero: Rules = zero_initialized {};
+
+export var imported_braces: Provider.Unit = {};
+export var nested_braces: Outer = {};

@@ -78,6 +78,50 @@ namespace iris::tools::tests_results_replacer
         return input.substr(begin_offset, end_offset - begin_offset);
     }
 
+    // Catch2 writes its report as XML, so the test output arrives with the five predefined
+    // entities escaped. They have to be turned back into the characters the compiler actually
+    // emitted, or the regenerated expectations no longer match what the test compares against.
+    std::pmr::string unescape_xml(std::string_view const input_text)
+    {
+        constexpr std::pair<std::string_view, char> entities[]
+        {
+            { "&lt;", '<' },
+            { "&gt;", '>' },
+            { "&quot;", '"' },
+            { "&apos;", '\'' },
+            { "&amp;", '&' },
+        };
+
+        std::pmr::string output;
+        output.reserve(input_text.size());
+
+        for (std::size_t offset = 0; offset < input_text.size(); )
+        {
+            if (input_text[offset] == '&')
+            {
+                std::string_view const remaining = input_text.substr(offset);
+
+                auto const location = std::find_if(
+                    std::begin(entities),
+                    std::end(entities),
+                    [remaining](std::pair<std::string_view, char> const& entity) -> bool { return remaining.starts_with(entity.first); }
+                );
+
+                if (location != std::end(entities))
+                {
+                    output.push_back(location->second);
+                    offset += location->first.size();
+                    continue;
+                }
+            }
+
+            output.push_back(input_text[offset]);
+            offset += 1;
+        }
+
+        return output;
+    }
+
     std::pmr::vector<Test_result> extract_test_results(std::string_view const input_text)
     {
         constexpr std::string_view begin_test_case_string = "<TestCase name=\"";
@@ -139,9 +183,9 @@ namespace iris::tools::tests_results_replacer
             output.push_back(
                 Test_result
                 {
-                    .test_name = std::pmr::string{test_name},
-                    .actual = std::pmr::string{actual},
-                    .expected = std::pmr::string{expected},
+                    .test_name = unescape_xml(test_name),
+                    .actual = unescape_xml(actual),
+                    .expected = unescape_xml(expected),
                 }
             );
         }

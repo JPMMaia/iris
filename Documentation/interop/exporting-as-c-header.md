@@ -58,6 +58,34 @@ export function my_interface(value: mb.My_struct) -> (c: Int32)
 
 The generated `module_a.h` will contain a C function declaration for `my_interface`, with `mb.My_struct` translated to its C-compatible struct representation.
 
+## Optional Members
+
+An [`Optional::<T>`](../language/optional-type.md) is emitted according to its representation. An
+optional pointer is spelled as the pointer itself:
+
+```c
+struct my_module_Node* parent;
+```
+
+Any other `T` gets a generated struct, emitted once per instantiation before anything that uses it:
+
+```c
+struct Optional_Int32
+{
+    int32_t value;
+    bool has_value;
+};
+```
+
+The struct's members are generated from the same declaration the compiler lays out, so the header
+and the compiled type always agree.
+
+Because C cannot distinguish an optional pointer from a plain one, the exporter records which
+members were a plain `*T` in the struct's `IRIS_META` comment as `raw_pointer_members=`. That is what
+makes an export/import round trip lossless when the import side asks for pointer members to be
+wrapped as optionals — importing does not wrap by default. See
+[Importing C Libraries](./importing-c.md).
+
 ## Limitations
 
 - Generics (function/type constructors) are not exported; only concrete instantiations would be.

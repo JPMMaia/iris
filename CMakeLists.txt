@@ -18,11 +18,32 @@ include(InstallRequiredSystemLibraries)
 include("Scripts/compile_cxx_header_unit.cmake")
 include("Scripts/compile_cpp_std_module.cmake")
 include("Scripts/module_exports.cmake")
+include("Scripts/compiler_rt_builtins.cmake")
 
 include(CTest)
 
+find_package(Git QUIET)
+if (GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" describe --always --dirty --abbrev=12
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_VARIABLE IRIS_BUILD_ID
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+endif ()
+
+if (NOT IRIS_BUILD_ID)
+    set(IRIS_BUILD_ID "${PROJECT_VERSION}-unknown")
+endif ()
+
+message(STATUS "Iris build id: ${IRIS_BUILD_ID}")
+
 if (MSVC)
     add_compile_options("/EHsc")
+    # Translation units that switch over Type_reference exceed the default COFF section
+    # limit (C1128); every added variant alternative brings more of them over the line.
+    add_compile_options("/bigobj")
 else ()
     if (CMAKE_DEBUG_TYPE STREQUAL "Debug")
         add_compile_options("-gdwarf-4")
@@ -46,3 +67,7 @@ add_custom_target(
 )
 
 install(DIRECTORY "share/iris" TYPE DATA CONFIGURATIONS Debug Release)
+
+# Builds share/iris/lib/iris_builtins.lib, the 128-bit integer helpers (__divti3 and
+# friends) that Decimal7-Decimal18 arithmetic lowers to. Windows only.
+iris_add_compiler_rt_builtins_library()

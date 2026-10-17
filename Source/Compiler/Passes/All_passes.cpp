@@ -5,6 +5,7 @@ import std;
 import iris.compiler.compile_time_pass;
 import iris.compiler.implicit_function_pass;
 import iris.compiler.instantiate_pass;
+import iris.compiler.lambda_pass;
 
 namespace iris::compiler
 {
@@ -28,6 +29,7 @@ namespace iris::compiler
 
         run_instantiate_pass_on_module(core_module, parameters);
         run_implicit_function_pass_on_module(core_module, parameters.declaration_database, parameters.is_test_mode);
+        run_lambda_pass_on_module(core_module, parameters.declaration_database, parameters.lambda_database, parameters.is_test_mode);
     }
 
     void run_all_passes_on_function(

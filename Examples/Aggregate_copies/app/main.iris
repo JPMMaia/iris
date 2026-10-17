@@ -1,0 +1,134 @@
+module aggregate_copies;
+
+// Aggregates are copied and zeroed through memcpy and memset rather than as first-class values.
+// These tests pin down the cases where that rewrite could change what a program means.
+
+struct Transform
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+    z: Float32 = 0.0f32;
+    w: Float32 = 1.0f32;
+}
+
+// Wide enough that copying 64 of them by value used to take minutes to code-generate.
+struct Row
+{
+    item: Constant_array::<C_char, 32> = zero_initialized {};
+    slot: Constant_array::<C_char, 32> = zero_initialized {};
+    joint: Constant_array::<C_char, 32> = zero_initialized {};
+    label: Constant_array::<C_char, 64> = zero_initialized {};
+    grip: Transform = {};
+}
+
+struct Pair
+{
+    first: Transform = {};
+    second: Transform = {};
+}
+
+function make_transform(value: Float32) -> (result: Transform)
+{
+    return explicit {
+        x: value,
+        y: value + 1.0f32,
+        z: value + 2.0f32,
+        w: 1.0f32
+    };
+}
+
+@test
+function test_a_copy_is_independent_of_its_source() -> ()
+{
+    mutable original = make_transform(1.0f32);
+    mutable copy = original;
+
+    copy.x = 99.0f32;
+
+    check(original.x == 1.0f32);
+    check(copy.x == 99.0f32);
+    check(copy.y == 2.0f32);
+}
+
+@test
+function test_a_swap_through_a_temporary_keeps_both_values() -> ()
+{
+    mutable a = make_transform(1.0f32);
+    mutable b = make_transform(5.0f32);
+
+    var temporary = a;
+    a = b;
+    b = temporary;
+
+    check(a.x == 5.0f32);
+    check(b.x == 1.0f32);
+    check(a.z == 7.0f32);
+    check(b.z == 3.0f32);
+}
+
+@test
+function test_swapping_array_elements_keeps_both_values() -> ()
+{
+    mutable rows: Constant_array::<Transform, 4> = zero_initialized {};
+    rows[0] = make_transform(10.0f32);
+    rows[3] = make_transform(30.0f32);
+
+    var temporary = rows[0];
+    rows[0] = rows[3];
+    rows[3] = temporary;
+
+    check(rows[0].x == 30.0f32);
+    check(rows[3].x == 10.0f32);
+    check(rows[1].x == 0.0f32);
+}
+
+@test
+function test_assigning_a_value_to_itself_changes_nothing() -> ()
+{
+    mutable value = make_transform(4.0f32);
+    value = value;
+
+    check(value.x == 4.0f32);
+    check(value.y == 5.0f32);
+    check(value.w == 1.0f32);
+}
+
+@test
+function test_a_nested_member_copy_leaves_its_sibling_alone() -> ()
+{
+    mutable pair: Pair = {};
+    pair.first = make_transform(2.0f32);
+    pair.second = pair.first;
+    pair.first.x = 8.0f32;
+
+    check(pair.second.x == 2.0f32);
+    check(pair.first.x == 8.0f32);
+}
+
+@test
+function test_a_zero_initialized_array_is_zero_and_copies_whole() -> ()
+{
+    mutable rows: Constant_array::<Row, 64> = zero_initialized {};
+    check(rows[17].grip.w == 0.0f32);
+    check(rows[63].label[0] == (0 as C_char));
+
+    rows[17].grip = make_transform(3.0f32);
+    rows[63].label[0] = 65 as C_char;
+
+    mutable copy = rows;
+    rows[17].grip.x = 0.0f32;
+
+    check(copy[17].grip.x == 3.0f32);
+    check(copy[63].label[0] == (65 as C_char));
+    check(copy[0].grip.x == 0.0f32);
+
+    mutable second_copy = copy;
+    mutable third_copy = second_copy;
+    check(third_copy[17].grip.y == 4.0f32);
+}
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return 0;
+}

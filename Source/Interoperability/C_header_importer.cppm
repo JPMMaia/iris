@@ -31,10 +31,12 @@ namespace iris::c
         std::pmr::vector<iris::Global_variable_declaration> global_variable_declarations;
         std::pmr::vector<iris::Struct_declaration> struct_declarations;
         std::pmr::vector<iris::Union_declaration> union_declarations;
+        std::pmr::vector<iris::Lambda_declaration> lambda_declarations;
         std::pmr::vector<iris::Function_declaration> function_declarations;
         std::pmr::vector<C_macro_declaration> macro_declarations;
         std::pmr::unordered_map<std::pmr::string, Imported_declaration_metadata> metadata_by_c_name;
         std::uint32_t unnamed_count = 0;
+        bool wrap_pointers_as_optional = false;
     };
 
     export struct C_header
@@ -51,7 +53,23 @@ namespace iris::c
         std::span<std::pmr::string const> public_prefixes;
         std::span<std::pmr::string const> remove_prefixes;
         bool allow_errors = true;
+        // When true, a pointer member of an imported struct or union becomes Optional::<*T>,
+        // unless the header names it in a raw_pointer_members= IRIS_META field.
+        bool wrap_pointers_as_optional = false;
     };
+
+    export struct Imported_header
+    {
+        iris::Module core_module;
+        std::pmr::vector<std::filesystem::path> included_files;
+    };
+
+    export std::optional<Imported_header> import_header_with_includes(
+        std::string_view const header_name,
+        std::filesystem::path const& header_path,
+        Options const& options,
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    );
 
     export std::optional<iris::Module> import_header(std::string_view const header_name, std::filesystem::path const& header_path, Options const& options);
 

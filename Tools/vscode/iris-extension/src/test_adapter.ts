@@ -340,6 +340,29 @@ function run_process(command: string, args: string[], spawn_options: child_proce
   });
 }
 
+function describe_abnormal_exit(code: number | null): string {
+    if (code === 2) {
+        return "The test run is incomplete: the test did not execute.";
+    }
+
+    if (code === null) {
+        return "The test process was terminated before it could report a result.";
+    }
+
+    // Node reports a Windows unhandled exception as the raw NTSTATUS, which is negative as a signed
+    // 32-bit value; a POSIX child killed by a signal comes back as 128 + signal.
+    const unsigned_code = code >>> 0;
+    if (unsigned_code >>> 30 === 3) {
+        return `The test crashed (exit status 0x${unsigned_code.toString(16).toUpperCase().padStart(8, "0")}).`;
+    }
+
+    if (code > 128 && code <= 128 + 64) {
+        return `The test was killed by signal ${code - 128}.`;
+    }
+
+    return `The test process exited abnormally with status ${code}.`;
+}
+
 function run_test(run: vscode.TestRun, item: vscode.TestItem, spawn_options: child_process.SpawnOptionsWithoutStdio, token: vscode.CancellationToken): Promise<Process_result> {
     run.started(item);
 
@@ -364,8 +387,11 @@ function run_test(run: vscode.TestRun, item: vscode.TestItem, spawn_options: chi
         else if (code === 0) {
             run.passed(item, duration_milliseconds);
         }
-        else {
+        else if (code === 1) {
             run.failed(item, new vscode.TestMessage("Test failed."), duration_milliseconds);
+        }
+        else {
+            run.errored(item, new vscode.TestMessage(describe_abnormal_exit(code)), duration_milliseconds);
         }
     };
 

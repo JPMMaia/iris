@@ -23,6 +23,7 @@ namespace iris
             Function_constructor const*,
             Function_declaration const*,
             Global_variable_declaration const*,
+            Lambda_declaration const*,
             Struct_declaration const*,
             Type_constructor const*,
             Union_declaration const*
@@ -75,6 +76,7 @@ namespace iris
         std::span<iris::Enum_declaration const> enum_declarations,
         std::span<iris::Forward_declaration const> forward_declarations,
         std::span<iris::Global_variable_declaration const> global_variable_declarations,
+        std::span<iris::Lambda_declaration const> lambda_declarations,
         std::span<iris::Struct_declaration const> struct_declarations,
         std::span<iris::Union_declaration const> union_declarations,
         std::span<iris::Function_declaration const> function_declarations,

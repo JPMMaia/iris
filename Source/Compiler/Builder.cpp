@@ -11,11 +11,13 @@ import llvm;
 
 import iris.binary_serializer;
 import iris.core;
+import iris.core.hash;
 import iris.core.struct_layout;
 import iris.common;
 import iris.common.archive;
 import iris.common.filesystem;
 import iris.common.filesystem_common;
+import iris.compiler.lambda_database;
 import iris.compiler;
 import iris.compiler.analysis;
 import iris.compiler.artifact;
@@ -23,7 +25,9 @@ import iris.compiler.clang_code_generation;
 import iris.compiler.clang_compiler;
 import iris.compiler.clang_data;
 import iris.compiler.compile_commands_generator;
+import iris.compiler.diagnostic;
 import iris.compiler.linker;
+import iris.compiler.parallel;
 import iris.compiler.profiler;
 import iris.compiler.project;
 import iris.compiler.repository;
@@ -39,7 +43,17 @@ import iris.parser.parser;
 
 namespace iris::compiler
 {
-    void copy_files_from_artifacts(Builder const& builder, std::span<Artifact const> const artifacts);
+    enum class Copy_phase
+    {
+        Build,
+        Install
+    };
+
+    static void copy_files_from_artifacts(
+        std::span<Artifact const> const artifacts,
+        std::filesystem::path const& destination_root,
+        Copy_phase const phase
+    );
 
     static std::filesystem::path get_hl_build_directory(
         std::filesystem::path const& build_directory_path
@@ -63,6 +77,360 @@ namespace iris::compiler
         }
     }
 
+#ifndef IRIS_BUILD_ID
+    #define IRIS_BUILD_ID "unknown"
+#endif
+
+    struct Cache_key_builder
+    {
+        std::pmr::string canonical;
+    };
+
+    static void add_key_token(Cache_key_builder& builder, std::string_view const token)
+    {
+        builder.canonical += std::format("{:08x}:", token.size());
+        builder.canonical += token;
+        builder.canonical += '\x1f';
+    }
+
+    static void add_key_token(Cache_key_builder& builder, std::uint64_t const value)
+    {
+        add_key_token(builder, std::format("{:016x}", value));
+    }
+
+    static void add_key_token(Cache_key_builder& builder, bool const value)
+    {
+        add_key_token(builder, value ? std::string_view{"1"} : std::string_view{"0"});
+    }
+
+    static void add_key_path_token(Cache_key_builder& builder, std::filesystem::path const& path)
+    {
+        std::error_code error_code;
+        std::filesystem::path const absolute_path = std::filesystem::absolute(path, error_code);
+        std::filesystem::path const normalized = error_code ? path.lexically_normal() : absolute_path.lexically_normal();
+        add_key_token(builder, normalized.generic_string());
+    }
+
+    static std::uint64_t finish_cache_key(Cache_key_builder const& builder)
+    {
+        return iris::hash_string(builder.canonical);
+    }
+
+    static void add_compiler_binary_identity(Cache_key_builder& key_builder)
+    {
+        auto const add_file = [&](std::filesystem::path const& file_path) -> void
+        {
+            std::error_code error_code;
+
+            std::uintmax_t const size = std::filesystem::file_size(file_path, error_code);
+            if (error_code)
+                return;
+
+            std::filesystem::file_time_type const time = std::filesystem::last_write_time(file_path, error_code);
+            if (error_code)
+                return;
+
+            add_key_token(key_builder, file_path.filename().generic_string());
+            add_key_token(key_builder, static_cast<std::uint64_t>(size));
+            add_key_token(key_builder, static_cast<std::uint64_t>(time.time_since_epoch().count()));
+        };
+
+        add_file(iris::common::get_executable_path());
+
+        std::filesystem::path const executable_directory = iris::common::get_executable_directory();
+
+        std::error_code error_code;
+        std::filesystem::directory_iterator iterator{executable_directory, error_code};
+        if (error_code)
+            return;
+
+        std::pmr::vector<std::filesystem::path> shared_libraries;
+
+        for (std::filesystem::directory_entry const& entry : iterator)
+        {
+            std::filesystem::path const& entry_path = entry.path();
+            std::string const extension = entry_path.extension().generic_string();
+            if (extension != ".dll" && extension != ".so" && extension != ".dylib")
+                continue;
+
+            std::string const filename = entry_path.filename().generic_string();
+            if (!filename.starts_with("Iris_") && !filename.starts_with("libIris_"))
+                continue;
+
+            shared_libraries.push_back(entry_path);
+        }
+
+        // 'directory_iterator' has no defined order; sort so that the key is stable across builds.
+        std::sort(shared_libraries.begin(), shared_libraries.end());
+
+        for (std::filesystem::path const& shared_library : shared_libraries)
+            add_file(shared_library);
+    }
+
+    static std::string_view contract_options_to_string(Contract_options const contract_options)
+    {
+        switch (contract_options)
+        {
+            case Contract_options::Disabled: return "disabled";
+            case Contract_options::Log_error_and_abort: return "log_error_and_abort";
+        }
+
+        return "unknown";
+    }
+
+    static void touch_stamp_file(std::filesystem::path const& stamp_file_path)
+    {
+        std::ofstream output_stream{stamp_file_path, std::ios::binary | std::ios::trunc};
+    }
+
+    static Build_identity update_build_state(
+        Builder const& builder,
+        std::filesystem::path const& hl_build_directory
+    )
+    {
+        Cache_key_builder parse_key_builder;
+        add_key_token(parse_key_builder, std::string_view{"iris_parse_identity/v1"});
+        add_key_token(parse_key_builder, std::string_view{IRIS_BUILD_ID});
+        if (builder.track_compiler_binary_identity)
+            add_compiler_binary_identity(parse_key_builder);
+
+        std::uint64_t const parse_identity = finish_cache_key(parse_key_builder);
+
+        Compilation_options const& compilation_options = builder.compilation_options;
+
+        Cache_key_builder codegen_key_builder;
+        add_key_token(codegen_key_builder, std::string_view{"iris_codegen_identity/v1"});
+        add_key_token(codegen_key_builder, parse_identity);
+        add_key_token(codegen_key_builder, std::string_view{builder.target.operating_system});
+        add_key_token(codegen_key_builder, compilation_options.target_triple.value_or("<default>"));
+        add_key_token(codegen_key_builder, compilation_options.is_optimized);
+        add_key_token(codegen_key_builder, compilation_options.debug);
+        add_key_token(codegen_key_builder, compilation_options.output_debug_code_view);
+        add_key_token(codegen_key_builder, contract_options_to_string(compilation_options.contract_options));
+        add_key_token(codegen_key_builder, compilation_options.enable_bounds_checks);
+        add_key_token(codegen_key_builder, compilation_options.enable_decimal_overflow_checks);
+        add_key_token(codegen_key_builder, compilation_options.is_test_mode);
+
+        std::uint64_t const codegen_identity = finish_cache_key(codegen_key_builder);
+
+        std::filesystem::path const build_state_file_path = hl_build_directory / "build_state.json";
+        std::filesystem::path const parse_stamp_file_path = hl_build_directory / "parse.stamp";
+        std::filesystem::path const codegen_stamp_file_path = hl_build_directory / "codegen.stamp";
+
+        std::optional<std::uint64_t> previous_parse_identity;
+        std::optional<std::uint64_t> previous_codegen_identity;
+
+        if (std::filesystem::exists(build_state_file_path))
+        {
+            std::optional<std::pmr::string> const contents = iris::common::get_file_contents(build_state_file_path);
+            if (contents.has_value())
+            {
+                nlohmann::json const json = nlohmann::json::parse(contents.value(), nullptr, false);
+                if (!json.is_discarded() && json.is_object() && json.value("version", 0) == 1)
+                {
+                    if (json.contains("parse_identity"))
+                        previous_parse_identity = std::stoull(json["parse_identity"].get<std::string>(), nullptr, 16);
+                    if (json.contains("codegen_identity"))
+                        previous_codegen_identity = std::stoull(json["codegen_identity"].get<std::string>(), nullptr, 16);
+                }
+            }
+        }
+
+        bool const parse_changed = previous_parse_identity != parse_identity || !std::filesystem::exists(parse_stamp_file_path);
+        bool const codegen_changed = previous_codegen_identity != codegen_identity || !std::filesystem::exists(codegen_stamp_file_path);
+
+        if (parse_changed)
+            touch_stamp_file(parse_stamp_file_path);
+
+        if (codegen_changed)
+            touch_stamp_file(codegen_stamp_file_path);
+
+        if (parse_changed || codegen_changed)
+        {
+            nlohmann::json json;
+            json["version"] = 1;
+            json["parse_identity"] = std::format("{:016x}", parse_identity);
+            json["codegen_identity"] = std::format("{:016x}", codegen_identity);
+            json["build_id"] = IRIS_BUILD_ID;
+            json["operating_system"] = builder.target.operating_system;
+            json["target_triple"] = compilation_options.target_triple.has_value() ? std::string{compilation_options.target_triple.value()} : std::string{"<default>"};
+            json["compilation_options"] = {
+                {"is_optimized", compilation_options.is_optimized},
+                {"debug", compilation_options.debug},
+                {"output_debug_code_view", compilation_options.output_debug_code_view},
+                {"contract_options", contract_options_to_string(compilation_options.contract_options)},
+                {"enable_bounds_checks", compilation_options.enable_bounds_checks},
+                {"enable_decimal_overflow_checks", compilation_options.enable_decimal_overflow_checks},
+                {"is_test_mode", compilation_options.is_test_mode},
+            };
+
+            std::string const json_string = json.dump(4);
+            std::ofstream output_stream{build_state_file_path, std::ios::binary | std::ios::trunc};
+            output_stream.write(json_string.data(), json_string.size());
+        }
+
+        std::error_code error_code;
+
+        std::filesystem::file_time_type const parse_floor = std::filesystem::last_write_time(parse_stamp_file_path, error_code);
+        std::filesystem::file_time_type const codegen_floor = std::filesystem::last_write_time(codegen_stamp_file_path, error_code);
+
+        if (error_code)
+        {
+            return Build_identity
+            {
+                .parse_identity = parse_identity,
+                .codegen_identity = codegen_identity,
+                .parse_floor = std::filesystem::file_time_type::min(),
+                .codegen_floor = std::filesystem::file_time_type::min(),
+            };
+        }
+
+        return Build_identity
+        {
+            .parse_identity = parse_identity,
+            .codegen_identity = codegen_identity,
+            .parse_floor = parse_floor,
+            .codegen_floor = codegen_floor,
+        };
+    }
+
+    static bool is_at_or_after_floor(
+        std::filesystem::path const& file_path,
+        std::filesystem::file_time_type const floor
+    )
+    {
+        std::error_code error_code;
+        std::filesystem::file_time_type const time = std::filesystem::last_write_time(file_path, error_code);
+        if (error_code)
+            return false;
+
+        return time >= floor;
+    }
+
+    static constexpr std::filesystem::file_time_type get_always_out_of_date_time()
+    {
+        return std::filesystem::file_time_type::max();
+    }
+
+    struct Header_cache_metadata
+    {
+        std::uint64_t cache_key = 0;
+        std::pmr::vector<std::filesystem::path> includes;
+    };
+
+    static std::filesystem::path get_header_dependency_file_path(
+        std::filesystem::path const& hl_build_directory,
+        std::string_view const module_name
+    )
+    {
+        return hl_build_directory / std::format("{}.irisb.deps.json", module_name);
+    }
+
+    static std::optional<Header_cache_metadata> read_header_cache_metadata(
+        std::filesystem::path const& dependency_file_path
+    )
+    {
+        if (!std::filesystem::exists(dependency_file_path))
+            return std::nullopt;
+
+        std::optional<std::pmr::string> const contents = iris::common::get_file_contents(dependency_file_path);
+        if (!contents.has_value())
+            return std::nullopt;
+
+        nlohmann::json const json = nlohmann::json::parse(contents.value(), nullptr, false);
+        if (json.is_discarded() || !json.is_object() || json.value("version", 0) != 1)
+            return std::nullopt;
+
+        if (!json.contains("cache_key") || !json.contains("includes") || !json["includes"].is_array())
+            return std::nullopt;
+
+        Header_cache_metadata metadata;
+        metadata.cache_key = std::stoull(json["cache_key"].get<std::string>(), nullptr, 16);
+
+        for (nlohmann::json const& include : json["includes"])
+            metadata.includes.push_back(std::filesystem::path{include.get<std::string>()});
+
+        return metadata;
+    }
+
+    static void write_header_cache_metadata(
+        std::filesystem::path const& dependency_file_path,
+        std::string_view const module_name,
+        std::filesystem::path const& header_path,
+        Header_cache_metadata const& metadata,
+        std::optional<std::string_view> const cache_key_debug
+    )
+    {
+        nlohmann::json json;
+        json["version"] = 1;
+        json["module_name"] = std::string{module_name};
+        json["header_path"] = header_path.generic_string();
+        json["cache_key"] = std::format("{:016x}", metadata.cache_key);
+
+        nlohmann::json includes = nlohmann::json::array();
+        for (std::filesystem::path const& include : metadata.includes)
+            includes.push_back(include.generic_string());
+        json["includes"] = std::move(includes);
+
+        if (cache_key_debug.has_value())
+            json["cache_key_debug"] = std::string{cache_key_debug.value()};
+
+        std::string const json_string = json.dump(4);
+        std::ofstream output_stream{dependency_file_path, std::ios::binary | std::ios::trunc};
+        output_stream.write(json_string.data(), json_string.size());
+    }
+
+    static bool are_header_includes_up_to_date(
+        std::filesystem::path const& output_header_module_path,
+        Header_cache_metadata const& metadata
+    )
+    {
+        std::error_code error_code;
+
+        std::filesystem::file_time_type const output_time = std::filesystem::last_write_time(output_header_module_path, error_code);
+        if (error_code)
+            return false;
+
+        for (std::filesystem::path const& include : metadata.includes)
+        {
+            std::filesystem::file_time_type const include_time = std::filesystem::last_write_time(include, error_code);
+            if (error_code)
+                return false;
+
+            if (include_time > output_time)
+                return false;
+        }
+
+        return true;
+    }
+
+    static std::filesystem::file_time_type get_newest_header_include_time(
+        std::filesystem::path const& hl_build_directory,
+        std::string_view const module_name
+    )
+    {
+        std::filesystem::path const dependency_file_path = get_header_dependency_file_path(hl_build_directory, module_name);
+
+        std::optional<Header_cache_metadata> const metadata = read_header_cache_metadata(dependency_file_path);
+        if (!metadata.has_value())
+            return std::filesystem::file_time_type::min();
+
+        std::filesystem::file_time_type newest_time = std::filesystem::file_time_type::min();
+
+        std::error_code error_code;
+
+        for (std::filesystem::path const& include : metadata->includes)
+        {
+            std::filesystem::file_time_type const include_time = std::filesystem::last_write_time(include, error_code);
+            if (error_code)
+                return get_always_out_of_date_time();
+
+            newest_time = std::max(newest_time, include_time);
+        }
+
+        return newest_time;
+    }
+
     // Tracks, per module, the most recent modification time among the module's own '.irisb' file and
     // the '.irisb' files of every module it transitively imports.
     //
@@ -75,18 +443,14 @@ namespace iris::compiler
         std::filesystem::path hl_build_directory;
         std::pmr::unordered_map<std::pmr::string, iris::Module const*> modules_by_name;
         std::pmr::unordered_map<std::pmr::string, std::filesystem::file_time_type> cache;
+        // Outputs older than this were produced by a different toolchain or configuration.
+        std::filesystem::file_time_type floor = std::filesystem::file_time_type::min();
     };
-
-    // Time that no output file can ever be newer than, used to force regeneration whenever the
-    // inputs of a module cannot be determined.
-    static constexpr std::filesystem::file_time_type get_always_out_of_date_time()
-    {
-        return std::filesystem::file_time_type::max();
-    }
 
     static Module_input_times create_module_input_times(
         std::filesystem::path const& hl_build_directory,
         std::span<iris::Module const* const> const modules,
+        std::filesystem::file_time_type const floor,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
@@ -101,12 +465,14 @@ namespace iris::compiler
             .hl_build_directory = hl_build_directory,
             .modules_by_name = std::move(modules_by_name),
             .cache = std::pmr::unordered_map<std::pmr::string, std::filesystem::file_time_type>{output_allocator},
+            .floor = floor,
         };
     }
 
     static Module_input_times create_module_input_times(
         std::filesystem::path const& hl_build_directory,
         std::span<iris::Module const> const modules,
+        std::filesystem::file_time_type const floor,
         std::pmr::polymorphic_allocator<> const& output_allocator
     )
     {
@@ -116,7 +482,7 @@ namespace iris::compiler
         for (iris::Module const& core_module : modules)
             module_pointers.push_back(&core_module);
 
-        return create_module_input_times(hl_build_directory, module_pointers, output_allocator);
+        return create_module_input_times(hl_build_directory, module_pointers, floor, output_allocator);
     }
 
     // Returns the newest modification time among the '.irisb' of 'module_name' and the '.irisb' of
@@ -144,15 +510,20 @@ namespace iris::compiler
 
         std::filesystem::file_time_type newest_input_time = std::filesystem::last_write_time(module_file_path);
 
+        newest_input_time = std::max(
+            newest_input_time,
+            get_newest_header_include_time(input_times.hl_build_directory, module_name)
+        );
+
+        if (newest_input_time == get_always_out_of_date_time())
+        {
+            input_times.cache.insert_or_assign(module_name, newest_input_time);
+            return newest_input_time;
+        }
+
         auto const module_location = input_times.modules_by_name.find(module_name);
         if (module_location == input_times.modules_by_name.end())
         {
-            // The module is not among the tracked modules. This is the normal case for a C header
-            // module, whose '.irisb' is regenerated whenever the underlying header changes, so its
-            // own modification time is a sound input time. Its dependency list is not available
-            // here, so recursion stops. Returning 'always out of date' instead would poison the
-            // cache (the placeholder inserted above) and force every importer to regenerate on
-            // every build.
             input_times.cache.insert_or_assign(module_name, newest_input_time);
             return newest_input_time;
         }
@@ -182,6 +553,14 @@ namespace iris::compiler
         if (!std::filesystem::exists(output_file_path))
             return false;
 
+        std::error_code error_code;
+        std::uintmax_t const output_file_size = std::filesystem::file_size(output_file_path, error_code);
+        if (error_code || output_file_size == 0)
+            return false;
+
+        if (!is_at_or_after_floor(output_file_path, input_times.floor))
+            return false;
+
         return std::filesystem::last_write_time(output_file_path) > get_newest_input_time(input_times, module_name);
     }
 
@@ -205,6 +584,17 @@ namespace iris::compiler
     Profiler* get_profiler(Builder& builder)
     {
         return builder.use_profiler ? &builder.profiler : nullptr;
+    }
+
+    Parallel_options get_parallel_options(
+        Builder& builder
+    )
+    {
+        return Parallel_options
+        {
+            .job_count = builder.job_count,
+            .profiler = get_profiler(builder),
+        };
     }
 
     Builder create_builder(
@@ -247,6 +637,8 @@ namespace iris::compiler
             .output_llvm_ir = builder_options.output_llvm_ir,
             .is_test_mode = builder_options.is_test_mode,
             .environment_variables = builder_options.environment_variables,
+            .track_compiler_binary_identity = builder_options.track_compiler_binary_identity,
+            .job_count = resolve_job_count(builder_options.job_count),
         };
     }
 
@@ -272,6 +664,11 @@ namespace iris::compiler
             builder.build_directory_path
         );
         create_directory_if_it_does_not_exist(hl_build_directory);
+
+
+        start_timer(get_profiler(builder), "update_build_state");
+        builder.build_identity = update_build_state(builder, hl_build_directory);
+        end_timer(get_profiler(builder), "update_build_state");
 
         std::pmr::vector<Artifact> const artifacts = get_sorted_artifacts(
             artifact_file_paths,
@@ -360,9 +757,9 @@ namespace iris::compiler
             builder,
             preprocessed.transformed_core_modules,
             module_name_to_file_path_map,
-            llvm_data,
             all_sorted_modules,
             preprocessed.declaration_database,
+            preprocessed.lambda_database,
             compilation_options,
             false
         );
@@ -386,9 +783,9 @@ namespace iris::compiler
                 builder,
                 preprocessed_test.transformed_core_modules,
                 module_name_to_file_path_map,
-                llvm_data,
                 preprocessed_test.sorted_modules,
                 preprocessed_test.declaration_database,
+                preprocessed_test.lambda_database,
                 test_compilation_options,
                 true
             );
@@ -422,11 +819,11 @@ namespace iris::compiler
             copy_dlls(
                 builder,
                 artifacts,
-                temporaries_allocator
+                builder.build_directory_path / "bin"
             );
         }
 
-        copy_files_from_artifacts(builder, artifacts);
+        copy_files_from_artifacts(artifacts, builder.build_directory_path, Copy_phase::Build);
 
         end_timer(get_profiler(builder), "build_artifact");
 
@@ -570,16 +967,36 @@ namespace iris::compiler
         return std::pmr::vector<Artifact>{std::move(artifacts), output_allocator};
     }
 
-    static bool are_chars_case_insensitive_equal(char const a, char const b)
+    // Two spellings of the same file give the same identity: '..' is resolved and, on Windows, the
+    // casing comes from the file system.
+    static std::string get_file_identity(
+        std::filesystem::path const& file_path
+    )
     {
-        return std::tolower(static_cast<unsigned char>(a)) ==
-            std::tolower(static_cast<unsigned char>(b));
+        std::error_code error_code;
+        std::filesystem::path const canonical_path = std::filesystem::weakly_canonical(file_path, error_code);
+        if (!error_code)
+            return canonical_path.generic_string();
+
+        std::filesystem::path const absolute_path = std::filesystem::absolute(file_path, error_code);
+        return (error_code ? file_path : absolute_path).lexically_normal().generic_string();
     }
 
-    static bool are_strings_case_insensitive_equal(const std::string& a, const std::string& b)
+    // Keeps the first spelling of each file, in order.
+    static void remove_duplicate_files(
+        std::pmr::vector<std::filesystem::path>& file_paths,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
     {
-        return a.size() == b.size() &&
-            std::equal(a.begin(), a.end(), b.begin(), are_chars_case_insensitive_equal);
+        std::pmr::unordered_set<std::string> seen_files{temporaries_allocator};
+        seen_files.reserve(file_paths.size());
+
+        auto const is_duplicate = [&](std::filesystem::path const& file_path) -> bool
+        {
+            return !seen_files.insert(get_file_identity(file_path)).second;
+        };
+
+        file_paths.erase(std::remove_if(file_paths.begin(), file_paths.end(), is_duplicate), file_paths.end());
     }
 
     std::pmr::vector<std::filesystem::path> get_artifacts_source_files(
@@ -605,16 +1022,12 @@ namespace iris::compiler
         }
 
         if (is_test_mode)
-        {
-            std::filesystem::path const json_module_file_path = iris::common::get_json_module_file_path();
-            auto const location = std::find_if(
-                source_files.begin(),
-                source_files.end(),
-                [&](std::filesystem::path const& path) -> bool { return are_strings_case_insensitive_equal(path.generic_string(), json_module_file_path.generic_string()); }
-            );
-            if (location == source_files.end())
-                source_files.push_back(json_module_file_path);
-        }
+            source_files.push_back(iris::common::get_json_module_file_path());
+
+        // A file can be listed by several artifacts, for example by one through a glob and by another
+        // through a relative path. Each file must become a single module: a second copy would be
+        // preprocessed against declarations the first copy already added and come out incomplete.
+        remove_duplicate_files(source_files, temporaries_allocator);
 
         return std::pmr::vector<std::filesystem::path>{std::move(source_files), output_allocator};
     }
@@ -673,15 +1086,48 @@ namespace iris::compiler
         };
     }
 
+    static Cache_key_builder create_c_header_cache_key_builder(
+        std::uint64_t const parse_identity,
+        std::filesystem::path const& header_path,
+        iris::c::Options const& options
+    )
+    {
+        Cache_key_builder key_builder;
+
+        add_key_token(key_builder, std::string_view{"c_header_cache/v1"});
+        add_key_token(key_builder, parse_identity);
+        add_key_path_token(key_builder, header_path);
+        add_key_token(key_builder, options.target_triple.value_or("<default>"));
+
+        add_key_token(key_builder, std::string_view{"include_directories"});
+        for (std::filesystem::path const& include_directory : options.include_directories)
+            add_key_path_token(key_builder, include_directory);
+
+        add_key_token(key_builder, std::string_view{"public_prefixes"});
+        for (std::pmr::string const& prefix : options.public_prefixes)
+            add_key_token(key_builder, std::string_view{prefix});
+
+        add_key_token(key_builder, std::string_view{"remove_prefixes"});
+        for (std::pmr::string const& prefix : options.remove_prefixes)
+            add_key_token(key_builder, std::string_view{prefix});
+
+        add_key_token(key_builder, options.allow_errors);
+        add_key_token(key_builder, options.wrap_pointers_as_optional);
+
+        return key_builder;
+    }
+
     static std::optional<iris::Module> parse_c_header_and_cache(
-        std::filesystem::path const& build_directory_path,
-        bool const output_module_json,
+        Builder const& builder,
+        Task_context& context,
         std::span<std::filesystem::path const> const header_search_paths,
         C_header const& c_header,
         Import_c_header_source_group const& source_group,
         bool const force_allow_errors
     )
     {
+        std::filesystem::path const& build_directory_path = builder.build_directory_path;
+
         std::string_view const header_module_name = c_header.module_name;
         std::string_view const header_filename = c_header.header;
 
@@ -690,11 +1136,34 @@ namespace iris::compiler
             iris::common::print_message_and_exit(std::format("Could not find header {}. Please provide its location using --header-search-path.", header_filename));
 
         std::filesystem::path const header_module_filename = std::format("{}.irisb", header_module_name);
-        std::filesystem::path const output_header_module_path = build_directory_path / "artifacts" / header_module_filename;
+        std::filesystem::path const output_header_module_path = get_hl_build_directory(build_directory_path) / header_module_filename;
+        std::filesystem::path const dependency_file_path = get_header_dependency_file_path(get_hl_build_directory(build_directory_path), header_module_name);
+
+        iris::c::Options const options
+        {
+            .target_triple = std::nullopt,
+            .include_directories = header_search_paths,
+            .public_prefixes = source_group.public_prefixes,
+            .remove_prefixes = source_group.remove_prefixes,
+            .allow_errors = force_allow_errors ? true : (c_header.allow_errors.has_value() ? c_header.allow_errors.value() : false),
+            // Per-header setting wins over the source group's; the default is not to wrap.
+            .wrap_pointers_as_optional =
+                c_header.wrap_pointers_as_optional.has_value() ? c_header.wrap_pointers_as_optional.value() :
+                source_group.wrap_pointers_as_optional.has_value() ? source_group.wrap_pointers_as_optional.value() :
+                false,
+        };
+
+        Cache_key_builder const key_builder = create_c_header_cache_key_builder(builder.build_identity.parse_identity, header_path.value(), options);
+        std::uint64_t const cache_key = finish_cache_key(key_builder);
 
         if (std::filesystem::exists(output_header_module_path))
         {
-            if (is_file_newer_than(output_header_module_path, header_path.value()))
+            std::optional<Header_cache_metadata> const metadata = read_header_cache_metadata(dependency_file_path);
+
+            if (metadata.has_value() &&
+                metadata->cache_key == cache_key &&
+                is_at_or_after_floor(output_header_module_path, builder.build_identity.parse_floor) &&
+                are_header_includes_up_to_date(output_header_module_path, metadata.value()))
             {
                 std::optional<Module> header_module = iris::binary_serializer::read_module_from_file(output_header_module_path);
 
@@ -705,37 +1174,46 @@ namespace iris::compiler
             }
         }
 
-        iris::c::Options const options
-        {
-            .target_triple = std::nullopt,
-            .include_directories = header_search_paths,
-            .public_prefixes = source_group.public_prefixes,
-            .remove_prefixes = source_group.remove_prefixes,
-            .allow_errors = force_allow_errors ? true : (c_header.allow_errors.has_value() ? c_header.allow_errors.value() : false),
-        };
-
-        ::printf("Importing c header \"%s\"\n    output is \"%s\"\n", header_path->generic_string().c_str(), output_header_module_path.generic_string().c_str());
+        write_task_output(context, "Importing c header \"{}\"\n    output is \"{}\"\n", header_path->generic_string(), output_header_module_path.generic_string());
         if (!options.include_directories.empty())
         {
-            ::printf("    header search paths\n");
+            write_task_output(context, "    header search paths\n");
             for (std::filesystem::path const& include_directory : options.include_directories)
             {
-                ::printf("    - \"%s\"\n", include_directory.generic_string().c_str());
+                write_task_output(context, "    - \"{}\"\n", include_directory.generic_string());
             }
         }
 
-        std::optional<iris::Module> header_module = iris::c::import_header_and_write_to_file(header_module_name, header_path.value(), output_header_module_path, options);
-        if (!header_module.has_value())
+        std::optional<iris::c::Imported_header> imported_header = iris::c::import_header_with_includes(header_module_name, header_path.value(), options, {});
+        if (!imported_header.has_value())
             return std::nullopt;
 
-        if (output_module_json)
+        iris::Module& header_module = imported_header->core_module;
+
+        iris::binary_serializer::write_module_to_file(output_header_module_path, header_module, {});
+
+        Header_cache_metadata const metadata
+        {
+            .cache_key = cache_key,
+            .includes = std::move(imported_header->included_files),
+        };
+
+        write_header_cache_metadata(
+            dependency_file_path,
+            header_module_name,
+            header_path.value(),
+            metadata,
+            builder.output_module_json ? std::optional<std::string_view>{key_builder.canonical} : std::nullopt
+        );
+
+        if (builder.output_module_json)
         {
             std::filesystem::path const output_module_json_filename = std::format("{}.irisb.json", header_module_name);
             std::filesystem::path const output_module_json_path = get_hl_build_directory(build_directory_path) / output_module_json_filename;
-            iris::json::write_module_to_file(output_module_json_path, *header_module);
+            iris::json::write_module_to_file(output_module_json_path, header_module);
         }
 
-        return header_module.value();
+        return std::move(header_module);
     }
 
     static std::filesystem::path create_output_header_path(
@@ -799,32 +1277,39 @@ namespace iris::compiler
         return std::pmr::unordered_map<std::pmr::string, std::filesystem::path>{output_header_paths, output_allocator};
     }
 
+    static bool is_c_header_file_up_to_date(
+        iris::Module const& core_module,
+        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& output_header_paths,
+        Module_input_times& input_times
+    )
+    {
+        std::filesystem::path const& output_c_header_path = output_header_paths.at(core_module.name);
+        std::filesystem::path const output_cpp_header_path = std::filesystem::path{output_c_header_path}.replace_extension("hpp");
+
+        if (!std::filesystem::exists(output_cpp_header_path))
+            return false;
+
+        return is_output_up_to_date(input_times, core_module.name, output_c_header_path);
+    }
+
     static void generate_c_header_file(
+        Task_context& context,
         iris::Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& output_header_paths,
         iris::Declaration_database const& declaration_database,
-        Module_input_times& input_times,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
         std::filesystem::path const& output_c_header_path = output_header_paths.at(core_module.name);
         std::filesystem::path const output_cpp_header_path = std::filesystem::path{output_c_header_path}.replace_extension("hpp");
 
-        if (std::filesystem::exists(output_cpp_header_path))
-        {
-            if (is_output_up_to_date(input_times, core_module.name, output_c_header_path))
-            {
-                return;
-            }
-        }
-
         create_directory_if_it_does_not_exist(output_c_header_path.parent_path());
-        
-        ::printf("Generating c header \"%s\"\n", output_c_header_path.generic_string().c_str());
+
+        write_task_output(context, "Generating c header \"{}\"\n", output_c_header_path.generic_string());
         iris::c::Exported_c_header const c_header = iris::c::export_module_as_c_header(core_module, declaration_database, output_header_paths, temporaries_allocator, temporaries_allocator);
         iris::common::write_to_file(output_c_header_path, c_header.content);
 
-        ::printf("Generating c++ header \"%s\"\n", output_cpp_header_path.generic_string().c_str());
+        write_task_output(context, "Generating c++ header \"{}\"\n", output_cpp_header_path.generic_string());
         iris::c::Exported_cpp_header const cpp_header = iris::c::export_module_as_cpp_header(core_module, output_c_header_path, temporaries_allocator, temporaries_allocator);
         iris::common::write_to_file(output_cpp_header_path, cpp_header.content);
     }
@@ -1026,11 +1511,14 @@ namespace iris::compiler
         Module_input_times input_times = create_module_input_times(
             get_hl_build_directory(builder.build_directory_path),
             std::span<iris::Module const>{core_modules.data(), core_modules.size()},
+            builder.build_identity.codegen_floor,
             temporaries_allocator
         );
 
         std::pmr::vector<iris::Module> header_modules{output_allocator};
         header_modules.resize(c_header_groups.c_headers.size());
+
+        std::pmr::vector<std::size_t> node_indices_to_process{temporaries_allocator};
 
         for (Source_file_graph_rank_range const rank : graph.ranks)
         {
@@ -1046,7 +1534,9 @@ namespace iris::compiler
                 }
             }
 
-            // TODO can be done in parallel
+            // Checking what is out of date fills the cache in input_times, so it happens before any
+            // work is handed to other threads.
+            node_indices_to_process.clear();
             for (std::size_t index = 0; index < rank.count; ++index)
             {
                 std::size_t const node_index = rank.start_index + index;
@@ -1055,33 +1545,68 @@ namespace iris::compiler
                 if (node.type == Source_file_node_type::Export_c_header)
                 {
                     iris::Module const& core_module = core_modules[node.index];
-                    
-                    generate_c_header_file(
-                        core_module,
-                        output_header_paths,
-                        declaration_database,
-                        input_times,
-                        temporaries_allocator
-                    );
+                    if (!is_c_header_file_up_to_date(core_module, output_header_paths, input_times))
+                        node_indices_to_process.push_back(node_index);
                 }
                 else if (node.type == Source_file_node_type::Import_c_header)
                 {
-                    C_header const& c_header = c_header_groups.c_headers[node.index];
-                    std::span<std::filesystem::path const> const header_search_paths = c_header_groups.header_search_paths[node.index];
-                    Import_c_header_source_group const& source_group = *c_header_groups.source_groups[node.index];
-
-                    std::optional<iris::Module> header_module = parse_c_header_and_cache(
-                        builder.build_directory_path,
-                        builder.output_module_json,
-                        header_search_paths,
-                        c_header,
-                        source_group,
-                        force_allow_errors
-                    );
-                    if (header_module.has_value())
-                        header_modules[node.index] = std::move(header_module.value());
+                    node_indices_to_process.push_back(node_index);
                 }
             }
+
+            // Nodes of a rank only depend on earlier ranks, whose declarations are already in the
+            // database, so they can run in parallel. The database is only read until the rank ends.
+            parallel_for_each(
+                get_parallel_options(builder),
+                std::span<std::size_t const>{ node_indices_to_process },
+                [&](std::size_t const node_index, Task_context& context) -> void
+                {
+                    // temporaries_allocator may not be safe to share between threads.
+                    std::pmr::polymorphic_allocator<> const task_allocator;
+
+                    Source_file_node const node = graph.nodes[node_index];
+
+                    if (node.type == Source_file_node_type::Export_c_header)
+                    {
+                        iris::Module const& core_module = core_modules[node.index];
+
+                        generate_c_header_file(
+                            context,
+                            core_module,
+                            output_header_paths,
+                            declaration_database,
+                            task_allocator
+                        );
+                    }
+                    else if (node.type == Source_file_node_type::Import_c_header)
+                    {
+                        C_header const& c_header = c_header_groups.c_headers[node.index];
+                        std::span<std::filesystem::path const> const header_search_paths = c_header_groups.header_search_paths[node.index];
+                        Import_c_header_source_group const& source_group = *c_header_groups.source_groups[node.index];
+
+                        std::chrono::steady_clock::time_point const start_time_point = std::chrono::steady_clock::now();
+
+                        std::optional<iris::Module> header_module = parse_c_header_and_cache(
+                            builder,
+                            context,
+                            header_search_paths,
+                            c_header,
+                            source_group,
+                            force_allow_errors
+                        );
+
+                        add_duration(
+                            context.profiler,
+                            "parse_c_header_and_cache",
+                            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start_time_point)
+                        );
+
+                        // Each node owns its own slot, so tasks never write the same element.
+                        if (header_module.has_value())
+                            header_modules[node.index] = std::move(header_module.value());
+                    }
+                }
+            );
 
             for (std::size_t index = 0; index < rank.count; ++index)
             {
@@ -1114,6 +1639,7 @@ namespace iris::compiler
         // TODO can be done in parallel but declaration_database.call_instances needs to be guarded...
         for (Module& core_module : core_modules)
         {
+            Compilation_scope const module_scope{"processing module", core_module.name};
             process_module(core_module, declaration_database, {.validate=false}, temporaries_allocator);
         }
 
@@ -1132,20 +1658,35 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     )
     {
+        std::pmr::vector<iris::compiler::Diagnostic> all_diagnostics{temporaries_allocator};
+
         for (Module& core_module : core_modules)
         {
+            Compilation_scope const module_scope{"validating module", core_module.name};
+
             Analysis_result result = process_module(core_module, declaration_database, {.validate=true}, temporaries_allocator);
 
-            if (!result.diagnostics.empty())
-            {
-                print_diagnostics_and_exit_if_needed(result.diagnostics, temporaries_allocator);
-            }
+            all_diagnostics.insert(
+                all_diagnostics.end(),
+                std::make_move_iterator(result.diagnostics.begin()),
+                std::make_move_iterator(result.diagnostics.end())
+            );
         }
+
+        sort_diagnostics(all_diagnostics);
+
+        print_diagnostics_and_exit_if_needed(all_diagnostics, temporaries_allocator);
     }
 
-    static bool is_compiled_cpp_up_to_date(std::filesystem::path const& output_dependency_file)
+    static bool is_compiled_cpp_up_to_date(
+        std::filesystem::path const& output_dependency_file,
+        std::filesystem::file_time_type const floor
+    )
     {
         if (!std::filesystem::exists(output_dependency_file))
+            return false;
+
+        if (!is_at_or_after_floor(output_dependency_file, floor))
             return false;
 
         std::optional<std::pmr::string> const file_contents = iris::common::get_file_contents(output_dependency_file);
@@ -1208,6 +1749,24 @@ namespace iris::compiler
         return true;
     }
 
+    namespace
+    {
+        struct Cpp_compile_job
+        {
+            std::filesystem::path source_file_path;
+            std::filesystem::path output_assembly_file;
+            std::optional<std::filesystem::path> output_llvm_ir_file;
+            std::filesystem::path output_dependency_file;
+            std::span<std::pmr::string const> include_directories;
+            std::span<std::pmr::string const> additional_flags;
+        };
+
+        // Thrown by a task to stop the batch the way the serial loop stopped at the first failure.
+        struct Cpp_compile_failed
+        {
+        };
+    }
+
     bool compile_cpp_and_write_to_bitcode_files(
         Builder& builder,
         std::span<Artifact const> const artifacts,
@@ -1224,10 +1783,23 @@ namespace iris::compiler
 
         bool const use_clang_cl = builder.target.operating_system == "windows";
 
+        // Owns the include directories that the jobs point into, one entry per artifact.
+        std::pmr::list<std::pmr::vector<std::pmr::string>> include_directories_per_artifact{temporaries_allocator};
+
+        static std::array<std::pmr::string, 1> const tests_main_additional_flags
+        {
+            "-std=c++20",
+        };
+
+        // Decide what to compile first, serially. It only reads dependency files.
+        std::pmr::vector<Cpp_compile_job> jobs{temporaries_allocator};
+
         for (Artifact const& artifact : artifacts)
         {
             std::pmr::vector<std::filesystem::path> const public_include_directories = get_public_include_directories(artifact, artifacts, temporaries_allocator, temporaries_allocator);
-            std::pmr::vector<std::pmr::string> const public_include_directories_strings = iris::common::convert_path_to_string(public_include_directories, temporaries_allocator);
+            std::pmr::vector<std::pmr::string> const& public_include_directories_strings = include_directories_per_artifact.emplace_back(
+                iris::common::convert_path_to_string(public_include_directories, temporaries_allocator)
+            );
 
             for (Source_group const& group : artifact.sources)
             {
@@ -1247,89 +1819,108 @@ namespace iris::compiler
                     std::filesystem::path const output_llvm_ir_file = build_directory_path / std::format("{}.{}.ll", artifact.name, source_file_path.stem().generic_string());
                     std::filesystem::path const output_dependency_file = build_directory_path / std::format("{}.{}.d", artifact.name, source_file_path.stem().generic_string());
 
-                    if (is_compiled_cpp_up_to_date(output_dependency_file))
+                    if (is_compiled_cpp_up_to_date(output_dependency_file, builder.build_identity.codegen_floor))
                         continue;
 
-                    if (builder.output_llvm_ir)
+                    jobs.push_back(Cpp_compile_job
                     {
-                        std::filesystem::path const output_file_path = build_directory_path / std::format("{}.{}.{}", artifact.name, source_file_path.stem().generic_string(), "ll");
-                        bool const success = compile_cpp(
-                            *llvm_data.clang_data,
-                            llvm_data.target_triple.str(),
-                            source_file_path,
-                            output_llvm_ir_file,
-                            std::nullopt,
-                            build_directory_path,
-                            public_include_directories_strings,
-                            group.additional_flags,
-                            use_clang_cl,
-                            compilation_options.debug,
-                            temporaries_allocator
-                        );
-                        if (!success)
-                        {
-                            end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
-                            return false;
-                        } 
-                    }
-
-                    bool const success = compile_cpp(
-                        *llvm_data.clang_data,
-                        llvm_data.target_triple.str(),
-                        source_file_path,
-                        output_assembly_file,
-                        output_dependency_file,
-                        build_directory_path,
-                        public_include_directories_strings,
-                        group.additional_flags,
-                        use_clang_cl,
-                        compilation_options.debug,
-                        temporaries_allocator
-                    );
-                    if (!success)
-                    {
-                        end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
-                        return false;
-                    }
+                        .source_file_path = source_file_path,
+                        .output_assembly_file = output_assembly_file,
+                        .output_llvm_ir_file = builder.output_llvm_ir ? std::optional<std::filesystem::path>{output_llvm_ir_file} : std::nullopt,
+                        .output_dependency_file = output_dependency_file,
+                        .include_directories = public_include_directories_strings,
+                        .additional_flags = group.additional_flags,
+                    });
                 }
             }
         }
 
         if (builder.is_test_mode)
         {
-            std::filesystem::path const tests_main_file_path = iris::common::get_tests_main_file_path();
-
-            std::filesystem::path const output_assembly_file = build_directory_path / std::format("iris.tests_main.{}", extension);
             std::filesystem::path const output_dependency_file = build_directory_path / std::format("iris.tests_main.d");
 
-            if (!is_compiled_cpp_up_to_date(output_dependency_file))
+            if (!is_compiled_cpp_up_to_date(output_dependency_file, builder.build_identity.codegen_floor))
             {
-                std::array<std::pmr::string, 1> const additional_flags
+                jobs.push_back(Cpp_compile_job
                 {
-                    "-std=c++20",
-                };
-
-                bool const success = compile_cpp(
-                    *llvm_data.clang_data,
-                    llvm_data.target_triple.str(),
-                    tests_main_file_path,
-                    output_assembly_file,
-                    output_dependency_file,
-                    build_directory_path,
-                    {},
-                    additional_flags,
-                    use_clang_cl,
-                    compilation_options.debug,
-                    temporaries_allocator
-                );
-                if (!success)
-                {
-                    end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
-                    return false;
-                }
+                    .source_file_path = iris::common::get_tests_main_file_path(),
+                    .output_assembly_file = build_directory_path / std::format("iris.tests_main.{}", extension),
+                    .output_llvm_ir_file = std::nullopt,
+                    .output_dependency_file = output_dependency_file,
+                    .include_directories = {},
+                    .additional_flags = tests_main_additional_flags,
+                });
             }
         }
 
+        std::string const target_triple = llvm_data.target_triple.str();
+
+        // Every clang process has exited by now, so nothing holds the logs open anymore.
+        auto const remove_output_logs = [&]() -> void
+        {
+            for (Cpp_compile_job const& job : jobs)
+            {
+                std::error_code error_code;
+                if (job.output_llvm_ir_file.has_value())
+                    std::filesystem::remove(get_compile_cpp_output_log_path(*job.output_llvm_ir_file), error_code);
+                std::filesystem::remove(get_compile_cpp_output_log_path(job.output_assembly_file), error_code);
+            }
+        };
+
+        // Each file is compiled by its own clang process, so the jobs share nothing.
+        try
+        {
+            parallel_for_each(
+                get_parallel_options(builder),
+                std::span<Cpp_compile_job const>{jobs},
+                [&](Cpp_compile_job const& job, Task_context& context) -> void
+                {
+                    // temporaries_allocator may not be safe to share between threads.
+                    std::pmr::polymorphic_allocator<> const task_allocator;
+
+                    auto const compile = [&](std::filesystem::path const& output_file_path, std::optional<std::filesystem::path> const& output_dependency_file_path) -> bool
+                    {
+                        std::pmr::string output{task_allocator};
+
+                        bool const success = compile_cpp(
+                            *llvm_data.clang_data,
+                            target_triple,
+                            job.source_file_path,
+                            output_file_path,
+                            output_dependency_file_path,
+                            build_directory_path,
+                            job.include_directories,
+                            job.additional_flags,
+                            use_clang_cl,
+                            compilation_options.debug,
+                            output,
+                            task_allocator
+                        );
+
+                        write_task_output(context, output);
+
+                        return success;
+                    };
+
+                    if (job.output_llvm_ir_file.has_value())
+                    {
+                        if (!compile(*job.output_llvm_ir_file, std::nullopt))
+                            throw Cpp_compile_failed{};
+                    }
+
+                    if (!compile(job.output_assembly_file, job.output_dependency_file))
+                        throw Cpp_compile_failed{};
+                }
+            );
+        }
+        catch (Cpp_compile_failed const&)
+        {
+            remove_output_logs();
+            end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
+            return false;
+        }
+
+        remove_output_logs();
         end_timer(get_profiler(builder), "compile_cpp_and_write_to_bitcode_files");
         return true;
     }
@@ -1371,67 +1962,146 @@ namespace iris::compiler
         std::pmr::vector<iris::Module> core_modules{output_allocator};
         core_modules.resize(source_files_paths.size(), iris::Module{});
 
-        iris::parser::Parser parser = iris::parser::create_parser();
+        // Read every module name first. It is cheap, and checking for duplicates before parsing means two
+        // tasks never write the same cached module.
+        std::pmr::vector<std::pmr::string> module_names{temporaries_allocator};
+        module_names.reserve(source_files_paths.size());
 
-        for (std::size_t index = 0; index < source_files_paths.size(); ++index)
+        for (std::filesystem::path const& source_file_path : source_files_paths)
         {
-            std::filesystem::path const& source_file_path = source_files_paths[index];
-
-            std::optional<std::pmr::string> const module_name = iris::parser::read_module_name(source_file_path);
+            std::optional<std::pmr::string> module_name = iris::parser::read_module_name(source_file_path);
             if (!module_name.has_value())
                 iris::common::print_message_and_exit(std::format("Could not read module name of source file {}.", source_file_path.generic_string()));
 
-            std::filesystem::path const output_module_filename = std::format("{}.irisb", module_name.value());
-            std::filesystem::path const output_module_path = get_hl_build_directory(builder.build_directory_path) / output_module_filename;
-
-            if (std::filesystem::exists(output_module_path))
-            {
-                if (is_file_newer_than(output_module_path, source_file_path))
-                {
-                    std::optional<Module> core_module = iris::binary_serializer::read_module_from_file(output_module_path);
-                    if (!core_module.has_value())
-                        iris::common::print_message_and_exit(std::format("Failed to read cached module {}.", output_module_path.generic_string()));
-
-                    core_modules[index] = std::move(core_module.value());
-
-                    continue;
-                }
-            }
-
-            std::optional<std::pmr::string> const source_content = iris::common::get_file_contents(source_file_path);
-            if (!source_content.has_value())
-                iris::common::print_message_and_exit(std::format("Could not read source file {}.", source_file_path.generic_string()));
-
-            std::pmr::u8string const utf_8_source_content{reinterpret_cast<char8_t const*>(source_content->data()), source_content->size(), temporaries_allocator};
-            iris::parser::Parse_tree parse_tree = iris::parser::parse(parser, std::move(utf_8_source_content));
-
-            iris::parser::Parse_node const root = get_root_node(parse_tree);
-    
-            std::optional<iris::Module> core_module = iris::parser::parse_node_to_module(
-                parse_tree,
-                root,
-                source_file_path,
-                output_allocator,
-                temporaries_allocator
-            );
-            if (!core_module.has_value())
-                iris::common::print_message_and_exit(std::format("Could not parse source file {}.", source_file_path.generic_string()));
-
-            iris::binary_serializer::write_module_to_file(output_module_path, core_module.value(), {});
-
-            if (builder.output_module_json)
-            {
-                std::filesystem::path const output_module_json_filename = std::format("{}.irisb.json", module_name.value());
-                std::filesystem::path const output_module_json_path = get_hl_build_directory(builder.build_directory_path) / output_module_json_filename;
-                iris::json::write_module_to_file(output_module_json_path, core_module.value());
-            }
-
-            core_modules[index] = std::move(core_module.value());
-
-            iris::parser::destroy_tree(std::move(parse_tree));
+            module_names.push_back(std::move(module_name.value()));
         }
 
-        iris::parser::destroy_parser(std::move(parser));
+        // Modules are found and their outputs are written by name, so two files cannot share one.
+        {
+            std::pmr::unordered_map<std::string_view, std::size_t> module_name_to_index{temporaries_allocator};
+            module_name_to_index.reserve(module_names.size());
+
+            for (std::size_t index = 0; index < module_names.size(); ++index)
+            {
+                auto const [location, inserted] = module_name_to_index.insert(std::make_pair(std::string_view{module_names[index]}, index));
+                if (!inserted)
+                {
+                    iris::common::print_message_and_exit(std::format(
+                        "Module '{}' is defined by both \"{}\" and \"{}\".",
+                        module_names[index],
+                        source_files_paths[location->second].generic_string(),
+                        source_files_paths[index].generic_string()
+                    ));
+                }
+            }
+        }
+
+        // One entry per file, so tasks never share a vector.
+        std::pmr::vector<std::pmr::vector<iris::compiler::Diagnostic>> parser_diagnostics_per_file{temporaries_allocator};
+        parser_diagnostics_per_file.resize(source_files_paths.size());
+
+        parallel_for(
+            get_parallel_options(builder),
+            source_files_paths.size(),
+            [&](Task_context& context) -> void
+            {
+                std::size_t const index = context.index;
+                std::filesystem::path const& source_file_path = source_files_paths[index];
+
+                // The caller's allocators may not be safe to share between threads.
+                std::pmr::polymorphic_allocator<> const task_allocator;
+
+                std::string_view const module_name = module_names[index];
+
+                std::filesystem::path const output_module_filename = std::format("{}.irisb", module_name);
+                std::filesystem::path const output_module_path = get_hl_build_directory(builder.build_directory_path) / output_module_filename;
+
+                if (std::filesystem::exists(output_module_path))
+                {
+                    if (is_file_newer_than(output_module_path, source_file_path) && is_at_or_after_floor(output_module_path, builder.build_identity.parse_floor))
+                    {
+                        std::optional<Module> core_module = iris::binary_serializer::read_module_from_file(output_module_path);
+                        if (!core_module.has_value())
+                            iris::common::print_message_and_exit(std::format("Failed to read cached module {}.", output_module_path.generic_string()));
+
+                        core_modules[index] = std::move(core_module.value());
+
+                        return;
+                    }
+                }
+
+                std::optional<std::pmr::string> const source_content = iris::common::get_file_contents(source_file_path);
+                if (!source_content.has_value())
+                    iris::common::print_message_and_exit(std::format("Could not read source file {}.", source_file_path.generic_string()));
+
+                // A tree-sitter parser must not be used by two threads at once, and creating one is cheap.
+                iris::parser::Parser parser = iris::parser::create_parser();
+
+                std::pmr::u8string const utf_8_source_content{reinterpret_cast<char8_t const*>(source_content->data()), source_content->size(), task_allocator};
+                iris::parser::Parse_tree parse_tree = iris::parser::parse(parser, std::move(utf_8_source_content));
+
+                iris::parser::Parse_node const root = get_root_node(parse_tree);
+
+                {
+                    std::pmr::vector<iris::compiler::Diagnostic> file_diagnostics = create_parser_diagnostics(
+                        source_file_path,
+                        parse_tree,
+                        task_allocator,
+                        task_allocator
+                    );
+
+                    if (!file_diagnostics.empty())
+                    {
+                        parser_diagnostics_per_file[index] = std::move(file_diagnostics);
+
+                        // Nothing is written to the cache for a file that did not parse.
+                        iris::parser::destroy_tree(std::move(parse_tree));
+                        iris::parser::destroy_parser(std::move(parser));
+                        return;
+                    }
+                }
+
+                std::optional<iris::Module> core_module = iris::parser::parse_node_to_module(
+                    parse_tree,
+                    root,
+                    source_file_path,
+                    task_allocator,
+                    task_allocator
+                );
+                if (!core_module.has_value())
+                    iris::common::print_message_and_exit(std::format("Could not parse source file {}.", source_file_path.generic_string()));
+
+                iris::binary_serializer::write_module_to_file(output_module_path, core_module.value(), {});
+
+                if (builder.output_module_json)
+                {
+                    std::filesystem::path const output_module_json_filename = std::format("{}.irisb.json", module_name);
+                    std::filesystem::path const output_module_json_path = get_hl_build_directory(builder.build_directory_path) / output_module_json_filename;
+                    iris::json::write_module_to_file(output_module_json_path, core_module.value());
+                }
+
+                core_modules[index] = std::move(core_module.value());
+
+                iris::parser::destroy_tree(std::move(parse_tree));
+                iris::parser::destroy_parser(std::move(parser));
+            }
+        );
+
+        std::pmr::vector<iris::compiler::Diagnostic> parser_diagnostics{temporaries_allocator};
+        for (std::pmr::vector<iris::compiler::Diagnostic>& file_diagnostics : parser_diagnostics_per_file)
+        {
+            parser_diagnostics.insert(
+                parser_diagnostics.end(),
+                std::make_move_iterator(file_diagnostics.begin()),
+                std::make_move_iterator(file_diagnostics.end())
+            );
+        }
+
+        if (!parser_diagnostics.empty())
+        {
+            sort_diagnostics(parser_diagnostics);
+            print_diagnostics_and_exit_if_needed(parser_diagnostics, temporaries_allocator, "Parsing failed.");
+        }
 
         for (iris::Module& core_module : core_modules)
         {
@@ -1464,6 +2134,7 @@ namespace iris::compiler
         Module_input_times input_times = create_module_input_times(
             get_hl_build_directory(builder.build_directory_path),
             core_modules,
+            builder.build_identity.codegen_floor,
             temporaries_allocator
         );
 
@@ -1579,14 +2250,17 @@ namespace iris::compiler
         return std::pmr::unordered_map<std::pmr::string, std::filesystem::path>{std::move(map), output_allocator};
     }
 
-    static void compile_and_write_to_bitcode_file(
-        Builder& builder,
+    struct Module_to_compile
+    {
+        iris::Module const* core_module;
+        std::filesystem::path output_assembly_file;
+        std::filesystem::path output_llvm_ir_file;
+    };
+
+    static std::optional<Module_to_compile> get_module_to_compile_if_out_of_date(
+        Builder const& builder,
         iris::Module const& core_module,
-        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
         Module_input_times& input_times,
-        LLVM_data& llvm_data,
-        std::span<iris::Module const* const> const all_sorted_modules,
-        Declaration_database const& declaration_database,
         Compilation_options const& compilation_options,
         bool const is_test_mode
     )
@@ -1595,37 +2269,81 @@ namespace iris::compiler
         std::string_view const extension = use_objects ? "obj" : "bc";
         std::string_view const test_extension = is_test_mode ? ".test" : "";
 
-        std::filesystem::path const output_assembly_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}{}.{}", core_module.name, test_extension, extension);
-        std::filesystem::path const output_llvm_ir_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}{}.{}", core_module.name, test_extension, "ll");
+        std::filesystem::path output_assembly_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}{}.{}", core_module.name, test_extension, extension);
+        std::filesystem::path output_llvm_ir_file = get_bitcode_build_directory(builder.build_directory_path) / std::format("{}{}.{}", core_module.name, test_extension, "ll");
 
         if (!builder.output_llvm_ir || std::filesystem::exists(output_llvm_ir_file))
         {
             if (is_output_up_to_date(input_times, core_module.name, output_assembly_file))
             {
-                return;
+                return std::nullopt;
             }
         }
 
-        ::printf("Compiling '%s'%s\n", core_module.name.c_str(), is_test_mode ? " tests" : "");
-        if (core_module.source_file_path.has_value())
-            ::printf("    input is \"%s\"\n", core_module.source_file_path->generic_string().c_str());
-        if (builder.output_llvm_ir)
-            ::printf("    output llvm IR is \"%s\"\n", output_llvm_ir_file.generic_string().c_str());
-        ::printf("    output is \"%s\"\n", output_assembly_file.generic_string().c_str());
+        return Module_to_compile
+        {
+            .core_module = &core_module,
+            .output_assembly_file = std::move(output_assembly_file),
+            .output_llvm_ir_file = std::move(output_llvm_ir_file),
+        };
+    }
 
-        std::unique_ptr<llvm::Module> llvm_module = create_llvm_module(
-            llvm_data,
-            core_module,
-            all_sorted_modules,
-            module_name_to_file_path_map,
-            declaration_database,
-            compilation_options
-        );
+    static void compile_and_write_to_bitcode_file(
+        Builder const& builder,
+        Task_context& context,
+        Module_to_compile const& module_to_compile,
+        std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
+        std::span<iris::Module const* const> const all_sorted_modules,
+        Declaration_database const& declaration_database,
+        Lambda_database const& lambda_database,
+        Compilation_options const& compilation_options,
+        bool const is_test_mode
+    )
+    {
+        iris::Module const& core_module = *module_to_compile.core_module;
+        std::filesystem::path const& output_assembly_file = module_to_compile.output_assembly_file;
+        std::filesystem::path const& output_llvm_ir_file = module_to_compile.output_llvm_ir_file;
+
+        write_task_output(context, "Compiling '{}'{}\n", core_module.name, is_test_mode ? " tests" : "");
+        if (core_module.source_file_path.has_value())
+            write_task_output(context, "    input is \"{}\"\n", core_module.source_file_path->generic_string());
+        if (builder.output_llvm_ir)
+            write_task_output(context, "    output llvm IR is \"{}\"\n", output_llvm_ir_file.generic_string());
+        write_task_output(context, "    output is \"{}\"\n", output_assembly_file.generic_string());
+
+        Compilation_scope const module_scope{"compiling module", core_module.name};
+
+        // Every module gets its own LLVM context, clang instance and pass managers. They cannot be
+        // shared between threads, and sharing them between modules would let one module's output
+        // depend on which modules were compiled before it.
+        LLVM_data llvm_data = initialize_llvm(compilation_options);
+
+        std::unique_ptr<llvm::Module> llvm_module = [&]() -> std::unique_ptr<llvm::Module>
+        {
+            try
+            {
+                return create_llvm_module(
+                    llvm_data,
+                    core_module,
+                    all_sorted_modules,
+                    module_name_to_file_path_map,
+                    declaration_database,
+                    lambda_database,
+                    compilation_options
+                );
+            }
+            catch (Compile_error& error)
+            {
+                if (!error.file_path.has_value())
+                    error.file_path = core_module.source_file_path;
+                throw;
+            }
+        }();
 
         if (builder.output_llvm_ir)
             iris::compiler::write_llvm_ir_to_file(*llvm_module, output_llvm_ir_file);
 
-        if (use_objects)
+        if (compilation_options.output_debug_code_view)
             iris::compiler::write_object_file(llvm_data, *llvm_module, output_assembly_file);
         else
             iris::compiler::write_bitcode_to_file(llvm_data, *llvm_module, output_assembly_file);
@@ -1635,9 +2353,9 @@ namespace iris::compiler
         Builder& builder,
         std::span<iris::Module const> const core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        LLVM_data& llvm_data,
         std::span<iris::Module const* const> const all_sorted_modules,
         Declaration_database const& declaration_database,
+        Lambda_database const& lambda_database,
         Compilation_options const& compilation_options,
         bool is_test_mode
     )
@@ -1647,26 +2365,47 @@ namespace iris::compiler
         Module_input_times input_times = create_module_input_times(
             get_hl_build_directory(builder.build_directory_path),
             all_sorted_modules,
+            builder.build_identity.codegen_floor,
             {}
         );
 
-        // TODO to paralelize, llvm_data and compilation_database should be const
+        // Checking what is out of date fills the cache in input_times, so it happens before any
+        // work is handed to other threads.
+        std::pmr::vector<Module_to_compile> modules_to_compile;
+        modules_to_compile.reserve(core_modules.size());
 
-        for (std::size_t index = 0; index < core_modules.size(); ++index)
+        for (iris::Module const& core_module : core_modules)
         {
-            iris::Module const& core_module = core_modules[index];
-            compile_and_write_to_bitcode_file(
+            std::optional<Module_to_compile> module_to_compile = get_module_to_compile_if_out_of_date(
                 builder,
                 core_module,
-                module_name_to_file_path_map,
                 input_times,
-                llvm_data,
-                all_sorted_modules,
-                declaration_database,
                 compilation_options,
                 is_test_mode
             );
+
+            if (module_to_compile.has_value())
+                modules_to_compile.push_back(std::move(module_to_compile.value()));
         }
+
+        parallel_for_each(
+            get_parallel_options(builder),
+            std::span<Module_to_compile const>{ modules_to_compile },
+            [&](Module_to_compile const& module_to_compile, Task_context& context) -> void
+            {
+                compile_and_write_to_bitcode_file(
+                    builder,
+                    context,
+                    module_to_compile,
+                    module_name_to_file_path_map,
+                    all_sorted_modules,
+                    declaration_database,
+                    lambda_database,
+                    compilation_options,
+                    is_test_mode
+                );
+            }
+        );
 
         end_timer(get_profiler(builder), "compile_and_write_to_bitcode_files");
     }
@@ -1957,6 +2696,32 @@ namespace iris::compiler
                 if (!result)
                     iris::common::print_message_and_exit(std::format("Failed to link static library '{}'.", artifact.name));
             }
+            else if (artifact.type == Artifact_type::Dynamic_library)
+            {
+                std::pmr::vector<std::pmr::string> exported_symbols{ temporaries_allocator };
+                if (artifact.info.has_value() && std::holds_alternative<iris::compiler::Dynamic_library_info>(*artifact.info))
+                    exported_symbols = std::get<iris::compiler::Dynamic_library_info>(*artifact.info).exports;
+
+                iris::compiler::Linker_options const linker_options
+                {
+                    .entry_point = std::nullopt,
+                    .debug = debug,
+                    .link_type = iris::compiler::Link_type::Shared_library,
+                    .exported_symbols = exported_symbols
+                };
+
+                std::filesystem::path const output = builder.build_directory_path / "bin" / artifact.name;
+                create_directory_if_it_does_not_exist(output.parent_path());
+
+                bool const result = iris::compiler::link(
+                    bitcode_files,
+                    artifact_libraries.libraries,
+                    output,
+                    linker_options
+                );
+                if (!result)
+                    iris::common::print_message_and_exit(std::format("Failed to link dynamic library '{}'.", artifact.name));
+            }
             else if (artifact.info.has_value() && std::holds_alternative<iris::compiler::Executable_info>(*artifact.info))
             {
                 iris::compiler::Executable_info const& executable_info = std::get<iris::compiler::Executable_info>(*artifact.info);
@@ -2014,10 +2779,10 @@ namespace iris::compiler
     void copy_dlls(
         Builder const& builder,
         std::span<Artifact const> const artifacts,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+        std::filesystem::path const& output_directory
     )
     {
-        std::filesystem::path const output_directory = builder.build_directory_path / "bin";
+        create_directory_if_it_does_not_exist(output_directory);
 
         for (std::size_t artifact_index = 0; artifact_index < artifacts.size(); ++artifact_index)
         {
@@ -2084,16 +2849,40 @@ namespace iris::compiler
         std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing);
     }
 
-    void copy_files_from_artifacts(
-        Builder const& builder,
-        std::span<Artifact const> const artifacts
+    static bool should_copy_in_phase(Copy_when const when, Copy_phase const phase)
+    {
+        switch (when)
+        {
+        case Copy_when::Always:
+            return true;
+        case Copy_when::Build:
+            return phase == Copy_phase::Build;
+        case Copy_when::Install:
+            return phase == Copy_phase::Install;
+        }
+        return true;
+    }
+
+    static void copy_files_from_artifacts(
+        std::span<Artifact const> const artifacts,
+        std::filesystem::path const& destination_root,
+        Copy_phase const phase
     )
     {
         for (Artifact const& artifact : artifacts)
         {
             for (Copy_entry const& entry : artifact.copy_entries)
             {
-                std::filesystem::path const destination_base = builder.build_directory_path / entry.destination;
+                if (!should_copy_in_phase(entry.when, phase))
+                    continue;
+
+                if (phase == Copy_phase::Install && entry.destination.is_absolute())
+                {
+                    std::fprintf(stderr, "Install: skipping copy to absolute destination '%s' of artifact '%s'.\n", entry.destination.generic_string().c_str(), artifact.name.c_str());
+                    continue;
+                }
+
+                std::filesystem::path const destination_base = destination_root / entry.destination;
 
                 if (std::filesystem::is_directory(entry.source))
                 {
@@ -2103,9 +2892,10 @@ namespace iris::compiler
                             continue;
 
                         std::filesystem::path const relative = std::filesystem::relative(directory_entry.path(), entry.source);
-                        std::filesystem::path const destination = destination_base / relative;
+                        if (is_copy_excluded(entry, relative.generic_string()))
+                            continue;
 
-                        copy_file_if_different(directory_entry.path(), destination);
+                        copy_file_if_different(directory_entry.path(), destination_base / relative);
                     }
                 }
                 else if (std::filesystem::is_regular_file(entry.source))
@@ -2114,6 +2904,102 @@ namespace iris::compiler
                 }
             }
         }
+    }
+
+    static std::optional<std::filesystem::path> get_installed_binary_name(
+        Artifact const& artifact,
+        Target const& target
+    )
+    {
+        if (!contains_any_compilable_source(artifact))
+            return std::nullopt;
+
+        bool const is_windows = target.operating_system == "windows";
+
+        if (artifact.type == Artifact_type::Dynamic_library)
+            return std::filesystem::path{ std::format("{}{}", artifact.name, is_windows ? ".dll" : ".so") };
+
+        if (artifact.info.has_value() && std::holds_alternative<Executable_info>(*artifact.info))
+            return std::filesystem::path{ std::format("{}{}", artifact.name, is_windows ? ".exe" : "") };
+
+        return std::nullopt;
+    }
+
+    static void write_install_archive(
+        std::filesystem::path const& prefix,
+        std::filesystem::path const& archive_path
+    )
+    {
+        if (std::filesystem::exists(archive_path))
+            std::filesystem::remove(archive_path);
+        if (!archive_path.parent_path().empty())
+            create_directory_if_it_does_not_exist(archive_path.parent_path());
+
+        std::optional<std::pmr::string> const error = iris::common::create_archive_from_directory(prefix, archive_path);
+        if (error.has_value())
+            iris::common::print_message_and_exit(std::format("Install: failed to create archive '{}': {}", archive_path.generic_string(), error.value()));
+
+        std::printf("Install: wrote archive '%s'.\n", archive_path.generic_string().c_str());
+    }
+
+    void install_artifacts(
+        Builder& builder,
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        Install_options const& options
+    )
+    {
+        build_artifacts(builder, artifact_file_paths);
+
+        std::pmr::polymorphic_allocator<> output_allocator;
+        std::pmr::polymorphic_allocator<> temporaries_allocator;
+
+        std::pmr::vector<Artifact> const artifacts = get_sorted_artifacts(
+            artifact_file_paths,
+            builder.repositories,
+            false,
+            builder.environment_variables,
+            output_allocator,
+            temporaries_allocator
+        );
+
+        if (options.clean && std::filesystem::exists(options.prefix))
+            std::filesystem::remove_all(options.prefix);
+
+        std::filesystem::path const built_binary_directory = builder.build_directory_path / "bin";
+        std::filesystem::path const installed_binary_directory = options.prefix / "bin";
+        create_directory_if_it_does_not_exist(installed_binary_directory);
+
+        for (Artifact const& artifact : artifacts)
+        {
+            std::optional<std::filesystem::path> const binary_name = get_installed_binary_name(artifact, builder.target);
+            if (!binary_name.has_value())
+                continue;
+
+            std::filesystem::path const binary_path = built_binary_directory / binary_name.value();
+            if (!std::filesystem::exists(binary_path))
+                iris::common::print_message_and_exit(std::format("Install: '{}' was not built.", binary_path.generic_string()));
+
+            copy_file_if_different(binary_path, installed_binary_directory / binary_name.value());
+
+            if (options.include_debug_files)
+            {
+                std::filesystem::path debug_file_name = binary_name.value();
+                debug_file_name.replace_extension(".pdb");
+                std::filesystem::path const debug_file_path = built_binary_directory / debug_file_name;
+                if (std::filesystem::exists(debug_file_path))
+                    copy_file_if_different(debug_file_path, installed_binary_directory / debug_file_name);
+            }
+        }
+
+        if (builder.target.operating_system == "windows")
+            copy_dlls(builder, artifacts, installed_binary_directory);
+
+        copy_files_from_artifacts(artifacts, options.prefix, Copy_phase::Install);
+
+        if (options.archive_path.has_value())
+            write_install_archive(options.prefix, options.archive_path.value());
+
+        std::printf("Install: installed into '%s'.\n", options.prefix.generic_string().c_str());
     }
 
     void print_struct_layout(

@@ -1,0 +1,29 @@
+module Access_through_global_pointer;
+
+struct Pair
+{
+    first: Int32 = 0i32;
+    second: Int32 = 0i32;
+}
+
+mutable g_pair: *Pair = null;
+
+function value_of(value: *Int32) -> (result: Int32)
+{
+    return *value;
+}
+
+export function read_second() -> (result: Int32)
+{
+    return g_pair->second;
+}
+
+export function address_of_second() -> (result: Int32)
+{
+    return value_of(&g_pair->second);
+}
+
+export function is_set() -> (result: Bool)
+{
+    return g_pair != null;
+}

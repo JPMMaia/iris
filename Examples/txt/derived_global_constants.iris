@@ -1,0 +1,27 @@
+module Derived_global_constants;
+
+import Derived_global_constants_provider as Provider;
+
+export var meters_per_foot = 0.3048f32;
+
+export var seconds_per_round = 6.0f32;
+
+export var five_feet_in_meters = 5.0f32 * meters_per_foot;
+
+export var speed_30_meters_per_second = 30.0f32 * meters_per_foot / seconds_per_round;
+
+export var meters_per_round = meters_per_foot + seconds_per_round;
+
+export var negative_meters_per_foot = -meters_per_foot;
+
+export var rounds_per_minute = 10u32;
+
+export var rounds_per_two_minutes = 2u32 * rounds_per_minute;
+
+export var half_a_mile_in_feet = Provider.feet_per_mile / 2u32;
+
+export var ten_feet_in_meters = 10.0f32 * Provider.meters_per_foot;
+
+export var alias_of_five_feet = five_feet_in_meters;
+
+export var imported_meters_per_foot = Provider.meters_per_foot;

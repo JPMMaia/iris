@@ -23,6 +23,8 @@ endif()
 find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(Iris_compiler PRIVATE nlohmann_json::nlohmann_json)
 
+target_compile_definitions(Iris_compiler PRIVATE IRIS_BUILD_ID="${IRIS_BUILD_ID}")
+
 target_sources(Iris_compiler
    PUBLIC FILE_SET modules TYPE CXX_MODULES
       FILES
@@ -39,7 +41,9 @@ target_sources(Iris_compiler
          "Diagnostic.cppm"
          "Expressions.cppm"
          "Instructions.cppm"
+         "Lambda_database.cppm"
          "Linker.cppm"
+         "Parallel.cppm"
          "Profiler.cppm"
          "Test_framework.cppm"
          "Types.cppm"
@@ -48,6 +52,7 @@ target_sources(Iris_compiler
          "Passes/Compile_time_pass.cppm"
          "Passes/Implicit_function_pass.cppm"
          "Passes/Instantiate_pass.cppm"
+         "Passes/Lambda_pass.cppm"
          "Project/Artifact.cppm"
          "Project/Presets.cppm"
          "Project/Repository.cppm"
@@ -65,6 +70,8 @@ target_sources(Iris_compiler
       "Diagnostic.cpp"
       "Expressions.cpp"
       "Instructions.cpp"
+      "Lambda_database.cpp"
+      "Parallel.cpp"
       "Test_framework.cpp"
       "Types.cpp"
       "Validation.cpp"
@@ -72,6 +79,7 @@ target_sources(Iris_compiler
       "Passes/Compile_time_pass.cpp"
       "Passes/Implicit_function_pass.cpp"
       "Passes/Instantiate_pass.cpp"
+      "Passes/Lambda_pass.cpp"
       "Project/Artifact.cpp"
       "Project/Presets.cpp"
       "Project/Repository.cpp"
@@ -118,6 +126,7 @@ if(BUILD_TESTING)
    add_executable(Iris_builder_tests)
    target_link_libraries(Iris_builder_tests PRIVATE ${iris_test_link_libraries})
    target_compile_definitions(Iris_builder_tests PRIVATE ${iris_test_compile_definitions})
+   target_link_libraries(Iris_builder_tests PRIVATE nlohmann_json::nlohmann_json)
    target_sources(Iris_builder_tests PRIVATE
       "main.tests.cpp"
       "Builder.tests.cpp"
@@ -138,6 +147,7 @@ if(BUILD_TESTING)
          "Passes/Compile_time_pass.tests.cpp"
          "Passes/Instantiate_pass.tests.cpp"
          "Passes/Implicit_function_pass.tests.cpp"
+         "Passes/Lambda_pass.tests.cpp"
    )
    catch_discover_tests(Iris_passes_tests)
 
@@ -175,5 +185,37 @@ if(BUILD_TESTING)
       "Compiler.tests.cpp"
    )
    catch_discover_tests(Iris_compiler_tests)
+
+   # Analysis tests
+   add_executable(Iris_analysis_tests)
+   target_link_libraries(Iris_analysis_tests PRIVATE ${iris_test_link_libraries})
+   target_compile_definitions(Iris_analysis_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_analysis_tests PRIVATE
+      "main.tests.cpp"
+      "Analysis.tests.cpp"
+   )
+   catch_discover_tests(Iris_analysis_tests)
+
+   # Parallel tests
+   add_executable(Iris_parallel_tests)
+   target_link_libraries(Iris_parallel_tests PRIVATE ${iris_test_link_libraries} Iris::Common)
+   target_compile_definitions(Iris_parallel_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_parallel_tests PRIVATE
+      "main.tests.cpp"
+      "Parallel.tests.cpp"
+   )
+   catch_discover_tests(Iris_parallel_tests)
+
+   # Core Hash tests
+   add_executable(Iris_hash_tests)
+   target_link_libraries(Iris_hash_tests PRIVATE ${iris_test_link_libraries})
+   target_compile_definitions(Iris_hash_tests PRIVATE ${iris_test_compile_definitions})
+   target_sources(Iris_hash_tests PRIVATE
+      "main.tests.cpp"
+      "${CMAKE_CURRENT_LIST_DIR}/../Core/Hash.tests.cpp"
+   )
+   find_package(xxHash CONFIG REQUIRED)
+   target_link_libraries(Iris_hash_tests PRIVATE xxHash::xxhash)
+   catch_discover_tests(Iris_hash_tests)
 
 endif()

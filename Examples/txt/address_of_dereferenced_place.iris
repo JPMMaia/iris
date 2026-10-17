@@ -1,0 +1,10 @@
+module Address_of_dereferenced_place;
+
+export function set_second(values: *mutable Constant_array::<Int32, 4>, value: *mutable Int32) -> (same: *mutable Int32)
+{
+    var element = &(*values)[1];
+    *element = 5;
+    var parenthesized = &(*value);
+    *parenthesized = 6;
+    return &*value;
+}

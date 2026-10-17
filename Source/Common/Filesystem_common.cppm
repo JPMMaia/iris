@@ -28,6 +28,8 @@ namespace iris::common
 
     export std::filesystem::path get_visualizers_file_path();
 
+    export std::filesystem::path get_builtins_library_directory();
+
     export std::optional<std::pmr::string> download_file(
         std::string_view const url,
         std::filesystem::path const& destination_path

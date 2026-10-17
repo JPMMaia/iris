@@ -23,8 +23,9 @@ export function use_comments() -> ()
     (Module_name
       (Identifier_with_dots
         (Identifier))))
+  (Comment)
+  (Comment)
   (Declaration
-    (Comment)
     (Function
       (Function_declaration
         (Function_name
@@ -33,9 +34,7 @@ export function use_comments() -> ()
         (Function_output_parameters))
       (Function_definition
         (Block
-          (Statement
-            (Expression_comment
-              (Comment)))
+          (Comment)
           (Statement
             (Expression_variable_declaration
               (Expression_variable_mutability)
@@ -44,12 +43,8 @@ export function use_comments() -> ()
               (Generic_expression
                 (Expression_constant
                   (Number)))))
-          (Statement
-            (Expression_comment
-              (Comment)))
-          (Statement
-            (Expression_comment
-              (Comment)))
+          (Comment)
+          (Comment)
           (Statement
             (Expression_variable_declaration
               (Expression_variable_mutability)

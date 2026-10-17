@@ -4,9 +4,11 @@ import std;
 
 import iris.core;
 import iris.core.declarations;
+import iris.compiler.lambda_database;
 import iris.compiler;
 import iris.compiler.artifact;
 import iris.compiler.project;
+import iris.compiler.parallel;
 import iris.compiler.profiler;
 import iris.compiler.presets;
 import iris.compiler.repository;
@@ -18,7 +20,18 @@ namespace iris::compiler
     {
         bool output_llvm_ir = false;
         bool is_test_mode = false;
+        bool track_compiler_binary_identity = true;
         Environment_variables environment_variables = {};
+        // 0 means one job per hardware thread.
+        std::uint32_t job_count = 1;
+    };
+
+    export struct Build_identity
+    {
+        std::uint64_t parse_identity = 0;
+        std::uint64_t codegen_identity = 0;
+        std::filesystem::file_time_type parse_floor = std::filesystem::file_time_type::min();
+        std::filesystem::file_time_type codegen_floor = std::filesystem::file_time_type::min();
     };
 
     export struct Builder
@@ -36,6 +49,9 @@ namespace iris::compiler
         Environment_variables environment_variables = {};
         std::optional<std::filesystem::path> dependencies_project_path;
         std::pmr::vector<Project_dependency> dependencies;
+        bool track_compiler_binary_identity = true;
+        Build_identity build_identity = {};
+        std::uint32_t job_count = 1;
     };
 
     export Builder create_builder(
@@ -48,6 +64,11 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> output_allocator
     );
 
+    // Options for running build work with parallel_for: the builder's job count and profiler.
+    export Parallel_options get_parallel_options(
+        Builder& builder
+    );
+
     export void build_artifact(
         Builder& builder,
         std::filesystem::path const& artifact_file_path
@@ -56,6 +77,23 @@ namespace iris::compiler
     export void build_artifacts(
         Builder& builder,
         std::span<std::filesystem::path const> const artifact_file_paths
+    );
+
+    export struct Install_options
+    {
+        std::filesystem::path prefix;
+        bool include_debug_files = false;
+        bool clean = false;
+        std::optional<std::filesystem::path> archive_path;
+    };
+
+    // Builds the artifacts, then lays out an install in `prefix` like the build directory: the
+    // executables and dynamic libraries of the artifacts and everything they depend on, their
+    // external DLLs, and the copy entries that apply at install time.
+    export void install_artifacts(
+        Builder& builder,
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        Install_options const& options
     );
 
     export std::pmr::vector<Artifact> get_sorted_artifacts(
@@ -131,9 +169,9 @@ namespace iris::compiler
         Builder& builder,
         std::span<iris::Module const> const core_modules,
         std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const& module_name_to_file_path_map,
-        LLVM_data& llvm_data,
         std::span<iris::Module const* const> const all_sorted_modules,
         Declaration_database const& declaration_database,
+        Lambda_database const& lambda_database,
         Compilation_options const& compilation_options,
         bool const is_test_mode
     );
@@ -159,7 +197,7 @@ namespace iris::compiler
     void copy_dlls(
         Builder const& builder,
         std::span<Artifact const> const artifacts,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+        std::filesystem::path const& output_directory
     );
 
     bool is_file_newer_than(
