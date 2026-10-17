@@ -263,6 +263,24 @@ std::filesystem::path get_effective_build_directory_argument(
     return build_directory;
 }
 
+// Installs build with different options than development builds, so unless a build directory is
+// given they use their own next to the usual one and leave its cache alone.
+std::filesystem::path get_effective_install_build_directory_argument(
+    argparse::ArgumentParser const& subprogram,
+    std::optional<iris::compiler::Presets> const& presets
+)
+{
+    std::filesystem::path const build_directory = get_effective_build_directory_argument(subprogram, presets);
+    if (subprogram.is_used("--build-directory"))
+        return build_directory;
+
+    std::filesystem::path install_build_directory = build_directory.lexically_normal();
+    if (!install_build_directory.has_filename())
+        install_build_directory = install_build_directory.parent_path();
+    install_build_directory += "-install";
+    return install_build_directory;
+}
+
 std::pmr::vector<std::filesystem::path> get_effective_header_search_paths_argument(
     argparse::ArgumentParser const& subprogram,
     std::optional<iris::compiler::Presets> const& presets
@@ -687,6 +705,60 @@ static int run_subcommand(argparse::ArgumentParser& program, int const argc, cha
         std::pmr::vector<std::filesystem::path> const artifact_paths = select_artifact_paths(artifact_name, environment_variables);
         iris::compiler::build_artifacts(builder, artifact_paths);
     }
+    else if (program.is_subcommand_used("install"))
+    {
+        print_arguments(argc, argv);
+
+        argparse::ArgumentParser const& subprogram = program.at<argparse::ArgumentParser>("install");
+        std::optional<iris::compiler::Presets> const presets = get_local_presets();
+        iris::compiler::Environment_variables const environment_variables = get_effective_environment_variables(presets);
+
+        std::filesystem::path const build_directory_path = get_effective_install_build_directory_argument(subprogram, presets);
+        std::pmr::vector<std::filesystem::path> const header_search_paths = get_effective_header_search_paths_argument(subprogram, presets);
+        std::pmr::vector<std::filesystem::path> const repository_paths = get_effective_repository_paths_argument(subprogram, presets);
+        bool const debug = subprogram.get<bool>("--debug");
+        bool const no_bounds_checks = subprogram.get<bool>("--no-bounds-checks");
+        iris::compiler::Contract_options const contract_options = get_effective_function_contract_options_argument(subprogram, presets);
+
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+        std::optional<bool> const decimal_overflow_checks = get_decimal_overflow_checks(subprogram);
+        iris::compiler::Compilation_options const compilation_options = create_compilation_options(target, !debug, contract_options, no_bounds_checks, decimal_overflow_checks);
+
+        iris::compiler::Builder_options const builder_options =
+        {
+            .output_llvm_ir = false,
+            .environment_variables = environment_variables,
+        };
+
+        iris::compiler::Builder builder = iris::compiler::create_builder(
+            target,
+            build_directory_path,
+            header_search_paths,
+            repository_paths,
+            compilation_options,
+            builder_options,
+            {}
+        );
+
+        std::pmr::vector<std::filesystem::path> artifact_paths;
+        for (std::string const& artifact_name : subprogram.get<std::vector<std::string>>("artifact_names"))
+        {
+            std::pmr::vector<std::filesystem::path> const selected = select_artifact_paths(artifact_name, environment_variables);
+            artifact_paths.insert(artifact_paths.end(), selected.begin(), selected.end());
+        }
+
+        std::optional<std::string> const archive = subprogram.present<std::string>("--archive");
+
+        iris::compiler::Install_options const install_options
+        {
+            .prefix = std::filesystem::absolute(subprogram.get<std::string>("--prefix")),
+            .include_debug_files = debug,
+            .clean = subprogram.get<bool>("--clean"),
+            .archive_path = archive.has_value() ? std::optional<std::filesystem::path>{ std::filesystem::absolute(archive.value()) } : std::nullopt,
+        };
+
+        iris::compiler::install_artifacts(builder, artifact_paths, install_options);
+    }
     else if (program.is_subcommand_used("build-tests"))
     {
         print_arguments(argc, argv);
@@ -1025,6 +1097,31 @@ int main(int const argc, char const* const* argv)
         .help("Stop a test executable's run when a test crashes instead of continuing with the next one")
         .flag();
     program.add_subparser(test_command);
+
+    // iris install <artifact_name>... --prefix=<directory> [--archive=<file>] [--clean] [--debug]
+    argparse::ArgumentParser install_command("install");
+    install_command.add_description("Build artifacts and install them, everything they depend on and their install-time copy entries into a prefix laid out like the build directory.");
+    install_command.add_argument("artifact_names")
+        .help("Artifacts to install")
+        .nargs(argparse::nargs_pattern::at_least_one);
+    install_command.add_argument("--prefix")
+        .help("Directory to install into")
+        .required();
+    install_command.add_argument("--archive")
+        .help("Also pack the installed directory into this .zip or .7z file");
+    install_command.add_argument("--clean")
+        .help("Delete the prefix before installing so files from earlier installs do not linger")
+        .flag();
+    install_command.add_argument("--debug")
+        .help("Build with debug information and install the debug files")
+        .flag();
+    add_build_directory_argument(install_command);
+    add_header_search_path_argument(install_command);
+    add_repository_argument(install_command);
+    add_no_bounds_checks_argument(install_command);
+    add_decimal_overflow_checks_arguments(install_command);
+    add_function_contract_options_argument(install_command);
+    program.add_subparser(install_command);
 
     // iris list [--build-directory=<build_directory>]
     argparse::ArgumentParser list_command("list");

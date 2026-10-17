@@ -13,6 +13,7 @@ You can also define optional local defaults in `iris_presets.json` to reduce rep
 ```powershell
 iris build [artifact_name] --build-directory build [--repository /path/to/repository --repository ...]
 iris list --build-directory build
+iris install <artifact_name>... --prefix dist/my_app [--archive dist/my_app.zip] [--clean] [--debug]
 ```
 
 `artifact_name` is optional. If omitted, Iris discovers all `iris_artifact.json` files recursively from the current directory while skipping `build` and hidden subdirectories.
@@ -23,6 +24,7 @@ Supported commands that read presets are:
 - `iris build`
 - `iris build-tests`
 - `iris test`
+- `iris install`
 - `iris generate-compile-commands`
 - `iris download-dependencies`
 - `iris build-dependencies`
@@ -187,6 +189,7 @@ See [Dependencies](./dependencies.md) for the full reference.
 | `sources` | array | ✓ | One or more source groups |
 | `executable` | object | When `type == "executable"` | Entry-point configuration |
 | `dynamic_library` | object | When `type == "dynamic_library"` | Exported symbol names |
+| `copy` | array | — | Files and folders copied into the build directory and installs |
 
 ### Artifact Types
 
@@ -240,6 +243,43 @@ any global state it owns. Keep the boundary a narrow C ABI and pass allocators a
 it explicitly rather than relying on shared globals.
 
 `Examples/Load_dynamic_library` is a complete host-and-plugin pair.
+
+### Copy Entries
+
+Each entry copies a file or a folder (recursively) to a destination relative to the build
+directory, or to the prefix during `iris install`:
+
+```json
+"copy": [
+    { "source": "assets", "destination": "data" },
+    { "source": "dev_manifest.txt", "destination": "manifest.txt", "when": "build" },
+    { "source": "install_manifest.txt", "destination": "manifest.txt", "when": "install" },
+    { "source": "content", "destination": "data", "when": "install", "exclude": ["**/cache/**", "*.tmp"] }
+]
+```
+
+| Field | Description |
+|---|---|
+| `source` | File or folder, relative to the artifact file |
+| `destination` | Path relative to the build directory or the install prefix |
+| `when` | `"always"` (default), `"build"` (only `iris build`/`test`) or `"install"` (only `iris install`) |
+| `exclude` | Patterns matched against paths relative to a copied folder: `**` crosses folders, `*` and `?` do not |
+
+### Installing
+
+`iris install` builds the named artifacts, then fills `--prefix` with the same layout as the build
+directory: `bin/` gets the executables and dynamic libraries of those artifacts and every artifact
+they depend on, plus the external DLLs their libraries name, and every copy entry whose `when` is
+`always` or `install` lands under the prefix. Static libraries, intermediate files and test
+executables are left out.
+
+- Without `--debug`, installs are built without debug information and debug files are not copied.
+- Unless `--build-directory` is given, an install builds into `<build directory>-install`, so the
+  development build cache is not rebuilt with different options.
+- `--clean` deletes the prefix first, so files from earlier installs do not linger.
+- `--archive <file>` also packs the installed folder into a `.zip` or `.7z`.
+
+`Examples/Install_files` shows build-only and install-only copies and exclude patterns.
 
 ### Source Group Types
 

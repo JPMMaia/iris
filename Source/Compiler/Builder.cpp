@@ -42,7 +42,17 @@ import iris.parser.parser;
 
 namespace iris::compiler
 {
-    void copy_files_from_artifacts(Builder const& builder, std::span<Artifact const> const artifacts);
+    enum class Copy_phase
+    {
+        Build,
+        Install
+    };
+
+    static void copy_files_from_artifacts(
+        std::span<Artifact const> const artifacts,
+        std::filesystem::path const& destination_root,
+        Copy_phase const phase
+    );
 
     static std::filesystem::path get_hl_build_directory(
         std::filesystem::path const& build_directory_path
@@ -798,11 +808,11 @@ namespace iris::compiler
             copy_dlls(
                 builder,
                 artifacts,
-                temporaries_allocator
+                builder.build_directory_path / "bin"
             );
         }
 
-        copy_files_from_artifacts(builder, artifacts);
+        copy_files_from_artifacts(artifacts, builder.build_directory_path, Copy_phase::Build);
 
         end_timer(get_profiler(builder), "build_artifact");
 
@@ -2559,10 +2569,10 @@ namespace iris::compiler
     void copy_dlls(
         Builder const& builder,
         std::span<Artifact const> const artifacts,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+        std::filesystem::path const& output_directory
     )
     {
-        std::filesystem::path const output_directory = builder.build_directory_path / "bin";
+        create_directory_if_it_does_not_exist(output_directory);
 
         for (std::size_t artifact_index = 0; artifact_index < artifacts.size(); ++artifact_index)
         {
@@ -2629,16 +2639,40 @@ namespace iris::compiler
         std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing);
     }
 
-    void copy_files_from_artifacts(
-        Builder const& builder,
-        std::span<Artifact const> const artifacts
+    static bool should_copy_in_phase(Copy_when const when, Copy_phase const phase)
+    {
+        switch (when)
+        {
+        case Copy_when::Always:
+            return true;
+        case Copy_when::Build:
+            return phase == Copy_phase::Build;
+        case Copy_when::Install:
+            return phase == Copy_phase::Install;
+        }
+        return true;
+    }
+
+    static void copy_files_from_artifacts(
+        std::span<Artifact const> const artifacts,
+        std::filesystem::path const& destination_root,
+        Copy_phase const phase
     )
     {
         for (Artifact const& artifact : artifacts)
         {
             for (Copy_entry const& entry : artifact.copy_entries)
             {
-                std::filesystem::path const destination_base = builder.build_directory_path / entry.destination;
+                if (!should_copy_in_phase(entry.when, phase))
+                    continue;
+
+                if (phase == Copy_phase::Install && entry.destination.is_absolute())
+                {
+                    std::fprintf(stderr, "Install: skipping copy to absolute destination '%s' of artifact '%s'.\n", entry.destination.generic_string().c_str(), artifact.name.c_str());
+                    continue;
+                }
+
+                std::filesystem::path const destination_base = destination_root / entry.destination;
 
                 if (std::filesystem::is_directory(entry.source))
                 {
@@ -2648,9 +2682,10 @@ namespace iris::compiler
                             continue;
 
                         std::filesystem::path const relative = std::filesystem::relative(directory_entry.path(), entry.source);
-                        std::filesystem::path const destination = destination_base / relative;
+                        if (is_copy_excluded(entry, relative.generic_string()))
+                            continue;
 
-                        copy_file_if_different(directory_entry.path(), destination);
+                        copy_file_if_different(directory_entry.path(), destination_base / relative);
                     }
                 }
                 else if (std::filesystem::is_regular_file(entry.source))
@@ -2659,6 +2694,102 @@ namespace iris::compiler
                 }
             }
         }
+    }
+
+    static std::optional<std::filesystem::path> get_installed_binary_name(
+        Artifact const& artifact,
+        Target const& target
+    )
+    {
+        if (!contains_any_compilable_source(artifact))
+            return std::nullopt;
+
+        bool const is_windows = target.operating_system == "windows";
+
+        if (artifact.type == Artifact_type::Dynamic_library)
+            return std::filesystem::path{ std::format("{}{}", artifact.name, is_windows ? ".dll" : ".so") };
+
+        if (artifact.info.has_value() && std::holds_alternative<Executable_info>(*artifact.info))
+            return std::filesystem::path{ std::format("{}{}", artifact.name, is_windows ? ".exe" : "") };
+
+        return std::nullopt;
+    }
+
+    static void write_install_archive(
+        std::filesystem::path const& prefix,
+        std::filesystem::path const& archive_path
+    )
+    {
+        if (std::filesystem::exists(archive_path))
+            std::filesystem::remove(archive_path);
+        if (!archive_path.parent_path().empty())
+            create_directory_if_it_does_not_exist(archive_path.parent_path());
+
+        std::optional<std::pmr::string> const error = iris::common::create_archive_from_directory(prefix, archive_path);
+        if (error.has_value())
+            iris::common::print_message_and_exit(std::format("Install: failed to create archive '{}': {}", archive_path.generic_string(), error.value()));
+
+        std::printf("Install: wrote archive '%s'.\n", archive_path.generic_string().c_str());
+    }
+
+    void install_artifacts(
+        Builder& builder,
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        Install_options const& options
+    )
+    {
+        build_artifacts(builder, artifact_file_paths);
+
+        std::pmr::polymorphic_allocator<> output_allocator;
+        std::pmr::polymorphic_allocator<> temporaries_allocator;
+
+        std::pmr::vector<Artifact> const artifacts = get_sorted_artifacts(
+            artifact_file_paths,
+            builder.repositories,
+            false,
+            builder.environment_variables,
+            output_allocator,
+            temporaries_allocator
+        );
+
+        if (options.clean && std::filesystem::exists(options.prefix))
+            std::filesystem::remove_all(options.prefix);
+
+        std::filesystem::path const built_binary_directory = builder.build_directory_path / "bin";
+        std::filesystem::path const installed_binary_directory = options.prefix / "bin";
+        create_directory_if_it_does_not_exist(installed_binary_directory);
+
+        for (Artifact const& artifact : artifacts)
+        {
+            std::optional<std::filesystem::path> const binary_name = get_installed_binary_name(artifact, builder.target);
+            if (!binary_name.has_value())
+                continue;
+
+            std::filesystem::path const binary_path = built_binary_directory / binary_name.value();
+            if (!std::filesystem::exists(binary_path))
+                iris::common::print_message_and_exit(std::format("Install: '{}' was not built.", binary_path.generic_string()));
+
+            copy_file_if_different(binary_path, installed_binary_directory / binary_name.value());
+
+            if (options.include_debug_files)
+            {
+                std::filesystem::path debug_file_name = binary_name.value();
+                debug_file_name.replace_extension(".pdb");
+                std::filesystem::path const debug_file_path = built_binary_directory / debug_file_name;
+                if (std::filesystem::exists(debug_file_path))
+                    copy_file_if_different(debug_file_path, installed_binary_directory / debug_file_name);
+            }
+        }
+
+        if (builder.target.operating_system == "windows")
+            copy_dlls(builder, artifacts, installed_binary_directory);
+
+        copy_files_from_artifacts(artifacts, options.prefix, Copy_phase::Install);
+
+        if (options.archive_path.has_value())
+            write_install_archive(options.prefix, options.archive_path.value());
+
+        std::printf("Install: installed into '%s'.\n", options.prefix.generic_string().c_str());
     }
 
     void print_struct_layout(

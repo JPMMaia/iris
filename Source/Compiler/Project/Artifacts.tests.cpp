@@ -359,4 +359,55 @@ namespace iris::compiler
         CHECK(output_data.find("${") == std::string::npos);
         CHECK(output_data.find("C:/src/project/main.iris") != std::string::npos);
     }
+
+    TEST_CASE("Artifact parser reads copy when and exclude, and the writer round-trips them", "[Artifact]")
+    {
+        std::filesystem::path const temporary_directory = create_clean_temporary_directory("iris_artifact_tests_copy_when_exclude");
+        std::filesystem::path const artifact_path = temporary_directory / "iris_artifact.json";
+
+        std::ofstream file{ artifact_path };
+        file << R"({
+  "name": "my_app",
+  "version": "0.1.0",
+  "type": "executable",
+  "copy": [
+    { "source": "a", "destination": "a" },
+    { "source": "b", "destination": "b", "when": "build" },
+    { "source": "c", "destination": "c", "when": "install", "exclude": ["**/cache/**", "*.tmp"] }
+  ],
+  "executable": { "source": "main.iris" }
+})";
+        file.close();
+
+        Artifact const artifact = get_artifact(artifact_path);
+        REQUIRE(artifact.copy_entries.size() == 3);
+        CHECK(artifact.copy_entries[0].when == Copy_when::Always);
+        CHECK(artifact.copy_entries[0].exclude.empty());
+        CHECK(artifact.copy_entries[1].when == Copy_when::Build);
+        CHECK(artifact.copy_entries[2].when == Copy_when::Install);
+        REQUIRE(artifact.copy_entries[2].exclude.size() == 2);
+        CHECK(artifact.copy_entries[2].exclude[0] == "**/cache/**");
+
+        std::filesystem::path const written_path = temporary_directory / "written.json";
+        write_artifact_to_file(artifact, written_path);
+        Artifact const read_back = get_artifact(written_path);
+        REQUIRE(read_back.copy_entries.size() == 3);
+        CHECK(read_back.copy_entries[1].when == Copy_when::Build);
+        CHECK(read_back.copy_entries[2].when == Copy_when::Install);
+        CHECK(read_back.copy_entries[2].exclude.size() == 2);
+    }
+
+    TEST_CASE("Copy exclude patterns match relative paths", "[Artifact]")
+    {
+        CHECK(matches_copy_pattern("*.tmp", "file.tmp"));
+        CHECK_FALSE(matches_copy_pattern("*.tmp", "folder/file.tmp"));
+        CHECK(matches_copy_pattern("**/*.tmp", "file.tmp"));
+        CHECK(matches_copy_pattern("**/*.tmp", "folder/deeper/file.tmp"));
+        CHECK(matches_copy_pattern("generated/**", "generated/terrain/world.usdc"));
+        CHECK_FALSE(matches_copy_pattern("generated/**", "usd/generated.usdc"));
+        CHECK(matches_copy_pattern("**/*.world/cache/**", "usd/terrain/a.world/cache/tile_0.bin"));
+        CHECK_FALSE(matches_copy_pattern("**/*.world/cache/**", "usd/terrain/a.world/tiles/tile_0.bin"));
+        CHECK(matches_copy_pattern("tile_?.bin", "tile_7.bin"));
+        CHECK_FALSE(matches_copy_pattern("tile_?.bin", "tile_17.bin"));
+    }
 }

@@ -89,11 +89,27 @@ namespace iris::compiler
         std::pmr::vector<std::pmr::string> exports;
     };
 
+    export enum class Copy_when
+    {
+        Always,
+        Build,
+        Install
+    };
+
     export struct Copy_entry
     {
         std::filesystem::path source;
         std::filesystem::path destination;
+        Copy_when when = Copy_when::Always;
+        std::pmr::vector<std::pmr::string> exclude;
     };
+
+    // Matches a path relative to a copied directory against an exclude pattern. '**' matches any
+    // run of characters including separators, '*' any run without a separator and '?' one
+    // character other than a separator.
+    export bool matches_copy_pattern(std::string_view const pattern, std::string_view const relative_path);
+
+    export bool is_copy_excluded(Copy_entry const& entry, std::string_view const relative_path);
 
     export struct Artifact
     {

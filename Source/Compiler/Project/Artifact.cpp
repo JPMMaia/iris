@@ -439,6 +439,33 @@ namespace iris::compiler
         }
     }
 
+    Copy_when parse_copy_when(std::string_view const when)
+    {
+        if (when == "always")
+            return Copy_when::Always;
+        if (when == "build")
+            return Copy_when::Build;
+        if (when == "install")
+            return Copy_when::Install;
+
+        iris::common::print_message_and_exit(std::format("Unknown copy 'when' value '{}'. Expected 'always', 'build' or 'install'.", when));
+        return Copy_when::Always;
+    }
+
+    std::string_view copy_when_to_string(Copy_when const when)
+    {
+        switch (when)
+        {
+        case Copy_when::Always:
+            return "always";
+        case Copy_when::Build:
+            return "build";
+        case Copy_when::Install:
+            return "install";
+        }
+        return "always";
+    }
+
     std::pmr::vector<Copy_entry> parse_copy_entries(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         if (!json.contains("copy"))
@@ -451,16 +478,72 @@ namespace iris::compiler
 
         for (nlohmann::json const& entry_json : copy_json)
         {
+            std::pmr::vector<std::pmr::string> exclude;
+            if (entry_json.contains("exclude"))
+            {
+                for (nlohmann::json const& pattern_json : entry_json.at("exclude"))
+                    exclude.push_back(pattern_json.get<std::string>().c_str());
+            }
+
             entries.push_back(
                 Copy_entry
                 {
                     .source = std::filesystem::path{substitute_variables(entry_json.at("source").get<std::string>(), environment_variables, "copy.source")},
                     .destination = std::filesystem::path{substitute_variables(entry_json.at("destination").get<std::string>(), environment_variables, "copy.destination")},
+                    .when = entry_json.contains("when") ? parse_copy_when(entry_json.at("when").get<std::string>()) : Copy_when::Always,
+                    .exclude = std::move(exclude),
                 }
             );
         }
 
         return entries;
+    }
+
+    bool matches_copy_pattern(std::string_view const pattern, std::string_view const relative_path)
+    {
+        if (pattern.empty())
+            return relative_path.empty();
+
+        if (pattern.starts_with("**"))
+        {
+            std::string_view const rest = pattern.substr(pattern.starts_with("**/") ? 3 : 2);
+            for (std::size_t start = 0; start <= relative_path.size(); ++start)
+            {
+                if (matches_copy_pattern(rest, relative_path.substr(start)))
+                    return true;
+            }
+            return false;
+        }
+
+        if (pattern.front() == '*')
+        {
+            for (std::size_t length = 0; length <= relative_path.size(); ++length)
+            {
+                if (matches_copy_pattern(pattern.substr(1), relative_path.substr(length)))
+                    return true;
+                if (length < relative_path.size() && relative_path[length] == '/')
+                    return false;
+            }
+            return false;
+        }
+
+        if (relative_path.empty())
+            return false;
+
+        bool const character_matches = pattern.front() == '?'
+            ? relative_path.front() != '/'
+            : pattern.front() == relative_path.front();
+
+        return character_matches && matches_copy_pattern(pattern.substr(1), relative_path.substr(1));
+    }
+
+    bool is_copy_excluded(Copy_entry const& entry, std::string_view const relative_path)
+    {
+        return std::any_of(
+            entry.exclude.begin(),
+            entry.exclude.end(),
+            [&](std::pmr::string const& pattern) -> bool { return matches_copy_pattern(pattern, relative_path); }
+        );
     }
 
     Artifact get_artifact(std::filesystem::path const& artifact_file_path)
@@ -706,13 +789,19 @@ namespace iris::compiler
 
             for (Copy_entry const& entry : artifact.copy_entries)
             {
-                copy_json.push_back(
-                    nlohmann::json
-                    {
-                        { "source", entry.source.generic_string() },
-                        { "destination", entry.destination.generic_string() },
-                    }
-                );
+                nlohmann::json entry_json
+                {
+                    { "source", entry.source.generic_string() },
+                    { "destination", entry.destination.generic_string() },
+                };
+
+                if (entry.when != Copy_when::Always)
+                    entry_json["when"] = copy_when_to_string(entry.when);
+
+                if (!entry.exclude.empty())
+                    entry_json["exclude"] = entry.exclude;
+
+                copy_json.push_back(std::move(entry_json));
             }
 
             json["copy"] = std::move(copy_json);

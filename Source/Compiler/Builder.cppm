@@ -70,6 +70,23 @@ namespace iris::compiler
         std::span<std::filesystem::path const> const artifact_file_paths
     );
 
+    export struct Install_options
+    {
+        std::filesystem::path prefix;
+        bool include_debug_files = false;
+        bool clean = false;
+        std::optional<std::filesystem::path> archive_path;
+    };
+
+    // Builds the artifacts, then lays out an install in `prefix` like the build directory: the
+    // executables and dynamic libraries of the artifacts and everything they depend on, their
+    // external DLLs, and the copy entries that apply at install time.
+    export void install_artifacts(
+        Builder& builder,
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        Install_options const& options
+    );
+
     export std::pmr::vector<Artifact> get_sorted_artifacts(
         std::span<std::filesystem::path const> const artifact_file_paths,
         std::span<Repository const> repositories,
@@ -172,7 +189,7 @@ namespace iris::compiler
     void copy_dlls(
         Builder const& builder,
         std::span<Artifact const> const artifacts,
-        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+        std::filesystem::path const& output_directory
     );
 
     bool is_file_newer_than(

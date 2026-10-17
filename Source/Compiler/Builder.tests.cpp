@@ -844,6 +844,107 @@ namespace iris::compiler
         test_builder("Copy_files", {"iris_artifact.json"}, target, repository_paths, expected_output_paths);
     }
 
+    static std::string read_whole_file(std::filesystem::path const& file_path)
+    {
+        std::ifstream input_stream{ file_path, std::ios::binary };
+        return std::string{ std::istreambuf_iterator<char>{input_stream}, std::istreambuf_iterator<char>{} };
+    }
+
+    static std::filesystem::path install_example(
+        std::string_view const temporary_directory_name,
+        std::span<std::filesystem::path const> const artifact_relative_paths,
+        std::optional<std::filesystem::path> const archive_name
+    )
+    {
+        std::filesystem::path const temporary_directory_path = std::filesystem::temp_directory_path() / temporary_directory_name;
+        std::filesystem::remove_all(temporary_directory_path);
+
+        std::filesystem::path const example_directory = g_examples_directory / "Install_files";
+
+        std::pmr::vector<std::filesystem::path> artifact_paths;
+        for (std::filesystem::path const& relative_path : artifact_relative_paths)
+            artifact_paths.push_back(example_directory / relative_path);
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_standard_repository_file_path,
+            example_directory / "iris_repository.json",
+        };
+
+        Builder builder = create_builder(
+            iris::compiler::get_default_target(),
+            temporary_directory_path / "build",
+            iris::common::get_default_header_search_directories(),
+            repository_paths,
+            {},
+            {},
+            {}
+        );
+
+        Install_options const options
+        {
+            .prefix = temporary_directory_path / "install",
+            .include_debug_files = false,
+            .clean = true,
+            .archive_path = archive_name.has_value()
+                ? std::optional<std::filesystem::path>{ temporary_directory_path / archive_name.value() }
+                : std::nullopt,
+        };
+
+        install_artifacts(builder, artifact_paths, options);
+
+        return temporary_directory_path;
+    }
+
+    TEST_CASE("Install lays out binaries, dependencies and install-time copies in the prefix", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const artifacts
+        {
+            std::filesystem::path{"my_app/iris_artifact.json"},
+            std::filesystem::path{"my_plugin/iris_artifact.json"},
+        };
+        std::filesystem::path const root = install_example("iris_builder_tests_install_files", artifacts, std::nullopt);
+        std::filesystem::path const prefix = root / "install";
+        std::filesystem::path const build = root / "build";
+
+        CHECK(std::filesystem::exists(prefix / "bin" / get_binary_name("my_app", target)));
+        if (target.operating_system == "windows")
+        {
+            CHECK(std::filesystem::exists(prefix / "bin" / "my_plugin.dll"));
+            CHECK_FALSE(std::filesystem::exists(prefix / "bin" / "my_app.pdb"));
+            CHECK_FALSE(std::filesystem::exists(prefix / "bin" / "my_plugin.lib"));
+        }
+        CHECK_FALSE(std::filesystem::exists(prefix / "lib"));
+        CHECK_FALSE(std::filesystem::exists(prefix / "artifacts"));
+
+        CHECK(std::filesystem::exists(prefix / "engine" / "engine.txt"));
+        CHECK(read_whole_file(prefix / "manifest.txt") == "install");
+        CHECK(std::filesystem::exists(prefix / "data" / "a.txt"));
+        CHECK(std::filesystem::exists(prefix / "data" / "maps" / "one.txt"));
+        CHECK_FALSE(std::filesystem::exists(prefix / "data" / "maps" / "x.world" / "cache" / "c.bin"));
+        CHECK_FALSE(std::filesystem::exists(prefix / "data" / "scratch.tmp"));
+
+        CHECK(read_whole_file(build / "manifest.txt") == "build");
+        CHECK(std::filesystem::exists(build / "engine" / "engine.txt"));
+        CHECK_FALSE(std::filesystem::exists(build / "data"));
+    }
+
+    TEST_CASE("Install leaves out artifacts that were not asked for and can write an archive", "[Builder]")
+    {
+        std::pmr::vector<std::filesystem::path> const artifacts
+        {
+            std::filesystem::path{"my_app/iris_artifact.json"},
+        };
+        std::filesystem::path const root = install_example("iris_builder_tests_install_archive", artifacts, std::filesystem::path{"my_app.zip"});
+        std::filesystem::path const prefix = root / "install";
+
+        CHECK_FALSE(std::filesystem::exists(prefix / "bin" / "my_plugin.dll"));
+        CHECK(std::filesystem::exists(root / "my_app.zip"));
+        CHECK(std::filesystem::file_size(root / "my_app.zip") > 0);
+    }
+
     TEST_CASE("Build Type_constructors", "[Builder]")
     {
         iris::compiler::Target const target = iris::compiler::get_default_target();
