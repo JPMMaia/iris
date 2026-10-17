@@ -1632,19 +1632,13 @@ namespace iris::compiler
         throw std::runtime_error{ std::format("type_reference_to_llvm_type: Not implemented.{}", format_source_location(type_reference.source_range)) };
     }
 
+    // LLVM pointers are opaque, so the pointee is never converted: it may be a forward-declared C
+    // struct, such as SDL_Thread, that has no LLVM type.
     static llvm::Type* pointer_type_to_llvm_type_on_demand(
-        llvm::LLVMContext& llvm_context,
-        llvm::DataLayout const& llvm_data_layout,
-        Pointer_type const type,
-        Declaration_database const& declaration_database,
-        Clang_context const& clang_context
+        llvm::LLVMContext& llvm_context
     )
     {
-        llvm::Type* pointed_type =
-            !type.element_type.empty() ?
-            type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, type.element_type[0], declaration_database, clang_context) :
-            llvm::PointerType::get(llvm::Type::getInt8Ty(llvm_context), 0);
-        return pointed_type->getPointerTo();
+        return llvm::PointerType::get(llvm_context, 0);
     }
 
     llvm::Type* type_reference_to_llvm_type_on_demand(
@@ -1727,8 +1721,7 @@ namespace iris::compiler
         }
         else if (std::holds_alternative<Pointer_type>(type_reference.data))
         {
-            Pointer_type const& data = std::get<Pointer_type>(type_reference.data);
-            return pointer_type_to_llvm_type_on_demand(llvm_context, llvm_data_layout, data, declaration_database, clang_context);
+            return pointer_type_to_llvm_type_on_demand(llvm_context);
         }
         else if (std::holds_alternative<Null_pointer_type>(type_reference.data))
         {

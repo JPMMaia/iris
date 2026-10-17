@@ -11527,6 +11527,52 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
     test_c_interoperability_call_function_with_struct_argument("x86_64-pc-windows-msvc", expected_llvm_ir);
   }
 
+  // A type argument that points to a forward-declared C struct must not need the struct's layout.
+  TEST_CASE("C Interoperability - Pointer to opaque struct as type argument", "[LLVM_IR]")
+  {
+    char const* const input_file = "c_interoperability_opaque_pointer_type_argument.iris";
+
+    std::filesystem::path const root_directory_path = std::filesystem::temp_directory_path() / "c_interoperability_opaque_pointer_type_argument";
+    std::filesystem::create_directories(root_directory_path);
+
+    std::string const header_content = R"(
+typedef struct Opaque_thing Opaque_thing;
+
+Opaque_thing* make_thing(void);
+)";
+
+    std::filesystem::path const header_module_file_path = create_and_import_c_header(header_content, "my_header.h", "my_header.iris", "my_module", root_directory_path);
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+        { "my_module", header_module_file_path }
+    };
+
+    char const* const expected_llvm_ir = R"(
+; Function Attrs: convergent
+define private i64 @c_interoperability_opaque_pointer_type_argument_run() #0 {
+entry:
+  %0 = call i64 @c_interoperability_opaque_pointer_type_argument__at__size_of_type__at__13253200131291718754()
+  ret i64 %0
+}
+
+; Function Attrs: convergent
+define private i64 @c_interoperability_opaque_pointer_type_argument__at__size_of_type__at__13253200131291718754() #0 {
+entry:
+  ret i64 8
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    Test_options const test_options
+    {
+      .target_triple = "x86_64-pc-windows-msvc",
+    };
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, test_options);
+  }
+
   void test_c_interoperability_definition_of_function_with_struct_argument(
     std::string_view const target_triple,
     std::string_view const expected_llvm_ir
