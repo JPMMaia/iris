@@ -1705,6 +1705,10 @@ namespace iris::compiler
             .temporaries_allocator = temporaries_allocator
         };
 
+        // A warning must not stop validation: the expressions that contain the warned one (an
+        // identity cast passed as a mistyped argument) still have to report their errors.
+        std::pmr::vector<iris::compiler::Diagnostic> statement_diagnostics{temporaries_allocator};
+
         for (std::size_t index = 0; index < statement.expressions.size(); ++index)
         {
             std::size_t const expression_index = statement.expressions.size() - 1 - index;
@@ -1714,11 +1718,22 @@ namespace iris::compiler
                 parameters
             );
 
-            if (!diagnostics.empty())
-                return diagnostics;
+            bool const contains_errors = std::any_of(
+                diagnostics.begin(),
+                diagnostics.end(),
+                [](iris::compiler::Diagnostic const& diagnostic) -> bool
+                {
+                    return diagnostic.severity == iris::compiler::Diagnostic_severity::Error;
+                }
+            );
+
+            statement_diagnostics.insert(statement_diagnostics.end(), diagnostics.begin(), diagnostics.end());
+
+            if (contains_errors)
+                return statement_diagnostics;
         }
 
-        return {};
+        return statement_diagnostics;
     }
 
     std::optional<iris::Type_reference> get_expected_expression_type(

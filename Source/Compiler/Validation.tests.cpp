@@ -3013,6 +3013,43 @@ function run(int_input: Int32, enum_input: My_enum) -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("A warned cast passed as an argument still has its argument type validated", "[Validation][Cast_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+function near(value: Float32) -> (result: Bool)
+{
+    return true;
+}
+
+function run(input: Decimal7) -> ()
+{
+    var result = near(input as Decimal7);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 23, 10, 40),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Argument 0 type is 'Float32' but 'Decimal7' was provided.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(10, 23, 10, 40),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Warning,
+                .message = "Numeric cast from 'Decimal7' to 'Decimal7'.",
+                .related_information = {},
+            },
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that the numeric cast destination type is a numeric type or an enum type using imported modules", "[Validation][Cast_expression]")
     {
 
