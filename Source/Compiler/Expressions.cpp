@@ -6614,6 +6614,19 @@ namespace iris::compiler
         return create_expression_value(expression.expression.expression_index, statement, parameters);
     }
 
+    // Whether `value` is where a value of `value_type` is stored rather than the value itself. A pointer value
+    // is told apart from a place holding one the way read_from_type does.
+    static bool is_place_of_value(llvm::Value* const value, llvm::Type* const value_type)
+    {
+        if (!value->getType()->isPointerTy())
+            return false;
+        if (!value_type->isPointerTy())
+            return true;
+        if (llvm::GlobalVariable const* const global_variable = llvm::dyn_cast<llvm::GlobalVariable>(value))
+            return global_variable->getValueType()->isPointerTy();
+        return llvm::isa<llvm::AllocaInst>(value) || llvm::isa<llvm::GetElementPtrInst>(value);
+    }
+
     Value_and_type create_return_expression_value(
         Return_expression const& expression,
         Statement const& statement,
@@ -6644,7 +6657,29 @@ namespace iris::compiler
 
         Expression_parameters new_parameters = parameters;
         new_parameters.expression_type = function_output_type.has_value() ? function_output_type.value() : std::optional<Type_reference>{};
-        Value_and_type const temporary = create_expression_value(expression.expression->expression_index, statement, new_parameters);
+        Value_and_type temporary = create_expression_value(expression.expression->expression_index, statement, new_parameters);
+
+        iris::Expression const& expression_to_return = statement.expressions[expression.expression->expression_index];
+        bool const is_taking_address_of = is_taking_address_of_expression(statement, expression_to_return);
+
+        // The value may still be a place the deferred statements change or free (`defer free(p); return p->x;`),
+        // so it is read before they run.
+        bool const has_deferred_statements = std::any_of(
+            parameters.defer_expressions_per_block.begin(),
+            parameters.defer_expressions_per_block.end(),
+            [](std::pmr::vector<Statement> const& block) -> bool { return !block.empty(); }
+        );
+        llvm::Type* const return_llvm_type =
+            has_deferred_statements && function_output_type.has_value() ?
+            type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, function_output_type.value(), parameters.type_database) :
+            nullptr;
+        if (return_llvm_type != nullptr && !is_taking_address_of && is_place_of_value(temporary.value, return_llvm_type))
+        {
+            llvm::Align const return_alignment = parameters.llvm_data_layout.getABITypeAlign(return_llvm_type);
+            llvm::AllocaInst* const copy = create_alloca_instruction(llvm_builder, parameters.llvm_data_layout, *parameters.llvm_parent_function, return_llvm_type, "return_value");
+            llvm_builder.CreateMemCpy(copy, return_alignment, temporary.value, return_alignment, parameters.llvm_data_layout.getTypeAllocSize(return_llvm_type));
+            temporary.value = copy;
+        }
 
         create_instructions_at_return(parameters);
 
@@ -6680,9 +6715,6 @@ namespace iris::compiler
         
         if (parameters.debug_info != nullptr)
             set_debug_location(parameters.llvm_builder, *parameters.debug_info, parameters.source_position);
-
-        iris::Expression const& expression_to_return = statement.expressions[expression.expression->expression_index];
-        bool const is_taking_address_of = is_taking_address_of_expression(statement, expression_to_return);
 
         llvm::Value* const instruction = generate_function_return_instruction(
             parameters.llvm_context,

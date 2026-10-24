@@ -1,0 +1,41 @@
+module Defer_return_value;
+
+struct Probe
+{
+    value: Int64 = 0i64;
+    next: *Probe = null;
+}
+
+function clear(probe: *mutable Probe) -> ()
+{
+    probe->value = 0i64;
+}
+
+function find(probe: *Probe) -> (found: *Probe)
+{
+    return probe;
+}
+
+function read_field(probe: *mutable Probe) -> (value: Int64)
+{
+    defer clear(probe);
+    return probe->value;
+}
+
+function read_struct(probe: *mutable Probe) -> (copy: Probe)
+{
+    defer clear(probe);
+    return *probe;
+}
+
+function read_pointer_field(probe: *mutable Probe) -> (next: *Probe)
+{
+    defer clear(probe);
+    return probe->next;
+}
+
+function read_pointer_value(probe: *mutable Probe) -> (found: *Probe)
+{
+    defer clear(probe);
+    return find(probe);
+}

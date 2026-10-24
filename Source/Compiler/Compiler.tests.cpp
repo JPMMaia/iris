@@ -5561,6 +5561,103 @@ attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir, { .debug = true });
   }
 
+  TEST_CASE("Compile Defer Return Value", "[LLVM_IR]")
+  {
+    char const* const input_file = "defer_return_value.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Defer_return_value_Probe = type { i64, ptr }
+
+; Function Attrs: convergent
+define private void @Defer_return_value_clear(ptr noundef %"arguments[0].probe") #0 {
+entry:
+  %probe = alloca ptr, align 8
+  store ptr %"arguments[0].probe", ptr %probe, align 8
+  %0 = load ptr, ptr %probe, align 8
+  %1 = getelementptr inbounds %struct.Defer_return_value_Probe, ptr %0, i32 0, i32 0
+  store i64 0, ptr %1, align 8
+  ret void
+}
+
+; Function Attrs: convergent
+define private ptr @Defer_return_value_find(ptr noundef %"arguments[0].probe") #0 {
+entry:
+  %probe = alloca ptr, align 8
+  store ptr %"arguments[0].probe", ptr %probe, align 8
+  %0 = load ptr, ptr %probe, align 8
+  ret ptr %0
+}
+
+; Function Attrs: convergent
+define private i64 @Defer_return_value_read_field(ptr noundef %"arguments[0].probe") #0 {
+entry:
+  %probe = alloca ptr, align 8
+  %return_value = alloca i64, align 8
+  store ptr %"arguments[0].probe", ptr %probe, align 8
+  %0 = load ptr, ptr %probe, align 8
+  %1 = getelementptr inbounds %struct.Defer_return_value_Probe, ptr %0, i32 0, i32 0
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return_value, ptr align 8 %1, i64 8, i1 false)
+  %2 = load ptr, ptr %probe, align 8
+  call void @Defer_return_value_clear(ptr noundef %2)
+  %3 = load i64, ptr %return_value, align 8
+  ret i64 %3
+}
+
+; Function Attrs: convergent
+define private { i64, ptr } @Defer_return_value_read_struct(ptr noundef %"arguments[0].probe") #0 {
+entry:
+  %probe = alloca ptr, align 8
+  %return_value = alloca %struct.Defer_return_value_Probe, align 8
+  store ptr %"arguments[0].probe", ptr %probe, align 8
+  %0 = load ptr, ptr %probe, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return_value, ptr align 8 %0, i64 16, i1 false)
+  %1 = load ptr, ptr %probe, align 8
+  call void @Defer_return_value_clear(ptr noundef %1)
+  %2 = load { i64, ptr }, ptr %return_value, align 8
+  ret { i64, ptr } %2
+}
+
+; Function Attrs: convergent
+define private ptr @Defer_return_value_read_pointer_field(ptr noundef %"arguments[0].probe") #0 {
+entry:
+  %probe = alloca ptr, align 8
+  %return_value = alloca ptr, align 8
+  store ptr %"arguments[0].probe", ptr %probe, align 8
+  %0 = load ptr, ptr %probe, align 8
+  %1 = getelementptr inbounds %struct.Defer_return_value_Probe, ptr %0, i32 0, i32 1
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %return_value, ptr align 8 %1, i64 8, i1 false)
+  %2 = load ptr, ptr %probe, align 8
+  call void @Defer_return_value_clear(ptr noundef %2)
+  %3 = load ptr, ptr %return_value, align 8
+  ret ptr %3
+}
+
+; Function Attrs: convergent
+define private ptr @Defer_return_value_read_pointer_value(ptr noundef %"arguments[0].probe") #0 {
+entry:
+  %probe = alloca ptr, align 8
+  store ptr %"arguments[0].probe", ptr %probe, align 8
+  %0 = load ptr, ptr %probe, align 8
+  %1 = call ptr @Defer_return_value_find(ptr noundef %0)
+  %2 = load ptr, ptr %probe, align 8
+  call void @Defer_return_value_clear(ptr noundef %2)
+  ret ptr %1
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Defer Expressions", "[LLVM_IR]")
   {
     char const* const input_file = "defer_expressions.iris";
