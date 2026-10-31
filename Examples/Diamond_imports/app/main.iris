@@ -1,0 +1,28 @@
+module diamond_imports;
+
+import diamond_imports.a_29 as a_29;
+import diamond_imports.b_29 as b_29;
+
+// Every layer imports both modules of the layer below, so the import graph has 2^layers paths
+// from here to the bottom. Collecting the debug types of the dependencies once per path used to
+// make this module take longer to compile than any test would wait.
+
+@test
+function test_every_layer_is_reached() -> ()
+{
+    check(a_29.depth() == 30i32);
+    check(b_29.depth() == 30i32);
+}
+
+@test
+function test_a_value_holds_the_bottom_layer() -> ()
+{
+    var value: a_29.Value = {};
+    check(value.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.left.depth == 1i32);
+}
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return a_29.depth() == 30i32 ? 0 : 1;
+}

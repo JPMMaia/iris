@@ -788,6 +788,33 @@ namespace iris::compiler
         );
     }
 
+    // Each layer of Diamond_imports imports both modules of the layer below. The debug types of a
+    // module's dependencies were once collected by walking the import graph once per path, which
+    // grows as 2^layers; this build would then not finish.
+    TEST_CASE("Build and run Diamond_imports in test mode", "[Builder]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Diamond_imports" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("diamond_imports.iris.test", target)
+        };
+
+        test_builder_and_run(
+            "Diamond_imports",
+            {"app/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "diamond_imports.iris.test"
+        );
+    }
+
     TEST_CASE("Build and run Reflection_json in test mode", "[Builder]")
     {
         iris::compiler::Target const target = iris::compiler::get_default_target();
