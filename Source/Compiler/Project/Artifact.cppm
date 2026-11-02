@@ -111,6 +111,21 @@ namespace iris::compiler
 
     export bool is_copy_excluded(Copy_entry const& entry, std::string_view const relative_path);
 
+    // Metadata for the Windows Installer package `iris install --msi` produces.
+    export struct Installer_info
+    {
+        std::pmr::string product_name;
+        std::pmr::string manufacturer;
+        // Braced, upper-case GUID. It identifies the product across versions, so it must never change.
+        std::pmr::string upgrade_code;
+        bool add_to_path = false;
+        bool start_menu_shortcut = true;
+    };
+
+    // Returns the GUID in the braced, upper-case form Windows Installer expects, or std::nullopt
+    // when the value is not a GUID. Braces are optional on input.
+    export std::optional<std::pmr::string> normalize_guid(std::string_view const value);
+
     export struct Artifact
     {
         std::filesystem::path file_path;
@@ -122,6 +137,7 @@ namespace iris::compiler
         std::pmr::vector<std::filesystem::path> public_include_directories;
         std::optional<std::variant<Executable_info, Library_info, Dynamic_library_info>> info;
         std::pmr::vector<Copy_entry> copy_entries;
+        std::optional<Installer_info> installer;
     };
 
     export Artifact get_artifact(std::filesystem::path const& artifact_file_path);

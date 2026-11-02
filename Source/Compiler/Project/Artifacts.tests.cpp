@@ -410,4 +410,89 @@ namespace iris::compiler
         CHECK(matches_copy_pattern("tile_?.bin", "tile_7.bin"));
         CHECK_FALSE(matches_copy_pattern("tile_?.bin", "tile_17.bin"));
     }
+
+    static std::filesystem::path write_installer_artifact(std::string_view const directory_name, std::string_view const installer_json)
+    {
+        std::filesystem::path const temporary_directory = create_clean_temporary_directory(directory_name);
+        std::filesystem::path const artifact_path = temporary_directory / "iris_artifact.json";
+
+        std::ofstream file{ artifact_path };
+        file << R"({
+  "name": "my_app",
+  "version": "1.2.3",
+  "type": "executable",
+  "executable": { "source": "main.iris" })";
+        if (!installer_json.empty())
+            file << ",\n  \"installer\": " << installer_json;
+        file << "\n}";
+        file.close();
+
+        return artifact_path;
+    }
+
+    TEST_CASE("Artifact parser reads the installer section and applies defaults", "[Artifact]")
+    {
+        std::filesystem::path const artifact_path = write_installer_artifact(
+            "iris_artifact_tests_installer_defaults",
+            R"({ "manufacturer": "Acme", "upgrade_code": "6b3c1e2a-9f4d-4c1b-8e7a-2d5f0a9b3c41" })"
+        );
+
+        Artifact const artifact = get_artifact(artifact_path);
+        REQUIRE(artifact.installer.has_value());
+        CHECK(artifact.installer->product_name == "my_app");
+        CHECK(artifact.installer->manufacturer == "Acme");
+        CHECK(artifact.installer->upgrade_code == "{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}");
+        CHECK_FALSE(artifact.installer->add_to_path);
+        CHECK(artifact.installer->start_menu_shortcut);
+    }
+
+    TEST_CASE("Artifact without an installer section has none", "[Artifact]")
+    {
+        std::filesystem::path const artifact_path = write_installer_artifact("iris_artifact_tests_installer_absent", "");
+        CHECK_FALSE(get_artifact(artifact_path).installer.has_value());
+    }
+
+    TEST_CASE("Artifact parser rejects an invalid installer section", "[Artifact]")
+    {
+        CHECK_THROWS(get_artifact(write_installer_artifact(
+            "iris_artifact_tests_installer_no_manufacturer",
+            R"({ "upgrade_code": "{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}" })"
+        )));
+        CHECK_THROWS(get_artifact(write_installer_artifact(
+            "iris_artifact_tests_installer_no_upgrade_code",
+            R"({ "manufacturer": "Acme" })"
+        )));
+        CHECK_THROWS(get_artifact(write_installer_artifact(
+            "iris_artifact_tests_installer_bad_guid",
+            R"({ "manufacturer": "Acme", "upgrade_code": "{6B3C1E2A-9F4D-4C1B-8E7A}" })"
+        )));
+    }
+
+    TEST_CASE("Artifact writer round-trips the installer section", "[Artifact]")
+    {
+        std::filesystem::path const artifact_path = write_installer_artifact(
+            "iris_artifact_tests_installer_round_trip",
+            R"({ "product_name": "My App", "manufacturer": "Acme", "upgrade_code": "{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}", "add_to_path": true, "start_menu_shortcut": false })"
+        );
+
+        Artifact const artifact = get_artifact(artifact_path);
+        std::filesystem::path const written_path = artifact_path.parent_path() / "written.json";
+        write_artifact_to_file(artifact, written_path);
+
+        Artifact const read_back = get_artifact(written_path);
+        REQUIRE(read_back.installer.has_value());
+        CHECK(read_back.installer->product_name == "My App");
+        CHECK(read_back.installer->manufacturer == "Acme");
+        CHECK(read_back.installer->upgrade_code == "{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}");
+        CHECK(read_back.installer->add_to_path);
+        CHECK_FALSE(read_back.installer->start_menu_shortcut);
+    }
+
+    TEST_CASE("normalize_guid accepts braced and bare GUIDs", "[Artifact]")
+    {
+        CHECK(normalize_guid("{6b3c1e2a-9f4d-4c1b-8e7a-2d5f0a9b3c41}") == std::pmr::string{"{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}"});
+        CHECK(normalize_guid("6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41") == std::pmr::string{"{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}"});
+        CHECK_FALSE(normalize_guid("6B3C1E2A9F4D4C1B8E7A2D5F0A9B3C41").has_value());
+        CHECK_FALSE(normalize_guid("{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C4G}").has_value());
+    }
 }

@@ -763,6 +763,7 @@ static int run_subcommand(argparse::ArgumentParser& program, int const argc, cha
         }
 
         std::optional<std::string> const archive = subprogram.present<std::string>("--archive");
+        std::optional<std::string> const msi = subprogram.present<std::string>("--msi");
 
         iris::compiler::Install_options const install_options
         {
@@ -770,6 +771,7 @@ static int run_subcommand(argparse::ArgumentParser& program, int const argc, cha
             .include_debug_files = debug,
             .clean = subprogram.get<bool>("--clean"),
             .archive_path = archive.has_value() ? std::optional<std::filesystem::path>{ std::filesystem::absolute(archive.value()) } : std::nullopt,
+            .msi_path = msi.has_value() ? std::optional<std::filesystem::path>{ std::filesystem::absolute(msi.value()) } : std::nullopt,
         };
 
         iris::compiler::install_artifacts(builder, artifact_paths, install_options);
@@ -1118,7 +1120,7 @@ int main(int const argc, char const* const* argv)
         .flag();
     program.add_subparser(test_command);
 
-    // iris install <artifact_name>... --prefix=<directory> [--archive=<file>] [--clean] [--debug]
+    // iris install <artifact_name>... --prefix=<directory> [--archive=<file>] [--msi=<file>] [--clean] [--debug]
     argparse::ArgumentParser install_command("install");
     install_command.add_description("Build artifacts and install them, everything they depend on and their install-time copy entries into a prefix laid out like the build directory.");
     install_command.add_argument("artifact_names")
@@ -1129,6 +1131,8 @@ int main(int const argc, char const* const* argv)
         .required();
     install_command.add_argument("--archive")
         .help("Also pack the installed directory into this .zip or .7z file");
+    install_command.add_argument("--msi")
+        .help("Also build a Windows Installer package (.msi) from the installed directory, using the 'installer' section of the artifact being installed");
     install_command.add_argument("--clean")
         .help("Delete the prefix before installing so files from earlier installs do not linger")
         .flag();

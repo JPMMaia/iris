@@ -86,6 +86,37 @@
       "items": {
         "$ref": "#/definitions/copy_entry"
       }
+    },
+    "installer": {
+      "type": "object",
+      "description": "Windows Installer package metadata used by 'iris install --msi'.",
+      "additionalProperties": false,
+      "required": ["manufacturer", "upgrade_code"],
+      "properties": {
+        "product_name": {
+          "type": "string",
+          "description": "Name shown in Apps & Features and used for the install and Start menu folders. Defaults to the artifact name."
+        },
+        "manufacturer": {
+          "type": "string",
+          "description": "Publisher name. The product installs under Program Files/<manufacturer>/<product_name>."
+        },
+        "upgrade_code": {
+          "type": "string",
+          "description": "GUID that identifies the product across versions. Generate it once and never change it, or upgrades stop replacing older installs.",
+          "pattern": "^\\{?[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\\}?$"
+        },
+        "add_to_path": {
+          "type": "boolean",
+          "description": "Append the installed bin directory to the system PATH.",
+          "default": false
+        },
+        "start_menu_shortcut": {
+          "type": "boolean",
+          "description": "Add a Start menu shortcut for each installed executable artifact.",
+          "default": true
+        }
+      }
     }
   },
   "definitions": {

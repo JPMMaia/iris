@@ -499,6 +499,64 @@ namespace iris::compiler
         return entries;
     }
 
+    std::optional<std::pmr::string> normalize_guid(std::string_view value)
+    {
+        if (value.size() == 38 && value.front() == '{' && value.back() == '}')
+            value = value.substr(1, 36);
+
+        if (value.size() != 36)
+            return std::nullopt;
+
+        std::pmr::string result{"{"};
+        for (std::size_t index = 0; index < value.size(); ++index)
+        {
+            char const character = value[index];
+            bool const is_dash_position = index == 8 || index == 13 || index == 18 || index == 23;
+            if (is_dash_position)
+            {
+                if (character != '-')
+                    return std::nullopt;
+            }
+            else if (!std::isxdigit(static_cast<unsigned char>(character)))
+            {
+                return std::nullopt;
+            }
+
+            result.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(character))));
+        }
+        result.push_back('}');
+        return result;
+    }
+
+    std::optional<Installer_info> parse_installer(nlohmann::json const& json, std::string_view const artifact_name, Environment_variables const& environment_variables)
+    {
+        if (!json.contains("installer"))
+            return std::nullopt;
+
+        nlohmann::json const& installer_json = json.at("installer");
+
+        if (!installer_json.contains("manufacturer"))
+            throw std::runtime_error(std::format("Artifact '{}': 'installer.manufacturer' is required.", artifact_name));
+        if (!installer_json.contains("upgrade_code"))
+            throw std::runtime_error(std::format("Artifact '{}': 'installer.upgrade_code' is required. Generate a GUID once and never change it.", artifact_name));
+
+        std::pmr::string const upgrade_code_string = substitute_variables(installer_json.at("upgrade_code").get<std::string>(), environment_variables, "installer.upgrade_code");
+        std::optional<std::pmr::string> upgrade_code = normalize_guid(upgrade_code_string);
+        if (!upgrade_code.has_value())
+            throw std::runtime_error(std::format("Artifact '{}': 'installer.upgrade_code' value '{}' is not a GUID.", artifact_name, upgrade_code_string));
+
+        return Installer_info
+        {
+            .product_name = installer_json.contains("product_name")
+                ? substitute_variables(installer_json.at("product_name").get<std::string>(), environment_variables, "installer.product_name")
+                : std::pmr::string{artifact_name},
+            .manufacturer = substitute_variables(installer_json.at("manufacturer").get<std::string>(), environment_variables, "installer.manufacturer"),
+            .upgrade_code = std::move(upgrade_code.value()),
+            .add_to_path = installer_json.value("add_to_path", false),
+            .start_menu_shortcut = installer_json.value("start_menu_shortcut", true),
+        };
+    }
+
     bool matches_copy_pattern(std::string_view const pattern, std::string_view const relative_path)
     {
         if (pattern.empty())
@@ -581,6 +639,8 @@ namespace iris::compiler
 
         std::pmr::vector<Copy_entry> copy_entries = parse_copy_entries(json, environment_variables);
 
+        std::optional<Installer_info> installer = parse_installer(json, name, environment_variables);
+
         std::filesystem::path const root_directory = artifact_file_path.parent_path();
         for (Copy_entry& entry : copy_entries)
         {
@@ -599,6 +659,7 @@ namespace iris::compiler
             .public_include_directories = std::move(public_include_directories),
             .info = std::move(info),
             .copy_entries = std::move(copy_entries),
+            .installer = std::move(installer),
         };
     }
 
@@ -805,6 +866,26 @@ namespace iris::compiler
             }
 
             json["copy"] = std::move(copy_json);
+        }
+
+        if (artifact.installer.has_value())
+        {
+            Installer_info const& installer = artifact.installer.value();
+
+            nlohmann::json installer_json
+            {
+                { "manufacturer", installer.manufacturer },
+                { "upgrade_code", installer.upgrade_code },
+            };
+
+            if (installer.product_name != artifact.name)
+                installer_json["product_name"] = installer.product_name;
+            if (installer.add_to_path)
+                installer_json["add_to_path"] = true;
+            if (!installer.start_menu_shortcut)
+                installer_json["start_menu_shortcut"] = false;
+
+            json["installer"] = std::move(installer_json);
         }
 
         std::string const json_string = json.dump(4);

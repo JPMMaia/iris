@@ -15,6 +15,7 @@ import iris.core.hash;
 import iris.core.struct_layout;
 import iris.common;
 import iris.common.archive;
+import iris.common.msi;
 import iris.common.filesystem;
 import iris.common.filesystem_common;
 import iris.compiler.lambda_database;
@@ -2942,6 +2943,124 @@ namespace iris::compiler
         std::printf("Install: wrote archive '%s'.\n", archive_path.generic_string().c_str());
     }
 
+    static bool is_requested_artifact(
+        Artifact const& artifact,
+        std::span<std::filesystem::path const> const artifact_file_paths
+    )
+    {
+        std::filesystem::path const artifact_path = std::filesystem::absolute(artifact.file_path).lexically_normal();
+        return std::ranges::any_of(artifact_file_paths, [&](std::filesystem::path const& requested_path)
+        {
+            return std::filesystem::absolute(requested_path).lexically_normal() == artifact_path;
+        });
+    }
+
+    static std::string_view get_msi_architecture()
+    {
+        llvm::Triple const triple{llvm::sys::getDefaultTargetTriple()};
+        switch (triple.getArch())
+        {
+        case llvm::Triple::x86_64:
+            return "x64";
+        case llvm::Triple::aarch64:
+            return "Arm64";
+        default:
+            iris::common::print_message_and_exit(std::format("Install: Windows Installer packages are not supported for target '{}'.", triple.str()));
+            return {};
+        }
+    }
+
+    static void write_install_msi(
+        Builder const& builder,
+        std::span<Artifact const> const artifacts,
+        std::span<std::filesystem::path const> const artifact_file_paths,
+        std::filesystem::path const& prefix,
+        std::filesystem::path const& msi_path
+    )
+    {
+        if (builder.target.operating_system != "windows")
+            iris::common::print_message_and_exit("Install: --msi is only supported when targeting Windows.");
+
+        std::pmr::vector<Artifact const*> requested_artifacts;
+        std::pmr::vector<Artifact const*> installer_artifacts;
+        for (Artifact const& artifact : artifacts)
+        {
+            if (!is_requested_artifact(artifact, artifact_file_paths))
+                continue;
+
+            requested_artifacts.push_back(&artifact);
+            if (artifact.installer.has_value())
+                installer_artifacts.push_back(&artifact);
+        }
+
+        if (installer_artifacts.size() != 1)
+        {
+            std::string names;
+            for (Artifact const* const artifact : installer_artifacts)
+                names += std::format("{}'{}'", names.empty() ? "" : ", ", artifact->name);
+
+            iris::common::print_message_and_exit(
+                installer_artifacts.empty()
+                    ? std::string{"Install: --msi needs exactly one of the artifacts being installed to have an 'installer' section; none has."}
+                    : std::format("Install: --msi needs exactly one of the artifacts being installed to have an 'installer' section; {} have one.", names)
+            );
+        }
+
+        Artifact const& installer_artifact = *installer_artifacts.front();
+        Installer_info const& installer = installer_artifact.installer.value();
+
+        std::pmr::vector<iris::common::Msi_shortcut> shortcuts;
+        if (installer.start_menu_shortcut)
+        {
+            std::size_t executable_count = 0;
+            for (Artifact const* const artifact : requested_artifacts)
+            {
+                if (artifact->info.has_value() && std::holds_alternative<Executable_info>(*artifact->info))
+                    ++executable_count;
+            }
+
+            for (Artifact const* const artifact : requested_artifacts)
+            {
+                if (!artifact->info.has_value() || !std::holds_alternative<Executable_info>(*artifact->info))
+                    continue;
+
+                std::optional<std::filesystem::path> const binary_name = get_installed_binary_name(*artifact, builder.target);
+                if (!binary_name.has_value())
+                    continue;
+
+                // A single executable is the product; with several, each keeps its own name.
+                shortcuts.push_back(
+                    iris::common::Msi_shortcut
+                    {
+                        .target = std::filesystem::path{"bin"} / binary_name.value(),
+                        .name = executable_count == 1 ? installer.product_name : artifact->name,
+                    }
+                );
+            }
+        }
+
+        Version const& version = installer_artifact.version;
+
+        iris::common::Msi_package_options const msi_options
+        {
+            .source_directory = prefix,
+            .output_path = msi_path,
+            .product_name = installer.product_name,
+            .manufacturer = installer.manufacturer,
+            .upgrade_code = installer.upgrade_code,
+            .product_version = std::pmr::string{std::format("{}.{}.{}", version.major, version.minor, version.patch)},
+            .architecture = std::pmr::string{get_msi_architecture()},
+            .path_directory = installer.add_to_path ? std::optional<std::filesystem::path>{"bin"} : std::nullopt,
+            .shortcuts = std::move(shortcuts),
+        };
+
+        std::optional<std::pmr::string> const error = iris::common::create_msi_from_directory(msi_options);
+        if (error.has_value())
+            iris::common::print_message_and_exit(std::format("Install: failed to create MSI '{}': {}", msi_path.generic_string(), error.value()));
+
+        std::printf("Install: wrote MSI '%s'.\n", msi_path.generic_string().c_str());
+    }
+
     void install_artifacts(
         Builder& builder,
         std::span<std::filesystem::path const> const artifact_file_paths,
@@ -2995,6 +3114,9 @@ namespace iris::compiler
             copy_dlls(builder, artifacts, installed_binary_directory);
 
         copy_files_from_artifacts(artifacts, options.prefix, Copy_phase::Install);
+
+        if (options.msi_path.has_value())
+            write_install_msi(builder, artifacts, artifact_file_paths, options.prefix, options.msi_path.value());
 
         if (options.archive_path.has_value())
             write_install_archive(options.prefix, options.archive_path.value());

@@ -38,5 +38,11 @@
     ],
     "executable": {
         "source": "my_app.iris"
+    },
+    "installer": {
+        "product_name": "My App",
+        "manufacturer": "Iris Examples",
+        "upgrade_code": "{3F9A2C71-5D8E-4B06-A1C4-7E2B9D0F6A53}",
+        "add_to_path": true
     }
 }

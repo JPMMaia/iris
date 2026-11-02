@@ -968,7 +968,8 @@ namespace iris::compiler
     static std::filesystem::path install_example(
         std::string_view const temporary_directory_name,
         std::span<std::filesystem::path const> const artifact_relative_paths,
-        std::optional<std::filesystem::path> const archive_name
+        std::optional<std::filesystem::path> const archive_name,
+        std::optional<std::filesystem::path> const msi_name = std::nullopt
     )
     {
         std::filesystem::path const temporary_directory_path = std::filesystem::temp_directory_path() / temporary_directory_name;
@@ -1003,6 +1004,9 @@ namespace iris::compiler
             .clean = true,
             .archive_path = archive_name.has_value()
                 ? std::optional<std::filesystem::path>{ temporary_directory_path / archive_name.value() }
+                : std::nullopt,
+            .msi_path = msi_name.has_value()
+                ? std::optional<std::filesystem::path>{ temporary_directory_path / msi_name.value() }
                 : std::nullopt,
         };
 
@@ -1058,6 +1062,25 @@ namespace iris::compiler
         CHECK_FALSE(std::filesystem::exists(prefix / "bin" / "my_plugin.dll"));
         CHECK(std::filesystem::exists(root / "my_app.zip"));
         CHECK(std::filesystem::file_size(root / "my_app.zip") > 0);
+    }
+
+    TEST_CASE("Install can write an MSI", "[Builder]")
+    {
+        if (iris::compiler::get_default_target().operating_system != "windows")
+            SKIP("Windows Installer packages are only built on Windows");
+
+        std::pmr::vector<std::filesystem::path> const artifacts
+        {
+            std::filesystem::path{"my_app/iris_artifact.json"},
+        };
+        std::filesystem::path const root = install_example("iris_builder_tests_install_msi", artifacts, std::nullopt, std::filesystem::path{"my_app.msi"});
+        std::filesystem::path const msi_path = root / "my_app.msi";
+
+        REQUIRE(std::filesystem::exists(msi_path));
+
+        // Windows Installer databases are OLE compound files.
+        std::string const header = read_whole_file(msi_path).substr(0, 8);
+        CHECK(std::vector<unsigned char>(header.begin(), header.end()) == std::vector<unsigned char>{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1});
     }
 
     TEST_CASE("Build Type_constructors", "[Builder]")

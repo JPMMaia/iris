@@ -13,7 +13,7 @@ You can also define optional local defaults in `iris_presets.json` to reduce rep
 ```powershell
 iris build [artifact_name] --build-directory build [--repository /path/to/repository --repository ...]
 iris list --build-directory build
-iris install <artifact_name>... --prefix dist/my_app [--archive dist/my_app.zip] [--clean] [--debug]
+iris install <artifact_name>... --prefix dist/my_app [--archive dist/my_app.zip] [--msi dist/my_app.msi] [--clean] [--debug]
 ```
 
 `artifact_name` is optional. If omitted, Iris discovers all `iris_artifact.json` files recursively from the current directory while skipping `build` and hidden subdirectories.
@@ -190,6 +190,7 @@ See [Dependencies](./dependencies.md) for the full reference.
 | `executable` | object | When `type == "executable"` | Entry-point configuration |
 | `dynamic_library` | object | When `type == "dynamic_library"` | Exported symbol names |
 | `copy` | array | — | Files and folders copied into the build directory and installs |
+| `installer` | object | — | Windows Installer package metadata for `iris install --msi` |
 
 ### Artifact Types
 
@@ -278,8 +279,42 @@ executables are left out.
   development build cache is not rebuilt with different options.
 - `--clean` deletes the prefix first, so files from earlier installs do not linger.
 - `--archive <file>` also packs the installed folder into a `.zip` or `.7z`.
+- `--msi <file>` also builds a Windows Installer package from the installed folder (Windows only).
 
 `Examples/Install_files` shows build-only and install-only copies and exclude patterns.
+
+### Windows Installer Packages
+
+`iris install --msi dist/my_app.msi` packages everything in the prefix into an `.msi`. Iris writes
+the package itself with the Windows Installer API, so no WiX or other tool is needed. Exactly one of
+the artifacts named on the command line must have an `installer` section:
+
+```json
+"installer": {
+    "product_name": "My App",
+    "manufacturer": "Acme",
+    "upgrade_code": "{3F9A2C71-5D8E-4B06-A1C4-7E2B9D0F6A53}",
+    "add_to_path": true,
+    "start_menu_shortcut": true
+}
+```
+
+| Field | Default | Description |
+|---|---|---|
+| `product_name` | artifact name | Name shown in Apps & Features and used for the folders |
+| `manufacturer` | required | Publisher; the product installs to `Program Files/<manufacturer>/<product_name>` |
+| `upgrade_code` | required | GUID that identifies the product across versions |
+| `add_to_path` | `false` | Append the installed `bin` folder to the system `PATH` |
+| `start_menu_shortcut` | `true` | Add a Start menu shortcut for each executable artifact being installed |
+
+Generate the `upgrade_code` once (for example with `[guid]::NewGuid()` in PowerShell) and never
+change it: Windows Installer uses it to find older versions of the product.
+
+The package installs per machine. The artifact's `version` becomes the product version, so it must
+fit Windows Installer's limits: major and minor at most 255 and patch at most 65535. Installing a
+package removes any installed version up to and including its own, so a rebuilt package with the
+same version replaces the old one. Installing an older version over a newer one is refused.
+Uninstalling removes the files, the shortcuts and the `PATH` entry.
 
 ### Source Group Types
 

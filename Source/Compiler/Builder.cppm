@@ -85,6 +85,9 @@ namespace iris::compiler
         bool include_debug_files = false;
         bool clean = false;
         std::optional<std::filesystem::path> archive_path;
+        // Windows Installer package built from the prefix, using the 'installer' section of the
+        // one requested artifact that has one.
+        std::optional<std::filesystem::path> msi_path;
     };
 
     // Builds the artifacts, then lays out an install in `prefix` like the build directory: the
