@@ -10681,6 +10681,70 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Default Enum Through Alias", "[LLVM_IR]")
+  {
+    char const* const input_file = "default_enum_through_alias.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+        { "Default_enum_through_alias_enum", parse_and_get_file_path(g_test_source_files_path / "default_enum_through_alias_enum.iris") },
+        { "Default_enum_through_alias_struct", parse_and_get_file_path(g_test_source_files_path / "default_enum_through_alias_struct.iris") }
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Default_enum_through_alias_struct_Runner = type { i64, [4 x i64], %struct.Default_enum_through_alias_struct_Gesture, float }
+%struct.Default_enum_through_alias_struct_Gesture = type { i32, i32, i32 }
+%struct.Default_enum_through_alias_Driver = type { %struct.Default_enum_through_alias_struct_Runner }
+
+; Function Attrs: convergent
+define private void @Default_enum_through_alias_reset(ptr noundef %"arguments[0].driver", ptr noundef %"arguments[1].enum_module") #0 {
+entry:
+  %driver = alloca ptr, align 8
+  %enum_module = alloca ptr, align 8
+  %runner = alloca %struct.Default_enum_through_alias_struct_Runner, align 8
+  store ptr %"arguments[0].driver", ptr %driver, align 8
+  store ptr %"arguments[1].enum_module", ptr %enum_module, align 8
+  %0 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Runner, ptr %runner, i32 0, i32 0
+  store i64 0, ptr %0, align 8
+  %1 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Runner, ptr %runner, i32 0, i32 1
+  call void @llvm.memset.p0.i64(ptr align 8 %1, i8 0, i64 32, i1 false)
+  %2 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Runner, ptr %runner, i32 0, i32 2
+  %3 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Gesture, ptr %2, i32 0, i32 0
+  store i32 0, ptr %3, align 4
+  %4 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Gesture, ptr %2, i32 0, i32 1
+  store i32 3, ptr %4, align 4
+  %5 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Gesture, ptr %2, i32 0, i32 2
+  store i32 0, ptr %5, align 4
+  %6 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Runner, ptr %runner, i32 0, i32 3
+  store float 0.000000e+00, ptr %6, align 4
+  %7 = load ptr, ptr %driver, align 8
+  %8 = getelementptr inbounds %struct.Default_enum_through_alias_Driver, ptr %7, i32 0, i32 0
+  %9 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Runner, ptr %8, i32 0, i32 0
+  store i64 0, ptr %9, align 8
+  %10 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Runner, ptr %8, i32 0, i32 1
+  call void @llvm.memset.p0.i64(ptr align 8 %10, i8 0, i64 32, i1 false)
+  %11 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Runner, ptr %8, i32 0, i32 2
+  %12 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Gesture, ptr %11, i32 0, i32 0
+  store i32 0, ptr %12, align 4
+  %13 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Gesture, ptr %11, i32 0, i32 1
+  store i32 3, ptr %13, align 4
+  %14 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Gesture, ptr %11, i32 0, i32 2
+  store i32 0, ptr %14, align 4
+  %15 = getelementptr inbounds %struct.Default_enum_through_alias_struct_Runner, ptr %8, i32 0, i32 3
+  store float 0.000000e+00, ptr %15, align 4
+  ret void
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Derived Global Constants", "[LLVM_IR]")
   {
     char const* const input_file = "derived_global_constants.iris";

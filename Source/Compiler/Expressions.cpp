@@ -93,11 +93,11 @@ namespace iris::compiler
         };
     }
 
-    Expression_parameters set_core_module(Expression_parameters const& parameters, iris::Module const& core_module)
+    // Parameters for evaluating an expression written in a declaration of `core_module`, such as a struct
+    // member default or a global initializer. The caller's arguments and locals are out of scope there:
+    // a local named like one of the module's import aliases must not shadow it.
+    Expression_parameters enter_declaration_scope(Expression_parameters const& parameters, iris::Module const& core_module)
     {
-        if (&parameters.core_module == &core_module)
-            return parameters;
-
         return Expression_parameters
         {
             .llvm_context = parameters.llvm_context,
@@ -115,8 +115,8 @@ namespace iris::compiler
             .blocks = parameters.blocks,
             .defer_expressions_per_block = parameters.defer_expressions_per_block,
             .function_declaration = parameters.function_declaration,
-            .function_arguments = parameters.function_arguments,
-            .local_variables = parameters.local_variables,
+            .function_arguments = {},
+            .local_variables = {},
             .expression_type = parameters.expression_type,
             .debug_info = parameters.debug_info,
             .contract_options = parameters.contract_options,
@@ -156,7 +156,7 @@ namespace iris::compiler
     {
         if (global_variable_declaration.global_type == Global_variable_type::Macro)
         {
-            Expression_parameters new_parameters = set_core_module(parameters, global_variable_module);
+            Expression_parameters new_parameters = enter_declaration_scope(parameters, global_variable_module);
             new_parameters.expression_type = global_variable_declaration.type;
 
             Value_and_type const value = create_statement_value(
@@ -509,7 +509,7 @@ namespace iris::compiler
         };
         globals_being_folded.push_back(&global_variable_declaration);
 
-        Expression_parameters new_parameters = set_core_module(parameters, global_variable_module);
+        Expression_parameters new_parameters = enter_declaration_scope(parameters, global_variable_module);
         new_parameters.expression_type = global_variable_declaration.type;
         new_parameters.globals_being_folded = globals_being_folded;
 
@@ -3705,7 +3705,7 @@ namespace iris::compiler
 
             for (std::size_t member_index = 0; member_index < soa_info.struct_declaration->member_names.size(); ++member_index)
             {
-                Expression_parameters new_parameters = set_core_module(parameters, struct_core_module);
+                Expression_parameters new_parameters = enter_declaration_scope(parameters, struct_core_module);
                 new_parameters.expression_type = soa_info.struct_declaration->member_types[member_index];
 
                 Value_and_type const member_value = create_loaded_statement_value(
@@ -5913,7 +5913,7 @@ namespace iris::compiler
                     module_name == parameters.core_module.name ?
                     parameters.core_module :
                     *parameters.core_module_dependencies.at(module_name.data());
-                Expression_parameters new_parameters = set_core_module(parameters, struct_core_module);
+                Expression_parameters new_parameters = enter_declaration_scope(parameters, struct_core_module);
                 new_parameters.expression_type = member_type;
 
                 llvm::Constant* const source_value = fold_statement_constant(struct_declaration.member_default_values[member_index], new_parameters);
@@ -6070,7 +6070,7 @@ namespace iris::compiler
                         module_name == parameters.core_module.name ?
                         parameters.core_module :
                         *parameters.core_module_dependencies.at(module_name.data());
-                    Expression_parameters new_parameters = set_core_module(parameters, struct_core_module);
+                    Expression_parameters new_parameters = enter_declaration_scope(parameters, struct_core_module);
                     new_parameters.expression_type = member_type;
 
                     store_instantiated_member_value(

@@ -1,0 +1,24 @@
+module Default_enum_through_alias_struct;
+
+import Default_enum_through_alias_enum as enum_module;
+
+enum Gesture_kind
+{
+    None = 0,
+    Click,
+}
+
+struct Gesture
+{
+    kind: Gesture_kind = Gesture_kind.None;
+    button: enum_module.Mouse_button = enum_module.Mouse_button.Right;
+    elapsed: Uint32 = 0u32;
+}
+
+export struct Runner
+{
+    tick: Uint64 = 0u64;
+    key_ticks: Constant_array::<Uint64, 4> = zero_initialized {};
+    gesture: Gesture = {};
+    cursor_x: Float32 = 0.0f32;
+}

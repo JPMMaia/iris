@@ -1,0 +1,15 @@
+module Default_enum_through_alias;
+
+import Default_enum_through_alias_enum as other_name;
+import Default_enum_through_alias_struct as struct_module;
+
+struct Driver
+{
+    runner: struct_module.Runner = {};
+}
+
+function reset(driver: *mutable Driver, enum_module: *Driver) -> ()
+{
+    var runner: struct_module.Runner = {};
+    driver->runner = {};
+}
