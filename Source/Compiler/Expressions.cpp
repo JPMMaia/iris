@@ -5204,6 +5204,7 @@ namespace iris::compiler
     }
 
     std::optional<Type_reference> common_value_type(
+        Declaration_database const& declaration_database,
         Type_reference const& then_type,
         Type_reference const& else_type
     );
@@ -5340,7 +5341,7 @@ namespace iris::compiler
             if (!array_data_values[index].type.has_value())
                 throw Compile_error{ "Type mismatch between elements of the initializer list.", parameters.source_position };
 
-            std::optional<Type_reference> common = common_value_type(array_data_values[0].type.value(), array_data_values[index].type.value());
+            std::optional<Type_reference> common = common_value_type(parameters.declaration_database, array_data_values[0].type.value(),array_data_values[index].type.value());
             if (!common.has_value())
                 throw Compile_error{ format_type_mismatch_error("Type mismatch between elements of the initializer list.", parameters.core_module, array_data_values[0].type, array_data_values[index].type), parameters.source_position };
 
@@ -6848,9 +6849,12 @@ namespace iris::compiler
     }
 
     // The type two values meet as, in the arms of a ternary condition or the elements of an
-    // initializer list. Two pointers to the same type, one of which
-    // may be mutable, meet as the non-mutable pointer; a pointer and null meet as the pointer.
+    // initializer list. Types are compared through their aliases, so an alias and its underlying
+    // type meet as the first one, as Analysis reports for a ternary. Two pointers to the same type,
+    // one of which may be mutable, meet as the non-mutable pointer; a pointer and null meet as the
+    // pointer.
     std::optional<Type_reference> common_value_type(
+        Declaration_database const& declaration_database,
         Type_reference const& then_type,
         Type_reference const& else_type
     )
@@ -6858,19 +6862,28 @@ namespace iris::compiler
         if (then_type == else_type)
             return then_type;
 
-        if (std::holds_alternative<Pointer_type>(then_type.data) && is_null_pointer_type(else_type))
+        std::optional<Type_reference> const then_underlying_type = get_underlying_type(declaration_database, then_type);
+        std::optional<Type_reference> const else_underlying_type = get_underlying_type(declaration_database, else_type);
+        if (!then_underlying_type.has_value() || !else_underlying_type.has_value())
+            return std::nullopt;
+
+        if (then_underlying_type.value() == else_underlying_type.value())
             return then_type;
 
-        if (is_null_pointer_type(then_type) && std::holds_alternative<Pointer_type>(else_type.data))
+        if (std::holds_alternative<Pointer_type>(then_underlying_type->data) && is_null_pointer_type(else_underlying_type.value()))
+            return then_type;
+
+        if (is_null_pointer_type(then_underlying_type.value()) && std::holds_alternative<Pointer_type>(else_underlying_type->data))
             return else_type;
 
-        if (std::holds_alternative<Pointer_type>(then_type.data) && std::holds_alternative<Pointer_type>(else_type.data))
+        if (std::holds_alternative<Pointer_type>(then_underlying_type->data) && std::holds_alternative<Pointer_type>(else_underlying_type->data))
         {
-            Pointer_type const& then_pointer = std::get<Pointer_type>(then_type.data);
-            Pointer_type const& else_pointer = std::get<Pointer_type>(else_type.data);
+            Pointer_type const& then_pointer = std::get<Pointer_type>(then_underlying_type->data);
+            Pointer_type const& else_pointer = std::get<Pointer_type>(else_underlying_type->data);
             if (then_pointer.element_type == else_pointer.element_type)
             {
-                Type_reference common = then_type;
+                // The underlying type, since then_type may be an alias whose data is not a Pointer_type.
+                Type_reference common = then_underlying_type.value();
                 std::get<Pointer_type>(common.data).is_mutable = false;
                 return common;
             }
@@ -6919,7 +6932,7 @@ namespace iris::compiler
         std::optional<Type_reference> result_type = then_value.type;
         if (then_value.type.has_value() && else_value.type.has_value())
         {
-            result_type = common_value_type(then_value.type.value(), else_value.type.value());
+            result_type = common_value_type(parameters.declaration_database, then_value.type.value(), else_value.type.value());
             if (!result_type.has_value())
                 throw Compile_error{ "Ternary condition then and else statements must have the same type!", parameters.source_position };
         }

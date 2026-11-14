@@ -8433,6 +8433,155 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Ternary Alias Operands", "[LLVM_IR]")
+  {
+    char const* const input_file = "ternary_alias_operands.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Ternary_alias_operands_Holder = type { i64 }
+
+; Function Attrs: convergent
+define i64 @Ternary_alias_operands_alias_then_underlying(i1 noundef zeroext %"arguments[0].flag", i64 noundef %"arguments[1].x") #0 {
+entry:
+  %flag = alloca i8, align 1
+  %x = alloca i64, align 8
+  %a = alloca i64, align 8
+  %0 = zext i1 %"arguments[0].flag" to i8
+  store i8 %0, ptr %flag, align 1
+  store i64 %"arguments[1].x", ptr %x, align 8
+  %1 = load i8, ptr %flag, align 1
+  %2 = trunc i8 %1 to i1
+  br i1 %2, label %ternary_condition_then, label %ternary_condition_else
+
+ternary_condition_then:                           ; preds = %entry
+  %3 = load i64, ptr %x, align 8
+  br label %ternary_condition_end
+
+ternary_condition_else:                           ; preds = %entry
+  br label %ternary_condition_end
+
+ternary_condition_end:                            ; preds = %ternary_condition_else, %ternary_condition_then
+  %4 = phi i64 [ %3, %ternary_condition_then ], [ 1, %ternary_condition_else ]
+  store i64 %4, ptr %a, align 8
+  %5 = load i64, ptr %a, align 8
+  ret i64 %5
+}
+
+; Function Attrs: convergent
+define i64 @Ternary_alias_operands_underlying_then_alias(i1 noundef zeroext %"arguments[0].flag", i64 noundef %"arguments[1].x") #0 {
+entry:
+  %flag = alloca i8, align 1
+  %x = alloca i64, align 8
+  %a = alloca i64, align 8
+  %0 = zext i1 %"arguments[0].flag" to i8
+  store i8 %0, ptr %flag, align 1
+  store i64 %"arguments[1].x", ptr %x, align 8
+  %1 = load i8, ptr %flag, align 1
+  %2 = trunc i8 %1 to i1
+  br i1 %2, label %ternary_condition_then, label %ternary_condition_else
+
+ternary_condition_then:                           ; preds = %entry
+  br label %ternary_condition_end
+
+ternary_condition_else:                           ; preds = %entry
+  %3 = load i64, ptr %x, align 8
+  br label %ternary_condition_end
+
+ternary_condition_end:                            ; preds = %ternary_condition_else, %ternary_condition_then
+  %4 = phi i64 [ 2, %ternary_condition_then ], [ %3, %ternary_condition_else ]
+  store i64 %4, ptr %a, align 8
+  %5 = load i64, ptr %a, align 8
+  ret i64 %5
+}
+
+; Function Attrs: convergent
+define i64 @Ternary_alias_operands_field_alias_then_underlying(i1 noundef zeroext %"arguments[0].flag", ptr noundef %"arguments[1].holder") #0 {
+entry:
+  %flag = alloca i8, align 1
+  %holder = alloca ptr, align 8
+  %0 = zext i1 %"arguments[0].flag" to i8
+  store i8 %0, ptr %flag, align 1
+  store ptr %"arguments[1].holder", ptr %holder, align 8
+  %1 = load i8, ptr %flag, align 1
+  %2 = trunc i8 %1 to i1
+  br i1 %2, label %ternary_condition_then, label %ternary_condition_else
+
+ternary_condition_then:                           ; preds = %entry
+  %3 = load ptr, ptr %holder, align 8
+  %4 = getelementptr inbounds %struct.Ternary_alias_operands_Holder, ptr %3, i32 0, i32 0
+  %5 = load i64, ptr %4, align 8
+  br label %ternary_condition_end
+
+ternary_condition_else:                           ; preds = %entry
+  br label %ternary_condition_end
+
+ternary_condition_end:                            ; preds = %ternary_condition_else, %ternary_condition_then
+  %6 = phi i64 [ %5, %ternary_condition_then ], [ 3, %ternary_condition_else ]
+  ret i64 %6
+}
+
+; Function Attrs: convergent
+define ptr @Ternary_alias_operands_pointer_alias_then_underlying(i1 noundef zeroext %"arguments[0].flag", ptr noundef %"arguments[1].first", ptr noundef %"arguments[2].second") #0 {
+entry:
+  %flag = alloca i8, align 1
+  %first = alloca ptr, align 8
+  %second = alloca ptr, align 8
+  %0 = zext i1 %"arguments[0].flag" to i8
+  store i8 %0, ptr %flag, align 1
+  store ptr %"arguments[1].first", ptr %first, align 8
+  store ptr %"arguments[2].second", ptr %second, align 8
+  %1 = load i8, ptr %flag, align 1
+  %2 = trunc i8 %1 to i1
+  br i1 %2, label %ternary_condition_then, label %ternary_condition_else
+
+ternary_condition_then:                           ; preds = %entry
+  %3 = load ptr, ptr %first, align 8
+  br label %ternary_condition_end
+
+ternary_condition_else:                           ; preds = %entry
+  %4 = load ptr, ptr %second, align 8
+  br label %ternary_condition_end
+
+ternary_condition_end:                            ; preds = %ternary_condition_else, %ternary_condition_then
+  %5 = phi ptr [ %3, %ternary_condition_then ], [ %4, %ternary_condition_else ]
+  ret ptr %5
+}
+
+; Function Attrs: convergent
+define i64 @Ternary_alias_operands_array_alias_then_underlying(i64 noundef %"arguments[0].x") #0 {
+entry:
+  %x = alloca i64, align 8
+  %array = alloca [2 x i64], align 8
+  %values = alloca [2 x i64], align 8
+  store i64 %"arguments[0].x", ptr %x, align 8
+  %0 = load i64, ptr %x, align 8
+  %array_element_pointer = getelementptr [2 x i64], ptr %array, i32 0, i32 0
+  store i64 %0, ptr %array_element_pointer, align 8
+  %array_element_pointer1 = getelementptr [2 x i64], ptr %array, i32 0, i32 1
+  store i64 4, ptr %array_element_pointer1, align 8
+  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %values, ptr align 8 %array, i64 16, i1 false)
+  %array_element_pointer2 = getelementptr [2 x i64], ptr %values, i32 0, i32 0
+  %1 = load i64, ptr %array_element_pointer2, align 8
+  %array_element_pointer3 = getelementptr [2 x i64], ptr %values, i32 0, i32 1
+  %2 = load i64, ptr %array_element_pointer3, align 8
+  %3 = add i64 %1, %2
+  ret i64 %3
+}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #1
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Ternary Aggregate Argument", "[LLVM_IR]")
   {
     char const* const input_file = "ternary_aggregate_argument.iris";

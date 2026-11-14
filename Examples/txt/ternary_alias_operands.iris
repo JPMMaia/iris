@@ -1,0 +1,36 @@
+module Ternary_alias_operands;
+
+using Address = Uint64;
+
+struct Holder
+{
+    address: Address = 0u64;
+}
+
+export function alias_then_underlying(flag: Bool, x: Address) -> (result: Address)
+{
+    var a = flag ? x : 1u64;
+    return a;
+}
+
+export function underlying_then_alias(flag: Bool, x: Address) -> (result: Uint64)
+{
+    var a = flag ? 2u64 : x;
+    return a;
+}
+
+export function field_alias_then_underlying(flag: Bool, holder: *Holder) -> (result: Uint64)
+{
+    return flag ? holder->address : 3u64;
+}
+
+export function pointer_alias_then_underlying(flag: Bool, first: *mutable Address, second: *Uint64) -> (result: *Uint64)
+{
+    return flag ? first : second;
+}
+
+export function array_alias_then_underlying(x: Address) -> (result: Uint64)
+{
+    var values = [x, 4u64];
+    return values[0] + values[1];
+}
