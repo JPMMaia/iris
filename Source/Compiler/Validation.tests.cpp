@@ -7125,6 +7125,169 @@ function run(a: module_a.My_unique_type, b: module_b.My_unique_type) -> ()
         test_validate_module(input, dependencies, expected_diagnostics);
     }
 
+    // Mirrors an imported C header (Module_b) that redeclares a struct owned by another module (Module_a)
+    // and uses it in a callback type, like SDL3.mixer's MIX_TrackMixCallback taking a const SDL_AudioSpec*.
+    static constexpr std::string_view g_unique_name_callback_module_a = R"(module Module_a;
+
+@unique_name("My_unique_type")
+export struct My_unique_type
+{
+}
+)";
+
+    static constexpr std::string_view g_unique_name_callback_module_b = R"(module Module_b;
+
+@unique_name("My_unique_type")
+export struct My_unique_type
+{
+}
+
+export using Callback = function<(user: *mutable Void, value: *My_unique_type) -> ()>;
+
+export function set_callback(callback: Callback) -> ()
+{
+}
+)";
+
+    TEST_CASE("Validates that a function converts to a callback type whose parameters have the same unique name in another module", "[Validation][Function_pointer_type][Unique_name]")
+    {
+        std::string_view const input = R"(module Module_c;
+
+import Module_a as module_a;
+import Module_b as module_b;
+
+function on_value(user: *mutable Void, value: *module_a.My_unique_type) -> ()
+{
+}
+
+function run() -> ()
+{
+    module_b.set_callback(on_value);
+    var callback: module_b.Callback = on_value;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        std::pmr::vector<std::string_view> const dependencies = { g_unique_name_callback_module_a, g_unique_name_callback_module_b };
+
+        test_validate_module(input, dependencies, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a function does not convert to a callback type whose pointer parameter differs in mutability", "[Validation][Function_pointer_type][Unique_name]")
+    {
+        std::string_view const input = R"(module Module_c;
+
+import Module_a as module_a;
+import Module_b as module_b;
+
+function on_value(user: *mutable Void, value: *mutable module_a.My_unique_type) -> ()
+{
+}
+
+function run() -> ()
+{
+    module_b.set_callback(on_value);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            {
+                .range = create_source_range(12, 27, 12, 35),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Argument 0 type is 'module_b.Callback' but 'function<(user: *mutable Void, value: *mutable module_a.My_unique_type) -> ()>' was provided.",
+                .related_information = {},
+            }
+        };
+
+        std::pmr::vector<std::string_view> const dependencies = { g_unique_name_callback_module_a, g_unique_name_callback_module_b };
+
+        test_validate_module(input, dependencies, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a function whose parameter is an alias converts to a function pointer of the underlying type", "[Validation][Function_pointer_type]")
+    {
+        std::string_view const input = R"(module Test;
+
+using My_int32 = Int32;
+using My_function = function<(value: Int32) -> (result: Int32)>;
+
+function my_function(value: My_int32) -> (result: My_int32)
+{
+    return value;
+}
+
+function run() -> ()
+{
+    var value: My_function = my_function;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a function with a different number of parameters does not convert to a function pointer", "[Validation][Function_pointer_type]")
+    {
+        std::string_view const input = R"(module Test;
+
+using My_function = function<(value: Int32) -> (result: Int32)>;
+
+function my_function(value: Int32, other: Int32) -> (result: Int32)
+{
+    return value;
+}
+
+function run() -> ()
+{
+    var value: My_function = my_function;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            {
+                .range = create_source_range(12, 30, 12, 41),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Expression type 'function<(value: Int32, other: Int32) -> (result: Int32)>' does not match expected type 'My_function'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that ternary arms that point to types with the same unique name from different modules match", "[Validation][Ternary_condition_expression][Unique_name]")
+    {
+        std::string_view const input = R"(module Module_c;
+
+import Module_a as module_a;
+import Module_b as module_b;
+
+function run(flag: Bool, a: *module_a.My_unique_type, b: *module_b.My_unique_type) -> ()
+{
+    var value = flag ? a : b;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+        };
+
+        std::pmr::vector<std::string_view> const dependencies = { g_unique_name_callback_module_a, g_unique_name_callback_module_b };
+
+        test_validate_module(input, dependencies, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that @alignment_of parameter is a valid type", "[Validation][Alignment_of]")
     {
         std::string_view const input = R"(module Test;

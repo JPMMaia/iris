@@ -74,6 +74,42 @@ namespace iris::compiler
         Declaration_database const& declaration_database,
         std::optional<iris::Type_reference> const& first,
         std::optional<iris::Type_reference> const& second
+    );
+
+    // Signatures match when they have the same shape and each parameter type is compatible.
+    // Parameter names are not part of Function_type, so they are ignored.
+    static bool are_compatible_function_types(
+        Declaration_database const& declaration_database,
+        iris::Function_type const& first,
+        iris::Function_type const& second
+    )
+    {
+        if (first.is_variadic != second.is_variadic)
+            return false;
+        if (first.input_parameter_types.size() != second.input_parameter_types.size())
+            return false;
+        if (first.output_parameter_types.size() != second.output_parameter_types.size())
+            return false;
+
+        for (std::size_t index = 0; index < first.input_parameter_types.size(); ++index)
+        {
+            if (!are_compatible_types(declaration_database, first.input_parameter_types[index], second.input_parameter_types[index]))
+                return false;
+        }
+
+        for (std::size_t index = 0; index < first.output_parameter_types.size(); ++index)
+        {
+            if (!are_compatible_types(declaration_database, first.output_parameter_types[index], second.output_parameter_types[index]))
+                return false;
+        }
+
+        return true;
+    }
+
+    bool are_compatible_types(
+        Declaration_database const& declaration_database,
+        std::optional<iris::Type_reference> const& first,
+        std::optional<iris::Type_reference> const& second
     )
     {
         if (!first.has_value() || !second.has_value())
@@ -131,7 +167,21 @@ namespace iris::compiler
         {
             iris::Function_pointer_type const& first_pointer_type = std::get<iris::Function_pointer_type>(first_underlying_type->data);
             iris::Function_pointer_type const& second_pointer_type = std::get<iris::Function_pointer_type>(second_underlying_type->data);
-            return first_pointer_type.type == second_pointer_type.type;
+            return are_compatible_function_types(declaration_database, first_pointer_type.type, second_pointer_type.type);
+        }
+
+        // Pointees are compared through their aliases and unique names, so *module_a.T and
+        // *module_b.T agree when both declarations share a unique name (e.g. a struct that an
+        // imported C header redeclares).
+        if (std::holds_alternative<iris::Pointer_type>(first_underlying_type->data) && std::holds_alternative<iris::Pointer_type>(second_underlying_type->data))
+        {
+            iris::Pointer_type const& first_pointer = std::get<iris::Pointer_type>(first_underlying_type->data);
+            iris::Pointer_type const& second_pointer = std::get<iris::Pointer_type>(second_underlying_type->data);
+            if (first_pointer.is_mutable != second_pointer.is_mutable)
+                return false;
+            if (first_pointer.element_type.empty() || second_pointer.element_type.empty())
+                return first_pointer.element_type.empty() && second_pointer.element_type.empty();
+            return are_compatible_types(declaration_database, first_pointer.element_type[0], second_pointer.element_type[0]);
         }
 
         // Elements are compared through their aliases, so Constant_array::<Seconds, N> and
