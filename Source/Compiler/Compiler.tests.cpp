@@ -13772,6 +13772,7 @@ entry:
   %raw = alloca ptr, align 8
   %pairs = alloca ptr, align 8
   %element = alloca ptr, align 8
+  %direct = alloca ptr, align 8
   %second = alloca ptr, align 8
   store ptr %"arguments[0].raw", ptr %raw, align 8
   store ptr %"arguments[1].pairs", ptr %pairs, align 8
@@ -13781,12 +13782,17 @@ entry:
   store ptr %array_element_pointer, ptr %element, align 8
   %2 = load ptr, ptr %element, align 8
   store i8 7, ptr %2, align 1
-  %3 = load ptr, ptr %pairs, align 8
-  %4 = call ptr @Address_of_access_on_call_result_get_second_pair(ptr noundef %3)
-  %5 = getelementptr inbounds %struct.Address_of_access_on_call_result_Pair, ptr %4, i32 0, i32 1
-  store ptr %5, ptr %second, align 8
-  %6 = load ptr, ptr %second, align 8
-  store i32 7, ptr %6, align 4
+  %3 = load ptr, ptr %raw, align 8
+  %array_element_pointer1 = getelementptr i8, ptr %3, i64 2
+  store ptr %array_element_pointer1, ptr %direct, align 8
+  %4 = load ptr, ptr %direct, align 8
+  store i8 5, ptr %4, align 1
+  %5 = load ptr, ptr %pairs, align 8
+  %6 = call ptr @Address_of_access_on_call_result_get_second_pair(ptr noundef %5)
+  %7 = getelementptr inbounds %struct.Address_of_access_on_call_result_Pair, ptr %6, i32 0, i32 1
+  store ptr %7, ptr %second, align 8
+  %8 = load ptr, ptr %second, align 8
+  store i32 7, ptr %8, align 4
   ret void
 }
 

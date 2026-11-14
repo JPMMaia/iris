@@ -5736,12 +5736,27 @@ function bytes(raw: *mutable Void) -> (pointer: *mutable Uint8)
     return reinterpret_as::<*mutable Uint8>(raw);
 }
 
+using Pair_pointer = *mutable Pair;
+using Bytes_pointer = *mutable Uint8;
+
+function get_alias(pair: *mutable Pair) -> (pointer: Pair_pointer)
+{
+    return pair;
+}
+
+function bytes_alias(raw: *mutable Void) -> (pointer: Bytes_pointer)
+{
+    return reinterpret_as::<Bytes_pointer>(raw);
+}
+
 function run(raw: *mutable Void, pair: *mutable Pair) -> ()
 {
     var a = &reinterpret_as::<*mutable Uint8>(raw)[3u64];
     var b = &bytes(raw)[3u64];
     var c = &(bytes(raw)[3u64]);
     var d = &get(pair)->second;
+    var e = &get_alias(pair)->first;
+    var f = &bytes_alias(raw)[1u64];
 }
 )";
 
