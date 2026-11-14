@@ -11366,6 +11366,132 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Function Contracts Imported", "[LLVM_IR]")
+  {
+    char const* const input_file = "function_contracts_imported.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+      { "Function_contracts_imported_dependency", parse_and_get_file_path(g_test_source_files_path / "function_contracts_imported_dependency.iris") },
+    };
+
+    char const* const expected_llvm_ir = R"(
+@iris_error_string = private unnamed_addr constant [94 x i8] c"In function 'Function_contracts_imported.make' precondition 'count <= maximum_count' failed!\0A\00"
+@stderr = external global ptr
+@iris_error_string.1 = private unnamed_addr constant [91 x i8] c"In function 'Function_contracts_imported.make' precondition 'count fits in Count' failed!\0A\00"
+@iris_error_string.2 = private unnamed_addr constant [136 x i8] c"function_contracts_imported.iris:10:5: In function 'Function_contracts_imported.make' postcondition 'result >= minimum_result' failed!\0A\00"
+@iris_error_string.3 = private unnamed_addr constant [90 x i8] c"In function 'Function_contracts_imported.validate' precondition 'value is valid' failed!\0A\00"
+
+; Function Attrs: convergent
+declare i32 @Function_contracts_imported_dependency_maximum_count() #0
+
+; Function Attrs: convergent
+declare i32 @Function_contracts_imported_dependency_minimum_result() #0
+
+; Function Attrs: convergent
+declare i1 @Function_contracts_imported_dependency_is_valid(i32 noundef) #0
+
+; Function Attrs: convergent
+define i32 @Function_contracts_imported_make(i32 noundef %"arguments[0].count") #0 {
+entry:
+  %count = alloca i32, align 4
+  store i32 %"arguments[0].count", ptr %count, align 4
+  %0 = load i32, ptr %count, align 4
+  %1 = icmp ugt i32 %0, 0
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %logical_and_rhs, label %logical_and_end
+
+logical_and_rhs:                                  ; preds = %entry
+  %4 = load i32, ptr %count, align 4
+  %5 = call i32 @Function_contracts_imported_dependency_maximum_count()
+  %6 = icmp ule i32 %4, %5
+  %7 = zext i1 %6 to i8
+  %8 = trunc i8 %7 to i1
+  br label %logical_and_end
+
+logical_and_end:                                  ; preds = %logical_and_rhs, %entry
+  %9 = phi i1 [ false, %entry ], [ %8, %logical_and_rhs ]
+  %10 = zext i1 %9 to i8
+  %11 = trunc i8 %10 to i1
+  br i1 %11, label %condition_success, label %condition_fail
+
+condition_success:                                ; preds = %logical_and_end
+  %12 = load i32, ptr %count, align 4
+  %13 = icmp ult i32 %12, 16
+  %14 = zext i1 %13 to i8
+  %15 = trunc i8 %14 to i1
+  br i1 %15, label %condition_success1, label %condition_fail2
+
+condition_fail:                                   ; preds = %logical_and_end
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %16 = call i32 @fputs(ptr @iris_error_string, ptr %stderr_pointer)
+  %17 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+
+condition_success1:                               ; preds = %condition_success
+  %18 = load i32, ptr %count, align 4
+  %19 = call i32 @Function_contracts_imported_validate(i32 noundef %18)
+  %20 = call i32 @Function_contracts_imported_dependency_minimum_result()
+  %21 = icmp uge i32 %19, %20
+  %22 = zext i1 %21 to i8
+  %23 = trunc i8 %22 to i1
+  br i1 %23, label %condition_success4, label %condition_fail5
+
+condition_fail2:                                  ; preds = %condition_success
+  %stderr_pointer3 = load ptr, ptr @stderr, align 8
+  %24 = call i32 @fputs(ptr @iris_error_string.1, ptr %stderr_pointer3)
+  %25 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+
+condition_success4:                               ; preds = %condition_success1
+  ret i32 %19
+
+condition_fail5:                                  ; preds = %condition_success1
+  %stderr_pointer6 = load ptr, ptr @stderr, align 8
+  %26 = call i32 @fputs(ptr @iris_error_string.2, ptr %stderr_pointer6)
+  %27 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+; Function Attrs: convergent
+define private i32 @Function_contracts_imported_validate(i32 noundef %"arguments[0].value") #0 {
+entry:
+  %value = alloca i32, align 4
+  store i32 %"arguments[0].value", ptr %value, align 4
+  %0 = load i32, ptr %value, align 4
+  %1 = call i1 @Function_contracts_imported_dependency_is_valid(i32 noundef %0)
+  %2 = zext i1 %1 to i8
+  %3 = trunc i8 %2 to i1
+  br i1 %3, label %condition_success, label %condition_fail
+
+condition_success:                                ; preds = %entry
+  %4 = load i32, ptr %value, align 4
+  ret i32 %4
+
+condition_fail:                                   ; preds = %entry
+  %stderr_pointer = load ptr, ptr @stderr, align 8
+  %5 = call i32 @fputs(ptr @iris_error_string.3, ptr %stderr_pointer)
+  %6 = call i32 @fflush(ptr null)
+  call void @abort()
+  unreachable
+}
+
+declare i32 @fputs(ptr, ptr)
+
+declare i32 @fflush(ptr)
+
+declare void @abort()
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Function Contracts", "[LLVM_IR]")
   {
     char const* const input_file = "function_contracts.iris";

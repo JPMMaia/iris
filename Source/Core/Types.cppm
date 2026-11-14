@@ -1059,6 +1059,18 @@ namespace iris
         Function_t predicate
     )
     {
+        for (Function_condition const& condition : declaration.preconditions)
+        {
+            if (visit_expressions(condition.condition, predicate))
+                return true;
+        }
+
+        for (Function_condition const& condition : declaration.postconditions)
+        {
+            if (visit_expressions(condition.condition, predicate))
+                return true;
+        }
+
         return false;
     }
 
@@ -1126,6 +1138,12 @@ namespace iris
         }
 
         for (Struct_declaration const& declaration : declarations.struct_declarations)
+        {
+            if (visit_expressions(declaration, predicate))
+                return true;
+        }
+
+        for (Function_declaration const& declaration : declarations.function_declarations)
         {
             if (visit_expressions(declaration, predicate))
                 return true;

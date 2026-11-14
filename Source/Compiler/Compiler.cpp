@@ -1550,12 +1550,27 @@ namespace iris::compiler
             process_type
         );
 
+        auto const visit_contract_types = [&](iris::Module_declarations const& declarations) -> void
+        {
+            for (iris::Function_declaration const& declaration : declarations.function_declarations)
+            {
+                for (iris::Function_condition const& condition : declaration.preconditions)
+                    iris::visit_type_references_recursively(condition.condition, process_type);
+
+                for (iris::Function_condition const& condition : declaration.postconditions)
+                    iris::visit_type_references_recursively(condition.condition, process_type);
+            }
+        };
+
+        visit_contract_types(core_module.export_declarations);
+        visit_contract_types(core_module.internal_declarations);
+
         auto const process_expression = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
         {
             if (std::holds_alternative<iris::Access_expression>(expression.data))
             {
                 iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
-                
+
                 iris::Expression const& left_hand_side = statement.expressions[access_expression.expression.expression_index];
                 if (std::holds_alternative<iris::Variable_expression>(left_hand_side.data))
                 {
