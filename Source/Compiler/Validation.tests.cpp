@@ -5720,6 +5720,81 @@ function run(values: *mutable Constant_array::<Int32, 4>, value: *mutable Int32)
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Allows taking the address of an element or field through a pointer-valued call result", "[Validation][Unary_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Pair { first: Int32 = 0; second: Int32 = 0; }
+
+function get(pair: *mutable Pair) -> (pointer: *mutable Pair)
+{
+    return pair;
+}
+
+function bytes(raw: *mutable Void) -> (pointer: *mutable Uint8)
+{
+    return reinterpret_as::<*mutable Uint8>(raw);
+}
+
+function run(raw: *mutable Void, pair: *mutable Pair) -> ()
+{
+    var a = &reinterpret_as::<*mutable Uint8>(raw)[3u64];
+    var b = &bytes(raw)[3u64];
+    var c = &(bytes(raw)[3u64]);
+    var d = &get(pair)->second;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Rejects taking the address of an element or field of a temporary value", "[Validation][Unary_expression]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Pair { first: Int32 = 0; second: Int32 = 0; }
+
+function make_pair() -> (pair: Pair)
+{
+    return {};
+}
+
+function make_array(values: Constant_array::<Int32, 4>) -> (values: Constant_array::<Int32, 4>)
+{
+    return values;
+}
+
+function run(values: Constant_array::<Int32, 4>) -> ()
+{
+    var a = &make_pair().first;
+    var b = &make_array(values)[0];
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(17, 13, 17, 14),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot apply unary operation '&' to expression.",
+                .related_information = {},
+            },
+            {
+                .range = create_source_range(18, 13, 18, 14),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot apply unary operation '&' to expression.",
+                .related_information = {},
+            },
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates unary operations related to pointers", "[Validation][Unary_expression]")
     {
         std::string_view const input = R"(module Test;

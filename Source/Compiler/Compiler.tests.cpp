@@ -13755,6 +13755,66 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Address Of Access On Call Result", "[LLVM_IR]")
+  {
+    char const* const input_file = "address_of_access_on_call_result.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    char const* const expected_llvm_ir = R"(
+%struct.Address_of_access_on_call_result_Pair = type { i32, i32 }
+
+; Function Attrs: convergent
+define void @Address_of_access_on_call_result_set_values(ptr noundef %"arguments[0].raw", ptr noundef %"arguments[1].pairs") #0 {
+entry:
+  %raw = alloca ptr, align 8
+  %pairs = alloca ptr, align 8
+  %element = alloca ptr, align 8
+  %second = alloca ptr, align 8
+  store ptr %"arguments[0].raw", ptr %raw, align 8
+  store ptr %"arguments[1].pairs", ptr %pairs, align 8
+  %0 = load ptr, ptr %raw, align 8
+  %1 = call ptr @Address_of_access_on_call_result_bytes(ptr noundef %0)
+  %array_element_pointer = getelementptr i8, ptr %1, i64 3
+  store ptr %array_element_pointer, ptr %element, align 8
+  %2 = load ptr, ptr %element, align 8
+  store i8 7, ptr %2, align 1
+  %3 = load ptr, ptr %pairs, align 8
+  %4 = call ptr @Address_of_access_on_call_result_get_second_pair(ptr noundef %3)
+  %5 = getelementptr inbounds %struct.Address_of_access_on_call_result_Pair, ptr %4, i32 0, i32 1
+  store ptr %5, ptr %second, align 8
+  %6 = load ptr, ptr %second, align 8
+  store i32 7, ptr %6, align 4
+  ret void
+}
+
+; Function Attrs: convergent
+define private ptr @Address_of_access_on_call_result_get_second_pair(ptr noundef %"arguments[0].pairs") #0 {
+entry:
+  %pairs = alloca ptr, align 8
+  store ptr %"arguments[0].pairs", ptr %pairs, align 8
+  %0 = load ptr, ptr %pairs, align 8
+  %array_element_pointer = getelementptr [2 x %struct.Address_of_access_on_call_result_Pair], ptr %0, i32 0, i32 1
+  ret ptr %array_element_pointer
+}
+
+; Function Attrs: convergent
+define private ptr @Address_of_access_on_call_result_bytes(ptr noundef %"arguments[0].raw") #0 {
+entry:
+  %raw = alloca ptr, align 8
+  store ptr %"arguments[0].raw", ptr %raw, align 8
+  %0 = load ptr, ptr %raw, align 8
+  ret ptr %0
+}
+
+attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }
+)";
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Index Array Returned By Value", "[LLVM_IR]")
   {
     char const* const input_file = "index_array_returned_by_value.iris";

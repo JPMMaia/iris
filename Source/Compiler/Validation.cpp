@@ -4784,33 +4784,56 @@ namespace iris::compiler
         return {};
     }
 
+    static bool is_pointer_expression(
+        Validate_expression_parameters const& parameters,
+        iris::Expression_index const expression_index
+    )
+    {
+        std::optional<iris::Type_reference> const type = get_expression_type_from_type_info(parameters.expression_types, expression_index);
+        if (!type.has_value())
+            return false;
+
+        std::optional<iris::Type_reference> const underlying_type = get_underlying_type(parameters.declaration_database, type.value());
+        return underlying_type.has_value() && is_pointer(underlying_type.value());
+    }
+
     static bool can_take_address_of_expression(
-        iris::Statement const& statement,
+        Validate_expression_parameters const& parameters,
         iris::Expression const& expression
     )
     {
+        iris::Statement const& statement = parameters.statement;
+
         if (std::holds_alternative<iris::Access_expression>(expression.data))
         {
             iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
             iris::Expression const& left_expression = statement.expressions[access_expression.expression.expression_index];
-            return can_take_address_of_expression(statement, left_expression);
+            return can_take_address_of_expression(parameters, left_expression);
         }
         else if (std::holds_alternative<iris::Access_array_expression>(expression.data))
         {
+            // p[i] names memory that p points at, whatever expression produced p.
             iris::Access_array_expression const& access_expression = std::get<iris::Access_array_expression>(expression.data);
+            if (is_pointer_expression(parameters, access_expression.expression))
+                return true;
+
             iris::Expression const& left_expression = statement.expressions[access_expression.expression.expression_index];
-            return can_take_address_of_expression(statement, left_expression);
+            return can_take_address_of_expression(parameters, left_expression);
         }
         else if (std::holds_alternative<iris::Dereference_and_access_expression>(expression.data))
         {
+            // p->field names memory that p points at, whatever expression produced p.
             iris::Dereference_and_access_expression const& access_expression = std::get<iris::Dereference_and_access_expression>(expression.data);
+            if (is_pointer_expression(parameters, access_expression.expression))
+                return true;
+
             iris::Expression const& left_expression = statement.expressions[access_expression.expression.expression_index];
-            return can_take_address_of_expression(statement, left_expression);
+            return can_take_address_of_expression(parameters, left_expression);
         }
         else if (std::holds_alternative<iris::Parenthesis_expression>(expression.data))
         {
             iris::Parenthesis_expression const& parenthesis_expression = std::get<iris::Parenthesis_expression>(expression.data);
-            return can_take_address_of_expression(statement, statement.expressions[parenthesis_expression.expression.expression_index]);
+            return can_take_address_of_expression(parameters, statement.expressions[parenthesis_expression.expression.expression_index]);
         }
         else if (std::holds_alternative<iris::Unary_expression>(expression.data))
         {
@@ -4947,7 +4970,7 @@ namespace iris::compiler
             case Unary_operation::Address_of:
             {
                 Expression const& operand_expression = parameters.statement.expressions[expression.expression.expression_index];
-                bool const can_take_adress = can_take_address_of_expression(parameters.statement, operand_expression);
+                bool const can_take_adress = can_take_address_of_expression(parameters, operand_expression);
                 if (!can_take_adress)
                 {
                     return
