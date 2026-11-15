@@ -724,4 +724,22 @@ namespace iris::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts pipeline_for_loop.iris", "[Convertor][Pipeline]")
+    {
+        std::string_view const input_file = "pipeline_for_loop.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts pipeline_multiple_parameters.iris", "[Convertor][Pipeline]")
+    {
+        std::string_view const input_file = "pipeline_multiple_parameters.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts pipeline_take_while_enumerate.iris", "[Convertor][Pipeline]")
+    {
+        std::string_view const input_file = "pipeline_take_while_enumerate.iris";
+        test_convertor(input_file);
+    }
+
 }

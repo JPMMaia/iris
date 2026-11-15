@@ -1664,11 +1664,19 @@
         },
         {
           "type": "SYMBOL",
+          "name": "Expression_for_each"
+        },
+        {
+          "type": "SYMBOL",
           "name": "Expression_for_loop"
         },
         {
           "type": "SYMBOL",
           "name": "Expression_if"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_pipeline"
         },
         {
           "type": "SEQ",
@@ -2842,6 +2850,35 @@
         }
       ]
     },
+    "Expression_for_each": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "for"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_for_loop_variable"
+        },
+        {
+          "type": "STRING",
+          "value": "in"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_for_each_range"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_for_loop_statements"
+        }
+      ]
+    },
+    "Expression_for_each_range": {
+      "type": "SYMBOL",
+      "name": "Expression_for_loop_number_expression"
+    },
     "Expression_lambda": {
       "type": "PREC_RIGHT",
       "value": 0,
@@ -3281,6 +3318,202 @@
     "Expression_null_pointer": {
       "type": "STRING",
       "value": "null"
+    },
+    "Expression_pipeline": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "pipeline"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_pipeline_name"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_pipeline_input_parameters"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_pipeline_stages"
+        }
+      ]
+    },
+    "Expression_pipeline_name": {
+      "type": "SYMBOL",
+      "name": "Identifier"
+    },
+    "Expression_pipeline_input_parameters": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "Function_parameter"
+                },
+                {
+                  "type": "REPEAT",
+                  "content": {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": ","
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "Function_parameter"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
+    },
+    "Expression_pipeline_stages": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "{"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "Expression_pipeline_stage"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "}"
+        }
+      ]
+    },
+    "Expression_pipeline_stage": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "Expression_pipeline_map"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_pipeline_filter"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_pipeline_take_while"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_pipeline_enumerate"
+        }
+      ]
+    },
+    "Expression_pipeline_map": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "map"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Generic_expression"
+        },
+        {
+          "type": "STRING",
+          "value": "=>"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_pipeline_map_name"
+        },
+        {
+          "type": "STRING",
+          "value": ";"
+        }
+      ]
+    },
+    "Expression_pipeline_map_name": {
+      "type": "SYMBOL",
+      "name": "Identifier"
+    },
+    "Expression_pipeline_filter": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "filter"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Generic_expression"
+        },
+        {
+          "type": "STRING",
+          "value": ";"
+        }
+      ]
+    },
+    "Expression_pipeline_take_while": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "take_while"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Generic_expression"
+        },
+        {
+          "type": "STRING",
+          "value": ";"
+        }
+      ]
+    },
+    "Expression_pipeline_enumerate": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "enumerate"
+        },
+        {
+          "type": "STRING",
+          "value": "=>"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_pipeline_map_name"
+        },
+        {
+          "type": "STRING",
+          "value": ";"
+        }
+      ]
     },
     "Expression_parenthesis": {
       "type": "SEQ",

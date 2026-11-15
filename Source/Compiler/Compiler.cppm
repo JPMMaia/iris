@@ -22,11 +22,16 @@ namespace iris::compiler
         Optimization_managers& operator=(Optimization_managers const&) = delete;
         ~Optimization_managers();
 
+        // The analysis managers keep callbacks that refer to the pass builder (the alias analysis
+        // pipeline, for example, is built from it on first use), so it must outlive them. Members are
+        // destroyed in reverse order, so it comes first.
+        std::unique_ptr<llvm::PassBuilder> pass_builder;
         std::unique_ptr<llvm::LoopAnalysisManager> loop_analysis_manager;
         std::unique_ptr<llvm::FunctionAnalysisManager> function_analysis_manager;
         std::unique_ptr<llvm::CGSCCAnalysisManager> cgscc_analysis_manager;
         std::unique_ptr<llvm::ModuleAnalysisManager> module_analysis_manager;
-        llvm::ModulePassManager module_pass_manager;
+        // O2 when set, otherwise O0. The pass pipeline itself is built per module.
+        bool is_optimized = false;
     };
 
     export struct LLVM_data

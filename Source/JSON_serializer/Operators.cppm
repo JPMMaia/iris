@@ -130,6 +130,25 @@ namespace iris::json::operators
             return output_stream;
         }
 
+        export std::istream& operator>>(std::istream& input_stream, Pipeline_stage_kind& value)
+        {
+            JSON data{};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }
+
+        export std::ostream& operator<<(std::ostream& output_stream, Pipeline_stage_kind const value)
+        {
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }
+
         export std::istream& operator>>(std::istream& input_stream, Unary_operation& value)
         {
             JSON data{};
@@ -1175,6 +1194,25 @@ namespace iris::json::operators
             return output_stream;
         }
 
+        export std::istream& operator>>(std::istream& input_stream, For_each_expression& value)
+        {
+            JSON data{};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }
+
+        export std::ostream& operator<<(std::ostream& output_stream, For_each_expression const& value)
+        {
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }
+
         export std::istream& operator>>(std::istream& input_stream, For_loop_expression& value)
         {
             JSON data{};
@@ -1384,6 +1422,44 @@ namespace iris::json::operators
             return output_stream;
         }
 
+        export std::istream& operator>>(std::istream& input_stream, Pipeline_stage& value)
+        {
+            JSON data{};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }
+
+        export std::ostream& operator<<(std::ostream& output_stream, Pipeline_stage const& value)
+        {
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }
+
+        export std::istream& operator>>(std::istream& input_stream, Pipeline_expression& value)
+        {
+            JSON data{};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }
+
+        export std::ostream& operator<<(std::ostream& output_stream, Pipeline_expression const& value)
+        {
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }
+
         export std::istream& operator>>(std::istream& input_stream, Reflection_expression& value)
         {
             JSON data{};
@@ -1433,6 +1509,25 @@ namespace iris::json::operators
         }
 
         export std::ostream& operator<<(std::ostream& output_stream, Struct_expression const& value)
+        {
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }
+
+        export std::istream& operator>>(std::istream& input_stream, Statement_block_expression& value)
+        {
+            JSON data{};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }
+
+        export std::ostream& operator<<(std::ostream& output_stream, Statement_block_expression const& value)
         {
             JSON const data = to_json(value);
 

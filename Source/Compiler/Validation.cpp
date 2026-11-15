@@ -376,7 +376,7 @@ namespace iris::compiler
         return are_compatible_types(declaration_database, destination, source);
     }
 
-    std::array<std::string_view, 14> get_reserved_keywords()
+    std::array<std::string_view, 15> get_reserved_keywords()
     {
         return
         {
@@ -394,6 +394,7 @@ namespace iris::compiler
             "Float64",
             "true",
             "false",
+            "pipeline",
         };
     }
 
@@ -750,7 +751,7 @@ namespace iris::compiler
 
         std::pmr::unordered_set<std::string_view> all_names{temporaries_allocator};
 
-        std::array<std::string_view, 14> const reserved_keywords = get_reserved_keywords();
+        std::array<std::string_view, 15> const reserved_keywords = get_reserved_keywords();
 
         auto const process_declaration_name = [&](
             std::string_view const name,
@@ -1716,6 +1717,10 @@ namespace iris::compiler
                         );
                     }
                 }
+                else if (std::holds_alternative<iris::Pipeline_expression>(expression.data))
+                {
+                    new_scope.pipelines.push_back(&std::get<iris::Pipeline_expression>(expression.data));
+                }
             }
         }
 
@@ -1851,12 +1856,48 @@ namespace iris::compiler
         return lambda_expression_copy.captured_variables.value();
     }
 
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_pipeline_fold_function(
+        Validate_expression_parameters const& parameters,
+        iris::Pipeline_expression const& pipeline,
+        iris::Call_expression const& call_expression
+    );
+
+    // When the lambda at `parameters.expression_index` is the function of a pipeline 'fold' sink,
+    // checks the rules that come from inlining it. They run before the generic lambda checks, which
+    // would otherwise report a parameter that conflicts with an outer name as a confusing type error.
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_lambda_as_pipeline_fold_function(
+        Validate_expression_parameters const& parameters
+    )
+    {
+        for (iris::Expression const& expression : parameters.statement.expressions)
+        {
+            if (!std::holds_alternative<iris::Call_expression>(expression.data))
+                continue;
+
+            iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
+            if (call_expression.arguments.size() != 2 || call_expression.arguments[1].expression_index != parameters.expression_index)
+                continue;
+
+            std::optional<Pipeline_sink_call> const sink_call = get_pipeline_sink_call(parameters.scope, parameters.statement, expression);
+            if (sink_call.has_value() && sink_call->sink_name == "fold")
+                return validate_pipeline_fold_function(parameters, *sink_call->pipeline, call_expression);
+        }
+
+        return {};
+    }
+
     std::pmr::vector<iris::compiler::Diagnostic> validate_lambda_expression(
         Validate_expression_parameters const& parameters,
         iris::Lambda_expression const& lambda_expression,
         std::optional<iris::Source_range> const& source_range
     )
     {
+        {
+            std::pmr::vector<iris::compiler::Diagnostic> fold_diagnostics = validate_lambda_as_pipeline_fold_function(parameters);
+            if (!fold_diagnostics.empty())
+                return fold_diagnostics;
+        }
+
         // The type the literal is being used as, which supplies whatever it left unwritten.
         std::optional<iris::Type_reference> const expected_type = get_expected_expression_type(
             parameters.core_module.name,
@@ -2151,10 +2192,20 @@ namespace iris::compiler
             iris::Continue_expression const& value = std::get<iris::Continue_expression>(expression.data);
             return validate_continue_expression(parameters, value, expression.source_range);
         }
+        else if (std::holds_alternative<iris::For_each_expression>(expression.data))
+        {
+            iris::For_each_expression const& value = std::get<iris::For_each_expression>(expression.data);
+            return validate_for_each_expression(parameters, value, expression.source_range);
+        }
         else if (std::holds_alternative<iris::For_loop_expression>(expression.data))
         {
             iris::For_loop_expression const& value = std::get<iris::For_loop_expression>(expression.data);
             return validate_for_loop_expression(parameters, value, expression.source_range);
+        }
+        else if (std::holds_alternative<iris::Pipeline_expression>(expression.data))
+        {
+            iris::Pipeline_expression const& value = std::get<iris::Pipeline_expression>(expression.data);
+            return validate_pipeline_expression(parameters, value, expression.source_range);
         }
         else if (std::holds_alternative<iris::If_expression>(expression.data))
         {
@@ -2226,6 +2277,18 @@ namespace iris::compiler
         std::optional<iris::Source_range> const& source_range
     )
     {
+        // `p(inputs).<sink>`: the sink call that contains this access validates it, and a pipeline
+        // call used any other way is reported by validate_call_expression.
+        if (get_pipeline_from_call_expression(parameters.scope, parameters.statement, parameters.statement.expressions[access_expression.expression.expression_index]) != nullptr)
+            return {};
+
+        // `p.<sink>`: the same, for a sink written on the pipeline name.
+        {
+            iris::Expression const& object = parameters.statement.expressions[access_expression.expression.expression_index];
+            if (std::holds_alternative<iris::Variable_expression>(object.data) && find_variable_from_scope(parameters.scope, std::get<iris::Variable_expression>(object.data).name) == nullptr && find_pipeline_from_scope(parameters.scope, std::get<iris::Variable_expression>(object.data).name) != nullptr)
+                return {};
+        }
+
         std::optional<iris::Type_reference> const& left_hand_side_type = get_expression_type_from_type_info(parameters.expression_types, access_expression.expression);
 
         if (left_hand_side_type.has_value())
@@ -3173,12 +3236,69 @@ namespace iris::compiler
         );
     }
 
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_pipeline_sink_call(
+        Validate_expression_parameters const& parameters,
+        Pipeline_sink_call const& sink_call,
+        iris::Call_expression const& call_expression,
+        std::optional<iris::Source_range> const& source_range
+    );
+
     std::pmr::vector<iris::compiler::Diagnostic> validate_call_expression(
         Validate_expression_parameters const& parameters,
         iris::Call_expression const& expression,
         std::optional<iris::Source_range> const& source_range
     )
     {
+        if (std::optional<Pipeline_sink_call> const sink_call = get_pipeline_sink_call(parameters.scope, parameters.statement, parameters.statement.expressions[parameters.expression_index]))
+            return validate_pipeline_sink_call(parameters, sink_call.value(), expression, source_range);
+
+        iris::Pipeline_expression const* const pipeline = get_pipeline_from_call_expression(
+            parameters.scope,
+            parameters.statement,
+            parameters.statement.expressions[parameters.expression_index]
+        );
+        if (pipeline != nullptr)
+        {
+            // A pipeline is never a runtime value: a call to it is only valid where a sink consumes it.
+            // The sink validates the inputs.
+            bool const is_consumed_by_for_each = std::any_of(
+                parameters.statement.expressions.begin(),
+                parameters.statement.expressions.end(),
+                [&](iris::Expression const& other) -> bool
+                {
+                    return std::holds_alternative<iris::For_each_expression>(other.data) &&
+                        std::get<iris::For_each_expression>(other.data).range_expression.expression_index == parameters.expression_index;
+                }
+            );
+            if (is_consumed_by_for_each)
+                return {};
+
+            bool const is_consumed_by_value_sink = std::any_of(
+                parameters.statement.expressions.begin(),
+                parameters.statement.expressions.end(),
+                [&](iris::Expression const& other) -> bool
+                {
+                    std::optional<Pipeline_sink_call> const sink_call = get_pipeline_sink_call(parameters.scope, parameters.statement, other);
+                    return sink_call.has_value() && sink_call->pipeline_call.expression_index == parameters.expression_index;
+                }
+            );
+            if (is_consumed_by_value_sink)
+                return {};
+
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format(
+                        "Pipeline '{}' is not a value. Consume it with a sink, for example 'for value in {}(...) {{ ... }}'.",
+                        pipeline->name,
+                        pipeline->name
+                    )
+                )
+            };
+        }
+
         std::optional<iris::Type_reference> const& expression_type_optional = get_expression_type_from_type_info(parameters.expression_types, expression.expression);
         std::optional<iris::Type_reference> const callable_type_optional = expression_type_optional.has_value() ? get_underlying_type(parameters.declaration_database, expression_type_optional.value()) : std::optional<iris::Type_reference>{};
 
@@ -3714,7 +3834,8 @@ namespace iris::compiler
     )
     {
         auto const is_loop_block = [](Block_expression_variant const& block) -> bool {
-            return std::holds_alternative<iris::For_loop_expression const*>(block) ||
+            return std::holds_alternative<iris::For_each_expression const*>(block) ||
+                   std::holds_alternative<iris::For_loop_expression const*>(block) ||
                    std::holds_alternative<iris::While_loop_expression const*>(block);
         };
 
@@ -3731,6 +3852,791 @@ namespace iris::compiler
                     parameters.core_module.source_file_path,
                     source_range,
                     "Expression 'continue' can only be placed inside for loops and while loops."
+                )
+            };
+        }
+
+        return {};
+    }
+
+    // The names that a pipeline expansion declares as locals: its parameters, then its map bindings.
+    static std::pmr::vector<std::string_view> get_pipeline_bound_names(
+        iris::Pipeline_expression const& pipeline,
+        std::pmr::polymorphic_allocator<> const& allocator
+    )
+    {
+        std::pmr::vector<std::string_view> names{allocator};
+        names.reserve(pipeline.input_parameter_names.size() + pipeline.stages.size());
+
+        for (std::pmr::string const& name : pipeline.input_parameter_names)
+            names.push_back(name);
+
+        for (iris::Pipeline_stage const& stage : pipeline.stages)
+        {
+            if (stage.binding_name.has_value())
+                names.push_back(stage.binding_name.value());
+        }
+
+        return names;
+    }
+
+    // Lambda bodies are validated against a stand-in declaration named 'lambda', a keyword that no
+    // user function can be named. Pipeline_pass does not walk into lambda bodies yet.
+    static std::optional<iris::compiler::Diagnostic> create_pipeline_inside_lambda_diagnostic(
+        Validate_expression_parameters const& parameters,
+        std::optional<iris::Source_range> const& source_range
+    )
+    {
+        if (parameters.function_declaration == nullptr || parameters.function_declaration->name != "lambda")
+            return std::nullopt;
+
+        return create_error_diagnostic(
+            parameters.core_module.source_file_path,
+            source_range,
+            "Pipelines cannot be declared or consumed inside a lambda body yet."
+        );
+    }
+
+    // Checks the inputs of a pipeline call that a sink consumes, and that the locals the expansion
+    // declares do not collide with anything visible where it is expanded.
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_pipeline_call_inputs(
+        Validate_expression_parameters const& parameters,
+        iris::Pipeline_expression const* const pipeline,
+        std::span<iris::Expression_index const> const arguments,
+        std::optional<iris::Source_range> const& inputs_source_range,
+        std::string_view const sink_description
+    )
+    {
+        if (arguments.size() != pipeline->input_parameter_names.size())
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    inputs_source_range,
+                    std::format(
+                        "Pipeline '{}' expects {} input(s) but {} were provided.",
+                        pipeline->name,
+                        pipeline->input_parameter_names.size(),
+                        arguments.size()
+                    )
+                )
+            };
+        }
+
+        for (std::size_t index = 0; index < arguments.size(); ++index)
+        {
+            iris::Expression const& argument_expression = parameters.statement.expressions[arguments[index].expression_index];
+            std::optional<iris::Type_reference> const& argument_type = get_expression_type_from_type_info(parameters.expression_types, arguments[index]);
+            std::optional<iris::Type_reference> const element_type =
+                argument_type.has_value() ?
+                get_pipeline_input_element_type(parameters.declaration_database, argument_type.value()) :
+                std::nullopt;
+
+            if (!element_type.has_value())
+            {
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, argument_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        argument_expression.source_range,
+                        std::format(
+                            "Pipeline input type '{}' is not supported. Expected 'Array_slice::<T>', 'Constant_array::<T, N>' or 'Soa_array_view::<T>'.",
+                            provided_type_name
+                        )
+                    )
+                };
+            }
+
+            iris::Type_reference const& parameter_type = pipeline->input_parameter_types[index];
+            if (!are_compatible_types(parameters.declaration_database, parameter_type, element_type))
+            {
+                std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, element_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const expected_type_name = iris::format_type_reference(parameters.core_module.dependencies, parameter_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                return
+                {
+                    create_error_diagnostic_with_code(
+                        parameters.core_module.source_file_path,
+                        argument_expression.source_range,
+                        std::format(
+                            "Pipeline input element type '{}' does not match type '{}' of parameter '{}'.",
+                            provided_type_name,
+                            expected_type_name,
+                            pipeline->input_parameter_names[index]
+                        ),
+                        Diagnostic_code::Type_mismatch,
+                        create_diagnostic_mismatch_type_data(element_type, parameter_type)
+                    )
+                };
+            }
+        }
+
+        // The expansion declares the pipeline parameters and bindings as locals here, so they
+        // must not collide with anything visible at this point.
+        std::pmr::vector<std::string_view> const bound_names = get_pipeline_bound_names(*pipeline, parameters.temporaries_allocator);
+
+        for (std::string_view const bound_name : bound_names)
+        {
+            if (find_variable_from_scope(parameters.scope, bound_name) != nullptr)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        inputs_source_range,
+                        std::format(
+                            "Pipeline '{}' binds '{}', which conflicts with a variable of the same name declared before this {}.",
+                            pipeline->name,
+                            bound_name,
+                            sink_description
+                        )
+                    )
+                };
+            }
+        }
+
+        return {};
+    }
+
+    static bool is_bool_type(iris::Type_reference const& type)
+    {
+        return is_bool(type) || is_c_bool(type);
+    }
+
+    // `p.in_place(values)` writes the kept elements back to the front of `values`. The write index
+    // never passes the read index, so this is safe for one input whose elements keep their type.
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_pipeline_in_place(
+        Validate_expression_parameters const& parameters,
+        iris::Pipeline_expression const& pipeline,
+        iris::Call_expression const& call_expression,
+        iris::Type_reference const& output_type,
+        std::optional<iris::Source_range> const& source_range
+    )
+    {
+        if (pipeline.input_parameter_names.size() != 1)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format(
+                        "Pipeline sink 'in_place' needs a pipeline with one input, but pipeline '{}' has {}.",
+                        pipeline.name,
+                        pipeline.input_parameter_names.size()
+                    )
+                )
+            };
+        }
+
+        iris::Expression_index const input_index = call_expression.arguments[0];
+        std::optional<iris::Type_reference> const& input_type = get_expression_type_from_type_info(parameters.expression_types, input_index);
+        std::optional<iris::Type_reference> const underlying_input_type = input_type.has_value() ? get_underlying_type(parameters.declaration_database, input_type.value()) : std::nullopt;
+
+        bool const is_mutable_slice =
+            underlying_input_type.has_value() &&
+            std::holds_alternative<iris::Array_slice_type>(underlying_input_type->data) &&
+            std::get<iris::Array_slice_type>(underlying_input_type->data).is_mutable;
+        if (!is_mutable_slice)
+        {
+            std::pmr::string const input_type_name = iris::format_type_reference(parameters.core_module.dependencies, input_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    parameters.statement.expressions[input_index.expression_index].source_range,
+                    std::format(
+                        "Pipeline sink 'in_place' overwrites its input, so it expects an 'Array_slice::<mutable T>' but got '{}'.",
+                        input_type_name
+                    )
+                )
+            };
+        }
+
+        iris::Type_reference const& input_element_type = pipeline.input_parameter_types[0];
+        if (!are_compatible_types(parameters.declaration_database, input_element_type, output_type))
+        {
+            std::pmr::string const output_type_name = iris::format_type_reference(parameters.core_module.dependencies, output_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+            std::pmr::string const input_type_name = iris::format_type_reference(parameters.core_module.dependencies, input_element_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format(
+                        "Pipeline sink 'in_place' writes the output back into the input, but pipeline '{}' turns '{}' into '{}'.",
+                        pipeline.name,
+                        input_type_name,
+                        output_type_name
+                    )
+                )
+            };
+        }
+
+        return {};
+    }
+
+    // The function of `fold(init, lambda (accumulator, element) => expression)` is expanded inline:
+    // the accumulator becomes the loop's running value and the element is bound to the output
+    // element. So it has to be a lambda literal with two parameters and an expression body, and
+    // its parameters become locals of the expansion. The body itself is checked as any lambda is,
+    // against the type (init, element) -> init.
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_pipeline_fold_function(
+        Validate_expression_parameters const& parameters,
+        iris::Pipeline_expression const& pipeline,
+        iris::Call_expression const& call_expression
+    )
+    {
+        iris::Expression const& function_expression = parameters.statement.expressions[call_expression.arguments[1].expression_index];
+
+        if (!std::holds_alternative<iris::Lambda_expression>(function_expression.data))
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    function_expression.source_range,
+                    "Pipeline sink 'fold' expects a lambda literal, for example 'fold(0, lambda (sum, value) => sum + value)'."
+                )
+            };
+        }
+
+        iris::Lambda_expression const& lambda_expression = std::get<iris::Lambda_expression>(function_expression.data);
+
+        if (lambda_expression.parameter_names.size() != 2)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    function_expression.source_range,
+                    std::format(
+                        "The lambda of pipeline sink 'fold' takes 2 parameters, the accumulator and the element, but {} were provided.",
+                        lambda_expression.parameter_names.size()
+                    )
+                )
+            };
+        }
+
+        bool const has_block_body =
+            !lambda_expression.body.expressions.empty() &&
+            std::holds_alternative<iris::Block_expression>(lambda_expression.body.expressions[0].data);
+        if (has_block_body)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    function_expression.source_range,
+                    "The lambda of pipeline sink 'fold' must have an expression body, for example 'lambda (sum, value) => sum + value'."
+                )
+            };
+        }
+
+        std::string_view const accumulator_name = lambda_expression.parameter_names[0];
+        std::string_view const element_name = lambda_expression.parameter_names[1];
+
+        if (accumulator_name == element_name)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    function_expression.source_range,
+                    std::format("The lambda of pipeline sink 'fold' declares parameter '{}' twice.", accumulator_name)
+                )
+            };
+        }
+
+        // The element may reuse the name of the pipeline's output element, since it is that value.
+        std::optional<std::string_view> const output_name = get_pipeline_output_name(pipeline);
+        std::pmr::vector<std::string_view> const bound_names = get_pipeline_bound_names(pipeline, parameters.temporaries_allocator);
+
+        for (std::string_view const parameter_name : { accumulator_name, element_name })
+        {
+            bool const is_output_element = parameter_name == element_name && output_name.has_value() && parameter_name == output_name.value();
+
+            bool const conflicts_with_pipeline =
+                !is_output_element &&
+                std::find(bound_names.begin(), bound_names.end(), parameter_name) != bound_names.end();
+
+            if (conflicts_with_pipeline || find_variable_from_scope(parameters.scope, parameter_name) != nullptr)
+            {
+                std::string const conflict = conflicts_with_pipeline ?
+                    std::format("a binding of pipeline '{}'", pipeline.name) :
+                    std::string{ "a variable" };
+
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        function_expression.source_range,
+                        std::format(
+                            "Parameter '{}' of the 'fold' lambda conflicts with {} of the same name.",
+                            parameter_name,
+                            conflict
+                        )
+                    )
+                };
+            }
+        }
+
+        return {};
+    }
+
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_pipeline_sink_call(
+        Validate_expression_parameters const& parameters,
+        Pipeline_sink_call const& sink_call,
+        iris::Call_expression const& call_expression,
+        std::optional<iris::Source_range> const& source_range
+    )
+    {
+        if (std::optional<iris::compiler::Diagnostic> diagnostic = create_pipeline_inside_lambda_diagnostic(parameters, source_range))
+            return { std::move(diagnostic.value()) };
+
+        iris::Pipeline_expression const& pipeline = *sink_call.pipeline;
+
+        if (!is_pipeline_sink_name(sink_call.sink_name))
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format(
+                        "Unknown pipeline sink '{}'. Expected 'count', 'any', 'all', 'first', 'fold', 'into' or 'in_place'.",
+                        sink_call.sink_name
+                    )
+                )
+            };
+        }
+
+        // in_place overwrites its input, so it is written on the pipeline itself and takes the inputs
+        // as its arguments. Every other sink consumes a pipeline call.
+        bool const is_in_place = sink_call.sink_name == "in_place";
+        if (is_in_place != sink_call.is_on_pipeline_name)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    is_in_place ?
+                    std::format("Pipeline sink 'in_place' takes the inputs itself: write '{}.in_place(values)'.", pipeline.name) :
+                    std::format("Pipeline '{}' needs its inputs before sink '{}': write '{}(values).{}(...)'.", pipeline.name, sink_call.sink_name, pipeline.name, sink_call.sink_name)
+                )
+            };
+        }
+
+        std::size_t const expected_argument_count =
+            sink_call.sink_name == "fold" ? 2 :
+            sink_call.sink_name == "into" ? 1 :
+            0;
+        if (!is_in_place && call_expression.arguments.size() != expected_argument_count)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format(
+                        "Pipeline sink '{}' expects {} argument(s) but {} were provided.",
+                        sink_call.sink_name,
+                        expected_argument_count,
+                        call_expression.arguments.size()
+                    )
+                )
+            };
+        }
+
+        // For `p.in_place(inputs)` the whole sink is the pipeline call.
+        std::optional<iris::Source_range> const inputs_source_range =
+            sink_call.is_on_pipeline_name ?
+            source_range :
+            parameters.statement.expressions[sink_call.pipeline_call.expression_index].source_range;
+        {
+            std::pmr::vector<iris::compiler::Diagnostic> input_diagnostics = validate_pipeline_call_inputs(parameters, &pipeline, sink_call.input_arguments, inputs_source_range, "expression");
+            if (!input_diagnostics.empty())
+                return input_diagnostics;
+        }
+
+        std::optional<iris::Type_reference> const output_type = get_pipeline_output_type(
+            parameters.core_module.name,
+            parameters.function_declaration,
+            parameters.scope,
+            pipeline,
+            parameters.declaration_database
+        );
+        if (!output_type.has_value())
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    inputs_source_range,
+                    std::format("Cannot deduce the output element type of pipeline '{}'.", pipeline.name)
+                )
+            };
+        }
+
+        if ((sink_call.sink_name == "any" || sink_call.sink_name == "all") && !is_bool_type(output_type.value()))
+        {
+            std::pmr::string const output_type_name = iris::format_type_reference(parameters.core_module.dependencies, output_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format(
+                        "Pipeline sink '{}' needs a 'Bool' output element, but pipeline '{}' produces '{}'.",
+                        sink_call.sink_name,
+                        pipeline.name,
+                        output_type_name
+                    )
+                )
+            };
+        }
+
+        if (is_in_place)
+        {
+            std::pmr::vector<iris::compiler::Diagnostic> in_place_diagnostics = validate_pipeline_in_place(parameters, pipeline, call_expression, output_type.value(), source_range);
+            if (!in_place_diagnostics.empty())
+                return in_place_diagnostics;
+        }
+
+        if (sink_call.sink_name == "fold")
+        {
+            std::pmr::vector<iris::compiler::Diagnostic> fold_diagnostics = validate_pipeline_fold_function(parameters, pipeline, call_expression);
+            if (!fold_diagnostics.empty())
+                return fold_diagnostics;
+        }
+
+        if (sink_call.sink_name == "into")
+        {
+            iris::Expression_index const buffer_index = call_expression.arguments[0];
+            std::optional<iris::Type_reference> const& buffer_type = get_expression_type_from_type_info(parameters.expression_types, buffer_index);
+            std::optional<iris::Type_reference> const underlying_buffer_type = buffer_type.has_value() ? get_underlying_type(parameters.declaration_database, buffer_type.value()) : std::nullopt;
+
+            bool const is_valid_buffer =
+                underlying_buffer_type.has_value() &&
+                std::holds_alternative<iris::Array_slice_type>(underlying_buffer_type->data) &&
+                std::get<iris::Array_slice_type>(underlying_buffer_type->data).is_mutable &&
+                !std::get<iris::Array_slice_type>(underlying_buffer_type->data).element_type.empty() &&
+                are_compatible_types(parameters.declaration_database, output_type, std::get<iris::Array_slice_type>(underlying_buffer_type->data).element_type[0]);
+
+            if (!is_valid_buffer)
+            {
+                std::pmr::string const output_type_name = iris::format_type_reference(parameters.core_module.dependencies, output_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+                std::pmr::string const buffer_type_name = iris::format_type_reference(parameters.core_module.dependencies, buffer_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        parameters.statement.expressions[buffer_index.expression_index].source_range,
+                        std::format(
+                            "Pipeline sink 'into' expects a buffer of type 'Array_slice::<mutable {}>' but got '{}'.",
+                            output_type_name,
+                            buffer_type_name
+                        )
+                    )
+                };
+            }
+        }
+
+        return {};
+    }
+
+    std::pmr::vector<iris::compiler::Diagnostic> validate_for_each_expression(
+        Validate_expression_parameters const& parameters,
+        iris::For_each_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    )
+    {
+        if (std::optional<iris::compiler::Diagnostic> diagnostic = create_pipeline_inside_lambda_diagnostic(parameters, source_range))
+            return { std::move(diagnostic.value()) };
+
+        iris::Expression const& range_expression = parameters.statement.expressions[expression.range_expression.expression_index];
+
+        iris::Pipeline_expression const* const pipeline = get_pipeline_from_call_expression(parameters.scope, parameters.statement, range_expression);
+        if (pipeline == nullptr)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    range_expression.source_range,
+                    "For-each loops can only iterate over a pipeline call, for example 'for value in my_pipeline(values)'."
+                )
+            };
+        }
+
+        {
+            std::pmr::vector<iris::compiler::Diagnostic> input_diagnostics = validate_pipeline_call_inputs(parameters, pipeline, std::get<iris::Call_expression>(range_expression.data).arguments, range_expression.source_range, "loop");
+            if (!input_diagnostics.empty())
+                return input_diagnostics;
+        }
+
+        std::optional<std::string_view> const output_name = get_pipeline_output_name(*pipeline);
+        std::pmr::vector<std::string_view> const bound_names = get_pipeline_bound_names(*pipeline, parameters.temporaries_allocator);
+
+        std::optional<iris::Source_range> const variable_source_range = create_sub_source_range(source_range, 4, expression.variable_name.size());
+
+        if (find_variable_from_scope(parameters.scope, expression.variable_name) != nullptr)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    variable_source_range,
+                    std::format("Duplicate variable name '{}'.", expression.variable_name)
+                )
+            };
+        }
+
+        bool const variable_is_output = output_name.has_value() && output_name.value() == expression.variable_name;
+        if (!variable_is_output && std::find(bound_names.begin(), bound_names.end(), expression.variable_name) != bound_names.end())
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    variable_source_range,
+                    std::format(
+                        "Loop variable '{}' conflicts with a parameter or binding of pipeline '{}'.",
+                        expression.variable_name,
+                        pipeline->name
+                    )
+                )
+            };
+        }
+
+        std::optional<iris::Type_reference> const output_type = get_pipeline_output_type(
+            parameters.core_module.name,
+            parameters.function_declaration,
+            parameters.scope,
+            *pipeline,
+            parameters.declaration_database
+        );
+        if (!output_type.has_value())
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    range_expression.source_range,
+                    std::format("Cannot deduce the output element type of pipeline '{}'.", pipeline->name)
+                )
+            };
+        }
+
+        Scope new_scope = parameters.scope;
+        new_scope.variables.push_back(
+            create_variable(expression.variable_name, output_type.value(), false, false, source_range)
+        );
+        new_scope.blocks.push_back(&expression);
+
+        return validate_statements(
+            parameters.core_module,
+            parameters.function_declaration,
+            new_scope,
+            expression.then_statements,
+            parameters.declaration_database,
+            parameters.temporaries_allocator
+        );
+    }
+
+    std::pmr::vector<iris::compiler::Diagnostic> validate_pipeline_expression(
+        Validate_expression_parameters const& parameters,
+        iris::Pipeline_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    )
+    {
+        std::optional<iris::Source_range> const name_source_range = create_sub_source_range(source_range, 9, expression.name.size());
+
+        if (std::optional<iris::compiler::Diagnostic> diagnostic = create_pipeline_inside_lambda_diagnostic(parameters, name_source_range))
+            return { std::move(diagnostic.value()) };
+
+        if (find_variable_from_scope(parameters.scope, expression.name) != nullptr || find_pipeline_from_scope(parameters.scope, expression.name) != nullptr)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    name_source_range,
+                    std::format("Duplicate pipeline name '{}'.", expression.name)
+                )
+            };
+        }
+
+        if (expression.input_parameter_names.empty())
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    name_source_range,
+                    std::format("Pipeline '{}' must have at least one parameter.", expression.name)
+                )
+            };
+        }
+
+        Scope new_scope = parameters.scope;
+
+        for (std::size_t index = 0; index < expression.input_parameter_names.size(); ++index)
+        {
+            std::pmr::string const& parameter_name = expression.input_parameter_names[index];
+            iris::Type_reference const& parameter_type = expression.input_parameter_types[index];
+
+            std::pmr::vector<iris::compiler::Diagnostic> const type_diagnostics = validate_type_reference(
+                parameters.core_module,
+                parameter_type,
+                parameters.declaration_database,
+                parameters.temporaries_allocator
+            );
+            if (!type_diagnostics.empty())
+                return type_diagnostics;
+
+            if (find_variable_from_scope(new_scope, parameter_name) != nullptr)
+            {
+                return
+                {
+                    create_error_diagnostic(
+                        parameters.core_module.source_file_path,
+                        name_source_range,
+                        std::format("Pipeline parameter '{}' conflicts with a variable of the same name.", parameter_name)
+                    )
+                };
+            }
+
+            new_scope.variables.push_back(
+                create_variable(parameter_name, parameter_type, false, false, source_range)
+            );
+        }
+
+        bool has_map = false;
+
+        for (iris::Pipeline_stage const& stage : expression.stages)
+        {
+            // enumerate => <name>: binds the original input index.
+            if (stage.kind == iris::Pipeline_stage_kind::Enumerate)
+            {
+                if (!stage.binding_name.has_value())
+                    continue;
+
+                if (find_variable_from_scope(new_scope, stage.binding_name.value()) != nullptr)
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            stage.source_range,
+                            std::format("Pipeline enumerate binding '{}' conflicts with a variable of the same name.", stage.binding_name.value())
+                        )
+                    };
+                }
+
+                new_scope.variables.push_back(
+                    create_variable(stage.binding_name.value(), create_integer_type_type_reference(64, false), false, false, stage.source_range)
+                );
+                continue;
+            }
+
+            std::pmr::vector<iris::compiler::Diagnostic> const stage_diagnostics = validate_statement(
+                parameters.core_module,
+                parameters.function_declaration,
+                new_scope,
+                stage.expression,
+                std::nullopt,
+                parameters.declaration_database,
+                parameters.temporaries_allocator
+            );
+            if (!stage_diagnostics.empty())
+                return stage_diagnostics;
+
+            std::optional<iris::Type_reference> const stage_type = get_expression_type(
+                parameters.core_module.name,
+                parameters.function_declaration,
+                new_scope,
+                stage.expression,
+                std::nullopt,
+                parameters.declaration_database
+            );
+
+            if (stage.kind == iris::Pipeline_stage_kind::Filter || stage.kind == iris::Pipeline_stage_kind::Take_while)
+            {
+                if (!stage_type.has_value() || (!is_bool(stage_type.value()) && !is_c_bool(stage_type.value())))
+                {
+                    std::pmr::string const provided_type_name = iris::format_type_reference(parameters.core_module.dependencies, stage_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            get_statement_source_range(stage.expression),
+                            std::format(
+                                "Pipeline {} expression type '{}' does not match expected type 'Bool'.",
+                                stage.kind == iris::Pipeline_stage_kind::Filter ? "filter" : "take_while",
+                                provided_type_name
+                            )
+                        )
+                    };
+                }
+            }
+            else if (stage.kind == iris::Pipeline_stage_kind::Map)
+            {
+                has_map = true;
+
+                if (!stage_type.has_value())
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            get_statement_source_range(stage.expression),
+                            "Pipeline map expression must produce a value."
+                        )
+                    };
+                }
+
+                if (!stage.binding_name.has_value())
+                    continue;
+
+                if (find_variable_from_scope(new_scope, stage.binding_name.value()) != nullptr)
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            stage.source_range,
+                            std::format("Pipeline map binding '{}' conflicts with a variable of the same name.", stage.binding_name.value())
+                        )
+                    };
+                }
+
+                new_scope.variables.push_back(
+                    create_variable(stage.binding_name.value(), stage_type.value(), false, false, stage.source_range)
+                );
+            }
+        }
+
+        if (!has_map && expression.input_parameter_names.size() > 1)
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    name_source_range,
+                    std::format(
+                        "Pipeline '{}' has several parameters and no map stage, so it has no single output element.",
+                        expression.name
+                    )
                 )
             };
         }
@@ -5241,6 +6147,42 @@ namespace iris::compiler
         if (variable != nullptr)
             return {};
 
+        if (find_pipeline_from_scope(parameters.scope, expression.name) != nullptr)
+        {
+            bool const is_callee = std::any_of(
+                parameters.statement.expressions.begin(),
+                parameters.statement.expressions.end(),
+                [&](iris::Expression const& other) -> bool
+                {
+                    return std::holds_alternative<iris::Call_expression>(other.data) &&
+                        std::get<iris::Call_expression>(other.data).expression.expression_index == parameters.expression_index;
+                }
+            );
+            if (is_callee)
+                return {};
+
+            bool const is_sink_object = std::any_of(
+                parameters.statement.expressions.begin(),
+                parameters.statement.expressions.end(),
+                [&](iris::Expression const& other) -> bool
+                {
+                    std::optional<Pipeline_sink_call> const sink_call = get_pipeline_sink_call(parameters.scope, parameters.statement, other);
+                    return sink_call.has_value() && sink_call->is_on_pipeline_name && sink_call->pipeline_call.expression_index == parameters.expression_index;
+                }
+            );
+            if (is_sink_object)
+                return {};
+
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    std::format("Pipeline '{}' is not a value. It can only be called and consumed by a sink.", expression.name)
+                )
+            };
+        }
+
         std::optional<Declaration> const declaration_optional = find_declaration(
             parameters.declaration_database,
             parameters.core_module.name,
@@ -5393,6 +6335,14 @@ namespace iris::compiler
             if (std::holds_alternative<iris::Call_expression>(expression.data))
             {
                 iris::Call_expression const& data = std::get<iris::Call_expression>(expression.data);
+
+                // p(inputs).fold(init, <lambda>): (type of init, element type) -> type of init.
+                if (data.arguments.size() == 2 && data.arguments[1].expression_index == expression_index)
+                {
+                    std::optional<Pipeline_sink_call> const sink_call = get_pipeline_sink_call(scope, statement, expression);
+                    if (sink_call.has_value() && sink_call->sink_name == "fold")
+                        return get_pipeline_fold_lambda_type(module_name, function_declaration, scope, statement, sink_call.value(), declaration_database);
+                }
 
                 for (std::size_t argument_index = 0; argument_index < data.arguments.size(); ++argument_index)
                 {

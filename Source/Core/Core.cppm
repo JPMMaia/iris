@@ -625,6 +625,17 @@ namespace iris
         friend bool operator==(Dereference_and_access_expression const&, Dereference_and_access_expression const&) = default;
     };
 
+    // for <variable_name> in <range_expression> { ... }
+    // Only valid when the range expression is a call to a pipeline. Pipeline_pass lowers it to a For_loop_expression.
+    export struct For_each_expression
+    {
+        std::pmr::string variable_name;
+        Expression_index range_expression;
+        std::pmr::vector<Statement> then_statements;
+
+        friend bool operator==(For_each_expression const&, For_each_expression const&) = default;
+    };
+
     export struct For_loop_expression
     {
         std::pmr::string variable_name;
@@ -723,6 +734,40 @@ namespace iris
         friend bool operator==(Parenthesis_expression const&, Parenthesis_expression const&) = default;
     };
 
+    // New kinds are appended, since binary serialization stores the value. Take_while stops the
+    // whole loop at the first element whose expression is false. Enumerate has no expression and
+    // binds the element's index in the inputs.
+    export enum class Pipeline_stage_kind
+    {
+        Map,
+        Filter,
+        Take_while,
+        Enumerate
+    };
+
+    export struct Pipeline_stage
+    {
+        Pipeline_stage_kind kind;
+        Statement expression;
+        std::optional<std::pmr::string> binding_name;  // Map and Enumerate
+        std::optional<Source_range> source_range;
+
+        friend bool operator==(Pipeline_stage const&, Pipeline_stage const&) = default;
+    };
+
+    // A function-local, compile-time recipe of map/filter stages. It is never a runtime value:
+    // Pipeline_pass expands it inline at every sink that consumes it, then removes the declaration.
+    export struct Pipeline_expression
+    {
+        std::pmr::string name;
+        std::pmr::vector<std::pmr::string> input_parameter_names;
+        std::pmr::vector<Type_reference> input_parameter_types;
+        std::pmr::vector<Pipeline_stage> stages;
+        std::optional<std::pmr::vector<Source_position>> input_parameter_source_positions;
+
+        friend bool operator==(Pipeline_expression const&, Pipeline_expression const&) = default;
+    };
+
     export struct Reflection_expression
     {
         std::pmr::string name;
@@ -744,6 +789,16 @@ namespace iris
         Struct_declaration declaration;
 
         friend bool operator==(Struct_expression const&, Struct_expression const&) = default;
+    };
+
+    // Runs `statements` in a new scope, then evaluates `result` as the value of the whole expression.
+    // Only compiler passes create it (Pipeline_pass expands value sinks into it); the parser never does.
+    export struct Statement_block_expression
+    {
+        std::pmr::vector<Statement> statements;
+        Statement result;
+
+        friend bool operator==(Statement_block_expression const&, Statement_block_expression const&) = default;
     };
 
     export struct Switch_case_expression_pair
@@ -840,6 +895,8 @@ namespace iris
 
     export struct Expression
     {
+        // New alternatives are appended rather than sorted, so that the indices of existing
+        // alternatives stay stable: hashes and binary serialization depend on them.
         using Data_type = std::variant <
             Access_expression,
             Access_array_expression,
@@ -877,7 +934,10 @@ namespace iris
             Variable_declaration_expression,
             Variable_declaration_with_type_expression,
             Variable_expression,
-            While_loop_expression
+            While_loop_expression,
+            For_each_expression,
+            Pipeline_expression,
+            Statement_block_expression
         > ;
 
         Data_type data;

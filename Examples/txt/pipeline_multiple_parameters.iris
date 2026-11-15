@@ -1,0 +1,17 @@
+module Pipeline_multiple_parameters;
+
+export function weighted_sum(values: Array_slice::<Int32>, weights: Array_slice::<Int32>) -> (result: Int32)
+{
+    pipeline weighted(value: Int32, weight: Int32)
+    {
+        map value * weight => product;
+    }
+
+    mutable sum = 0;
+    for product in weighted(values, weights)
+    {
+        sum += product;
+    }
+
+    return sum;
+}

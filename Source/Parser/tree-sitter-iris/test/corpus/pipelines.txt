@@ -1,0 +1,357 @@
+=========================
+Pipelines
+=========================
+
+module Pipelines;
+
+function run(list: Array_slice::<Complex>, weights: Array_slice::<Float32>, threshold: Float32) -> ()
+{
+    pipeline process(input: Complex, weight: Float32)
+    {
+        map scale(input, weight) => v0;
+        map v0->real => v1;
+        map v1 * weight => v2;
+        filter v2 > threshold;
+    }
+
+    for v in process(list, weights)
+    {
+        print(v);
+    }
+}
+
+---
+
+(Module
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Array_slice_type
+                  (Type
+                    (Type_name
+                      (Identifier)))))))
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Array_slice_type
+                  (Type
+                    (Type_name
+                      (Identifier)))))))
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Type_name
+                  (Identifier))))))
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_pipeline
+              (Expression_pipeline_name
+                (Identifier))
+              (Expression_pipeline_input_parameters
+                (Function_parameter
+                  (Function_parameter_name
+                    (Identifier))
+                  (Function_parameter_type
+                    (Type
+                      (Type_name
+                        (Identifier)))))
+                (Function_parameter
+                  (Function_parameter_name
+                    (Identifier))
+                  (Function_parameter_type
+                    (Type
+                      (Type_name
+                        (Identifier))))))
+              (Expression_pipeline_stages
+                (Expression_pipeline_stage
+                  (Expression_pipeline_map
+                    (Generic_expression
+                      (Expression_call
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))
+                        (Expression_call_arguments
+                          (Generic_expression_or_instantiate
+                            (Generic_expression
+                              (Expression_variable
+                                (Variable_name
+                                  (Identifier)))))
+                          (Generic_expression_or_instantiate
+                            (Generic_expression
+                              (Expression_variable
+                                (Variable_name
+                                  (Identifier))))))))
+                    (Expression_pipeline_map_name
+                      (Identifier))))
+                (Expression_pipeline_stage
+                  (Expression_pipeline_map
+                    (Generic_expression
+                      (Expression_dereference_and_access
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))
+                        (Identifier)))
+                    (Expression_pipeline_map_name
+                      (Identifier))))
+                (Expression_pipeline_stage
+                  (Expression_pipeline_map
+                    (Generic_expression
+                      (Expression_binary
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))))
+                    (Expression_pipeline_map_name
+                      (Identifier))))
+                (Expression_pipeline_stage
+                  (Expression_pipeline_filter
+                    (Generic_expression
+                      (Expression_binary
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier)))))))))))
+          (Statement
+            (Expression_for_each
+              (Expression_for_loop_variable
+                (Identifier))
+              (Expression_for_each_range
+                (Expression_for_loop_number_expression
+                  (Expression_call
+                    (Generic_expression
+                      (Expression_variable
+                        (Variable_name
+                          (Identifier))))
+                    (Expression_call_arguments
+                      (Generic_expression_or_instantiate
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier)))))
+                      (Generic_expression_or_instantiate
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier)))))))))
+              (Expression_for_loop_statements
+                (Statement
+                  (Expression_call
+                    (Generic_expression
+                      (Expression_variable
+                        (Variable_name
+                          (Identifier))))
+                    (Expression_call_arguments
+                      (Generic_expression_or_instantiate
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))))))))))))))
+
+=========================
+Map and filter are not reserved outside pipelines
+=========================
+
+module Pipelines;
+
+function run(map: Int32) -> ()
+{
+    var filter = map(map, 1);
+}
+
+---
+
+(Module
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Type_name
+                  (Identifier))))))
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_call
+                  (Generic_expression
+                    (Expression_variable
+                      (Variable_name
+                        (Identifier))))
+                  (Expression_call_arguments
+                    (Generic_expression_or_instantiate
+                      (Generic_expression
+                        (Expression_variable
+                          (Variable_name
+                            (Identifier)))))
+                    (Generic_expression_or_instantiate
+                      (Generic_expression
+                        (Expression_constant
+                          (Number))))))))))))))
+
+=========================
+Take while and enumerate stages
+=========================
+
+module Pipelines;
+
+function run(list: Array_slice::<Int32>) -> ()
+{
+    pipeline prefix(value: Int32)
+    {
+        enumerate => index;
+        take_while value > 0;
+        filter index > 1u64;
+    }
+}
+
+---
+
+(Module
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Array_slice_type
+                  (Type
+                    (Type_name
+                      (Identifier))))))))
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_pipeline
+              (Expression_pipeline_name
+                (Identifier))
+              (Expression_pipeline_input_parameters
+                (Function_parameter
+                  (Function_parameter_name
+                    (Identifier))
+                  (Function_parameter_type
+                    (Type
+                      (Type_name
+                        (Identifier))))))
+              (Expression_pipeline_stages
+                (Expression_pipeline_stage
+                  (Expression_pipeline_enumerate
+                    (Expression_pipeline_map_name
+                      (Identifier))))
+                (Expression_pipeline_stage
+                  (Expression_pipeline_take_while
+                    (Generic_expression
+                      (Expression_binary
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))
+                        (Generic_expression
+                          (Expression_constant
+                            (Number)))))))
+                (Expression_pipeline_stage
+                  (Expression_pipeline_filter
+                    (Generic_expression
+                      (Expression_binary
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))
+                        (Generic_expression
+                          (Expression_constant
+                            (Number)))))))))))))))
+
+=========================
+Take while and enumerate are not reserved outside pipelines
+=========================
+
+module Pipelines;
+
+function run(enumerate: Int32) -> ()
+{
+    var take_while = enumerate;
+}
+
+---
+
+(Module
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Type_name
+                  (Identifier))))))
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_variable
+                  (Variable_name
+                    (Identifier)))))))))))

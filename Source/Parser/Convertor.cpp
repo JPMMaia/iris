@@ -1974,6 +1974,10 @@ namespace iris::parser
         {
             expression.data = node_to_expression_dereference_and_access(statement, module_info, tree, expression_node, output_allocator, temporaries_allocator);
         }
+        else if (expression_type == "Expression_for_each")
+        {
+            expression.data = node_to_expression_for_each(statement, module_info, tree, expression_node, output_allocator, temporaries_allocator);
+        }
         else if (expression_type == "Expression_for_loop")
         {
             expression.data = node_to_expression_for_loop(statement, module_info, tree, expression_node, output_allocator, temporaries_allocator);
@@ -2005,6 +2009,10 @@ namespace iris::parser
         else if (expression_type == "Expression_parenthesis")
         {
             expression.data = node_to_expression_parenthesis(statement, module_info, tree, expression_node, output_allocator, temporaries_allocator);
+        }
+        else if (expression_type == "Expression_pipeline")
+        {
+            expression.data = node_to_expression_pipeline(module_info, tree, expression_node, output_allocator, temporaries_allocator);
         }
         else if (expression_type == "Expression_reflection_call")
         {
@@ -2841,6 +2849,125 @@ namespace iris::parser
         if (block_node.has_value())
         {
             output.then_statements = node_to_block(module_info, tree, block_node.value(), output_allocator, temporaries_allocator);
+        }
+
+        return output;
+    }
+
+    iris::For_each_expression node_to_expression_for_each(
+        iris::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        iris::For_each_expression output;
+
+        std::optional<Parse_node> const variable_node = get_child_node(tree, node, "Expression_for_loop_variable");
+        if (variable_node.has_value())
+            output.variable_name = create_string(get_node_value(tree, variable_node.value()), output_allocator);
+
+        std::optional<Parse_node> const range_node = get_child_node(tree, node, "Expression_for_each_range");
+        if (range_node.has_value())
+        {
+            std::optional<Parse_node> const number_expression_node = get_child_node(tree, range_node.value(), 0);
+            std::optional<Parse_node> const range_expression_node = number_expression_node.has_value() ? get_child_node(tree, number_expression_node.value(), 0) : std::nullopt;
+            if (range_expression_node.has_value())
+                output.range_expression = node_to_expression(statement, module_info, tree, range_expression_node.value(), output_allocator, temporaries_allocator);
+        }
+
+        std::optional<Parse_node> const block_node = get_child_node(tree, node, "Expression_for_loop_statements");
+        if (block_node.has_value())
+            output.then_statements = node_to_block(module_info, tree, block_node.value(), output_allocator, temporaries_allocator);
+
+        return output;
+    }
+
+    static iris::Statement node_to_expression_statement(
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& expression_node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        iris::Statement output;
+        output.expressions = std::pmr::vector<iris::Expression>{temporaries_allocator};
+
+        node_to_expression(output, module_info, tree, expression_node, output_allocator, temporaries_allocator);
+
+        std::pmr::vector<iris::Expression> final_expressions{std::move(output.expressions), output_allocator};
+        output.expressions = std::move(final_expressions);
+
+        return output;
+    }
+
+    iris::Pipeline_expression node_to_expression_pipeline(
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        iris::Pipeline_expression output = {};
+
+        std::optional<Parse_node> const name_node = get_child_node(tree, node, "Expression_pipeline_name");
+        if (name_node.has_value())
+            output.name = create_string(get_node_value(tree, name_node.value()), output_allocator);
+
+        std::pmr::vector<Parse_node> const parameter_nodes = get_child_nodes_of_parent(tree, node, "Expression_pipeline_input_parameters", "Function_parameter", temporaries_allocator);
+        output.input_parameter_source_positions = std::pmr::vector<Source_position>{};
+        add_function_parameters(
+            output.input_parameter_names,
+            output.input_parameter_types,
+            output.input_parameter_source_positions.value(),
+            module_info,
+            tree,
+            parameter_nodes,
+            output_allocator,
+            temporaries_allocator
+        );
+
+        std::pmr::vector<Parse_node> const stage_nodes = get_child_nodes_of_parent(tree, node, "Expression_pipeline_stages", "Expression_pipeline_stage", temporaries_allocator);
+        output.stages.reserve(stage_nodes.size());
+
+        for (Parse_node const& stage_wrapper_node : stage_nodes)
+        {
+            std::optional<Parse_node> const stage_node = get_child_node(tree, stage_wrapper_node, 0);
+            if (!stage_node.has_value())
+                continue;
+
+            std::string_view const stage_symbol = get_node_symbol(stage_node.value());
+
+            iris::Pipeline_stage stage = {};
+            stage.source_range = get_node_source_range(stage_node.value());
+
+            if (stage_symbol == "Expression_pipeline_map")
+                stage.kind = iris::Pipeline_stage_kind::Map;
+            else if (stage_symbol == "Expression_pipeline_filter")
+                stage.kind = iris::Pipeline_stage_kind::Filter;
+            else if (stage_symbol == "Expression_pipeline_take_while")
+                stage.kind = iris::Pipeline_stage_kind::Take_while;
+            else if (stage_symbol == "Expression_pipeline_enumerate")
+                stage.kind = iris::Pipeline_stage_kind::Enumerate;
+            else
+                continue;
+
+            std::optional<Parse_node> const expression_node = get_child_node(tree, stage_node.value(), "Generic_expression");
+            if (expression_node.has_value())
+                stage.expression = node_to_expression_statement(module_info, tree, expression_node.value(), output_allocator, temporaries_allocator);
+
+            if (stage.kind == iris::Pipeline_stage_kind::Map || stage.kind == iris::Pipeline_stage_kind::Enumerate)
+            {
+                std::optional<Parse_node> const binding_node = get_child_node(tree, stage_node.value(), "Expression_pipeline_map_name");
+                if (binding_node.has_value())
+                    stage.binding_name = create_string(get_node_value(tree, binding_node.value()), output_allocator);
+            }
+
+            output.stages.push_back(std::move(stage));
         }
 
         return output;

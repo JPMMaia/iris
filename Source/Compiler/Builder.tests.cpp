@@ -157,36 +157,22 @@ namespace iris::compiler
         std::string output;
     };
 
-    // Like test_builder_and_run, but captures the runner's own transcript instead of only looking
-    // at the exit code.
-    Test_run_output test_builder_and_capture_run(
-        std::string_view const project_name,
-        std::pmr::vector<std::filesystem::path> const& artifact_paths,
+    // Runs an already built test executable and captures the runner's own transcript. A run that
+    // aborts ends the process, so a caller that expects several aborts runs one test at a time.
+    Test_run_output run_test_executable_and_capture(
+        std::filesystem::path const& build_directory_path,
         iris::compiler::Target const& target,
-        std::span<std::filesystem::path const> const additional_repository_paths,
-        std::span<std::filesystem::path const> const expected_output_paths,
         std::string_view const test_executable_name,
-        std::optional<std::string_view> const temporary_directory_name = std::nullopt,
-        std::string_view const test_executable_arguments = {}
+        std::string_view const test_executable_arguments,
+        std::string_view const output_file_name = "test_run_output.txt"
     )
     {
-        std::filesystem::path const build_directory_path = test_builder(
-            project_name,
-            artifact_paths,
-            target,
-            additional_repository_paths,
-            expected_output_paths,
-            temporary_directory_name,
-            {.is_test_mode = true},
-            {}
-        );
-
         std::filesystem::path const test_executable_path =
             build_directory_path / "bin" / get_binary_name(test_executable_name, target);
 
         REQUIRE(std::filesystem::exists(test_executable_path));
 
-        std::filesystem::path const output_file_path = build_directory_path / "test_run_output.txt";
+        std::filesystem::path const output_file_path = build_directory_path / output_file_name;
 
 #if defined(_WIN32)
         // 'cmd /c' removes the first and last quote character of the whole string, which would
@@ -215,6 +201,33 @@ namespace iris::compiler
         result.output = std::string{ std::istreambuf_iterator<char>{output_stream}, std::istreambuf_iterator<char>{} };
 
         return result;
+    }
+
+    // Like test_builder_and_run, but captures the runner's own transcript instead of only looking
+    // at the exit code.
+    Test_run_output test_builder_and_capture_run(
+        std::string_view const project_name,
+        std::pmr::vector<std::filesystem::path> const& artifact_paths,
+        iris::compiler::Target const& target,
+        std::span<std::filesystem::path const> const additional_repository_paths,
+        std::span<std::filesystem::path const> const expected_output_paths,
+        std::string_view const test_executable_name,
+        std::optional<std::string_view> const temporary_directory_name = std::nullopt,
+        std::string_view const test_executable_arguments = {}
+    )
+    {
+        std::filesystem::path const build_directory_path = test_builder(
+            project_name,
+            artifact_paths,
+            target,
+            additional_repository_paths,
+            expected_output_paths,
+            temporary_directory_name,
+            {.is_test_mode = true},
+            {}
+        );
+
+        return run_test_executable_and_capture(build_directory_path, target, test_executable_name, test_executable_arguments);
     }
 
     static std::uint64_t count_occurrences(std::string_view const haystack, std::string_view const needle)
@@ -786,6 +799,104 @@ namespace iris::compiler
             expected_output_paths,
             "aggregate_copies.iris.test"
         );
+    }
+
+    // Runs every pipeline expansion and checks its results: map, filter, several inputs, Constant_array
+    // inputs, captured locals, break and continue, nested pipelines and generated name hygiene.
+    TEST_CASE("Build and run Pipelines in test mode", "[Builder][Pipeline]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Pipelines" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("pipelines.iris.test", target)
+        };
+
+        test_builder_and_run(
+            "Pipelines",
+            {"app/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            "pipelines.iris.test"
+        );
+    }
+
+    // Each test of Pipeline_asserts breaks a precondition of a pipeline expansion. The assert that the
+    // expansion emits must stop the test, and the runner must report it rather than hang. An abort
+    // ends the run, so each test is run on its own.
+    TEST_CASE("Pipeline expansions assert their preconditions at run time", "[Builder][Pipeline]")
+    {
+        iris::compiler::Target const target = iris::compiler::get_default_target();
+
+        std::pmr::vector<std::filesystem::path> const repository_paths
+        {
+            g_examples_directory / "Pipeline_asserts" / "iris_repository.json"
+        };
+
+        std::pmr::vector<std::filesystem::path> const expected_output_paths
+        {
+            std::filesystem::path{"bin"} / get_binary_name("pipeline_asserts.iris.test", target)
+        };
+
+        std::filesystem::path const build_directory_path = test_builder(
+            "Pipeline_asserts",
+            {"app/iris_artifact.json"},
+            target,
+            repository_paths,
+            expected_output_paths,
+            std::nullopt,
+            {.is_test_mode = true},
+            {}
+        );
+
+        {
+            Test_run_output const result = run_test_executable_and_capture(
+                build_directory_path,
+                target,
+                "pipeline_asserts.iris.test",
+                " --test-name=pipeline_asserts.test_inputs_of_different_lengths",
+                "different_lengths_output.txt"
+            );
+
+            CHECK(result.output.find("assert 'Pipeline inputs have equal length' failed!") != std::string::npos);
+            CHECK(result.output.find("CRASH") != std::string::npos);
+            CHECK(result.output.find("1 tests selected, 1 run, 0 passed, 1 failed (1 crashed), 0 not run") != std::string::npos);
+            CHECK(result.exit_code != 0);
+        }
+
+        {
+            Test_run_output const result = run_test_executable_and_capture(
+                build_directory_path,
+                target,
+                "pipeline_asserts.iris.test",
+                " --test-name=pipeline_asserts.test_an_into_buffer_that_is_too_small",
+                "small_buffer_output.txt"
+            );
+
+            CHECK(result.output.find("assert 'Pipeline output buffer is large enough' failed!") != std::string::npos);
+            CHECK(result.output.find("CRASH") != std::string::npos);
+            CHECK(result.output.find("1 tests selected, 1 run, 0 passed, 1 failed (1 crashed), 0 not run") != std::string::npos);
+            CHECK(result.exit_code != 0);
+        }
+
+        {
+            Test_run_output const result = run_test_executable_and_capture(
+                build_directory_path,
+                target,
+                "pipeline_asserts.iris.test",
+                " --test-name=pipeline_asserts.test_a_large_enough_buffer",
+                "large_enough_buffer_output.txt"
+            );
+
+            CHECK(result.output.find("1 tests selected, 1 run, 1 passed, 0 failed (0 crashed), 0 not run") != std::string::npos);
+            CHECK(result.exit_code == 0);
+        }
     }
 
     // Each layer of Diamond_imports imports both modules of the layer below. The debug types of a

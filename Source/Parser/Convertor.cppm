@@ -337,8 +337,25 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
+    iris::For_each_expression node_to_expression_for_each(
+        iris::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     iris::For_loop_expression node_to_expression_for_loop(
         iris::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    iris::Pipeline_expression node_to_expression_pipeline(
         Module_info const& module_info,
         Parse_tree const& tree,
         Parse_node const& node,

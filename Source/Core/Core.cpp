@@ -509,6 +509,11 @@ namespace iris
             Dereference_and_access_expression& data = std::get<Dereference_and_access_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
         }
+        else if (std::holds_alternative<iris::For_each_expression>(current_expression.data))
+        {
+            For_each_expression& data = std::get<For_each_expression>(current_expression.data);
+            data.range_expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.range_expression);
+        }
         else if (std::holds_alternative<iris::For_loop_expression>(current_expression.data))
         {
             For_loop_expression& data = std::get<For_loop_expression>(current_expression.data);
@@ -543,6 +548,15 @@ namespace iris
         {
             Parenthesis_expression& data = std::get<Parenthesis_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
+        }
+        else if (std::holds_alternative<iris::Pipeline_expression>(current_expression.data))
+        {
+        }
+        else if (std::holds_alternative<iris::Lambda_expression>(current_expression.data))
+        {
+        }
+        else if (std::holds_alternative<iris::Statement_block_expression>(current_expression.data))
+        {
         }
         else if (std::holds_alternative<iris::Reflection_expression>(current_expression.data))
         {
@@ -684,6 +698,7 @@ namespace iris
     bool is_add_scope_expression(iris::Expression const& expression)
     {
         return std::holds_alternative<iris::Block_expression>(expression.data)
+            || std::holds_alternative<iris::For_each_expression>(expression.data)
             || std::holds_alternative<iris::For_loop_expression>(expression.data)
             || std::holds_alternative<iris::If_expression>(expression.data)
             || std::holds_alternative<iris::Switch_expression>(expression.data)

@@ -1,0 +1,642 @@
+module pipelines;
+
+// Pipelines expand into the loop one would write by hand. These tests run the expansions and
+// check that they compute what the source says.
+
+struct Point
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+}
+
+function make_point(x: Float32, y: Float32) -> (result: Point)
+{
+    return { x: x, y: y };
+}
+
+function square(value: Int32) -> (result: Int32)
+{
+    return value * value;
+}
+
+function sum_of_large_squares(values: Array_slice::<Int32>, threshold: Int32) -> (result: Int32)
+{
+    pipeline process(input: Int32)
+    {
+        map square(input) => squared;
+        filter squared > threshold;
+    }
+
+    mutable sum = 0;
+    for value in process(values)
+    {
+        sum += value;
+    }
+
+    return sum;
+}
+
+@test
+function test_map_and_filter() -> ()
+{
+    var values: Constant_array::<Int32, 5> = [1, 2, 3, 4, 5];
+
+    check(sum_of_large_squares(values, 5) == 50);
+    check(sum_of_large_squares(values, 100) == 0);
+    check(sum_of_large_squares([], 0) == 0);
+}
+
+function weighted_sum(values: Array_slice::<Int32>, weights: Array_slice::<Int32>) -> (result: Int32)
+{
+    pipeline weighted(value: Int32, weight: Int32)
+    {
+        map value * weight => product;
+    }
+
+    mutable sum = 0;
+    for product in weighted(values, weights)
+    {
+        sum += product;
+    }
+
+    return sum;
+}
+
+@test
+function test_several_inputs_are_read_in_lockstep() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 2, 3];
+    var weights: Constant_array::<Int32, 3> = [4, 5, 6];
+
+    check(weighted_sum(values, weights) == 32);
+}
+
+@test
+function test_a_constant_array_input_and_a_filter_only_pipeline() -> ()
+{
+    var values: Constant_array::<Int32, 4> = [3, -1, 4, -1];
+
+    pipeline positive(value: Int32)
+    {
+        filter value > 0;
+    }
+
+    mutable count = 0;
+    mutable sum = 0;
+    for kept in positive(values)
+    {
+        count += 1;
+        sum += kept;
+    }
+
+    check(count == 2);
+    check(sum == 7);
+}
+
+@test
+function test_struct_elements_and_captured_locals() -> ()
+{
+    var points: Constant_array::<Point, 3> = [
+        make_point(1.0f32, 10.0f32),
+        make_point(2.0f32, 20.0f32),
+        make_point(3.0f32, 30.0f32)
+    ];
+    var scale = 2.0f32;
+    var minimum = 3.0f32;
+
+    pipeline scaled_x(point: Point)
+    {
+        map point.x * scale => scaled;
+        filter scaled > minimum;
+        map scaled + point.y => total;
+    }
+
+    mutable sum = 0.0f32;
+    for total in scaled_x(points)
+    {
+        sum += total;
+    }
+
+    check(sum == 60.0f32);
+}
+
+@test
+function test_break_and_continue_in_the_body() -> ()
+{
+    var values: Constant_array::<Int32, 6> = [1, 2, 3, 4, 5, 6];
+
+    pipeline plus_zero(value: Int32)
+    {
+        map value + 0 => same;
+    }
+
+    mutable sum = 0;
+    for same in plus_zero(values)
+    {
+        if same == 2
+        {
+            continue;
+        }
+
+        if same == 5
+        {
+            break;
+        }
+
+        sum += same;
+    }
+
+    check(sum == 8);
+}
+
+@test
+function test_generated_names_do_not_collide_with_user_names() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 2, 3];
+    var i = 100;
+    mutable count = 0;
+    var pipeline0_i = 7;
+
+    pipeline plus_one(value: Int32)
+    {
+        map value + 1 => next;
+    }
+
+    for next in plus_one(values)
+    {
+        count += next;
+    }
+
+    check(i == 100);
+    check(count == 9);
+    check(pipeline0_i == 7);
+}
+
+@test
+function test_nested_pipelines() -> ()
+{
+    var rows: Constant_array::<Int32, 2> = [1, 2];
+    var columns: Constant_array::<Int32, 3> = [10, 20, 30];
+
+    pipeline doubled(row: Int32)
+    {
+        map row * 2 => twice;
+    }
+
+    mutable total = 0;
+    for twice in doubled(rows)
+    {
+        pipeline shifted(column: Int32)
+        {
+            map column + twice => sum;
+        }
+
+        for sum in shifted(columns)
+        {
+            total += sum;
+        }
+    }
+
+    check(total == 138);
+}
+
+function count_calls(values: Array_slice::<Int32>, calls: *mutable Int32) -> (result: Array_slice::<Int32>)
+{
+    *calls = *calls + 1;
+    return values;
+}
+
+@test
+function test_an_input_expression_is_evaluated_once() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 2, 3];
+    mutable calls = 0;
+
+    pipeline doubled(value: Int32)
+    {
+        map value * 2 => twice;
+    }
+
+    mutable sum = 0;
+    for twice in doubled(count_calls(values, &calls))
+    {
+        sum += twice;
+    }
+
+    check(calls == 1);
+    check(sum == 12);
+}
+
+function count_even(values: Array_slice::<Int32>) -> (result: Uint64)
+{
+    pipeline even(value: Int32)
+    {
+        filter value % 2 == 0;
+    }
+
+    return even(values).count();
+}
+
+@test
+function test_count() -> ()
+{
+    var values: Constant_array::<Int32, 5> = [1, 2, 3, 4, 5];
+
+    check(count_even(values) == 2u64);
+    check(count_even([]) == 0u64);
+}
+
+@test
+function test_any_and_all() -> ()
+{
+    var values: Constant_array::<Int32, 5> = [1, 2, 3, 4, 5];
+
+    pipeline is_large(value: Int32)
+    {
+        map value > 3 => large;
+    }
+
+    pipeline is_positive(value: Int32)
+    {
+        map value > 0 => positive;
+    }
+
+    check(is_large(values).any());
+    check(!is_large(values).all());
+    check(is_positive(values).all());
+}
+
+@test
+function test_into_writes_the_kept_prefix() -> ()
+{
+    var values: Constant_array::<Int32, 5> = [1, 2, 3, 4, 5];
+    mutable storage: Constant_array::<Int32, 5> = [0, 0, 0, 0, 0];
+    var first: *mutable Int32 = &storage[0];
+    var buffer = create_array_slice_from_pointer(first, 5u64);
+
+    pipeline odd_squares(value: Int32)
+    {
+        filter value % 2 == 1;
+        map value * value => squared;
+    }
+
+    var written = odd_squares(values).into(buffer);
+
+    check(written.length == 3u64);
+    check(written[0] == 1);
+    check(written[1] == 9);
+    check(written[2] == 25);
+    check(storage[3] == 0);
+}
+
+@test
+function test_a_while_condition_runs_the_pipeline_on_every_check() -> ()
+{
+    mutable remaining: Constant_array::<Int32, 3> = [1, 1, 1];
+
+    pipeline is_positive(value: Int32)
+    {
+        map value > 0 => positive;
+    }
+
+    mutable iterations = 0;
+    mutable index = 0u64;
+    while is_positive(remaining).any()
+    {
+        remaining[index] = 0;
+        index += 1u64;
+        iterations += 1;
+    }
+
+    check(iterations == 3);
+}
+
+@test
+function test_a_sink_on_the_right_of_and_is_short_circuited() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 2, 3];
+    mutable calls = 0;
+
+    pipeline is_positive(value: Int32)
+    {
+        map value > 0 => positive;
+    }
+
+    var disabled = false;
+    var skipped = disabled && is_positive(count_calls(values, &calls)).all();
+    check(!skipped);
+    check(calls == 0);
+
+    var enabled = true;
+    var evaluated = enabled && is_positive(count_calls(values, &calls)).all();
+    check(evaluated);
+    check(calls == 1);
+}
+
+function record(order: *mutable Int32, id: Int32, values: Array_slice::<Int32>) -> (result: Array_slice::<Int32>)
+{
+    *order = *order * 10 + id;
+    return values;
+}
+
+function add_counts(first: Uint64, second: Uint64) -> (result: Uint64)
+{
+    return first + second;
+}
+
+@test
+function test_sinks_in_call_arguments_are_evaluated_in_order() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 2, 3];
+    mutable order = 0;
+
+    pipeline plus_one(value: Int32)
+    {
+        map value + 1 => next;
+    }
+
+    var total = add_counts(plus_one(record(&order, 1, values)).count(), plus_one(record(&order, 2, values)).count());
+
+    check(total == 6u64);
+    check(order == 12);
+}
+
+@test
+function test_fold_combines_the_kept_elements() -> ()
+{
+    var values: Constant_array::<Int32, 5> = [1, 2, 3, 4, 5];
+
+    pipeline even_squares(value: Int32)
+    {
+        filter value % 2 == 0;
+        map value * value => squared;
+    }
+
+    var sum = even_squares(values).fold(0, lambda (total, element) => total + element);
+    check(sum == 20);
+
+    // The element parameter may reuse the name of the pipeline's output element.
+    var product = even_squares(values).fold(1, lambda (accumulator, squared) => accumulator * squared);
+    check(product == 64);
+}
+
+@test
+function test_fold_of_no_elements_is_the_initial_value() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 3, 5];
+
+    pipeline evens(value: Int32)
+    {
+        filter value % 2 == 0;
+    }
+
+    check(evens(values).fold(42, lambda (total, element) => total + element) == 42);
+}
+
+@test
+function test_fold_reads_captured_locals_and_keeps_the_initial_type() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 2, 3];
+    var weight = 10;
+
+    pipeline identity(value: Int32)
+    {
+    }
+
+    var weighted = identity(values).fold(5, lambda (total, element) => total + element * weight);
+    check(weighted == 65);
+
+    // A Bool accumulator over Int32 elements.
+    var has_two = identity(values).fold(false, lambda (found, element) => found || element == 2);
+    check(has_two);
+}
+
+function visit(visited: *mutable Int32, value: Int32) -> (result: Int32)
+{
+    *visited = *visited + 1;
+    return value;
+}
+
+@test
+function test_first_returns_the_first_kept_element_and_stops() -> ()
+{
+    var values: Constant_array::<Int32, 5> = [1, 2, 3, 4, 5];
+    mutable visited = 0;
+
+    pipeline first_large(value: Int32)
+    {
+        map visit(&visited, value) => seen;
+        filter seen > 2;
+    }
+
+    var found = first_large(values).first();
+    check(found.has_value);
+    check(found.value == 3);
+    check(visited == 3);
+}
+
+@test
+function test_first_of_no_elements_is_empty() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 2, 3];
+
+    pipeline large(value: Int32)
+    {
+        filter value > 10;
+    }
+
+    var found = large(values).first();
+    check(!found.has_value);
+}
+
+@test
+function test_in_place_keeps_the_filtered_elements_at_the_front() -> ()
+{
+    mutable storage: Constant_array::<Int32, 6> = [1, 2, 3, 4, 5, 6];
+    var first: *mutable Int32 = &storage[0];
+    var values = create_array_slice_from_pointer(first, 6u64);
+
+    pipeline doubled_odds(value: Int32)
+    {
+        filter value % 2 == 1;
+        map value * 2 => doubled;
+    }
+
+    var kept = doubled_odds.in_place(values);
+
+    check(kept.length == 3u64);
+    check(kept[0] == 2);
+    check(kept[1] == 6);
+    check(kept[2] == 10);
+
+    // The elements past the kept prefix are left as they were.
+    check(storage[3] == 4);
+    check(storage[4] == 5);
+    check(storage[5] == 6);
+}
+
+@test
+function test_in_place_of_a_map_only_pipeline_rewrites_every_element() -> ()
+{
+    mutable storage: Constant_array::<Int32, 3> = [1, 2, 3];
+    var first: *mutable Int32 = &storage[0];
+    var values = create_array_slice_from_pointer(first, 3u64);
+
+    pipeline plus_ten(value: Int32)
+    {
+        map value + 10 => shifted;
+    }
+
+    var kept = plus_ten.in_place(values);
+
+    check(kept.length == 3u64);
+    check(storage[0] == 11);
+    check(storage[1] == 12);
+    check(storage[2] == 13);
+}
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+    alive: Bool = true;
+}
+
+function get_x(particle: Particle) -> (result: Float32)
+{
+    return particle.x;
+}
+
+@test
+function test_a_soa_view_input_reads_the_used_fields() -> ()
+{
+    mutable particles: Soa_array::<Particle, 4> = [];
+    var view: Soa_array_view::<mutable Particle> = particles.view();
+    view[0] = { x: 1.0f32, y: 10.0f32, alive: true };
+    view[1] = { x: 2.0f32, y: 20.0f32, alive: false };
+    view[2] = { x: 3.0f32, y: 30.0f32, alive: true };
+    view[3] = { x: 4.0f32, y: 40.0f32, alive: true };
+
+    pipeline fast(particle: Particle)
+    {
+        filter particle.x > 1.5f32;
+        map particle.x + particle.y => speed;
+    }
+
+    mutable total = 0.0f32;
+    for speed in fast(view)
+    {
+        total += speed;
+    }
+    check(total == 99.0f32);
+
+    // The loop variable is the element itself, so its fields are read the same way.
+    pipeline living(particle: Particle)
+    {
+        filter particle.alive;
+    }
+
+    mutable sum_x = 0.0f32;
+    for alive_particle in living(view)
+    {
+        sum_x += alive_particle.x;
+    }
+    check(sum_x == 8.0f32);
+
+    check(living(view).count() == 3u64);
+}
+
+@test
+function test_a_soa_element_is_read_at_the_start_of_the_iteration() -> ()
+{
+    mutable particles: Soa_array::<Particle, 2> = [];
+    var view: Soa_array_view::<mutable Particle> = particles.view();
+    view[0] = { x: 1.0f32, y: 0.0f32, alive: true };
+    view[1] = { x: 2.0f32, y: 0.0f32, alive: true };
+
+    pipeline every(particle: Particle)
+    {
+    }
+
+    mutable sum_x = 0.0f32;
+    for particle in every(view)
+    {
+        view->x[0] = 100.0f32;
+        view->x[1] = 100.0f32;
+        sum_x += particle.x;
+    }
+
+    // The first element was read before the body wrote to it; the second was read after.
+    check(sum_x == 101.0f32);
+}
+
+@test
+function test_a_soa_element_used_whole_and_in_lockstep_with_a_slice() -> ()
+{
+    mutable particles: Soa_array::<Particle, 3> = [];
+    var view: Soa_array_view::<mutable Particle> = particles.view();
+    view[0] = { x: 1.0f32, y: 0.0f32, alive: true };
+    view[1] = { x: 2.0f32, y: 0.0f32, alive: true };
+    view[2] = { x: 3.0f32, y: 0.0f32, alive: true };
+
+    var weights: Constant_array::<Float32, 3> = [10.0f32, 20.0f32, 30.0f32];
+
+    pipeline weighted(particle: Particle, weight: Float32)
+    {
+        map get_x(particle) * weight => product;
+    }
+
+    check(weighted(view, weights).fold(0.0f32, lambda (total, product) => total + product) == 140.0f32);
+}
+
+@test
+function test_take_while_stops_the_whole_loop() -> ()
+{
+    var values: Constant_array::<Int32, 6> = [2, 4, 5, 6, -1, 8];
+
+    pipeline positive_evens(value: Int32)
+    {
+        take_while value > 0;
+        filter value % 2 == 0;
+    }
+
+    // Stops at -1: the 8 after it is never reached, and 5 is filtered out before.
+    check(positive_evens(values).fold(0, lambda (sum, value) => sum + value) == 12);
+
+    // After a filter, take_while only sees the kept elements: 5 and -1 are dropped first, so the
+    // loop stops at 8 and counts 2, 4 and 6.
+    pipeline evens_then_positive(value: Int32)
+    {
+        filter value % 2 == 0;
+        take_while value < 7;
+    }
+
+    check(evens_then_positive(values).count() == 3u64);
+}
+
+@test
+function test_enumerate_binds_the_index_in_the_inputs() -> ()
+{
+    var values: Constant_array::<Int32, 5> = [10, 11, 12, 13, 14];
+
+    pipeline odd_positions(value: Int32)
+    {
+        enumerate => index;
+        filter value % 2 == 1;
+        map index => position;
+    }
+
+    mutable positions = 0u64;
+    for position in odd_positions(values)
+    {
+        positions = positions * 10u64 + position;
+    }
+
+    check(positions == 13u64);
+}
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return 0;
+}

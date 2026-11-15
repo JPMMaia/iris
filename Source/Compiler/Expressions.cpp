@@ -6615,6 +6615,43 @@ namespace iris::compiler
         return create_expression_value(expression.expression.expression_index, statement, parameters);
     }
 
+    bool is_comment(Statement const& statement);
+
+    // Emits the statements into the current basic block, then evaluates the result with the locals
+    // they declared in scope. Like a parenthesis, the result value is passed through unloaded, so the
+    // caller loads it exactly as it would load the result expression written in its place.
+    // Only passes create this node, and they never put a return, a defer, or a break or continue
+    // aimed at an outer loop inside it, so no block info is pushed.
+    Value_and_type create_statement_block_expression_value(
+        Statement_block_expression const& expression,
+        Expression_parameters const& parameters
+    )
+    {
+        std::pmr::vector<Value_and_type> all_local_variables;
+        all_local_variables.reserve(parameters.local_variables.size() + expression.statements.size());
+        all_local_variables.insert(all_local_variables.end(), parameters.local_variables.begin(), parameters.local_variables.end());
+
+        Expression_parameters new_parameters = parameters;
+
+        for (Statement const& statement : expression.statements)
+        {
+            if (is_comment(statement) || statement.expressions.empty())
+                continue;
+
+            new_parameters.local_variables = all_local_variables;
+
+            Value_and_type const statement_value = create_statement_value(statement, new_parameters);
+            if (!statement_value.name.empty())
+                all_local_variables.push_back(statement_value);
+        }
+
+        new_parameters.local_variables = all_local_variables;
+
+        Value_and_type result = create_statement_value(expression.result, new_parameters);
+        result.name = "";
+        return result;
+    }
+
     // Whether `value` is where a value of `value_type` is stored rather than the value itself. A pointer value
     // is told apart from a place holding one the way read_from_type does.
     static bool is_place_of_value(llvm::Value* const value, llvm::Type* const value_type)
@@ -7853,6 +7890,11 @@ namespace iris::compiler
         {
             Return_expression const& data = std::get<Return_expression>(expression.data);
             return create_return_expression_value(data, statement, new_parameters);
+        }
+        else if (std::holds_alternative<Statement_block_expression>(expression.data))
+        {
+            Statement_block_expression const& data = std::get<Statement_block_expression>(expression.data);
+            return create_statement_block_expression_value(data, new_parameters);
         }
         else if (std::holds_alternative<Switch_expression>(expression.data))
         {

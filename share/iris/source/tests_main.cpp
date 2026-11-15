@@ -583,6 +583,13 @@ int main(int const argc, char const* const argv[])
         }
     }
 
+#if defined(_WIN32)
+    // The debug CRT shows an "abort() has been called" message box before it raises SIGABRT, which
+    // blocks a headless run forever, and _CALL_REPORTFAULT hands the process to Windows Error
+    // Reporting. Turn both off so that a failing assert reaches abort_signal_handler.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
+
     std::signal(SIGABRT, abort_signal_handler);
 
     std::span<char const* const> const all_test_names = get_all_test_names();

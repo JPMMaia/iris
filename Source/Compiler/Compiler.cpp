@@ -1370,8 +1370,11 @@ namespace iris::compiler
         std::unique_ptr<llvm::CGSCCAnalysisManager> cgscc_analysis_manager = std::make_unique<llvm::CGSCCAnalysisManager>();
         std::unique_ptr<llvm::ModuleAnalysisManager> module_analysis_manager = std::make_unique<llvm::ModuleAnalysisManager>();
 
-        // TODO set according to optimization level
-        llvm::PassBuilder pass_builder;
+        // Kept alive in Optimization_managers: the analyses registered here call back into it, and
+        // optimize_llvm_module builds a pipeline from it on every call. The target machine gives the
+        // optimizer the target's costs; it is owned by LLVM_data, which also owns the pass builder.
+        std::unique_ptr<llvm::PassBuilder> pass_builder_pointer = std::make_unique<llvm::PassBuilder>(target_machine.get());
+        llvm::PassBuilder& pass_builder = *pass_builder_pointer;
         pass_builder.registerModuleAnalyses(*module_analysis_manager);
         pass_builder.registerCGSCCAnalyses(*cgscc_analysis_manager);
         pass_builder.registerFunctionAnalyses(*function_analysis_manager);
@@ -1383,11 +1386,6 @@ namespace iris::compiler
             *module_analysis_manager
         );
 
-        llvm::OptimizationLevel const optimization_level = options.is_optimized ? llvm::OptimizationLevel::O2 : llvm::OptimizationLevel::O0;
-        llvm::ModulePassManager module_pass_manager = pass_builder.buildPerModuleDefaultPipeline(optimization_level);
-
-        // This merges identical functions. We might have a lot of these when generating functions using function constructors that only use pointers.
-        module_pass_manager.addPass(llvm::MergeFunctionsPass());
 
         std::unique_ptr<Clang_data, void(*)(Clang_data*)> clang_data = create_clang_data(
             *llvm_context,
@@ -1396,11 +1394,12 @@ namespace iris::compiler
         );
 
         Optimization_managers opt_managers;
+        opt_managers.pass_builder = std::move(pass_builder_pointer);
         opt_managers.loop_analysis_manager = std::move(loop_analysis_manager);
         opt_managers.function_analysis_manager = std::move(function_analysis_manager);
         opt_managers.cgscc_analysis_manager = std::move(cgscc_analysis_manager);
         opt_managers.module_analysis_manager = std::move(module_analysis_manager);
-        opt_managers.module_pass_manager = std::move(module_pass_manager);
+        opt_managers.is_optimized = options.is_optimized;
 
         return LLVM_data(
             std::move(target_triple),
@@ -1768,7 +1767,24 @@ namespace iris::compiler
         llvm::Module& llvm_module
     )
     {
-        llvm_data.optimization_managers.module_pass_manager.run(llvm_module, *llvm_data.optimization_managers.module_analysis_manager);
+        Optimization_managers& managers = llvm_data.optimization_managers;
+
+        // The pipeline is built for every module rather than once per LLVM_data: the O1+ pipelines
+        // contain ModuleInlinerWrapperPass, which moves its inner CGSCC pipeline out when it runs,
+        // so a second run of the same pass manager dereferences null passes.
+        llvm::OptimizationLevel const optimization_level = managers.is_optimized ? llvm::OptimizationLevel::O2 : llvm::OptimizationLevel::O0;
+        llvm::ModulePassManager module_pass_manager = managers.pass_builder->buildPerModuleDefaultPipeline(optimization_level);
+
+        // This merges identical functions. We might have a lot of these when generating functions using function constructors that only use pointers.
+        module_pass_manager.addPass(llvm::MergeFunctionsPass());
+
+        module_pass_manager.run(llvm_module, *managers.module_analysis_manager);
+
+        // Cached results are keyed by IR addresses, which a later module may reuse.
+        managers.loop_analysis_manager->clear();
+        managers.function_analysis_manager->clear();
+        managers.cgscc_analysis_manager->clear();
+        managers.module_analysis_manager->clear();
     }
 
     std::string to_string(

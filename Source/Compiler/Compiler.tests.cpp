@@ -1,8 +1,14 @@
 #include <cstdio>
+#include <algorithm>
+#include <vector>
+#include <numeric>
+#include <array>
 #include <filesystem>
+#include <format>
 #include <memory_resource>
 #include <mutex>
 #include <optional>
+#include <regex>
 #include <string>
 #include <unordered_map>
 
@@ -168,6 +174,8 @@ namespace iris
     bool enable_bounds_checks = false;
     bool enable_decimal_overflow_checks = false;
     bool is_test_mode = false;
+    // Compiles with the O2 pipeline that optimized builds use (create_llvm_module runs it).
+    bool is_optimized = false;
   };
 
   static void add_test_mode_dependencies(
@@ -213,7 +221,7 @@ namespace iris
     iris::compiler::Compilation_options const compilation_options
     {
       .target_triple = test_options.target_triple,
-      .is_optimized = false,
+      .is_optimized = test_options.is_optimized,
       .debug = test_options.debug,
       .contract_options = test_options.contract_options,
       .enable_bounds_checks = test_options.enable_bounds_checks,
@@ -275,6 +283,7 @@ namespace iris
       preprocessed.lambda_database,
       compilation_options
     );
+
     std::string const llvm_ir = iris::compiler::to_string(*llvm_module);
 
     iris::parser::destroy_tree(std::move(parse_tree));
@@ -297,6 +306,168 @@ namespace iris
     );
 
     CHECK(llvm_ir_body == expected_llvm_ir);
+  }
+
+  // Renames the function itself, every local value and every label in order of first appearance,
+  // drops comments (the `; preds = ...` padding depends on the original label lengths) and masks
+  // what depends on names rather than on the code: attribute group numbers and the lengths of error
+  // messages, which embed the module name and source path.
+  static std::string canonicalize_function_definition(std::string definition, std::string_view const function_name)
+  {
+    std::string const name_token = std::format("@{}(", function_name);
+    std::size_t const own_name_location = definition.find(name_token);
+    if (own_name_location != std::string::npos)
+      definition.replace(own_name_location, name_token.size(), "@function(");
+
+    definition = std::regex_replace(definition, std::regex{ R"re([ \t]*;[^\n"]*)re" }, "");
+    definition = std::regex_replace(definition, std::regex{ R"re(#[0-9]+)re" }, "#attributes");
+    definition = std::regex_replace(definition, std::regex{ R"re((@iris_error_string[.0-9]*, i64 )[0-9]+)re" }, "$1N");
+
+    std::regex const local_pattern{ R"re(%("[^"]*"|[-a-zA-Z$._0-9]+))re" };
+    std::regex const label_pattern{ R"re((^|\n)([-a-zA-Z$._0-9]+):)re" };
+
+    std::unordered_map<std::string, std::string> renames;
+    auto const get_rename = [&](std::string const& name) -> std::string
+    {
+      auto const location = renames.find(name);
+      if (location != renames.end())
+        return location->second;
+
+      std::string rename = std::format("v{}", renames.size());
+      renames.emplace(name, rename);
+      return rename;
+    };
+
+    // Labels first, in block order, so that a branch to a later block and the block agree.
+    for (auto iterator = std::sregex_iterator(definition.begin(), definition.end(), label_pattern); iterator != std::sregex_iterator(); ++iterator)
+      get_rename((*iterator)[2].str());
+
+    std::string output;
+    std::size_t previous = 0;
+    for (auto iterator = std::sregex_iterator(definition.begin(), definition.end(), local_pattern); iterator != std::sregex_iterator(); ++iterator)
+    {
+      std::string const name = (*iterator)[1].str();
+      std::string const unquoted = name.starts_with('"') ? name.substr(1, name.size() - 2) : name;
+
+      output.append(definition, previous, static_cast<std::size_t>(iterator->position()) - previous);
+      output += "%";
+      output += get_rename(unquoted);
+      previous = static_cast<std::size_t>(iterator->position() + iterator->length());
+    }
+    output.append(definition, previous);
+
+    std::string relabeled;
+    previous = 0;
+    for (auto iterator = std::sregex_iterator(output.begin(), output.end(), label_pattern); iterator != std::sregex_iterator(); ++iterator)
+    {
+      relabeled.append(output, previous, static_cast<std::size_t>(iterator->position()) - previous);
+      relabeled += (*iterator)[1].str();
+      relabeled += get_rename((*iterator)[2].str());
+      relabeled += ":";
+      previous = static_cast<std::size_t>(iterator->position() + iterator->length());
+    }
+    relabeled.append(output, previous);
+
+    return relabeled;
+  }
+
+  // The definition of `@<function_name>` in `llvm_ir`, from `define` to its closing brace.
+  static std::optional<std::string> get_function_definition(
+    std::string_view const llvm_ir,
+    std::string_view const function_name
+  )
+  {
+    std::size_t const name_location = llvm_ir.find(std::format("@{}(", function_name));
+    if (name_location == std::string_view::npos)
+      return std::nullopt;
+
+    std::size_t const start = llvm_ir.rfind("define ", name_location);
+    std::size_t const end = llvm_ir.find("\n}\n", name_location);
+    if (start == std::string_view::npos || end == std::string_view::npos)
+      return std::nullopt;
+
+    return std::string{ llvm_ir.substr(start, end + 2 - start) };
+  }
+
+  // True when the two definitions are the same code: equal after canonicalization, allowing the phi
+  // instructions at the start of each block to appear in any order. That order follows the order in
+  // which the source declared its variables, which says nothing about the code.
+  static bool are_same_function_code(
+    std::string const& left_definition,
+    std::string_view const left_function_name,
+    std::string const& right_definition,
+    std::string_view const right_function_name
+  )
+  {
+    std::string const right = canonicalize_function_definition(right_definition, right_function_name);
+
+    std::vector<std::string> lines;
+    {
+      std::size_t start = 0;
+      while (start <= left_definition.size())
+      {
+        std::size_t const end = left_definition.find('\n', start);
+        lines.push_back(left_definition.substr(start, end == std::string::npos ? std::string::npos : end - start));
+        if (end == std::string::npos)
+          break;
+        start = end + 1;
+      }
+    }
+
+    // Each run of two or more phis is a group whose order is free.
+    std::regex const phi_pattern{ R"re(^\s*%\S+ = phi )re" };
+    std::vector<std::pair<std::size_t, std::size_t>> groups;
+    for (std::size_t index = 0; index < lines.size();)
+    {
+      std::size_t end = index;
+      while (end < lines.size() && std::regex_search(lines[end], phi_pattern))
+        end += 1;
+
+      if (end - index > 1)
+        groups.emplace_back(index, end);
+
+      index = end == index ? index + 1 : end;
+    }
+
+    // Try every combination of orders, group by group, like an odometer. Groups are small.
+    std::vector<std::vector<std::size_t>> orders;
+    for (auto const& [begin, end] : groups)
+    {
+      std::vector<std::size_t> order(end - begin);
+      std::iota(order.begin(), order.end(), std::size_t{ 0 });
+      orders.push_back(std::move(order));
+    }
+
+    for (std::size_t attempt = 0; attempt < 100000; ++attempt)
+    {
+      std::vector<std::string> candidate = lines;
+      for (std::size_t group_index = 0; group_index < groups.size(); ++group_index)
+      {
+        auto const [begin, end] = groups[group_index];
+        for (std::size_t offset = 0; offset < end - begin; ++offset)
+          candidate[begin + offset] = lines[begin + orders[group_index][offset]];
+      }
+
+      std::string joined;
+      for (std::size_t index = 0; index < candidate.size(); ++index)
+      {
+        if (index > 0)
+          joined += '\n';
+        joined += candidate[index];
+      }
+
+      if (canonicalize_function_definition(joined, left_function_name) == right)
+        return true;
+
+      std::size_t group_index = 0;
+      while (group_index < orders.size() && !std::next_permutation(orders[group_index].begin(), orders[group_index].end()))
+        group_index += 1;
+
+      if (group_index == orders.size())
+        return false;
+    }
+
+    return false;
   }
 
   TEST_CASE("Compile Address Of", "[LLVM_IR]")
@@ -14204,5 +14375,51 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
     char const* const expected_llvm_ir = R"()";
 
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
+  // A pipeline is meant to cost nothing: after optimization it must be the very loop one would write
+  // by hand. The two versions are in separate modules so that MergeFunctionsPass cannot fold one into
+  // the other, and are compared after canonicalizing names.
+  TEST_CASE("Pipelines compile to the same optimized code as the hand-written loops", "[LLVM_IR][Pipeline]")
+  {
+    std::array<std::string_view, 6> const function_names
+    {
+      "sum_of_even_squares",
+      "weighted_sum",
+      "count_large",
+      "any_negative",
+      "keep_positive",
+      "sum_of_x",
+    };
+
+    for (bool const enable_bounds_checks : { false, true })
+    {
+      Test_options const test_options
+      {
+        .enable_bounds_checks = enable_bounds_checks,
+        .is_optimized = true,
+      };
+
+      std::string const pipeline_llvm_ir = create_llvm_ir_body("pipeline_zero_cost.iris", {}, test_options);
+      std::string const hand_written_llvm_ir = create_llvm_ir_body("pipeline_zero_cost_hand_written.iris", {}, test_options);
+
+      for (std::string_view const function_name : function_names)
+      {
+        CAPTURE(function_name, enable_bounds_checks);
+
+        std::string const pipeline_function_name = std::format("Pipeline_zero_cost_{}", function_name);
+        std::string const hand_written_function_name = std::format("Pipeline_zero_cost_hand_written_{}", function_name);
+
+        std::optional<std::string> const pipeline_function = get_function_definition(pipeline_llvm_ir, pipeline_function_name);
+        std::optional<std::string> const hand_written_function = get_function_definition(hand_written_llvm_ir, hand_written_function_name);
+
+        REQUIRE(pipeline_function.has_value());
+        REQUIRE(hand_written_function.has_value());
+
+        bool const is_same_code = are_same_function_code(pipeline_function.value(), pipeline_function_name, hand_written_function.value(), hand_written_function_name);
+        INFO("Pipeline:\n" << pipeline_function.value() << "\nHand-written:\n" << hand_written_function.value());
+        CHECK(is_same_code);
+      }
+    }
   }
 }

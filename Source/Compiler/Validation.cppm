@@ -223,9 +223,21 @@ namespace iris::compiler
         std::optional<iris::Source_range> const& source_range
     );
 
+    std::pmr::vector<iris::compiler::Diagnostic> validate_for_each_expression(
+        Validate_expression_parameters const& parameters,
+        iris::For_each_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    );
+
     std::pmr::vector<iris::compiler::Diagnostic> validate_for_loop_expression(
         Validate_expression_parameters const& parameters,
         iris::For_loop_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    );
+
+    std::pmr::vector<iris::compiler::Diagnostic> validate_pipeline_expression(
+        Validate_expression_parameters const& parameters,
+        iris::Pipeline_expression const& expression,
         std::optional<iris::Source_range> const& source_range
     );
 

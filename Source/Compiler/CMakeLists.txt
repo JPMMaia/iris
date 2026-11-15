@@ -53,6 +53,7 @@ target_sources(Iris_compiler
          "Passes/Implicit_function_pass.cppm"
          "Passes/Instantiate_pass.cppm"
          "Passes/Lambda_pass.cppm"
+         "Passes/Pipeline_pass.cppm"
          "Project/Artifact.cppm"
          "Project/Presets.cppm"
          "Project/Repository.cppm"
@@ -80,6 +81,7 @@ target_sources(Iris_compiler
       "Passes/Implicit_function_pass.cpp"
       "Passes/Instantiate_pass.cpp"
       "Passes/Lambda_pass.cpp"
+      "Passes/Pipeline_pass.cpp"
       "Project/Artifact.cpp"
       "Project/Presets.cpp"
       "Project/Repository.cpp"
@@ -148,6 +150,7 @@ if(BUILD_TESTING)
          "Passes/Instantiate_pass.tests.cpp"
          "Passes/Implicit_function_pass.tests.cpp"
          "Passes/Lambda_pass.tests.cpp"
+         "Passes/Pipeline_pass.tests.cpp"
    )
    catch_discover_tests(Iris_passes_tests)
 

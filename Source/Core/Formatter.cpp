@@ -334,8 +334,10 @@ namespace iris
             std::holds_alternative<iris::Block_expression>(expression.data) ||
             std::holds_alternative<iris::Comment_expression>(expression.data) ||
             std::holds_alternative<iris::Compile_time_expression>(expression.data) ||
+            std::holds_alternative<iris::For_each_expression>(expression.data) ||
             std::holds_alternative<iris::For_loop_expression>(expression.data) ||
             std::holds_alternative<iris::If_expression>(expression.data) ||
+            std::holds_alternative<iris::Pipeline_expression>(expression.data) ||
             std::holds_alternative<iris::Switch_expression>(expression.data) ||
             std::holds_alternative<iris::While_loop_expression>(expression.data);
         return !does_not_end_with_semicolon;
@@ -476,10 +478,25 @@ namespace iris
             Dereference_and_access_expression const& value = std::get<Dereference_and_access_expression>(expression.data);
             add_format_expression_dereference_and_access(buffer, statement, value, options);
         }
+        else if (std::holds_alternative<For_each_expression>(expression.data))
+        {
+            For_each_expression const& value = std::get<For_each_expression>(expression.data);
+            add_format_expression_for_each(buffer, statement, value, indentation, options);
+        }
         else if (std::holds_alternative<For_loop_expression>(expression.data))
         {
             For_loop_expression const& value = std::get<For_loop_expression>(expression.data);
             add_format_expression_for_loop(buffer, statement, value, indentation, options);
+        }
+        else if (std::holds_alternative<Pipeline_expression>(expression.data))
+        {
+            Pipeline_expression const& value = std::get<Pipeline_expression>(expression.data);
+            add_format_expression_pipeline(buffer, value, indentation, options);
+        }
+        else if (std::holds_alternative<Statement_block_expression>(expression.data))
+        {
+            Statement_block_expression const& value = std::get<Statement_block_expression>(expression.data);
+            add_format_expression_statement_block(buffer, value, indentation, options);
         }
         else if (std::holds_alternative<Function_expression>(expression.data))
         {
@@ -1400,6 +1417,114 @@ namespace iris
         add_indentation(buffer, outside_indentation);
 
         add_format_expression_block(buffer, expression.then_statements, outside_indentation, options);
+    }
+
+    void add_format_expression_for_each(
+        String_buffer& buffer,
+        Statement const& statement,
+        For_each_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "for ");
+        add_text(buffer, expression.variable_name);
+        add_text(buffer, " in ");
+        add_format_expression(buffer, statement, get_expression(statement, expression.range_expression), 0, options);
+
+        add_new_line(buffer);
+        add_indentation(buffer, outside_indentation);
+
+        add_format_expression_block(buffer, expression.then_statements, outside_indentation, options);
+    }
+
+    // Internal node with no source syntax; printed as `${ ...; yield <result>; }` for compiler dumps.
+    void add_format_expression_statement_block(
+        String_buffer& buffer,
+        Statement_block_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "${");
+
+        for (Statement const& statement : expression.statements)
+        {
+            add_new_line(buffer);
+            add_indentation(buffer, outside_indentation + 4);
+            add_format_statement(buffer, statement, outside_indentation + 4, options);
+        }
+
+        add_new_line(buffer);
+        add_indentation(buffer, outside_indentation + 4);
+        add_text(buffer, "yield ");
+        add_format_statement(buffer, expression.result, outside_indentation + 4, options, false);
+        add_text(buffer, ";");
+
+        add_new_line(buffer);
+        add_indentation(buffer, outside_indentation);
+        add_text(buffer, "}");
+    }
+
+    void add_format_expression_pipeline(
+        String_buffer& buffer,
+        Pipeline_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "pipeline ");
+        add_text(buffer, expression.name);
+        add_format_function_parameters(
+            buffer,
+            expression.input_parameter_names,
+            expression.input_parameter_types,
+            expression.input_parameter_source_positions,
+            false,
+            true,
+            outside_indentation,
+            options
+        );
+
+        add_new_line(buffer);
+        add_indentation(buffer, outside_indentation);
+        add_text(buffer, "{");
+
+        for (Pipeline_stage const& stage : expression.stages)
+        {
+            add_new_line(buffer);
+            add_indentation(buffer, outside_indentation + 4);
+
+            switch (stage.kind)
+            {
+            case Pipeline_stage_kind::Map:
+                add_text(buffer, "map ");
+                add_format_statement(buffer, stage.expression, outside_indentation + 4, options, false);
+                add_text(buffer, " => ");
+                if (stage.binding_name.has_value())
+                    add_text(buffer, stage.binding_name.value());
+                break;
+            case Pipeline_stage_kind::Filter:
+                add_text(buffer, "filter ");
+                add_format_statement(buffer, stage.expression, outside_indentation + 4, options, false);
+                break;
+            case Pipeline_stage_kind::Take_while:
+                add_text(buffer, "take_while ");
+                add_format_statement(buffer, stage.expression, outside_indentation + 4, options, false);
+                break;
+            case Pipeline_stage_kind::Enumerate:
+                add_text(buffer, "enumerate => ");
+                if (stage.binding_name.has_value())
+                    add_text(buffer, stage.binding_name.value());
+                break;
+            }
+
+            add_text(buffer, ";");
+        }
+
+        add_new_line(buffer);
+        add_indentation(buffer, outside_indentation);
+        add_text(buffer, "}");
     }
 
     void add_format_expression_function(

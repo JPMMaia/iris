@@ -549,6 +549,19 @@ namespace iris
 
                 return false;
             }
+            else if (std::holds_alternative<Pipeline_expression>(expression.data))
+            {
+                Pipeline_expression const& data = std::get<Pipeline_expression>(expression.data);
+
+                for (Type_reference const& parameter_type : data.input_parameter_types)
+                {
+                    if (visit_type_references(parameter_type, predicate))
+                        return true;
+                }
+
+                // Stage expressions are reached through visit_expressions.
+                return false;
+            }
             else if (std::holds_alternative<Struct_expression>(expression.data))
             {
                 Struct_expression const& data = std::get<Struct_expression>(expression.data);
@@ -952,6 +965,11 @@ namespace iris
             Lambda_expression const& data = std::get<Lambda_expression>(expression.data);
             return visit_expressions(data.body, predicate);
         }
+        else if (std::holds_alternative<For_each_expression>(expression.data))
+        {
+            For_each_expression const& data = std::get<For_each_expression>(expression.data);
+            return visit_expressions(data.then_statements, predicate);
+        }
         else if (std::holds_alternative<For_loop_expression>(expression.data))
         {
             For_loop_expression const& data = std::get<For_loop_expression>(expression.data);
@@ -960,6 +978,27 @@ namespace iris
                 return true;
 
             return visit_expressions(data.then_statements, predicate);
+        }
+        else if (std::holds_alternative<Pipeline_expression>(expression.data))
+        {
+            Pipeline_expression const& data = std::get<Pipeline_expression>(expression.data);
+
+            for (Pipeline_stage const& stage : data.stages)
+            {
+                if (visit_expressions(stage.expression, predicate))
+                    return true;
+            }
+
+            return false;
+        }
+        else if (std::holds_alternative<Statement_block_expression>(expression.data))
+        {
+            Statement_block_expression const& data = std::get<Statement_block_expression>(expression.data);
+
+            if (visit_expressions(data.statements, predicate))
+                return true;
+
+            return visit_expressions(data.result, predicate);
         }
         else if (std::holds_alternative<If_expression>(expression.data))
         {

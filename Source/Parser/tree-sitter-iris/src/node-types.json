@@ -602,6 +602,44 @@
     }
   },
   {
+    "type": "Expression_for_each",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_for_each_range",
+          "named": true
+        },
+        {
+          "type": "Expression_for_loop_statements",
+          "named": true
+        },
+        {
+          "type": "Expression_for_loop_variable",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_for_each_range",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_for_loop_number_expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "Expression_for_loop",
     "named": true,
     "fields": {},
@@ -1016,6 +1054,180 @@
   },
   {
     "type": "Expression_parenthesis",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Generic_expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_pipeline",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_pipeline_input_parameters",
+          "named": true
+        },
+        {
+          "type": "Expression_pipeline_name",
+          "named": true
+        },
+        {
+          "type": "Expression_pipeline_stages",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_pipeline_enumerate",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_pipeline_map_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_pipeline_filter",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Generic_expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_pipeline_input_parameters",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "Function_parameter",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_pipeline_map",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_pipeline_map_name",
+          "named": true
+        },
+        {
+          "type": "Generic_expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_pipeline_map_name",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_pipeline_name",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_pipeline_stage",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Expression_pipeline_enumerate",
+          "named": true
+        },
+        {
+          "type": "Expression_pipeline_filter",
+          "named": true
+        },
+        {
+          "type": "Expression_pipeline_map",
+          "named": true
+        },
+        {
+          "type": "Expression_pipeline_take_while",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_pipeline_stages",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "Expression_pipeline_stage",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Expression_pipeline_take_while",
     "named": true,
     "fields": {},
     "children": {
@@ -2255,11 +2467,19 @@
           "named": true
         },
         {
+          "type": "Expression_for_each",
+          "named": true
+        },
+        {
           "type": "Expression_for_loop",
           "named": true
         },
         {
           "type": "Expression_if",
+          "named": true
+        },
+        {
+          "type": "Expression_pipeline",
           "named": true
         },
         {
@@ -2919,6 +3139,10 @@
     "named": false
   },
   {
+    "type": "enumerate",
+    "named": false
+  },
+  {
     "type": "explicit",
     "named": false
   },
@@ -2928,6 +3152,10 @@
   },
   {
     "type": "false",
+    "named": false
+  },
+  {
+    "type": "filter",
     "named": false
   },
   {
@@ -2967,11 +3195,19 @@
     "named": false
   },
   {
+    "type": "map",
+    "named": false
+  },
+  {
     "type": "module",
     "named": false
   },
   {
     "type": "mutable",
+    "named": false
+  },
+  {
+    "type": "pipeline",
     "named": false
   },
   {
@@ -2996,6 +3232,10 @@
   },
   {
     "type": "switch",
+    "named": false
+  },
+  {
+    "type": "take_while",
     "named": false
   },
   {

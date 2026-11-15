@@ -209,6 +209,30 @@ namespace iris::json
     }
 
     EXPORT template <>
+    JSON to_json(Pipeline_stage_kind const& value)
+    {
+        switch (value)
+        {
+            case Pipeline_stage_kind::Map: return "Map";
+            case Pipeline_stage_kind::Filter: return "Filter";
+            case Pipeline_stage_kind::Take_while: return "Take_while";
+            case Pipeline_stage_kind::Enumerate: return "Enumerate";
+        default: return "Map";
+        }
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Pipeline_stage_kind& output)
+    {
+        std::string const& value = data.get<std::string>();
+        if (value == "Map") { output = Pipeline_stage_kind::Map; return; }
+        if (value == "Filter") { output = Pipeline_stage_kind::Filter; return; }
+        if (value == "Take_while") { output = Pipeline_stage_kind::Take_while; return; }
+        if (value == "Enumerate") { output = Pipeline_stage_kind::Enumerate; return; }
+        output = Pipeline_stage_kind::Map;
+    }
+
+    EXPORT template <>
     JSON to_json(Unary_operation const& value)
     {
         switch (value)
@@ -1197,6 +1221,24 @@ namespace iris::json
     }
 
     EXPORT template <>
+    JSON to_json(For_each_expression const& value)
+    {
+        JSON data;
+        data["variable_name"] = to_json(value.variable_name);
+        data["range_expression"] = to_json(value.range_expression);
+        data["then_statements"] = to_json(value.then_statements);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, For_each_expression& value)
+    {
+        from_json(data.at("variable_name"), value.variable_name);
+        from_json(data.at("range_expression"), value.range_expression);
+        if (data.contains("then_statements")) from_json(data.at("then_statements"), value.then_statements);
+    }
+
+    EXPORT template <>
     JSON to_json(For_loop_expression const& value)
     {
         JSON data;
@@ -1381,6 +1423,48 @@ namespace iris::json
     }
 
     EXPORT template <>
+    JSON to_json(Pipeline_stage const& value)
+    {
+        JSON data;
+        data["kind"] = to_json(value.kind);
+        data["expression"] = to_json(value.expression);
+        if (value.binding_name.has_value()) data["binding_name"] = to_json(value.binding_name);
+        if (value.source_range.has_value()) data["source_range"] = to_json(value.source_range);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Pipeline_stage& value)
+    {
+        from_json(data.at("kind"), value.kind);
+        from_json(data.at("expression"), value.expression);
+        if (data.contains("binding_name")) from_json(data.at("binding_name"), value.binding_name);
+        if (data.contains("source_range")) from_json(data.at("source_range"), value.source_range);
+    }
+
+    EXPORT template <>
+    JSON to_json(Pipeline_expression const& value)
+    {
+        JSON data;
+        data["name"] = to_json(value.name);
+        data["input_parameter_names"] = to_json(value.input_parameter_names);
+        data["input_parameter_types"] = to_json(value.input_parameter_types);
+        data["stages"] = to_json(value.stages);
+        if (value.input_parameter_source_positions.has_value()) data["input_parameter_source_positions"] = to_json(value.input_parameter_source_positions);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Pipeline_expression& value)
+    {
+        from_json(data.at("name"), value.name);
+        if (data.contains("input_parameter_names")) from_json(data.at("input_parameter_names"), value.input_parameter_names);
+        if (data.contains("input_parameter_types")) from_json(data.at("input_parameter_types"), value.input_parameter_types);
+        if (data.contains("stages")) from_json(data.at("stages"), value.stages);
+        if (data.contains("input_parameter_source_positions")) from_json(data.at("input_parameter_source_positions"), value.input_parameter_source_positions);
+    }
+
+    EXPORT template <>
     JSON to_json(Reflection_expression const& value)
     {
         JSON data;
@@ -1424,6 +1508,22 @@ namespace iris::json
     void from_json(JSON const& data, Struct_expression& value)
     {
         from_json(data.at("declaration"), value.declaration);
+    }
+
+    EXPORT template <>
+    JSON to_json(Statement_block_expression const& value)
+    {
+        JSON data;
+        data["statements"] = to_json(value.statements);
+        data["result"] = to_json(value.result);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Statement_block_expression& value)
+    {
+        if (data.contains("statements")) from_json(data.at("statements"), value.statements);
+        from_json(data.at("result"), value.result);
     }
 
     EXPORT template <>

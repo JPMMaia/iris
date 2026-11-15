@@ -273,6 +273,28 @@ namespace iris
         Format_options const& options
     );
 
+    void add_format_expression_for_each(
+        String_buffer& buffer,
+        Statement const& statement,
+        For_each_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    );
+
+    void add_format_expression_statement_block(
+        String_buffer& buffer,
+        Statement_block_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    );
+
+    void add_format_expression_pipeline(
+        String_buffer& buffer,
+        Pipeline_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    );
+
     void add_format_expression_function(
         String_buffer& buffer,
         Function_expression const& expression,

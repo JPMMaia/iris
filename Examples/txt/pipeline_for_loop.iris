@@ -1,0 +1,33 @@
+module Pipeline_for_loop;
+
+struct Complex
+{
+    real: Float32 = 0.0f32;
+    imaginary: Float32 = 0.0f32;
+}
+
+function square(value: Complex) -> (result: Complex)
+{
+    return {
+        real: value.real * value.real - value.imaginary * value.imaginary,
+        imaginary: 2.0f32 * value.real * value.imaginary
+    };
+}
+
+function use(value: Complex) -> ()
+{
+}
+
+export function run(list: Array_slice::<Complex>, threshold: Float32) -> ()
+{
+    pipeline process(input: Complex)
+    {
+        map square(input) => v0;
+        filter v0.real > threshold;
+    }
+
+    for v in process(list)
+    {
+        use(v);
+    }
+}
