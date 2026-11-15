@@ -229,18 +229,44 @@ namespace iris::compiler
         }
     }
 
-    Pipeline_expression const* find_pipeline_from_scope(
+    void add_pipeline_to_scope(
+        Scope& scope,
+        Pipeline_expression const& pipeline
+    )
+    {
+        scope.pipelines.push_back(Scope_pipeline{ .pipeline = &pipeline, .visible_variable_count = scope.variables.size() });
+    }
+
+    Scope_pipeline const* find_scope_pipeline(
         Scope const& scope,
         std::string_view const name
     )
     {
         for (auto iterator = scope.pipelines.rbegin(); iterator != scope.pipelines.rend(); ++iterator)
         {
-            if ((*iterator)->name == name)
-                return *iterator;
+            if (iterator->pipeline->name == name)
+                return &(*iterator);
         }
 
         return nullptr;
+    }
+
+    Pipeline_expression const* find_pipeline_from_scope(
+        Scope const& scope,
+        std::string_view const name
+    )
+    {
+        Scope_pipeline const* const scope_pipeline = find_scope_pipeline(scope, name);
+        return scope_pipeline != nullptr ? scope_pipeline->pipeline : nullptr;
+    }
+
+    std::span<Scope_pipeline const> get_pipelines_visible_at_declaration(
+        Scope const& scope,
+        Scope_pipeline const& scope_pipeline
+    )
+    {
+        std::size_t const index = static_cast<std::size_t>(&scope_pipeline - scope.pipelines.data());
+        return std::span<Scope_pipeline const>{ scope.pipelines.data(), index };
     }
 
     Pipeline_expression const* get_pipeline_from_call_expression(
@@ -390,6 +416,43 @@ namespace iris::compiler
         return name == "count" || name == "any" || name == "all" || name == "into" || name == "fold" || name == "first" || name == "in_place";
     }
 
+    // When the expression at `index` is `p(inputs).separate(...)` and `p` is a pipeline in scope.
+    static std::optional<Pipeline_separate_call> get_pipeline_separate_call(
+        Scope const& scope,
+        iris::Statement const& statement,
+        iris::Expression_index const index
+    )
+    {
+        if (index.expression_index >= statement.expressions.size())
+            return std::nullopt;
+
+        iris::Expression const& expression = statement.expressions[index.expression_index];
+        if (!std::holds_alternative<iris::Call_expression>(expression.data))
+            return std::nullopt;
+
+        iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
+        if (call_expression.expression.expression_index >= statement.expressions.size())
+            return std::nullopt;
+
+        iris::Expression const& callee = statement.expressions[call_expression.expression.expression_index];
+        if (!std::holds_alternative<iris::Access_expression>(callee.data))
+            return std::nullopt;
+
+        iris::Access_expression const& access_expression = std::get<iris::Access_expression>(callee.data);
+        if (access_expression.member_name != "separate" || access_expression.expression.expression_index >= statement.expressions.size())
+            return std::nullopt;
+
+        if (get_pipeline_from_call_expression(scope, statement, statement.expressions[access_expression.expression.expression_index]) == nullptr)
+            return std::nullopt;
+
+        return Pipeline_separate_call
+        {
+            .call = index,
+            .call_expression = &call_expression,
+            .scratch_argument = !call_expression.arguments.empty() ? std::optional<iris::Expression_index>{ call_expression.arguments[0] } : std::nullopt,
+        };
+    }
+
     std::optional<Pipeline_sink_call> get_pipeline_sink_call(
         Scope const& scope,
         iris::Statement const& statement,
@@ -431,6 +494,24 @@ namespace iris::compiler
             };
         }
 
+        // p(inputs).separate([scratch]).<sink>(arguments)
+        if (std::optional<Pipeline_separate_call> const separate = get_pipeline_separate_call(scope, statement, access_expression.expression); separate.has_value())
+        {
+            iris::Access_expression const& separate_access = std::get<iris::Access_expression>(statement.expressions[separate->call_expression->expression.expression_index].data);
+            iris::Expression const& pipeline_call = statement.expressions[separate_access.expression.expression_index];
+
+            return Pipeline_sink_call
+            {
+                .pipeline = get_pipeline_from_call_expression(scope, statement, pipeline_call),
+                .sink_name = access_expression.member_name,
+                .pipeline_call = separate_access.expression,
+                .call_expression = &call_expression,
+                .is_on_pipeline_name = false,
+                .input_arguments = std::get<iris::Call_expression>(pipeline_call.data).arguments,
+                .separate = separate,
+            };
+        }
+
         // p(inputs).<sink>(arguments)
         iris::Pipeline_expression const* const pipeline = get_pipeline_from_call_expression(scope, statement, object);
         if (pipeline == nullptr)
@@ -445,6 +526,87 @@ namespace iris::compiler
             .is_on_pipeline_name = false,
             .input_arguments = std::get<iris::Call_expression>(object.data).arguments,
         };
+    }
+
+    std::optional<Separated_pipeline_layout> get_separated_pipeline_layout(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope const& scope,
+        Pipeline_expression const& pipeline,
+        iris::Declaration_database const& declaration_database
+    )
+    {
+        Scope binding_scope = scope;
+        add_pipeline_bindings_to_scope(module_name, function_declaration, binding_scope, pipeline, declaration_database);
+
+        // Pipeline names never collide with visible variables, so the first match is the binding.
+        auto const get_binding_type = [&](std::string_view const name) -> std::optional<iris::Type_reference>
+        {
+            for (auto iterator = binding_scope.variables.rbegin(); iterator != binding_scope.variables.rend(); ++iterator)
+            {
+                if (iterator->name == name)
+                    return iterator->type;
+            }
+            return std::nullopt;
+        };
+
+        std::optional<std::string_view> const output_name = get_pipeline_output_name(pipeline);
+        if (!output_name.has_value())
+            return std::nullopt;
+
+        std::optional<iris::Type_reference> output_type = get_binding_type(output_name.value());
+        if (!output_type.has_value())
+            return std::nullopt;
+
+        Separated_pipeline_layout layout
+        {
+            .stages = {},
+            .output_type = std::move(output_type.value()),
+        };
+
+        std::optional<std::string_view> element_name =
+            pipeline.input_parameter_names.size() == 1 ?
+            std::optional<std::string_view>{ pipeline.input_parameter_names[0] } :
+            std::nullopt;
+
+        for (iris::Pipeline_stage const& stage : pipeline.stages)
+        {
+            if (stage.kind == iris::Pipeline_stage_kind::Enumerate)
+                return std::nullopt;
+
+            if (stage.kind == iris::Pipeline_stage_kind::Map)
+            {
+                if (!stage.binding_name.has_value())
+                    return std::nullopt;
+                element_name = stage.binding_name.value();
+            }
+
+            // Several inputs have no single element until a map combines them.
+            if (!element_name.has_value())
+                return std::nullopt;
+
+            std::optional<iris::Type_reference> element_type = get_binding_type(element_name.value());
+            if (!element_type.has_value())
+                return std::nullopt;
+
+            bool const is_in_scratch = element_type.value() != layout.output_type;
+            if (is_in_scratch)
+            {
+                if (!layout.scratch_type.has_value())
+                    layout.scratch_type = element_type.value();
+                else if (layout.scratch_type.value() != element_type.value())
+                    layout.has_several_scratch_types = true;
+            }
+
+            layout.stages.push_back(Separated_pipeline_stage
+            {
+                .element_name = element_name.value(),
+                .element_type = std::move(element_type.value()),
+                .is_in_scratch = is_in_scratch,
+            });
+        }
+
+        return layout;
     }
 
     // The type of the initial value of a fold, which is also the type of its result.
@@ -679,10 +841,14 @@ namespace iris::compiler
     // lay out the environment struct deterministically.
     struct Capture_collector
     {
-        // Names visible from outside the lambda.
+        // Names visible from outside the lambda. Null records every name that is not bound.
         std::pmr::vector<std::pmr::string> const* enclosing_names;
+        // Pipelines visible from outside the lambda.
+        std::span<Scope_pipeline const> enclosing_pipelines;
         // Names bound by the lambda itself: parameters, then body-local declarations.
         std::pmr::vector<std::pmr::string> bound_names;
+        // Pipelines declared inside the lambda. Their stages are collected where they are declared.
+        std::pmr::vector<Scope_pipeline> bound_pipelines;
         std::pmr::vector<std::pmr::string> captured_names;
 
         bool is_bound(std::string_view const name) const
@@ -692,7 +858,7 @@ namespace iris::compiler
 
         bool is_enclosing(std::string_view const name) const
         {
-            return std::find(enclosing_names->begin(), enclosing_names->end(), name) != enclosing_names->end();
+            return enclosing_names == nullptr || std::find(enclosing_names->begin(), enclosing_names->end(), name) != enclosing_names->end();
         }
 
         void record_reference(std::string_view const name)
@@ -705,14 +871,85 @@ namespace iris::compiler
 
             captured_names.push_back(std::pmr::string{name});
         }
+
+        // A name that refers to an enclosing pipeline consumes it: its expansion, written here,
+        // reads what the pipeline's stages read.
+        void record_pipeline_reference(std::string_view const name)
+        {
+            if (is_bound(name))
+                return;
+
+            for (Scope_pipeline const& bound_pipeline : bound_pipelines)
+            {
+                if (bound_pipeline.pipeline->name == name)
+                    return;
+            }
+
+            for (std::size_t index = enclosing_pipelines.size(); index > 0; --index)
+            {
+                Scope_pipeline const& scope_pipeline = enclosing_pipelines[index - 1];
+                if (scope_pipeline.pipeline->name != name)
+                    continue;
+
+                std::pmr::vector<std::pmr::string> const free_names = get_pipeline_free_names(
+                    *scope_pipeline.pipeline,
+                    enclosing_pipelines.subspan(0, index - 1)
+                );
+                for (std::pmr::string const& free_name : free_names)
+                    record_reference(free_name);
+
+                return;
+            }
+        }
     };
 
-    void compute_lambda_captures(
-        iris::Lambda_expression& lambda_expression,
-        std::pmr::vector<std::pmr::string> const& enclosing_names
-    );
-
     void collect_captures_from_statement(Capture_collector& collector, iris::Statement& statement);
+
+    void collect_captures_from_statement(Capture_collector& collector, iris::Statement const& statement)
+    {
+        // The collector only writes into nested lambdas' capture lists, so a copy is enough when
+        // the caller has no mutable statement.
+        iris::Statement copy = statement;
+        collect_captures_from_statement(collector, copy);
+    }
+
+    std::pmr::vector<std::pmr::string> get_pipeline_free_names(
+        Pipeline_expression const& pipeline,
+        std::span<Scope_pipeline const> const enclosing_pipelines
+    )
+    {
+        Capture_collector collector
+        {
+            .enclosing_names = nullptr,
+            .enclosing_pipelines = enclosing_pipelines,
+        };
+
+        collector.bound_names.insert(collector.bound_names.end(), pipeline.input_parameter_names.begin(), pipeline.input_parameter_names.end());
+
+        for (iris::Pipeline_stage const& stage : pipeline.stages)
+        {
+            if (!stage.expression.expressions.empty())
+                collect_captures_from_statement(collector, stage.expression);
+
+            if (stage.binding_name.has_value())
+                collector.bound_names.push_back(stage.binding_name.value());
+        }
+
+        return std::move(collector.captured_names);
+    }
+
+    std::pmr::vector<std::pmr::string> get_statement_free_names(
+        iris::Statement const& statement
+    )
+    {
+        Capture_collector collector
+        {
+            .enclosing_names = nullptr,
+        };
+
+        collect_captures_from_statement(collector, statement);
+        return std::move(collector.captured_names);
+    }
 
     void collect_captures_from_expression(
         Capture_collector& collector,
@@ -724,6 +961,7 @@ namespace iris::compiler
         {
             iris::Variable_expression const& data = std::get<iris::Variable_expression>(expression.data);
             collector.record_reference(data.name);
+            collector.record_pipeline_reference(data.name);
             return;
         }
 
@@ -734,10 +972,30 @@ namespace iris::compiler
             // a name we bind ourselves, must also travel in our own environment.
             iris::Lambda_expression& nested = std::get<iris::Lambda_expression>(expression.data);
 
+            if (collector.enclosing_names == nullptr)
+            {
+                // Collecting free names: everything the nested body reads that it does not bind.
+                Capture_collector nested_collector
+                {
+                    .enclosing_names = nullptr,
+                    .enclosing_pipelines = collector.enclosing_pipelines,
+                };
+                nested_collector.bound_names.insert(nested_collector.bound_names.end(), nested.parameter_names.begin(), nested.parameter_names.end());
+                collect_captures_from_statement(nested_collector, nested.body);
+
+                for (std::pmr::string const& name : nested_collector.captured_names)
+                    collector.record_reference(name);
+
+                return;
+            }
+
             std::pmr::vector<std::pmr::string> nested_enclosing{*collector.enclosing_names};
             nested_enclosing.insert(nested_enclosing.end(), collector.bound_names.begin(), collector.bound_names.end());
 
-            compute_lambda_captures(nested, nested_enclosing);
+            std::pmr::vector<Scope_pipeline> nested_enclosing_pipelines{ collector.enclosing_pipelines.begin(), collector.enclosing_pipelines.end() };
+            nested_enclosing_pipelines.insert(nested_enclosing_pipelines.end(), collector.bound_pipelines.begin(), collector.bound_pipelines.end());
+
+            compute_lambda_captures(nested, nested_enclosing, nested_enclosing_pipelines);
 
             if (nested.captured_variables.has_value())
             {
@@ -745,6 +1003,24 @@ namespace iris::compiler
                     collector.record_reference(captured_name);
             }
 
+            return;
+        }
+
+        if (std::holds_alternative<iris::Assert_expression>(expression.data))
+        {
+            collect_captures_from_statement(collector, std::get<iris::Assert_expression>(expression.data).statement);
+            return;
+        }
+
+        // Passes create statement blocks; their locals are only visible inside them, like a block's.
+        if (std::holds_alternative<iris::Statement_block_expression>(expression.data))
+        {
+            iris::Statement_block_expression& data = std::get<iris::Statement_block_expression>(expression.data);
+            std::size_t const bound_count = collector.bound_names.size();
+            for (iris::Statement& nested_statement : data.statements)
+                collect_captures_from_statement(collector, nested_statement);
+            collect_captures_from_statement(collector, data.result);
+            collector.bound_names.resize(bound_count);
             return;
         }
 
@@ -800,6 +1076,28 @@ namespace iris::compiler
                 if (stage.binding_name.has_value())
                     collector.bound_names.push_back(stage.binding_name.value());
             }
+            collector.bound_pipelines.push_back(Scope_pipeline{ .pipeline = &data, .visible_variable_count = 0 });
+            return;
+        }
+
+        // The branches of a ternary and the cases of a switch are statements of their own, so the
+        // names they read are not in this statement's expressions.
+        if (std::holds_alternative<iris::Ternary_condition_expression>(expression.data))
+        {
+            iris::Ternary_condition_expression& data = std::get<iris::Ternary_condition_expression>(expression.data);
+            collect_captures_from_statement(collector, data.then_statement);
+            collect_captures_from_statement(collector, data.else_statement);
+            return;
+        }
+
+        if (std::holds_alternative<iris::Switch_expression>(expression.data))
+        {
+            iris::Switch_expression& data = std::get<iris::Switch_expression>(expression.data);
+            for (iris::Switch_case_expression_pair& pair : data.cases)
+            {
+                for (iris::Statement& nested_statement : pair.statements)
+                    collect_captures_from_statement(collector, nested_statement);
+            }
             return;
         }
 
@@ -841,12 +1139,14 @@ namespace iris::compiler
 
     void compute_lambda_captures(
         iris::Lambda_expression& lambda_expression,
-        std::pmr::vector<std::pmr::string> const& enclosing_names
+        std::pmr::vector<std::pmr::string> const& enclosing_names,
+        std::span<Scope_pipeline const> const enclosing_pipelines
     )
     {
         Capture_collector collector
         {
             .enclosing_names = &enclosing_names,
+            .enclosing_pipelines = enclosing_pipelines,
         };
 
         collector.bound_names.insert(
@@ -1021,7 +1321,7 @@ namespace iris::compiler
             while (scope.variables.size() > original_count)
                 scope.variables.pop_back();
 
-            scope.pipelines.push_back(&data);
+            add_pipeline_to_scope(scope, data);
         }
         else if (std::holds_alternative<iris::Function_expression>(expression.data))
         {
@@ -1047,7 +1347,7 @@ namespace iris::compiler
             for (Variable const& variable : scope.variables)
                 enclosing_names.push_back(variable.name);
 
-            compute_lambda_captures(data, enclosing_names);
+            compute_lambda_captures(data, enclosing_names, scope.pipelines);
 
             // Analyse the body with the lambda parameters in scope. Parameter types come from
             // the lambda's own resolved type, which needs the expected type from the context;

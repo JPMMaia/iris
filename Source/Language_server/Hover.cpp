@@ -292,7 +292,7 @@ namespace iris::language_server
                         for (iris::compiler::Variable const& variable : scope.variables)
                             enclosing_names.push_back(variable.name);
 
-                        iris::compiler::compute_lambda_captures(lambda_expression_copy, enclosing_names);
+                        iris::compiler::compute_lambda_captures(lambda_expression_copy, enclosing_names, scope.pipelines);
                     }
 
                     if (lambda_expression_copy.captured_variables.has_value() && !lambda_expression_copy.captured_variables->empty())

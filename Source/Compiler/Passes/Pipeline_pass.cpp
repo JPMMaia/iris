@@ -3,6 +3,7 @@ module iris.compiler.pipeline_pass;
 import std;
 
 import iris.compiler.analysis;
+import iris.compiler.validation;
 import iris.core;
 import iris.core.declarations;
 import iris.core.expressions;
@@ -161,16 +162,13 @@ namespace iris::compiler
             return statement;
         }
 
-        // for <index_name> in 0u64 to <first_input length> { <then_statements> }
+        // for <index_name> in 0u64 to <range_end> { <then_statements> }
         iris::Statement create_index_loop_statement(
             std::string_view const index_name,
-            Pipeline_input const& first_input,
+            iris::Statement range_end,
             std::pmr::vector<iris::Statement> then_statements
         )
         {
-            iris::Statement range_end;
-            add_input_length_expression(range_end, first_input);
-
             iris::Statement statement;
             std::uint64_t const loop_index = add_expression(statement, iris::Expression{ .data = iris::For_loop_expression{} });
             std::uint64_t const begin_index = add_expression(statement, create_uint64_constant_expression(0));
@@ -186,6 +184,18 @@ namespace iris::compiler
             };
 
             return statement;
+        }
+
+        // for <index_name> in 0u64 to <first_input length> { <then_statements> }
+        iris::Statement create_index_loop_statement(
+            std::string_view const index_name,
+            Pipeline_input const& first_input,
+            std::pmr::vector<iris::Statement> then_statements
+        )
+        {
+            iris::Statement range_end;
+            add_input_length_expression(range_end, first_input);
+            return create_index_loop_statement(index_name, std::move(range_end), std::move(then_statements));
         }
 
         struct Pipeline_pass_context
@@ -279,8 +289,12 @@ namespace iris::compiler
             return create_if_statement(condition, std::move(then_statements));
         }
 
-        // assert "Pipeline output buffer is large enough" { <output>.length >= <first_input length> };
-        iris::Statement create_output_capacity_assert_statement(Pipeline_input const& output, Pipeline_input const& first_input)
+        // assert "<message>" { <output>.length >= <first_input length> };
+        iris::Statement create_output_capacity_assert_statement(
+            Pipeline_input const& output,
+            Pipeline_input const& first_input,
+            std::string_view const message = "Pipeline output buffer is large enough"
+        )
         {
             iris::Statement condition;
             std::uint64_t const binary_index = add_expression(condition, iris::Expression{ .data = iris::Binary_expression{} });
@@ -298,7 +312,7 @@ namespace iris::compiler
             {
                 .data = iris::Assert_expression
                 {
-                    .message = std::pmr::string{ "Pipeline output buffer is large enough" },
+                    .message = std::pmr::string{ message },
                     .statement = std::move(condition),
                 }
             });
@@ -352,6 +366,37 @@ namespace iris::compiler
             call_expression.arguments.push_back(to_index(count_index));
 
             return statement;
+        }
+
+        // <callee>(<argument_names>...)  where the callee is the root of `callee`.
+        iris::Statement create_call_statement(iris::Statement const& callee, std::span<std::string_view const> const argument_names)
+        {
+            iris::Statement statement;
+            std::uint64_t const call_index = add_expression(statement, iris::Expression{ .data = iris::Call_expression{} });
+            std::uint64_t const callee_index = statement.expressions.size();
+            add_expressions_to_expressions(statement.expressions, callee.expressions);
+
+            std::pmr::vector<iris::Expression_index> arguments;
+            for (std::string_view const argument_name : argument_names)
+                arguments.push_back(to_index(add_expression(statement, create_variable_expression(std::pmr::string{ argument_name }))));
+
+            iris::Call_expression& call_expression = std::get<iris::Call_expression>(statement.expressions[call_index].data);
+            call_expression.expression = to_index(callee_index);
+            call_expression.arguments = std::move(arguments);
+
+            return statement;
+        }
+
+        // A variable or a chain of member accesses on one, such as `add` or `Math.add`: reading it
+        // has no side effects, so it can be repeated instead of being bound to a local.
+        bool is_access_path(iris::Statement const& statement, iris::Expression_index const index)
+        {
+            iris::Expression const& expression = statement.expressions[index.expression_index];
+            if (std::holds_alternative<iris::Variable_expression>(expression.data))
+                return true;
+            if (std::holds_alternative<iris::Access_expression>(expression.data))
+                return is_access_path(statement, std::get<iris::Access_expression>(expression.data).expression);
+            return false;
         }
 
         // <name> = <expression>;  where the expression is the root of `value`.
@@ -839,6 +884,34 @@ namespace iris::compiler
             return field_bindings;
         }
 
+        // Binds the parameters to the elements at the expansion's index, at the top of `body`. A
+        // Soa_array_view parameter whose fields `body` only reads one by one gets one local per field.
+        void insert_input_bindings(
+            Pipeline_expansion const& expansion,
+            std::pmr::vector<iris::Statement>& body
+        )
+        {
+            iris::Pipeline_expression const& pipeline = *expansion.pipeline;
+
+            for (std::size_t input_index = expansion.inputs.size(); input_index > 0; --input_index)
+            {
+                Pipeline_input const& input = expansion.inputs[input_index - 1];
+                std::string_view const parameter_name = pipeline.input_parameter_names[input_index - 1];
+
+                if (input.is_soa)
+                {
+                    std::optional<std::pmr::vector<iris::Statement>> field_bindings = bind_soa_fields(body, parameter_name, input, expansion.pipeline_index, expansion.index_name);
+                    if (field_bindings.has_value())
+                    {
+                        body.insert(body.begin(), field_bindings->begin(), field_bindings->end());
+                        continue;
+                    }
+                }
+
+                body.insert(body.begin(), create_input_element_statement(parameter_name, input, expansion.index_name));
+            }
+        }
+
         // The index loop: binds the inputs, runs the stages, and runs `innermost` for every element that
         // passes all filters, with the output element bound to its name.
         iris::Statement create_pipeline_loop_statement(
@@ -878,23 +951,7 @@ namespace iris::compiler
                 }
             }
 
-            for (std::size_t input_index = expansion.inputs.size(); input_index > 0; --input_index)
-            {
-                Pipeline_input const& input = expansion.inputs[input_index - 1];
-                std::string_view const parameter_name = pipeline.input_parameter_names[input_index - 1];
-
-                if (input.is_soa)
-                {
-                    std::optional<std::pmr::vector<iris::Statement>> field_bindings = bind_soa_fields(body, parameter_name, input, expansion.pipeline_index, expansion.index_name);
-                    if (field_bindings.has_value())
-                    {
-                        body.insert(body.begin(), field_bindings->begin(), field_bindings->end());
-                        continue;
-                    }
-                }
-
-                body.insert(body.begin(), create_input_element_statement(parameter_name, input, expansion.index_name));
-            }
+            insert_input_bindings(expansion, body);
 
             return create_index_loop_statement(expansion.index_name, expansion.inputs[0], std::move(body));
         }
@@ -949,6 +1006,174 @@ namespace iris::compiler
             });
         }
 
+        // Expands `p(inputs).separate([scratch]).into(out)`: one loop per stage, so that each loop does
+        // one thing and vectorizes on its own. The first loop reads the inputs; each later loop reads
+        // the element the previous stage left in a buffer. Elements of the output type live in `out`,
+        // others in `scratch`, at the same index; a filter compacts its buffer in place, and the count
+        // of live elements goes down as filters and take_while drop them.
+        std::optional<iris::Statement_block_expression> lower_separated_into(
+            Pipeline_pass_context& context,
+            Scope const& scope,
+            iris::Statement const& statement,
+            iris::Call_expression const& sink_call_expression,
+            Pipeline_sink_call const& sink_call,
+            Pipeline_expansion& expansion
+        )
+        {
+            if (sink_call.sink_name != "into" || sink_call_expression.arguments.size() != 1 || !sink_call.separate.has_value())
+                return std::nullopt;
+
+            iris::Pipeline_expression const& pipeline = *expansion.pipeline;
+
+            std::optional<Separated_pipeline_layout> const layout = get_separated_pipeline_layout(
+                context.module_name,
+                &context.function_declaration,
+                scope,
+                pipeline,
+                context.declaration_database
+            );
+            if (!layout.has_value() || layout->has_several_scratch_types)
+                return std::nullopt;
+            if (layout->scratch_type.has_value() != sink_call.separate->scratch_argument.has_value())
+                return std::nullopt;
+
+            std::size_t const pipeline_index = expansion.pipeline_index;
+            std::pmr::vector<iris::Statement> statements = std::move(expansion.prologue);
+
+            // The scratch argument is written before the sink's own argument, so it is evaluated first.
+            std::optional<std::pmr::string> scratch_name;
+            if (sink_call.separate->scratch_argument.has_value())
+                scratch_name = bind_argument_once(statement, sink_call.separate->scratch_argument.value(), get_pipeline_local_name(pipeline_index, "scratch"), statements);
+
+            std::pmr::string const output_name = bind_argument_once(statement, sink_call_expression.arguments[0], get_pipeline_local_name(pipeline_index, "output"), statements);
+
+            // map preserves the element count and filter only removes elements, so buffers as long as
+            // the first input always have room.
+            statements.push_back(create_output_capacity_assert_statement(Pipeline_input{ .variable_name = output_name }, expansion.inputs[0]));
+            if (scratch_name.has_value())
+                statements.push_back(create_output_capacity_assert_statement(Pipeline_input{ .variable_name = scratch_name.value() }, expansion.inputs[0], "Pipeline scratch buffer is large enough"));
+
+            std::pmr::string const count_name = get_pipeline_local_name(pipeline_index, "count");
+            {
+                iris::Statement input_length;
+                add_input_length_expression(input_length, expansion.inputs[0]);
+                iris::Statement count_declaration = create_variable_declaration_statement(count_name, input_length);
+                std::get<iris::Variable_declaration_expression>(count_declaration.expressions[0].data).is_mutable = true;
+                statements.push_back(std::move(count_declaration));
+            }
+
+            auto const get_buffer_name = [&](bool const is_in_scratch) -> std::string_view
+            {
+                return is_in_scratch ? std::string_view{ scratch_name.value() } : std::string_view{ output_name };
+            };
+
+            auto const create_variable_value = [](std::string_view const name) -> iris::Expression
+            {
+                return create_variable_expression(std::pmr::string{ name });
+            };
+
+            // Without stages the output element is the single parameter: copy it.
+            if (pipeline.stages.empty())
+            {
+                std::pmr::vector<iris::Statement> body;
+                body.push_back(create_output_store_statement(output_name, expansion.index_name, pipeline.input_parameter_names[0]));
+                insert_input_bindings(expansion, body);
+                statements.push_back(create_index_loop_statement(expansion.index_name, expansion.inputs[0], std::move(body)));
+            }
+
+            for (std::size_t stage_index = 0; stage_index < pipeline.stages.size(); ++stage_index)
+            {
+                iris::Pipeline_stage const& stage = pipeline.stages[stage_index];
+                Separated_pipeline_stage const& stage_layout = layout->stages[stage_index];
+                bool const is_first = stage_index == 0;
+
+                std::pmr::string const index_name =
+                    is_first ?
+                    expansion.index_name :
+                    get_pipeline_local_name(pipeline_index, std::format("i{}", stage_index));
+
+                std::pmr::vector<iris::Statement> body;
+
+                // A later stage starts from the element the previous one left in its buffer.
+                if (!is_first)
+                {
+                    Separated_pipeline_stage const& previous = layout->stages[stage_index - 1];
+
+                    iris::Statement value;
+                    std::uint64_t const access_index = add_expression(value, iris::Expression{ .data = iris::Access_array_expression{} });
+                    std::uint64_t const buffer_index = add_expression(value, create_variable_value(get_buffer_name(previous.is_in_scratch)));
+                    std::uint64_t const element_index = add_expression(value, create_variable_value(index_name));
+                    std::get<iris::Access_array_expression>(value.expressions[access_index].data) = iris::Access_array_expression
+                    {
+                        .expression = to_index(buffer_index),
+                        .index = to_index(element_index),
+                    };
+                    body.push_back(create_variable_declaration_statement(previous.element_name, value));
+                }
+
+                std::optional<std::pmr::string> kept_name;
+
+                if (stage.kind == iris::Pipeline_stage_kind::Map)
+                {
+                    body.push_back(create_variable_declaration_statement(stage_layout.element_name, stage.expression));
+                    body.push_back(create_output_store_statement(get_buffer_name(stage_layout.is_in_scratch), index_name, stage_layout.element_name));
+                }
+                else if (stage.kind == iris::Pipeline_stage_kind::Filter)
+                {
+                    // Compacts the kept elements to the front of the buffer the element lives in.
+                    kept_name = get_pipeline_local_name(pipeline_index, std::format("kept{}", stage_index));
+
+                    std::pmr::vector<iris::Statement> then_statements;
+                    then_statements.push_back(create_output_store_statement(get_buffer_name(stage_layout.is_in_scratch), kept_name.value(), stage_layout.element_name));
+                    then_statements.push_back(create_assignment_statement(kept_name.value(), create_uint64_constant_expression(1), iris::Binary_operation::Add));
+                    body.push_back(create_if_statement(stage.expression, std::move(then_statements)));
+                }
+                else if (stage.kind == iris::Pipeline_stage_kind::Take_while)
+                {
+                    // if !(<condition>) { <count> = <index>; break; }
+                    iris::Statement stop = create_stop_unless_statement(stage.expression);
+                    iris::If_expression& if_expression = std::get<iris::If_expression>(stop.expressions[0].data);
+                    if_expression.series[0].then_statements.insert(
+                        if_expression.series[0].then_statements.begin(),
+                        create_assignment_statement(count_name, create_variable_value(index_name), std::nullopt)
+                    );
+                    body.push_back(std::move(stop));
+
+                    // The first loop still has to move the element out of the inputs.
+                    if (is_first)
+                        body.push_back(create_output_store_statement(get_buffer_name(stage_layout.is_in_scratch), index_name, stage_layout.element_name));
+                }
+                else
+                {
+                    return std::nullopt;
+                }
+
+                if (kept_name.has_value())
+                    statements.push_back(create_mutable_variable_statement(kept_name.value(), create_uint64_constant_expression(0)));
+
+                if (is_first)
+                {
+                    insert_input_bindings(expansion, body);
+                    statements.push_back(create_index_loop_statement(index_name, expansion.inputs[0], std::move(body)));
+                }
+                else
+                {
+                    iris::Statement range_end;
+                    add_expression(range_end, create_variable_value(count_name));
+                    statements.push_back(create_index_loop_statement(index_name, std::move(range_end), std::move(body)));
+                }
+
+                if (kept_name.has_value())
+                    statements.push_back(create_assignment_statement(count_name, create_variable_value(kept_name.value()), std::nullopt));
+            }
+
+            return iris::Statement_block_expression
+            {
+                .statements = std::move(statements),
+                .result = create_written_prefix_statement(output_name, count_name),
+            };
+        }
+
         // Expands a value sink `p(inputs).<sink>(<arguments>)` into a statement block expression.
         std::optional<iris::Statement_block_expression> lower_value_sink(
             Pipeline_pass_context& context,
@@ -969,6 +1194,10 @@ namespace iris::compiler
                 return std::nullopt;
 
             iris::Call_expression const& sink_call_expression = std::get<iris::Call_expression>(sink_expression.data);
+
+            if (sink_call.separate.has_value())
+                return lower_separated_into(context, scope, statement, sink_call_expression, sink_call, expansion.value());
+
             std::size_t const pipeline_index = expansion->pipeline_index;
 
             std::pmr::vector<iris::Statement> statements = std::move(expansion->prologue);
@@ -1001,9 +1230,41 @@ namespace iris::compiler
                 if (sink_call_expression.arguments.size() != 2)
                     return std::nullopt;
 
-                iris::Expression const& function_expression = statement.expressions[sink_call_expression.arguments[1].expression_index];
+                iris::Expression_index const function_index = sink_call_expression.arguments[1];
+                iris::Expression const& function_expression = statement.expressions[function_index.expression_index];
                 if (!std::holds_alternative<iris::Lambda_expression>(function_expression.data))
-                    return std::nullopt;
+                {
+                    // fold(init, f): a function or a lambda value is called on every element.
+                    std::pmr::string const accumulator_name = get_pipeline_local_name(pipeline_index, "accumulator");
+
+                    iris::Statement initial_value;
+                    copy_expressions_to_new_statement(initial_value, statement, sink_call_expression.arguments[0]);
+                    iris::Statement accumulator_declaration = create_variable_declaration_statement(accumulator_name, initial_value);
+                    std::get<iris::Variable_declaration_expression>(accumulator_declaration.expressions[0].data).is_mutable = true;
+                    statements.push_back(std::move(accumulator_declaration));
+
+                    iris::Statement callee;
+                    if (is_access_path(statement, function_index))
+                    {
+                        copy_expressions_to_new_statement(callee, statement, function_index);
+                    }
+                    else
+                    {
+                        std::pmr::string const function_name = bind_argument_once(statement, function_index, get_pipeline_local_name(pipeline_index, "function"), statements);
+                        add_expression(callee, create_variable_expression(function_name));
+                    }
+
+                    std::array<std::string_view, 2> const argument_names{ accumulator_name, expansion->output_name };
+                    innermost.push_back(create_assignment_from_statement(accumulator_name, create_call_statement(callee, argument_names)));
+                    add_expression(result, create_variable_expression(accumulator_name));
+
+                    statements.push_back(create_pipeline_loop_statement(expansion.value(), std::move(innermost)));
+                    return iris::Statement_block_expression
+                    {
+                        .statements = std::move(statements),
+                        .result = std::move(result),
+                    };
+                }
 
                 iris::Lambda_expression const& lambda_expression = std::get<iris::Lambda_expression>(function_expression.data);
                 if (lambda_expression.parameter_names.size() != 2)
@@ -1216,7 +1477,9 @@ namespace iris::compiler
         bool found_pipeline = false;
 
         // The visitor reads each statement again after the callback, so a for-each replaced here
-        // is walked as the loop it became, and pipelines used inside its body are lowered too.
+        // is walked as the loop it became, and pipelines used inside its body are lowered too. It
+        // also walks lambda bodies, with the lambda's parameters in scope, so pipelines declared or
+        // consumed there are expanded inside the lambda before the lambda pass lowers it.
         auto const callback = [&](iris::Statement const& statement, Scope const& statement_scope) -> void
         {
             if (statement.expressions.empty())
@@ -1234,7 +1497,7 @@ namespace iris::compiler
             lower_value_sinks(context, statement_scope, const_cast<iris::Statement&>(statement));
         };
 
-        visit_statements_using_scope(
+        visit_statements_using_scope_including_lambda_bodies(
             module_name,
             &function_declaration,
             scope,

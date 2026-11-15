@@ -40,18 +40,52 @@ namespace iris::compiler
         While_loop_expression const*
     >;
 
+    export struct Scope_pipeline
+    {
+        Pipeline_expression const* pipeline;
+        // How many variables were in scope where the pipeline was declared. Its stages read the
+        // variables before this index; a later variable of the same name (a lambda parameter) hides
+        // the one they mean.
+        std::size_t visible_variable_count;
+    };
+
     export struct Scope
     {
         std::pmr::vector<Variable> variables;
         std::pmr::vector<Block_expression_variant> blocks;
         // Pipelines declared so far in the enclosing function. They are compile-time recipes, not
         // variables, so they live in their own list.
-        std::pmr::vector<Pipeline_expression const*> pipelines;
+        std::pmr::vector<Scope_pipeline> pipelines;
     };
+
+    export void add_pipeline_to_scope(
+        Scope& scope,
+        Pipeline_expression const& pipeline
+    );
+
+    export Scope_pipeline const* find_scope_pipeline(
+        Scope const& scope,
+        std::string_view const name
+    );
 
     export Pipeline_expression const* find_pipeline_from_scope(
         Scope const& scope,
         std::string_view const name
+    );
+
+    // The names that the stages of `pipeline` read from outside it: everything they reference except
+    // the pipeline's own parameters and bindings, including what the pipelines they consume read.
+    // `enclosing_pipelines` are the pipelines visible where `pipeline` is declared. The result also
+    // holds names that are not variables, such as called functions; callers filter by what they need.
+    export std::pmr::vector<std::pmr::string> get_pipeline_free_names(
+        Pipeline_expression const& pipeline,
+        std::span<Scope_pipeline const> const enclosing_pipelines
+    );
+
+    // The pipelines that were visible where `scope_pipeline` was declared: those before it in `scope`.
+    export std::span<Scope_pipeline const> get_pipelines_visible_at_declaration(
+        Scope const& scope,
+        Scope_pipeline const& scope_pipeline
     );
 
     // When `expression` is a call whose callee names a pipeline in scope, returns that pipeline.
@@ -91,6 +125,16 @@ namespace iris::compiler
         iris::Declaration_database const& declaration_database
     );
 
+    // `p(inputs).separate([scratch])` before a sink: the sink runs one loop per stage.
+    export struct Pipeline_separate_call
+    {
+        // The `.separate(...)` call, which lives in the same statement.
+        iris::Expression_index call;
+        iris::Call_expression const* call_expression;
+        // The buffer for elements that do not have the output type.
+        std::optional<iris::Expression_index> scratch_argument;
+    };
+
     // A value sink applied to a pipeline call: `p(inputs).<sink_name>(<arguments>)`.
     export struct Pipeline_sink_call
     {
@@ -105,7 +149,44 @@ namespace iris::compiler
         bool is_on_pipeline_name;
         // The expressions that are the pipeline's inputs.
         std::span<iris::Expression_index const> input_arguments;
+        // Set for `p(inputs).separate([scratch]).<sink>(...)`. `pipeline_call` is still `p(inputs)`.
+        std::optional<Pipeline_separate_call> separate = std::nullopt;
     };
+
+    // One stage of a separated pipeline: the element it leaves for the next stage, and the buffer that
+    // element lives in. Elements of the output type live in the output buffer, others in the scratch.
+    export struct Separated_pipeline_stage
+    {
+        std::string_view element_name;
+        iris::Type_reference element_type;
+        bool is_in_scratch;
+    };
+
+    export struct Separated_pipeline_layout
+    {
+        std::pmr::vector<Separated_pipeline_stage> stages;
+        iris::Type_reference output_type;
+        // The element type stored in the scratch buffer, when some stage needs it.
+        std::optional<iris::Type_reference> scratch_type;
+        // True when stages leave elements of more than one type other than the output type, which a
+        // single scratch buffer cannot hold.
+        bool has_several_scratch_types = false;
+    };
+
+    // Nullopt when the pipeline cannot be separated in a linear chain (an enumerate stage, several
+    // inputs before the first map) or when a type cannot be deduced.
+    export std::optional<Separated_pipeline_layout> get_separated_pipeline_layout(
+        std::string_view const module_name,
+        iris::Function_declaration const* function_declaration,
+        Scope const& scope,
+        Pipeline_expression const& pipeline,
+        iris::Declaration_database const& declaration_database
+    );
+
+    // The names that `statement` reads and does not declare itself.
+    export std::pmr::vector<std::pmr::string> get_statement_free_names(
+        iris::Statement const& statement
+    );
 
     export bool is_pipeline_sink_name(std::string_view const name);
 
@@ -258,9 +339,12 @@ namespace iris::compiler
         std::string_view const member_name
     );
 
+    // `enclosing_pipelines` are the pipelines visible where the lambda is written. When the body
+    // consumes one of them, the expansion reads what its stages read, so those names are captured too.
     export void compute_lambda_captures(
         iris::Lambda_expression& lambda_expression,
-        std::pmr::vector<std::pmr::string> const& enclosing_names
+        std::pmr::vector<std::pmr::string> const& enclosing_names,
+        std::span<Scope_pipeline const> const enclosing_pipelines = {}
     );
 
     // Resolves a type reference to the lambda signature it denotes: either an anonymous
@@ -508,7 +592,7 @@ namespace iris::compiler
                     }
                     scope.variables.erase(scope.variables.begin() + variable_count, scope.variables.end());
 
-                    scope.pipelines.push_back(&pipeline_expression);
+                    add_pipeline_to_scope(scope, pipeline_expression);
                 }
                 else if (std::holds_alternative<iris::Ternary_condition_expression>(expression.data))
                 {

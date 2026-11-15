@@ -9568,30 +9568,438 @@ export function run(values: Array_slice::<Int32>) -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
-    TEST_CASE("Validates that pipelines are not used inside lambda bodies yet", "[Validation][Pipeline]")
+    TEST_CASE("Validates pipelines declared or consumed inside lambda bodies", "[Validation][Pipeline]")
     {
         std::string_view const input = R"(module Test;
 
 lambda Action(value: Int32) -> ();
+lambda Counter(values: Array_slice::<Int32>) -> (result: Uint64);
+lambda Summer(values: Array_slice::<Int32>) -> (result: Int32);
 
-export function run() -> ()
+function use(value: Int32) -> ()
 {
+}
+
+export function run(values: Array_slice::<Int32>) -> ()
+{
+    var threshold = 2;
+
+    pipeline large(input: Int32)
+    {
+        filter input > threshold;
+    }
+
     var action: Action = lambda(value) => {
         pipeline process(input: Int32)
         {
             map input + value => next;
         }
+
+        for next in process(values)
+        {
+            use(next);
+        }
+
+        for element in large(values)
+        {
+            use(element);
+        }
     };
+
+    var count_large: Counter = lambda(inputs) => large(inputs).count();
+
+    // The fold lambda is typed by the fold, not by the enclosing lambda's return type.
+    var sum_large: Summer = lambda(inputs) => large(inputs).fold(0, lambda (total, value) => total + value);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a lambda parameter does not hide a name that a pipeline reads", "[Validation][Pipeline]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Counter(threshold: Int32) -> (result: Uint64);
+
+export function run(values: Array_slice::<Int32>) -> ()
+{
+    var threshold = 2;
+
+    pipeline large(input: Int32)
+    {
+        filter input > threshold;
+    }
+
+    var count_large: Counter = lambda(threshold) => large(values).count();
 }
 )";
 
         std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
             iris::compiler::Diagnostic
             {
-                .range = create_source_range(8, 18, 8, 25),
+                .range = create_source_range(14, 53, 14, 66),
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
-                .message = "Pipelines cannot be declared or consumed inside a lambda body yet.",
+                .message = "Pipeline 'large' reads 'threshold', which is hidden here by a variable of the same name.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a returned lambda does not capture through a pipeline it consumes", "[Validation][Pipeline]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Counter(values: Array_slice::<Int32>) -> (result: Uint64);
+
+export function make_counter() -> (result: Counter)
+{
+    var threshold = 2;
+
+    pipeline large(input: Int32)
+    {
+        filter input > threshold;
+    }
+
+    return lambda(values) => large(values).count();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(14, 12, 14, 51),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Lambda captures 'threshold' from the enclosing function and cannot be returned from it.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates a separated pipeline", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        map value * 2 => doubled;
+        filter doubled > 3;
+        map doubled as Float32 => result;
+    }
+    var with_scratch = process(values).separate(ints).into(floats);
+
+    pipeline same_type(value: Int32)
+    {
+        filter value > 0;
+        map value * 2 => doubled;
+        take_while doubled < 100;
+    }
+    var without_scratch = same_type(values).separate().into(ints);
+
+    pipeline weighted(value: Int32, weight: Int32)
+    {
+        map value * weight => product;
+        filter product > 0;
+    }
+    var products = weighted(values, weights).separate().into(ints);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that separate is followed by a sink", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        filter value > 0;
+    }
+    process(values).separate();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(9, 5, 9, 31),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "'separate' must be followed by a sink: write 'process(values).separate().into(out)'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that only into supports separate", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        filter value > 0;
+    }
+    var count = process(values).separate().count();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(9, 17, 9, 51),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Only sink 'into' supports 'separate', but got 'count'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that separate takes at most a scratch buffer", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        filter value > 0;
+    }
+    var written = process(values).separate(ints, ints).into(ints);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(9, 19, 9, 55),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "'separate' takes at most 1 argument, the scratch buffer, but 2 were provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a separated pipeline has no enumerate stage", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        enumerate => position;
+        filter value > 0;
+    }
+    var written = process(values).separate().into(ints);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(7, 9, 7, 31),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline 'process' cannot be separated because it has an 'enumerate' stage.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a separated pipeline with several inputs starts with a map", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline weighted(value: Int32, weight: Int32)
+    {
+        filter value > weight;
+        map value + weight => sum;
+    }
+    var written = weighted(values, weights).separate().into(ints);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 19, 10, 55),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline 'weighted' cannot be separated: with several inputs, its first stage must be a 'map'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a separated stage only reads the previous element", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        map value * 2 => doubled;
+        filter doubled > value;
+    }
+    var written = process(values).separate().into(ints);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(8, 9, 8, 32),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Stage 2 of pipeline 'process' reads 'value', but a separated stage only sees the element of the stage before it, 'doubled'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a separated pipeline holds at most one scratch element type", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        map value as Float64 => wide;
+        map wide as Float32 => narrow;
+        map narrow as Int32 => result;
+    }
+    var written = process(values).separate(doubles).into(ints);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(11, 19, 11, 52),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline 'process' cannot be separated: its stages produce more than one element type other than the output type, and the scratch buffer holds only one.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a separated pipeline gets the scratch buffer it needs", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        map value * 2 => doubled;
+        map doubled as Float32 => result;
+    }
+    var written = process(values).separate().into(floats);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 19, 10, 45),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline 'process' needs a scratch buffer of type 'Array_slice::<mutable Int32>' to be separated: write 'process(values).separate(scratch).into(out)'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a separated pipeline gets no scratch buffer it does not need", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        filter value > 0;
+    }
+    var written = process(values).separate(ints).into(ints);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(9, 44, 9, 48),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline 'process' does not need a scratch buffer to be separated, since every stage produces 'Int32'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates the type of the scratch buffer of a separated pipeline", "[Validation][Pipeline][Separate]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Int32>, ints: Array_slice::<mutable Int32>, floats: Array_slice::<mutable Float32>, doubles: Array_slice::<mutable Float64>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        map value * 2 => doubled;
+        map doubled as Float32 => result;
+    }
+    var written = process(values).separate(doubles).into(floats);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 44, 10, 51),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "'separate' expects a scratch buffer of type 'Array_slice::<mutable Int32>' but got 'Array_slice::<mutable Float64>'.",
                 .related_information = {},
             }
         };
@@ -9729,7 +10137,7 @@ export function run(values: Array_slice::<Int32>) -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
-    TEST_CASE("Validates that the fold sink takes a lambda literal", "[Validation][Pipeline]")
+    TEST_CASE("Validates that the fold sink takes a function", "[Validation][Pipeline]")
     {
         std::string_view const input = R"(module Test;
 
@@ -9755,7 +10163,72 @@ export function run(values: Array_slice::<Int32>) -> ()
                 .range = create_source_range(15, 38, 15, 44),
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
-                .message = "Pipeline sink 'fold' expects a lambda literal, for example 'fold(0, lambda (sum, value) => sum + value)'.",
+                .message = "Pipeline sink 'fold' expects a function of type '(Int32, Int32) -> Int32', but got 'Array_slice::<Int32>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates the fold sink with a named function and a lambda value", "[Validation][Pipeline]")
+    {
+        std::string_view const input = R"(module Test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+function add(total: Int32, value: Int32) -> (result: Int32)
+{
+    return total + value;
+}
+
+export function run(values: Array_slice::<Int32>) -> ()
+{
+    pipeline even(value: Int32)
+    {
+        filter value % 2 == 0;
+    }
+
+    var offset = 1;
+    var add_offset: Adder = lambda (a, b) => a + b + offset;
+
+    var total: Int32 = even(values).fold(0, add);
+    var total_with_offset: Int32 = even(values).fold(0, add_offset);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that the fold function takes the accumulator and the element and returns the accumulator", "[Validation][Pipeline]")
+    {
+        std::string_view const input = R"(module Test;
+
+function is_greater(total: Int32, value: Int32) -> (result: Bool)
+{
+    return total > value;
+}
+
+export function run(values: Array_slice::<Int32>) -> ()
+{
+    pipeline even(value: Int32)
+    {
+        filter value % 2 == 0;
+    }
+
+    var total = even(values).fold(0, is_greater);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(15, 38, 15, 48),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline sink 'fold' expects a function of type '(Int32, Int32) -> Int32', but got 'function<(total: Int32, value: Int32) -> (result: Bool)>'.",
                 .related_information = {},
             }
         };

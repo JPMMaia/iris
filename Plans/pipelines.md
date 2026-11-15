@@ -117,9 +117,10 @@ An input's element type must equal the matching parameter type.
 | count | `p(inputs).count()` | `Uint64` | None |
 | any / all | `p(inputs).any()` / `.all()` | `Bool` | None. The output element must be `Bool`. Short-circuits with `break`. |
 | first | `p(inputs).first()` | `Optional::<U>` (see `optional_type.md`) | None |
-| fold | `p(inputs).fold(init, lambda (acc, v) => expression)` | type of `init` | None |
+| fold | `p(inputs).fold(init, lambda (acc, v) => expression)` or `p(inputs).fold(init, f)` | type of `init` | None |
 | in place | `p.in_place(list)` | `Array_slice::<mutable T>`, the kept prefix | Overwrites `list` |
 | fixed capacity | `p(constant_array)` used as a value | `Fixed_capacity_array::<U, N>` (deferred, see Future work) | Stack |
+| separated into | `p(inputs).separate([scratch]).into(out)` | as `into` | `out`, plus `scratch` when a stage produces a type other than `U` (see Step 5) |
 
 Bounds:
 - `into`: `map` preserves the element count and `filter` only removes elements, so `out.length >= input length` is always sufficient. The expansion asserts it. A later `into_bounded(out)` can stop when `out` is full and return `{ written, consumed }` for chunked streaming.
@@ -271,11 +272,31 @@ Stage bindings (`v0`) and parameter names (`input`) keep their source names, so 
 
 ---
 
-## Step 5: `separate` (later phase)
+## Step 5: `separate`
 
-`p(list).separate().into(out, scratch: tmp)` produces one loop per stage, which helps vectorization when one stage is expensive. Every stage boundary needs storage:
-- When the intermediate element size equals the output element size, `out` can serve as its own scratch: `map` writes into `out`, then `filter` compacts `out` in place.
-- Otherwise the caller passes an explicit `scratch:` buffer, and its length is asserted like `out`'s.
+`p(list).separate().into(out)` and `p(list).separate(scratch).into(out)` produce one loop per stage, which helps vectorization when one stage is expensive. Iris has no named arguments, so the scratch buffer is the argument of `separate` itself.
+
+It is a linear chain:
+- The first loop reads the inputs and runs the first stage. Each later stage sees only the element the stage before it produced (the latest map binding, or the parameter before any map), plus the enclosing function's locals. Reading any other parameter or binding is an error.
+- `enumerate` is rejected. With several inputs, the first stage must be a `map`.
+- Between loops, each element lives at its index in a buffer chosen by its type: the output type `U` in `out`, and any other type in `scratch`. So the chain may produce at most one type other than `U`. `scratch` is required exactly when it produces one, and must be `Array_slice::<mutable T>` of that type.
+- `map` writes the next buffer at the same index (in place when the type stays the same). `filter` compacts its buffer in place with a `kept` counter. `take_while` sets the count to the failing index and breaks. A `$pipeline<N>_count` tracks the live elements, and the result is `out`'s first `count` elements.
+- `out` and `scratch` are asserted to be at least as long as the first input ("Pipeline scratch buffer is large enough").
+- Only `into` supports `separate`, and `separate` must be followed by a sink.
+
+```
+var written = ${
+    assert "Pipeline output buffer is large enough" { output.length >= values.length };
+    assert "Pipeline scratch buffer is large enough" { scratch.length >= values.length };
+    mutable $pipeline0_count = values.length;
+    for $pipeline0_i in 0u64 to values.length { var value = values[$pipeline0_i]; var doubled = value * 2; scratch[$pipeline0_i] = doubled; }
+    mutable $pipeline0_kept1 = 0u64;
+    for $pipeline0_i1 in 0u64 to $pipeline0_count { var doubled = scratch[$pipeline0_i1]; if doubled > threshold { scratch[$pipeline0_kept1] = doubled; $pipeline0_kept1 += 1u64; } }
+    $pipeline0_count = $pipeline0_kept1;
+    for $pipeline0_i2 in 0u64 to $pipeline0_count { var doubled = scratch[$pipeline0_i2]; var result = doubled as Float32; output[$pipeline0_i2] = result; }
+    yield create_array_slice_from_pointer(output.data, $pipeline0_count);
+};
+```
 
 ---
 
@@ -297,11 +318,18 @@ Phase 3 is implemented: the `in_place` sink. The fixed-capacity sink is deferred
 
 Phase 4 is implemented: `Soa_array_view::<T>` inputs (mutable or not), alone or in lockstep with other inputs.
 
-Phase 5 is partly implemented: the `take_while` and `enumerate` stages. `separate` is not.
+Phase 5 is implemented: the `take_while` and `enumerate` stages, and `separate` (see Step 5).
+
+Pipelines can be declared and consumed inside lambda bodies, and `fold` also takes a function name or a lambda value.
 
 Decisions taken while implementing:
 - Map syntax is `map <expression> => <name>;` (see 1e).
-- Pipelines cannot be declared or consumed inside a lambda body; validation reports it ("Pipelines cannot be declared or consumed inside a lambda body yet."). This is the design for now: `visit_statements_using_scope`, and so `Pipeline_pass`, does not walk lambda bodies, and a lambda can call a function that uses a pipeline instead. Lifting it would mean walking lambda bodies with their own scope in the visitor and the pass.
+- Pipelines inside lambda bodies:
+  - `Pipeline_pass` walks with `visit_statements_using_scope_including_lambda_bodies`, which moved from the language server to `iris.compiler.validation` and is shared by both. It enters each lambda body with the lambda's parameters in scope, so a pipeline is expanded inside the lambda before the lambda pass turns the lambda into a function.
+  - A lambda that consumes a pipeline declared outside it reads, once expanded, whatever that pipeline's stages read. So capture analysis (`compute_lambda_captures`, which now takes the enclosing `scope.pipelines`) adds the pipeline's free names (`get_pipeline_free_names`) when the body names an enclosing pipeline. This is computed before expansion, so the "cannot return a capturing lambda" check sees those captures too.
+  - Locals cannot shadow, but lambda parameters can. `Scope::pipelines` holds `Scope_pipeline { pipeline, visible_variable_count }`, and a sink or for-each is an error ("Pipeline 'p' reads 't', which is hidden here by a variable of the same name.") when a name the stages read resolves to a variable declared after the pipeline.
+- `fold(init, f)` with anything but a lambda literal is called, not inlined: `mutable $pipeline<N>_accumulator = init;` and `$pipeline<N>_accumulator = f($pipeline<N>_accumulator, <output>);` per element. A variable or member-access path (`add`, `Math.add`) is called as written. Any other expression (`make_adder()`) is bound once to `$pipeline<N>_function`. Validation requires a function or lambda type `(type of init, U) -> type of init`. At O2 a named function inlines to the hand-written loop (`sum_of_odd_cubes` in the zero-cost test).
+- `separate` is recognized by `get_pipeline_sink_call` as `p(inputs).separate([scratch]).<sink>(...)`. `Pipeline_sink_call::separate` holds the `separate` call and its scratch argument, and `pipeline_call` stays `p(inputs)`. `get_separated_pipeline_layout` decides which buffer holds each stage's element, and both validation and the pass use it. The bare `.separate(...)` call is validated by the sink called on it.
 - `For_each_expression` and `Pipeline_expression` are appended at the end of the `Expression` variant instead of sorted in, because expression hashes (instance names) and binary serialization use the variant index.
 - `Scope` gained a `pipelines` list. Analysis, validation and `visit_statements_using_scope` push a pipeline when its statement is reached and drop it at the end of the enclosing block.
 - The loop variable may reuse the output binding's name (`for v0 in p(list)`), in which case no copy is emitted. Any other collision between the loop variable, pipeline parameters, bindings and visible locals is an error, both at the declaration and at the for-each site.
@@ -320,9 +348,14 @@ Decisions taken while implementing:
 - `visit_statements_using_scope` now also visits `while` conditions and the statements and result of statement blocks, so later passes (lambda, instantiate) see code inside them.
 - `Statement_block_expression` codegen emits the statements into the current basic block and passes the result value through unloaded, like a parenthesis. It pushes no block info, because passes never put `return`, `defer` or an outward `break` / `continue` inside it.
 
+- Two bugs fixed along the way, both on HEAD before this work:
+  - `Lambda_pass` appended to the module's declaration vectors while the declaration database pointed into them. Once a capturing lambda reallocated a vector, a later function that read a struct's members read freed memory. Lambda functions and environment structs now reserve room first and repoint the moved entries (`reserve_declarations_keeping_database_pointers`).
+  - `get_expected_expression_type` gave every expression of a statement the statement's expected type. So in `lambda (xs) => p(xs).fold(0, lambda (a, b) => a + b)`, the inner lambda was "expected" to be the outer lambda's return type. A lambda literal nested in a statement is now typed by its context (call argument, fold, typed declaration) first, and falls back to the statement's type only when nothing applies.
+  - Capture analysis did not look inside ternary branches or switch cases, which are statements of their own. So `lambda (v) => v > 0 ? weight : 0` failed with "Undefined variable 'weight'". It now collects names from them too.
+
 Known gaps:
-- `fold` does not accept a lambda variable or a function name, only a literal, since it is inlined.
 - Language server: scopes inside pipelines and for-each bodies are computed, but hover / go-to / completion have no pipeline-specific handling.
+- `separate` only feeds `into`, and its stages form a linear chain (see Step 5).
 
 ## Verification
 

@@ -169,7 +169,7 @@ namespace iris::compiler
             for (Variable const& variable : scope.variables)
                 enclosing_names.push_back(variable.name);
 
-            compute_lambda_captures(lambda_expression, enclosing_names);
+            compute_lambda_captures(lambda_expression, enclosing_names, scope.pipelines);
         }
 
         std::span<std::pmr::string const> const captured_names =
@@ -276,6 +276,44 @@ namespace iris::compiler
         };
     }
 
+    // The declaration database points into the module's declaration vectors. Makes room for
+    // `additional_count` more declarations, and when that moves the vector, repoints the entries that
+    // pointed into its old storage, which would otherwise dangle.
+    template <typename Declaration_t>
+    static void reserve_declarations_keeping_database_pointers(
+        iris::Declaration_database& declaration_database,
+        std::string_view const module_name,
+        std::pmr::vector<Declaration_t>& declarations,
+        std::size_t const additional_count
+    )
+    {
+        std::size_t const old_size = declarations.size();
+        if (old_size + additional_count <= declarations.capacity())
+            return;
+
+        std::uintptr_t const old_begin = reinterpret_cast<std::uintptr_t>(declarations.data());
+        std::uintptr_t const old_end = reinterpret_cast<std::uintptr_t>(declarations.data() + old_size);
+
+        declarations.reserve(std::max(old_size + additional_count, old_size * 2));
+
+        auto const map_location = declaration_database.map.find(module_name);
+        if (map_location == declaration_database.map.end())
+            return;
+
+        for (auto& [name, declaration] : map_location->second)
+        {
+            if (!std::holds_alternative<Declaration_t const*>(declaration.data))
+                continue;
+
+            std::uintptr_t const address = reinterpret_cast<std::uintptr_t>(std::get<Declaration_t const*>(declaration.data));
+            if (address < old_begin || address >= old_end)
+                continue;
+
+            std::size_t const index = (address - old_begin) / sizeof(Declaration_t);
+            declaration.data = &declarations[index];
+        }
+    }
+
     void run_lambda_pass_on_function(
         iris::Module& core_module,
         iris::Declaration_database& declaration_database,
@@ -350,6 +388,14 @@ namespace iris::compiler
             declaration_database,
             callback
         );
+
+        std::size_t const environment_count = static_cast<std::size_t>(std::count_if(
+            results.begin(),
+            results.end(),
+            [](Lambda_lowering_result const& result) -> bool { return result.environment_struct_declaration.has_value(); }
+        ));
+        reserve_declarations_keeping_database_pointers(declaration_database, core_module.name, core_module.internal_declarations.struct_declarations, environment_count);
+        reserve_declarations_keeping_database_pointers(declaration_database, core_module.name, core_module.internal_declarations.function_declarations, results.size());
 
         for (Lambda_lowering_result& result : results)
         {

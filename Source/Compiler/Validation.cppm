@@ -128,6 +128,18 @@ namespace iris::compiler
         std::size_t const expression_index
     );
 
+    // Like visit_statements_using_scope, but it also walks the body of every lambda literal it meets,
+    // with the lambda's parameters added to the scope (typed from the lambda's resolved signature).
+    // Lambdas whose signature cannot be resolved are not entered.
+    export void visit_statements_using_scope_including_lambda_bodies(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope& scope,
+        std::span<iris::Statement const> const statements,
+        Declaration_database const& declaration_database,
+        std::function<void(iris::Statement const&, Scope const&)> const& callback
+    );
+
     export std::pmr::vector<iris::compiler::Diagnostic> validate_statement(
         iris::Module const& core_module,
         Function_declaration const* const function_declaration,

@@ -92,3 +92,22 @@ export function sum_of_x(particles: Soa_array_view::<Particle>) -> (result: Floa
     }
     return sum;
 }
+
+function add_cube(total: Int32, value: Int32) -> (result: Int32)
+{
+    return total + value * value * value;
+}
+
+export function sum_of_odd_cubes(values: Array_slice::<Int32>) -> (result: Int32)
+{
+    mutable total = 0;
+    for index in 0u64 to values.length
+    {
+        var value = values[index];
+        if value % 2 != 0
+        {
+            total = add_cube(total, value);
+        }
+    }
+    return total;
+}

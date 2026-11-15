@@ -411,6 +411,192 @@ function test_fold_reads_captured_locals_and_keeps_the_initial_type() -> ()
     check(has_two);
 }
 
+lambda Combine(accumulator: Int32, element: Int32) -> (result: Int32);
+
+function add_squared(accumulator: Int32, element: Int32) -> (result: Int32)
+{
+    return accumulator + element * element;
+}
+
+function make_tripled_add(calls: *mutable Int32) -> (result: Combine)
+{
+    *calls = *calls + 1;
+    return lambda (accumulator, element) => accumulator + element * 3;
+}
+
+@test
+function test_fold_calls_a_named_function_or_a_lambda_value() -> ()
+{
+    var values: Constant_array::<Int32, 4> = [1, 2, 3, 4];
+
+    pipeline evens(value: Int32)
+    {
+        filter value % 2 == 0;
+    }
+
+    // A named function: 4 + 16.
+    check(evens(values).fold(0, add_squared) == 20);
+
+    // A capturing lambda value: 100 + (2 + 4) * 10.
+    var weight = 10;
+    var add_weighted: Combine = lambda (accumulator, element) => accumulator + element * weight;
+    check(evens(values).fold(100, add_weighted) == 160);
+
+    // A call that returns the function runs once, not once per element.
+    mutable calls = 0;
+    check(evens(values).fold(0, make_tripled_add(&calls)) == 18);
+    check(calls == 1);
+}
+
+@test
+function test_separate_with_a_scratch_buffer_matches_the_fused_loop() -> ()
+{
+    var values: Constant_array::<Int32, 6> = [1, 4, 2, 5, 3, 6];
+    var threshold = 5;
+
+    mutable fused_storage: Constant_array::<Float32, 6> = [0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32];
+    var fused_buffer = create_array_slice_from_pointer(&fused_storage[0], 6u64);
+    mutable output_storage: Constant_array::<Float32, 6> = [0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32];
+    var output = create_array_slice_from_pointer(&output_storage[0], 6u64);
+    mutable scratch_storage: Constant_array::<Int32, 6> = [0, 0, 0, 0, 0, 0];
+    var scratch = create_array_slice_from_pointer(&scratch_storage[0], 6u64);
+
+    // Int32 elements live in scratch, the Float32 output in output.
+    pipeline process(value: Int32)
+    {
+        map value * 2 => doubled;
+        filter doubled > threshold;
+        map doubled as Float32 => result;
+    }
+
+    var fused = process(values).into(fused_buffer);
+    var separated = process(values).separate(scratch).into(output);
+
+    check(separated.length == 4u64);
+    check(fused.length == separated.length);
+    for index in 0u64 to separated.length
+    {
+        check(separated[index] == fused[index]);
+    }
+    check(separated[0] == 8.0f32);
+    check(separated[1] == 10.0f32);
+    check(separated[2] == 6.0f32);
+    check(separated[3] == 12.0f32);
+}
+
+@test
+function test_separate_without_scratch_filters_maps_and_stops() -> ()
+{
+    var values: Constant_array::<Int32, 7> = [3, -1, 5, 40, 2, 60, 1];
+    mutable storage: Constant_array::<Int32, 7> = [0, 0, 0, 0, 0, 0, 0];
+    var output = create_array_slice_from_pointer(&storage[0], 7u64);
+
+    // Every element is an Int32, so it all happens in output: a filter that compacts, a map in place,
+    // and a take_while that cuts the count. It stops at 80, so the 4 after it is not kept.
+    pipeline process(value: Int32)
+    {
+        filter value > 0;
+        map value * 2 => doubled;
+        take_while doubled < 50;
+    }
+
+    var written = process(values).separate().into(output);
+
+    check(written.length == 2u64);
+    check(written[0] == 6);
+    check(written[1] == 10);
+}
+
+@test
+function test_separate_reads_several_inputs_and_soa_views() -> ()
+{
+    var values: Constant_array::<Int32, 4> = [1, 2, 3, 4];
+    var weights: Constant_array::<Int32, 4> = [10, 0, 10, 0];
+    mutable storage: Constant_array::<Int32, 4> = [0, 0, 0, 0];
+    var output = create_array_slice_from_pointer(&storage[0], 4u64);
+
+    pipeline weighted(value: Int32, weight: Int32)
+    {
+        map value * weight => product;
+        filter product > 0;
+    }
+
+    var products = weighted(values, weights).separate().into(output);
+    check(products.length == 2u64);
+    check(products[0] == 10);
+    check(products[1] == 30);
+
+    mutable particles: Soa_array::<Particle, 3> = [];
+    var view: Soa_array_view::<mutable Particle> = particles.view();
+    view[0] = { x: 1.0f32, y: 10.0f32, alive: true };
+    view[1] = { x: 2.0f32, y: 20.0f32, alive: false };
+    view[2] = { x: 3.0f32, y: 30.0f32, alive: true };
+
+    mutable speed_storage: Constant_array::<Float32, 3> = [0.0f32, 0.0f32, 0.0f32];
+    var speeds = create_array_slice_from_pointer(&speed_storage[0], 3u64);
+
+    pipeline speed(particle: Particle)
+    {
+        map particle.x + particle.y => total;
+        filter total > 15.0f32;
+    }
+
+    var fast = speed(view).separate().into(speeds);
+    check(fast.length == 2u64);
+    check(fast[0] == 22.0f32);
+    check(fast[1] == 33.0f32);
+}
+
+lambda Count_values(inputs: Array_slice::<Int32>) -> (result: Uint64);
+lambda Sum_values(inputs: Array_slice::<Int32>) -> (result: Int32);
+lambda Scale(factor: Int32) -> (result: Int32);
+
+@test
+function test_pipelines_inside_lambda_bodies() -> ()
+{
+    var values: Constant_array::<Int32, 5> = [1, 2, 3, 4, 5];
+    var threshold = 2;
+
+    pipeline large(value: Int32)
+    {
+        filter value > threshold;
+    }
+
+    // The lambda consumes a pipeline declared outside it, so it captures what the stages read.
+    var count_large: Count_values = lambda (inputs) => large(inputs).count();
+    check(count_large(values) == 3u64);
+
+    // A pipeline declared and consumed inside a block body, reading a lambda parameter.
+    var sum_shifted: Sum_values = lambda (inputs) => {
+        var shift = 10;
+
+        pipeline shifted(value: Int32)
+        {
+            map value + shift => next;
+        }
+
+        mutable sum = 0;
+        for next in shifted(inputs)
+        {
+            sum += next;
+        }
+        return sum;
+    };
+    check(sum_shifted(values) == 65);
+
+    // A nested lambda consumes a pipeline that its enclosing lambda declares.
+    var sum_scaled: Scale = lambda (factor) => {
+        pipeline scaled(value: Int32)
+        {
+            map value * factor => product;
+        }
+
+        var sum_products: Sum_values = lambda (inputs) => scaled(inputs).fold(0, lambda (total, product) => total + product);
+        return sum_products(values);
+    };
+    check(sum_scaled(2) == 30);
+}
+
 function visit(visited: *mutable Int32, value: Int32) -> (result: Int32)
 {
     *visited = *visited + 1;

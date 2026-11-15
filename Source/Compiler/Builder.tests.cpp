@@ -890,6 +890,21 @@ namespace iris::compiler
                 build_directory_path,
                 target,
                 "pipeline_asserts.iris.test",
+                " --test-name=pipeline_asserts.test_a_scratch_buffer_that_is_too_small",
+                "small_scratch_output.txt"
+            );
+
+            CHECK(result.output.find("assert 'Pipeline scratch buffer is large enough' failed!") != std::string::npos);
+            CHECK(result.output.find("CRASH") != std::string::npos);
+            CHECK(result.output.find("1 tests selected, 1 run, 0 passed, 1 failed (1 crashed), 0 not run") != std::string::npos);
+            CHECK(result.exit_code != 0);
+        }
+
+        {
+            Test_run_output const result = run_test_executable_and_capture(
+                build_directory_path,
+                target,
+                "pipeline_asserts.iris.test",
                 " --test-name=pipeline_asserts.test_a_large_enough_buffer",
                 "large_enough_buffer_output.txt"
             );

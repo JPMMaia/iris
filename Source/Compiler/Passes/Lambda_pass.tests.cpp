@@ -408,6 +408,60 @@ export function run() -> ()
         CHECK(has_function_declaration(context.core_module(), "run__lambda0"));
     }
 
+    // The pass appends environment structs and lambda functions to the module's declaration vectors.
+    // When that moves a vector, the database must not keep pointing at the old storage: a later
+    // function that reads a struct's members would read freed memory.
+    TEST_CASE("Lambda pass keeps the declaration database pointing at the module's declarations", "[Lambda_pass][Passes][Lambda]")
+    {
+        std::string_view const input = R"(module Lambda_pass_test;
+
+lambda Combine(a: Int32, b: Int32) -> (result: Int32);
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function get_x(particle: Particle) -> (result: Float32)
+{
+    return particle.x;
+}
+
+function run() -> ()
+{
+    var weight = 10;
+    var first: Combine = lambda (a, b) => a + b * weight;
+    var second: Combine = lambda (a, b) => a - b * weight;
+}
+)";
+
+        iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input, {});
+
+        Lambda_database lambda_database;
+        run_lambda_pass_on_module(context.core_module(), context.declaration_database, lambda_database, false);
+
+        iris::Module const& core_module = context.core_module();
+
+        for (iris::Struct_declaration const& declaration : core_module.internal_declarations.struct_declarations)
+        {
+            std::optional<Declaration> const found = find_declaration(context.declaration_database, core_module.name, declaration.name);
+            REQUIRE(found.has_value());
+            REQUIRE(std::holds_alternative<iris::Struct_declaration const*>(found->data));
+            CHECK(std::get<iris::Struct_declaration const*>(found->data) == &declaration);
+        }
+
+        for (iris::Function_declaration const& declaration : core_module.internal_declarations.function_declarations)
+        {
+            std::optional<Declaration> const found = find_declaration(context.declaration_database, core_module.name, declaration.name);
+            REQUIRE(found.has_value());
+            REQUIRE(std::holds_alternative<iris::Function_declaration const*>(found->data));
+            CHECK(std::get<iris::Function_declaration const*>(found->data) == &declaration);
+        }
+
+        CHECK(core_module.internal_declarations.struct_declarations.size() == 3);
+        CHECK(core_module.internal_declarations.function_declarations.size() == 4);
+    }
+
     TEST_CASE("Lambda pass records the captured variables of a lambda expression", "[Lambda_pass][Passes][Lambda]")
     {
         std::string_view const input = R"(module Lambda_pass_test;
@@ -435,6 +489,37 @@ export function run() -> ()
         REQUIRE(lambda_expression->captured_variables.has_value());
         REQUIRE(lambda_expression->captured_variables.value().size() == 1);
         CHECK(lambda_expression->captured_variables.value()[0] == "offset");
+    }
+
+    TEST_CASE("Lambda pass captures variables read only inside a ternary branch", "[Lambda_pass][Passes][Lambda]")
+    {
+        std::string_view const input = R"(module Lambda_pass_test;
+
+lambda Pick(value: Int32) -> (result: Int32);
+
+export function run() -> ()
+{
+    var weight: Int32 = 10;
+    var fallback: Int32 = 1;
+    var pick: Pick = lambda(value) => value > 0 ? weight : fallback;
+}
+)";
+
+        iris::compiler::tests::Parsed_module_context context = iris::compiler::tests::parse_module_context(input, {});
+
+        Lambda_database lambda_database;
+        run_lambda_pass_on_module(context.core_module(), context.declaration_database, lambda_database, false);
+
+        iris::Function_definition const* const definition = iris::compiler::tests::find_mutable_function_definition(context.core_module(), "run");
+        REQUIRE(definition != nullptr);
+
+        iris::Lambda_expression const* const lambda_expression = find_first_lambda_expression(definition->statements);
+        REQUIRE(lambda_expression != nullptr);
+
+        REQUIRE(lambda_expression->captured_variables.has_value());
+        REQUIRE(lambda_expression->captured_variables.value().size() == 2);
+        CHECK(lambda_expression->captured_variables.value()[0] == "weight");
+        CHECK(lambda_expression->captured_variables.value()[1] == "fallback");
     }
 
     TEST_CASE("Lambda pass is idempotent", "[Lambda_pass][Passes][Lambda]")

@@ -41,6 +41,27 @@ function test_an_into_buffer_that_is_too_small() -> ()
 }
 
 @test
+function test_a_scratch_buffer_that_is_too_small() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 2, 3];
+    mutable storage: Constant_array::<Float32, 3> = [0.0f32, 0.0f32, 0.0f32];
+    var first: *mutable Float32 = &storage[0];
+    var buffer = create_array_slice_from_pointer(first, 3u64);
+    mutable scratch_storage: Constant_array::<Int32, 2> = [0, 0];
+    var scratch_first: *mutable Int32 = &scratch_storage[0];
+    var scratch = create_array_slice_from_pointer(scratch_first, 2u64);
+
+    pipeline doubled_as_float(value: Int32)
+    {
+        map value * 2 => doubled;
+        map doubled as Float32 => result;
+    }
+
+    var written = doubled_as_float(values).separate(scratch).into(buffer);
+    check(written.length == 3u64);
+}
+
+@test
 function test_a_large_enough_buffer() -> ()
 {
     var values: Constant_array::<Int32, 3> = [1, 2, 3];

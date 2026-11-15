@@ -403,6 +403,272 @@ export function run(values: Array_slice::<Int32>) -> ()
         test_pipeline_pass_on_module(input, expected);
     }
 
+    TEST_CASE("Pipeline pass calls a fold function that is not a lambda literal", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+function add(total: Int32, value: Int32) -> (result: Int32)
+{
+    return total + value;
+}
+
+function make_adder() -> (result: Adder)
+{
+    return lambda (a, b) => a + b;
+}
+
+export function run(values: Array_slice::<Int32>, add_value: Adder) -> ()
+{
+    pipeline squares(value: Int32)
+    {
+        map value * value => squared;
+    }
+
+    var sum = squares(values).fold(0, add);
+    var sum_with_value = squares(values).fold(1, add_value);
+    var sum_with_made = squares(values).fold(2, make_adder());
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+lambda Adder(a: Int32, b: Int32) -> (result: Int32);
+
+function add(total: Int32, value: Int32) -> (result: Int32)
+{
+    return total + value;
+}
+
+function make_adder() -> (result: Adder)
+{
+    return lambda(a, b) => a + b;
+}
+
+export function run(values: Array_slice::<Int32>, add_value: Adder) -> ()
+{
+    var sum = ${
+        mutable $pipeline0_accumulator = 0;
+        for $pipeline0_i in 0u64 to values.length
+        {
+            var value = values[$pipeline0_i];
+            var squared = value * value;
+            $pipeline0_accumulator = add($pipeline0_accumulator, squared);
+        }
+        yield $pipeline0_accumulator;
+    };
+    var sum_with_value = ${
+        mutable $pipeline1_accumulator = 1;
+        for $pipeline1_i in 0u64 to values.length
+        {
+            var value = values[$pipeline1_i];
+            var squared = value * value;
+            $pipeline1_accumulator = add_value($pipeline1_accumulator, squared);
+        }
+        yield $pipeline1_accumulator;
+    };
+    var sum_with_made = ${
+        mutable $pipeline2_accumulator = 2;
+        var $pipeline2_function = make_adder();
+        for $pipeline2_i in 0u64 to values.length
+        {
+            var value = values[$pipeline2_i];
+            var squared = value * value;
+            $pipeline2_accumulator = $pipeline2_function($pipeline2_accumulator, squared);
+        }
+        yield $pipeline2_accumulator;
+    };
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
+    TEST_CASE("Pipeline pass expands pipelines inside lambda bodies", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+lambda Action(value: Int32) -> ();
+
+lambda Counter(inputs: Array_slice::<Int32>) -> (result: Uint64);
+
+function use(value: Int32) -> ()
+{
+}
+
+export function run(values: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline large(input: Int32)
+    {
+        filter input > threshold;
+    }
+    var action: Action = lambda(value) => {
+        pipeline shifted(input: Int32)
+        {
+            map input + value => next;
+        }
+        for next in shifted(values)
+        {
+            use(next);
+        }
+    };
+    var count_large: Counter = lambda(inputs) => large(inputs).count();
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+lambda Action(value: Int32) -> ();
+
+lambda Counter(inputs: Array_slice::<Int32>) -> (result: Uint64);
+
+function use(value: Int32) -> ()
+{
+}
+
+export function run(values: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    var action: Action = lambda(value) => {
+        for $pipeline0_i in 0u64 to values.length
+        {
+            var input = values[$pipeline0_i];
+            var next = input + value;
+            use(next);
+        }
+    };
+
+
+    var count_large: Counter = lambda(inputs) => ${
+        mutable $pipeline1_count = 0u64;
+        for $pipeline1_i in 0u64 to inputs.length
+        {
+            var input = inputs[$pipeline1_i];
+            if input > threshold
+            {
+                $pipeline1_count += 1u64;
+            }
+        }
+        yield $pipeline1_count;
+    };
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
+    TEST_CASE("Pipeline pass separates a pipeline into one loop per stage", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+export function run(values: Array_slice::<Int32>, scratch: Array_slice::<mutable Int32>, output: Array_slice::<mutable Float32>, threshold: Int32) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        map value * 2 => doubled;
+        filter doubled > threshold;
+        map doubled as Float32 => result;
+    }
+    var written = process(values).separate(scratch).into(output);
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+export function run(values: Array_slice::<Int32>, scratch: Array_slice::<mutable Int32>, output: Array_slice::<mutable Float32>, threshold: Int32) -> ()
+{
+    var written = ${
+        assert "Pipeline output buffer is large enough" { output.length >= values.length };
+        assert "Pipeline scratch buffer is large enough" { scratch.length >= values.length };
+        mutable $pipeline0_count = values.length;
+        for $pipeline0_i in 0u64 to values.length
+        {
+            var value = values[$pipeline0_i];
+            var doubled = value * 2;
+            scratch[$pipeline0_i] = doubled;
+        }
+        mutable $pipeline0_kept1 = 0u64;
+        for $pipeline0_i1 in 0u64 to $pipeline0_count
+        {
+            var doubled = scratch[$pipeline0_i1];
+            if doubled > threshold
+            {
+                scratch[$pipeline0_kept1] = doubled;
+                $pipeline0_kept1 += 1u64;
+            }
+        }
+        $pipeline0_count = $pipeline0_kept1;
+        for $pipeline0_i2 in 0u64 to $pipeline0_count
+        {
+            var doubled = scratch[$pipeline0_i2];
+            var result = doubled as Float32;
+            output[$pipeline0_i2] = result;
+        }
+        yield create_array_slice_from_pointer(output.data, $pipeline0_count);
+    };
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
+    TEST_CASE("Pipeline pass separates a pipeline whose elements all have the output type", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+export function run(values: Array_slice::<Int32>, output: Array_slice::<mutable Int32>) -> ()
+{
+    pipeline process(value: Int32)
+    {
+        filter value > 0;
+        map value * 2 => doubled;
+        take_while doubled < 100;
+    }
+    var written = process(values).separate().into(output);
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+export function run(values: Array_slice::<Int32>, output: Array_slice::<mutable Int32>) -> ()
+{
+    var written = ${
+        assert "Pipeline output buffer is large enough" { output.length >= values.length };
+        mutable $pipeline0_count = values.length;
+        mutable $pipeline0_kept0 = 0u64;
+        for $pipeline0_i in 0u64 to values.length
+        {
+            var value = values[$pipeline0_i];
+            if value > 0
+            {
+                output[$pipeline0_kept0] = value;
+                $pipeline0_kept0 += 1u64;
+            }
+        }
+        $pipeline0_count = $pipeline0_kept0;
+        for $pipeline0_i1 in 0u64 to $pipeline0_count
+        {
+            var value = output[$pipeline0_i1];
+            var doubled = value * 2;
+            output[$pipeline0_i1] = doubled;
+        }
+        for $pipeline0_i2 in 0u64 to $pipeline0_count
+        {
+            var doubled = output[$pipeline0_i2];
+            if !(doubled < 100)
+            {
+                $pipeline0_count = $pipeline0_i2;
+                break;
+            }
+        }
+        yield create_array_slice_from_pointer(output.data, $pipeline0_count);
+    };
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
     TEST_CASE("Pipeline pass compacts the kept elements of an in_place sink", "[Pipeline_pass][Passes][Pipeline]")
     {
         std::string_view const input = R"(module Pipeline_pass_test;
