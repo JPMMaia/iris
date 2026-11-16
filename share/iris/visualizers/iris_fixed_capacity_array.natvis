@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <!--
+    Fixed_capacity_array::<T, N> debug visualization. Its debug type is named
+    Fixed_capacity_array<T,N> and laid out as { values: T[N], length: Uint64 }.
+    Only the first `length` values are filled.
+  -->
+  <Type Name="Fixed_capacity_array&lt;*,*&gt;">
+    <AlternativeType Name="iris::Fixed_capacity_array&lt;*,*&gt;" />
+    <DisplayString>{{ length={length} capacity={$T2} }}</DisplayString>
+    <Expand>
+      <Item Name="[length]">length</Item>
+      <Item Name="[capacity]">$T2</Item>
+      <ArrayItems>
+        <Size>length</Size>
+        <ValuePointer>values</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>

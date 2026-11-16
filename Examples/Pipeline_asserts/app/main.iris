@@ -1,7 +1,7 @@
 module pipeline_asserts;
 
-// Each test breaks a precondition of a pipeline expansion, so the inline assert it emits must stop
-// the test. They are expected to fail.
+// Each test breaks a precondition of a pipeline expansion or of a Fixed_capacity_array operation,
+// so the check it emits must stop the test. They are expected to fail.
 
 @test
 function test_inputs_of_different_lengths() -> ()
@@ -76,6 +76,32 @@ function test_a_large_enough_buffer() -> ()
 
     var written = plus_one(values).into(buffer);
     check(written.length == 3u64);
+}
+
+@test
+function test_a_push_on_a_full_fixed_capacity_array() -> ()
+{
+    mutable values: Fixed_capacity_array::<Int32, 2> = {};
+    values.push(1);
+    values.push(2);
+    values.push(3);
+    check(values.length == 3u64);
+}
+
+@test
+function test_a_pop_on_an_empty_fixed_capacity_array() -> ()
+{
+    mutable values: Fixed_capacity_array::<Int32, 2> = {};
+    var value = values.pop();
+    check(value == 0);
+}
+
+@test
+function test_an_index_past_the_length_of_a_fixed_capacity_array() -> ()
+{
+    mutable values: Fixed_capacity_array::<Int32, 4> = {};
+    values.push(1);
+    check(values[1] == 0);
 }
 
 @unique_name("main")

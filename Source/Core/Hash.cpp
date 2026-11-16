@@ -175,6 +175,17 @@ namespace iris
             update_hash(state, &data.number_of_bits, sizeof(data.number_of_bits));
             update_hash(state, &data.is_signed, sizeof(data.is_signed));
         }
+        else if (std::holds_alternative<iris::Fixed_capacity_array_type>(type_reference.data))
+        {
+            iris::Fixed_capacity_array_type const& data = std::get<iris::Fixed_capacity_array_type>(type_reference.data);
+
+            for (iris::Type_reference const& value_type : data.value_type)
+            {
+                update_hash(state, value_type);
+            }
+
+            update_hash(state, &data.capacity, sizeof(data.capacity));
+        }
         else if (std::holds_alternative<iris::Optional_type>(type_reference.data))
         {
             iris::Optional_type const& data = std::get<iris::Optional_type>(type_reference.data);

@@ -1578,6 +1578,40 @@
     }
   },
   {
+    "type": "Fixed_capacity_array_capacity",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "Number",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "Fixed_capacity_array_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "Fixed_capacity_array_capacity",
+          "named": true
+        },
+        {
+          "type": "Type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "Function",
     "named": true,
     "fields": {},
@@ -2628,6 +2662,10 @@
           "named": true
         },
         {
+          "type": "Fixed_capacity_array_type",
+          "named": true
+        },
+        {
           "type": "Function_pointer_type",
           "named": true
         },
@@ -3053,6 +3091,10 @@
   {
     "type": "Expression_null_pointer",
     "named": true
+  },
+  {
+    "type": "Fixed_capacity_array",
+    "named": false
   },
   {
     "type": "Identifier",

@@ -216,6 +216,20 @@ namespace iris::binary_serializer
     }
 
     template <>
+    void serialize(Serializer& serializer, Fixed_capacity_array_type const& value)
+    {
+        serialize(serializer, value.value_type);
+        serialize(serializer, value.capacity);
+    }
+
+    template <>
+    void deserialize(Deserializer& deserializer, Fixed_capacity_array_type& value)
+    {
+        deserialize(deserializer, value.value_type);
+        deserialize(deserializer, value.capacity);
+    }
+
+    template <>
     void serialize(Serializer& serializer, Soa_array_type const& value)
     {
         serialize(serializer, value.value_type);

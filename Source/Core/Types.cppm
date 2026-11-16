@@ -20,6 +20,13 @@ namespace iris
     export std::uint64_t get_constant_array_type_size(Type_reference const& type_reference);
     export bool is_constant_array_type_reference(Type_reference const& type);
 
+    export Type_reference create_fixed_capacity_array_type_reference(std::pmr::vector<Type_reference> value_type, std::uint64_t capacity);
+    export bool is_fixed_capacity_array_type_reference(Type_reference const& type);
+    export std::optional<Type_reference> get_fixed_capacity_array_value_type(Type_reference const& type);
+    export std::uint64_t get_fixed_capacity_array_capacity(Type_reference const& type);
+    // Maps a Fixed_capacity_array method (push, pop, clear) to the builtin its access is typed as.
+    export std::optional<std::string_view> get_fixed_capacity_array_method_builtin_name(std::string_view member_name);
+
     export Type_reference create_soa_array_type_reference(std::pmr::vector<Type_reference> value_type, std::uint64_t const size);
     export bool is_soa_array_type_reference(Type_reference const& type);
     export bool is_soa_array_view_type_reference(Type_reference const& type);
@@ -102,6 +109,8 @@ namespace iris
     // as the synthetic Clang record name and the C header exporter as the emitted struct name, so the
     // compiled layout and the exported header describe the same type by construction.
     export std::pmr::string mangle_optional_type_name(std::pmr::vector<Type_reference> const& value_type);
+    export std::pmr::string mangle_fixed_capacity_array_type_name(std::pmr::vector<Type_reference> const& value_type, std::uint64_t capacity);
+    export iris::Struct_declaration create_fixed_capacity_array_type_struct_declaration(std::pmr::vector<Type_reference> const& value_type, std::uint64_t capacity);
 
     // Returns the synthetic struct declaration that describes the members of a builtin
     // generic type, or nullopt if the type is not one. Member lookup, GEP index computation
@@ -172,6 +181,17 @@ namespace iris
         else if (std::holds_alternative<Optional_type>(type_reference.data))
         {
             Optional_type const& data = std::get<Optional_type>(type_reference.data);
+            for (Type_reference const& nested_type_reference : data.value_type)
+            {
+                if (visit_type_references_recursively(nested_type_reference, predicate))
+                    return true;
+            }
+
+            return false;
+        }
+        else if (std::holds_alternative<Fixed_capacity_array_type>(type_reference.data))
+        {
+            Fixed_capacity_array_type const& data = std::get<Fixed_capacity_array_type>(type_reference.data);
             for (Type_reference const& nested_type_reference : data.value_type)
             {
                 if (visit_type_references_recursively(nested_type_reference, predicate))

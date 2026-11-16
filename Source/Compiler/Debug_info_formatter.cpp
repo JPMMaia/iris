@@ -11,6 +11,7 @@ import iris.compiler.common;
 import iris.compiler.types;
 import iris.core;
 import iris.core.declarations;
+import iris.core.types;
 
 namespace iris::compiler
 {
@@ -188,6 +189,18 @@ namespace iris::compiler
                 output += element_type_name;
                 output += std::format("[{}]", value.size);
                 return output;
+            }
+
+            if (std::holds_alternative<Fixed_capacity_array_type>(type_reference.data))
+            {
+                Fixed_capacity_array_type const& value = std::get<Fixed_capacity_array_type>(type_reference.data);
+
+                std::pmr::string element_type_name = !value.value_type.empty() ?
+                    format_debug_type_name_internal(core_module, value.value_type[0], debug_type_database, output_allocator, temporaries_allocator) :
+                    std::pmr::string{ "Void", output_allocator };
+
+                // Shaped like a template instance so that the natvis visualizer can match every T and N.
+                return std::pmr::string{ std::format("Fixed_capacity_array<{},{}>", element_type_name, value.capacity), output_allocator };
             }
 
             if (std::holds_alternative<Custom_type_reference>(type_reference.data))

@@ -403,6 +403,59 @@ export function run(values: Array_slice::<Int32>) -> ()
         test_pipeline_pass_on_module(input, expected);
     }
 
+    TEST_CASE("Pipeline pass expands into_fixed into a Fixed_capacity_array", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+export function run(values: Constant_array::<Int32, 4>) -> ()
+{
+    pipeline odd_squares(value: Int32)
+    {
+        filter value % 2 == 1;
+        map value * value => squared;
+    }
+
+    var squares = odd_squares(values).into_fixed();
+    var again = odd_squares(squares).into_fixed();
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+export function run(values: Constant_array::<Int32, 4>) -> ()
+{
+    var squares = ${
+        mutable $pipeline0_result: Fixed_capacity_array::<Int32, 4> = {};
+        for $pipeline0_i in 0u64 to 4u64
+        {
+            var value = values[$pipeline0_i];
+            if value % 2 == 1
+            {
+                var squared = value * value;
+                $pipeline0_result.push(squared);
+            }
+        }
+        yield $pipeline0_result;
+    };
+    var again = ${
+        mutable $pipeline1_result: Fixed_capacity_array::<Int32, 4> = {};
+        for $pipeline1_i in 0u64 to squares.length
+        {
+            var value = squares[$pipeline1_i];
+            if value % 2 == 1
+            {
+                var squared = value * value;
+                $pipeline1_result.push(squared);
+            }
+        }
+        yield $pipeline1_result;
+    };
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
     TEST_CASE("Pipeline pass calls a fold function that is not a lambda literal", "[Pipeline_pass][Passes][Pipeline]")
     {
         std::string_view const input = R"(module Pipeline_pass_test;

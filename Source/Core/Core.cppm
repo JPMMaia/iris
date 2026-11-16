@@ -192,6 +192,14 @@ namespace iris
         friend bool operator==(Constant_array_type const&, Constant_array_type const&) = default;
     };
 
+    export struct Fixed_capacity_array_type
+    {
+        std::pmr::vector<Type_reference> value_type;
+        std::uint64_t capacity;
+
+        friend bool operator==(Fixed_capacity_array_type const&, Fixed_capacity_array_type const&) = default;
+    };
+
     export struct Soa_array_type
     {
         std::pmr::vector<Type_reference> value_type;
@@ -257,7 +265,8 @@ namespace iris
             Pointer_type,
             Soa_array_type,
             Soa_array_view_type,
-            Type_instance
+            Type_instance,
+            Fixed_capacity_array_type
         >;
 
         Data_type data;

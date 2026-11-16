@@ -344,6 +344,28 @@ namespace iris::compiler
             return statement;
         }
 
+        // <receiver_name>.push(<element_name>);
+        iris::Statement create_push_statement(std::string_view const receiver_name, std::string_view const element_name)
+        {
+            iris::Statement statement;
+            std::uint64_t const call_index = add_expression(statement, iris::Expression{ .data = iris::Call_expression{} });
+            std::uint64_t const access_index = add_expression(statement, iris::Expression{ .data = iris::Access_expression{} });
+            std::uint64_t const receiver_index = add_expression(statement, create_variable_expression(std::pmr::string{ receiver_name }));
+            std::uint64_t const element_index = add_expression(statement, create_variable_expression(std::pmr::string{ element_name }));
+
+            std::get<iris::Access_expression>(statement.expressions[access_index].data) = iris::Access_expression
+            {
+                .expression = to_index(receiver_index),
+                .member_name = std::pmr::string{ "push" },
+            };
+
+            iris::Call_expression& call_expression = std::get<iris::Call_expression>(statement.expressions[call_index].data);
+            call_expression.expression = to_index(access_index);
+            call_expression.arguments.push_back(to_index(element_index));
+
+            return statement;
+        }
+
         // create_array_slice_from_pointer(<output>.data, <count_name>)
         iris::Statement create_written_prefix_statement(std::string_view const output_name, std::string_view const count_name)
         {
@@ -537,11 +559,12 @@ namespace iris::compiler
 
             Pipeline_input input;
 
+            // A Fixed_capacity_array is read like a slice: its length is the fill count, `.length`.
             if (std::holds_alternative<iris::Constant_array_type>(underlying_type->data))
                 input.constant_length = std::get<iris::Constant_array_type>(underlying_type->data).size;
             else if (std::holds_alternative<iris::Soa_array_view_type>(underlying_type->data))
                 input.is_soa = true;
-            else if (!std::holds_alternative<iris::Array_slice_type>(underlying_type->data))
+            else if (!std::holds_alternative<iris::Array_slice_type>(underlying_type->data) && !std::holds_alternative<iris::Fixed_capacity_array_type>(underlying_type->data))
                 return std::nullopt;
 
             input.variable_name = bind_argument_once(statement, argument_index, std::move(generated_name), prologue);
@@ -1320,6 +1343,27 @@ namespace iris::compiler
                 innermost.push_back(create_output_store_statement(input_name, count_name, expansion->output_name));
                 innermost.push_back(create_assignment_statement(count_name, create_uint64_constant_expression(1), iris::Binary_operation::Add));
                 result = create_written_prefix_statement(input_name, count_name);
+            }
+            else if (sink_call.sink_name == "into_fixed")
+            {
+                // The result is a Fixed_capacity_array::<U, N> where N is the inputs' static size. map keeps
+                // the count and filter only removes elements, so every kept element fits.
+                std::optional<iris::Type_reference> const result_type = get_pipeline_sink_type(
+                    context.module_name,
+                    &context.function_declaration,
+                    scope,
+                    statement,
+                    sink_call,
+                    context.declaration_database
+                );
+                if (!result_type.has_value())
+                    return std::nullopt;
+
+                std::pmr::string const result_name = get_pipeline_local_name(pipeline_index, "result");
+
+                statements.push_back(create_default_typed_variable_statement(result_name, result_type.value()));
+                innermost.push_back(create_push_statement(result_name, expansion->output_name));
+                add_expression(result, create_variable_expression(result_name));
             }
             else if (sink_call.sink_name == "into")
             {

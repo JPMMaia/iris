@@ -1026,6 +1026,9 @@ namespace iris::compiler
         if (std::holds_alternative<iris::Constant_array_type>(resolved_type.data))
             return std::get<iris::Constant_array_type>(resolved_type.data).value_type.at(0);
 
+        if (std::holds_alternative<iris::Fixed_capacity_array_type>(resolved_type.data))
+            return std::get<iris::Fixed_capacity_array_type>(resolved_type.data).value_type.at(0);
+
         return std::nullopt;
     }
 

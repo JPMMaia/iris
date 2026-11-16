@@ -864,6 +864,37 @@ namespace iris::parser
 
             return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
         }
+        else if (type_choice == "Fixed_capacity_array_type")
+        {
+            iris::Fixed_capacity_array_type output = {};
+
+            std::optional<Parse_node> const value_type_node = get_child_node(tree, child, 2);
+            if (value_type_node.has_value())
+            {
+                std::optional<iris::Type_reference> value_type = node_to_type_reference(
+                    module_info,
+                    tree,
+                    value_type_node.value(),
+                    output_allocator,
+                    temporaries_allocator
+                );
+
+                if (value_type.has_value())
+                {
+                    output.value_type = std::pmr::vector<iris::Type_reference>{output_allocator};
+                    output.value_type.emplace_back(std::move(value_type.value()));
+                }
+            }
+
+            std::optional<Parse_node> const capacity_node = get_child_node(tree, child, 4);
+            if (capacity_node.has_value())
+            {
+                std::string_view const capacity_string = get_node_value(tree, capacity_node.value());
+                output.capacity = parse_uint64(capacity_string);
+            }
+
+            return iris::Type_reference{ .data = std::move(output), .source_range = source_range };
+        }
         else if (type_choice == "Soa_array_type")
         {
             iris::Soa_array_type output = {};

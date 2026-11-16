@@ -332,6 +332,15 @@ namespace iris::compiler
 
                 return can_assign_type(declaration_database, destination_array_slice_type.element_type[0], constant_array_type.value_type[0]);
             }
+            else if (std::holds_alternative<iris::Fixed_capacity_array_type>(source_type.data))
+            {
+                iris::Fixed_capacity_array_type const& fixed_capacity_array_type = std::get<iris::Fixed_capacity_array_type>(source_type.data);
+
+                if (destination_array_slice_type.element_type.empty() || fixed_capacity_array_type.value_type.empty())
+                    return false;
+
+                return can_assign_type(declaration_database, destination_array_slice_type.element_type[0], fixed_capacity_array_type.value_type[0]);
+            }
         }
 
         if (std::holds_alternative<iris::Constant_array_type>(destination_type.data) && std::holds_alternative<iris::Constant_array_type>(source_type.data))
@@ -2136,6 +2145,44 @@ namespace iris::compiler
     }
 
 
+    // `p->member` where p points at a Fixed_capacity_array: only its public members exist.
+    static std::pmr::vector<iris::compiler::Diagnostic> validate_fixed_capacity_array_dereference_and_access_expression(
+        Validate_expression_parameters const& parameters,
+        iris::Dereference_and_access_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    )
+    {
+        std::optional<iris::Type_reference> const& pointer_type = get_expression_type_from_type_info(parameters.expression_types, expression.expression);
+        if (!pointer_type.has_value() || !std::holds_alternative<iris::Pointer_type>(pointer_type->data))
+            return {};
+
+        iris::Pointer_type const& pointer = std::get<iris::Pointer_type>(pointer_type->data);
+        if (pointer.element_type.empty() || !std::holds_alternative<iris::Fixed_capacity_array_type>(pointer.element_type[0].data))
+            return {};
+
+        bool const is_known_member =
+            expression.member_name == "length" ||
+            expression.member_name == "capacity" ||
+            iris::get_fixed_capacity_array_method_builtin_name(expression.member_name).has_value();
+        if (is_known_member)
+            return {};
+
+        std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module.dependencies, pointer.element_type[0], parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+        return
+        {
+            create_error_diagnostic(
+                parameters.core_module.source_file_path,
+                source_range,
+                std::format(
+                    "Member '{}' does not exist in the type '{}'.",
+                    expression.member_name,
+                    type_full_name
+                )
+            )
+        };
+    }
+
     std::pmr::vector<iris::compiler::Diagnostic> validate_expression(
         Validate_expression_parameters const& parameters
     )
@@ -2267,6 +2314,11 @@ namespace iris::compiler
             iris::While_loop_expression const& value = std::get<iris::While_loop_expression>(expression.data);
             return validate_while_loop_expression(parameters, value, expression.source_range);
         }
+        else if (std::holds_alternative<iris::Dereference_and_access_expression>(expression.data))
+        {
+            iris::Dereference_and_access_expression const& value = std::get<iris::Dereference_and_access_expression>(expression.data);
+            return validate_fixed_capacity_array_dereference_and_access_expression(parameters, value, expression.source_range);
+        }
 
         return {};
     }
@@ -2372,6 +2424,31 @@ namespace iris::compiler
             if (std::holds_alternative<iris::Array_slice_type>(left_hand_side_type->data))
             {
                 if (access_expression.member_name != "data" && access_expression.member_name != "length")
+                {
+                    std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            std::format(
+                                "Member '{}' does not exist in the type '{}'.",
+                                access_expression.member_name,
+                                type_full_name
+                            )
+                        )
+                    };
+                }
+            }
+            else if (std::holds_alternative<iris::Fixed_capacity_array_type>(left_hand_side_type->data))
+            {
+                bool const is_known_member =
+                    access_expression.member_name == "length" ||
+                    access_expression.member_name == "capacity" ||
+                    iris::get_fixed_capacity_array_method_builtin_name(access_expression.member_name).has_value();
+
+                if (!is_known_member)
                 {
                     std::pmr::string const type_full_name = iris::format_type_reference(parameters.core_module.dependencies, left_hand_side_type.value(), parameters.temporaries_allocator, parameters.temporaries_allocator);
 
@@ -2997,6 +3074,73 @@ namespace iris::compiler
         return nullptr;
     }
 
+    // `a.push(v)`, `a.pop()` and `a.clear()`: the receiver `a` and its type info, or nullopt when the
+    // callee is not an access on a Fixed_capacity_array.
+    // `a.push(v)`, `a.pop()` and `a.clear()`, or the same through a pointer, `p->push(v)`: the
+    // Fixed_capacity_array they act on, mutable when `a` is, or when `p` is a *mutable pointer. Nullopt
+    // when the callee is not one of these.
+    static std::optional<Type_info> get_fixed_capacity_array_method_receiver_type_info(
+        Validate_expression_parameters const& parameters,
+        iris::Call_expression const& expression
+    )
+    {
+        iris::Expression const& callee_expression = parameters.statement.expressions[expression.expression.expression_index];
+
+        std::size_t receiver_index = 0;
+        bool is_through_pointer = false;
+        if (std::holds_alternative<iris::Access_expression>(callee_expression.data))
+        {
+            receiver_index = std::get<iris::Access_expression>(callee_expression.data).expression.expression_index;
+        }
+        else if (std::holds_alternative<iris::Dereference_and_access_expression>(callee_expression.data))
+        {
+            receiver_index = std::get<iris::Dereference_and_access_expression>(callee_expression.data).expression.expression_index;
+            is_through_pointer = true;
+        }
+        else
+        {
+            return std::nullopt;
+        }
+
+        if (receiver_index >= parameters.expression_types.size() || !parameters.expression_types[receiver_index].has_value())
+            return std::nullopt;
+
+        Type_info const& receiver_type_info = parameters.expression_types[receiver_index].value();
+
+        if (is_through_pointer)
+        {
+            if (!std::holds_alternative<iris::Pointer_type>(receiver_type_info.type.data))
+                return std::nullopt;
+
+            iris::Pointer_type const& pointer_type = std::get<iris::Pointer_type>(receiver_type_info.type.data);
+            if (pointer_type.element_type.empty() || !std::holds_alternative<iris::Fixed_capacity_array_type>(pointer_type.element_type[0].data))
+                return std::nullopt;
+
+            return Type_info
+            {
+                .type = pointer_type.element_type[0],
+                .is_mutable = pointer_type.is_mutable,
+            };
+        }
+
+        if (!std::holds_alternative<iris::Fixed_capacity_array_type>(receiver_type_info.type.data))
+            return std::nullopt;
+
+        return receiver_type_info;
+    }
+
+    static std::optional<iris::Type_reference> get_fixed_capacity_array_method_receiver_value_type(
+        Validate_expression_parameters const& parameters,
+        iris::Call_expression const& expression
+    )
+    {
+        std::optional<Type_info> const receiver_type_info = get_fixed_capacity_array_method_receiver_type_info(parameters, expression);
+        if (!receiver_type_info.has_value())
+            return std::nullopt;
+
+        return iris::get_fixed_capacity_array_value_type(receiver_type_info->type);
+    }
+
     std::optional<iris::Function_pointer_type> get_function_pointer_type_from_callable(
         Validate_expression_parameters const& parameters,
         iris::Call_expression const& expression,
@@ -3132,6 +3276,41 @@ namespace iris::compiler
                     .type = std::move(function_type),
                     .input_parameter_names = {"pointer", "offset"},
                     .output_parameter_names = {"result"}
+                };
+            }
+            else if (
+                builtin_type_reference.value == "fixed_capacity_array_push" ||
+                builtin_type_reference.value == "fixed_capacity_array_pop" ||
+                builtin_type_reference.value == "fixed_capacity_array_clear"
+            )
+            {
+                std::optional<iris::Type_reference> const value_type = get_fixed_capacity_array_method_receiver_value_type(parameters, expression);
+
+                iris::Function_type function_type
+                {
+                    .input_parameter_types = {},
+                    .output_parameter_types = {},
+                    .is_variadic = false,
+                };
+                std::pmr::vector<std::pmr::string> input_parameter_names;
+                std::pmr::vector<std::pmr::string> output_parameter_names;
+
+                if (builtin_type_reference.value == "fixed_capacity_array_push" && value_type.has_value())
+                {
+                    function_type.input_parameter_types.push_back(value_type.value());
+                    input_parameter_names.push_back("value");
+                }
+                else if (builtin_type_reference.value == "fixed_capacity_array_pop" && value_type.has_value())
+                {
+                    function_type.output_parameter_types.push_back(value_type.value());
+                    output_parameter_names.push_back("value");
+                }
+
+                return iris::Function_pointer_type
+                {
+                    .type = std::move(function_type),
+                    .input_parameter_names = std::move(input_parameter_names),
+                    .output_parameter_names = std::move(output_parameter_names)
                 };
             }
             else if (builtin_type_reference.value == "soa_array_view")
@@ -3351,6 +3530,34 @@ namespace iris::compiler
                             )
                         };
                     }
+                }
+            }
+            else if (
+                builtin_type_reference.value == "fixed_capacity_array_push" ||
+                builtin_type_reference.value == "fixed_capacity_array_pop" ||
+                builtin_type_reference.value == "fixed_capacity_array_clear"
+            )
+            {
+                std::optional<Type_info> const receiver_type_info = get_fixed_capacity_array_method_receiver_type_info(parameters, expression);
+                if (receiver_type_info.has_value() && !receiver_type_info->is_mutable)
+                {
+                    iris::Expression const& callee_expression = parameters.statement.expressions[expression.expression.expression_index];
+                    bool const is_through_pointer = std::holds_alternative<iris::Dereference_and_access_expression>(callee_expression.data);
+                    std::string_view const member_name =
+                        is_through_pointer ?
+                        std::string_view{std::get<iris::Dereference_and_access_expression>(callee_expression.data).member_name} :
+                        std::string_view{std::get<iris::Access_expression>(callee_expression.data).member_name};
+
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            source_range,
+                            is_through_pointer ?
+                            std::format("Cannot call '{}' through a pointer that is not mutable. Use a '*mutable Fixed_capacity_array'.", member_name) :
+                            std::format("Cannot call '{}' on an immutable Fixed_capacity_array.", member_name)
+                        )
+                    };
                 }
             }
             else if (builtin_type_reference.value == "soa_array_view")
@@ -4454,7 +4661,7 @@ namespace iris::compiler
                     parameters.core_module.source_file_path,
                     source_range,
                     std::format(
-                        "Unknown pipeline sink '{}'. Expected 'count', 'any', 'all', 'first', 'fold', 'into' or 'in_place'.",
+                        "Unknown pipeline sink '{}'. Expected 'count', 'any', 'all', 'first', 'fold', 'into', 'into_fixed' or 'in_place'.",
                         sink_call.sink_name
                     )
                 )
@@ -4560,6 +4767,56 @@ namespace iris::compiler
             std::pmr::vector<iris::compiler::Diagnostic> fold_diagnostics = validate_pipeline_fold_function(parameters, pipeline, call_expression);
             if (!fold_diagnostics.empty())
                 return fold_diagnostics;
+        }
+
+        // into_fixed collects into a Fixed_capacity_array::<U, N>, so every input needs a length known at
+        // compile time, and they must agree on it. map keeps the count and filter only removes, so N
+        // elements always fit.
+        if (sink_call.sink_name == "into_fixed")
+        {
+            std::optional<std::uint64_t> capacity = std::nullopt;
+
+            for (iris::Expression_index const input_index : sink_call.input_arguments)
+            {
+                std::optional<iris::Type_reference> const& input_type = get_expression_type_from_type_info(parameters.expression_types, input_index);
+                std::optional<std::uint64_t> const input_capacity = input_type.has_value() ? get_pipeline_input_static_capacity(parameters.declaration_database, input_type.value()) : std::nullopt;
+                std::optional<iris::Source_range> const& input_source_range = parameters.statement.expressions[input_index.expression_index].source_range;
+
+                if (!input_capacity.has_value())
+                {
+                    std::pmr::string const input_type_name = iris::format_type_reference(parameters.core_module.dependencies, input_type, parameters.temporaries_allocator, parameters.temporaries_allocator);
+
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            input_source_range,
+                            std::format(
+                                "Pipeline sink 'into_fixed' needs inputs of type 'Constant_array' or 'Fixed_capacity_array', but got '{}'. Use 'into(out)' for other inputs.",
+                                input_type_name
+                            )
+                        )
+                    };
+                }
+
+                if (capacity.has_value() && capacity.value() != input_capacity.value())
+                {
+                    return
+                    {
+                        create_error_diagnostic(
+                            parameters.core_module.source_file_path,
+                            input_source_range,
+                            std::format(
+                                "Pipeline sink 'into_fixed' needs inputs of the same size, but got {} and {}.",
+                                capacity.value(),
+                                input_capacity.value()
+                            )
+                        )
+                    };
+                }
+
+                capacity = input_capacity;
+            }
         }
 
         if (sink_call.sink_name == "into")
@@ -5247,6 +5504,18 @@ namespace iris::compiler
                     parameters.core_module.source_file_path,
                     source_range,
                     "Could not deduce type to instantiate."
+                )
+            };
+        }
+
+        if (std::holds_alternative<iris::Fixed_capacity_array_type>(type_to_instantiate->data) && !expression.members.empty())
+        {
+            return
+            {
+                create_error_diagnostic(
+                    parameters.core_module.source_file_path,
+                    source_range,
+                    "A Fixed_capacity_array can only be initialized empty, with '{}'. Use push() to add elements."
                 )
             };
         }
@@ -6311,6 +6580,7 @@ namespace iris::compiler
             std::holds_alternative<iris::Instantiate_expression>(right_hand_side.data) &&
             !std::holds_alternative<iris::Array_slice_type>(type.data) &&
             !std::holds_alternative<iris::Optional_type>(type.data) &&
+            !std::holds_alternative<iris::Fixed_capacity_array_type>(type.data) &&
             !std::holds_alternative<iris::Soa_array_type>(type.data) &&
             !std::holds_alternative<iris::Soa_array_view_type>(type.data) &&
             !std::holds_alternative<iris::Constant_array_type>(type.data) &&

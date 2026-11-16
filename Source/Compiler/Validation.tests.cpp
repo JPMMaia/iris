@@ -10064,7 +10064,364 @@ export function run(values: Array_slice::<Int32>, buffer: Array_slice::<mutable 
                 .range = create_source_range(15, 17, 15, 35),
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
-                .message = "Unknown pipeline sink 'sum'. Expected 'count', 'any', 'all', 'first', 'fold', 'into' or 'in_place'.",
+                .message = "Unknown pipeline sink 'sum'. Expected 'count', 'any', 'all', 'first', 'fold', 'into', 'into_fixed' or 'in_place'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates Fixed_capacity_array members, methods and slice conversion", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+function sum(values: Array_slice::<Int32>) -> (result: Int32)
+{
+    return 0;
+}
+
+export function run(input: Constant_array::<Int32, 4>) -> ()
+{
+    mutable values: Fixed_capacity_array::<Int32, 4> = {};
+    values.push(1);
+    var last: Int32 = values.pop();
+    values[0] = last;
+    var first: Int32 = values[0];
+    var length: Uint64 = values.length;
+    var capacity: Uint64 = values.capacity;
+    var total = sum(values);
+    values.clear();
+
+    pipeline doubled(value: Int32)
+    {
+        map value * 2 => twice;
+    }
+
+    var result: Fixed_capacity_array::<Int32, 4> = doubled(input).into_fixed();
+    var again: Fixed_capacity_array::<Int32, 4> = doubled(result).into_fixed();
+    var count = doubled(result).count();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates Fixed_capacity_array methods and members through a pointer", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+function fill(values: *mutable Fixed_capacity_array::<Int32, 4>) -> (result: Uint64)
+{
+    values->clear();
+    values->push(1);
+    values->push(2);
+    var last: Int32 = values->pop();
+    return values->length + values->capacity;
+}
+
+function size(values: *Fixed_capacity_array::<Int32, 4>) -> (result: Uint64)
+{
+    return values->length;
+}
+
+export function run() -> ()
+{
+    mutable values: Fixed_capacity_array::<Int32, 4> = {};
+    var filled = fill(&values);
+    var length = size(&values);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {};
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that push through a pointer needs a mutable pointer", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+function fill(values: *Fixed_capacity_array::<Int32, 4>) -> ()
+{
+    values->push(1);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 5, 5, 20),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot call 'push' through a pointer that is not mutable. Use a '*mutable Fixed_capacity_array'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates the members of a Fixed_capacity_array accessed through a pointer", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+function read(values: *Fixed_capacity_array::<Int32, 4>) -> ()
+{
+    var data = values->values;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 16, 5, 30),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Member 'values' does not exist in the type 'Fixed_capacity_array::<Int32, 4>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that the values of a Fixed_capacity_array are not accessible", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run() -> ()
+{
+    mutable values: Fixed_capacity_array::<Int32, 4> = {};
+    var data = values.values;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 16, 6, 29),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Member 'values' does not exist in the type 'Fixed_capacity_array::<Int32, 4>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that the length of a Fixed_capacity_array is read-only", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run() -> ()
+{
+    mutable values: Fixed_capacity_array::<Int32, 4> = {};
+    values.length = 2u64;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 5, 6, 25),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot modify non-mutable value.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that push is called on a mutable Fixed_capacity_array", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run() -> ()
+{
+    var values: Fixed_capacity_array::<Int32, 4> = {};
+    values.push(1);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 5, 6, 19),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Cannot call 'push' on an immutable Fixed_capacity_array.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates the type of the value pushed to a Fixed_capacity_array", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run() -> ()
+{
+    mutable values: Fixed_capacity_array::<Int32, 4> = {};
+    values.push(1.0f32);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(6, 17, 6, 23),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Argument 0 type is 'Int32' but 'Float32' was provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that a Fixed_capacity_array is initialized empty", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run() -> ()
+{
+    mutable values: Fixed_capacity_array::<Int32, 4> = { length: 2u64 };
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(5, 56, 5, 72),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "A Fixed_capacity_array can only be initialized empty, with '{}'. Use push() to add elements.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates the element type when a Fixed_capacity_array converts to a slice", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+function sum(values: Array_slice::<Int64>) -> (result: Int64)
+{
+    return 0i64;
+}
+
+export function run() -> ()
+{
+    mutable values: Fixed_capacity_array::<Int32, 4> = {};
+    var total = sum(values);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(11, 21, 11, 27),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Argument 0 type is 'Array_slice::<Int64>' but 'Fixed_capacity_array::<Int32, 4>' was provided.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that the into_fixed sink needs inputs of static size", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Array_slice::<Int32>) -> ()
+{
+    pipeline doubled(value: Int32)
+    {
+        map value * 2 => twice;
+    }
+
+    var result = doubled(values).into_fixed();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 26, 10, 32),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline sink 'into_fixed' needs inputs of type 'Constant_array' or 'Fixed_capacity_array', but got 'Array_slice::<Int32>'. Use 'into(out)' for other inputs.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that the into_fixed sink needs inputs of the same size", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(first: Constant_array::<Int32, 4>, second: Constant_array::<Int32, 3>) -> ()
+{
+    pipeline add(a: Int32, b: Int32)
+    {
+        map a + b => sum;
+    }
+
+    var result = add(first, second).into_fixed();
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 29, 10, 35),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline sink 'into_fixed' needs inputs of the same size, but got 4 and 3.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates that the into_fixed sink takes no arguments", "[Validation][Fixed_capacity_array]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(values: Constant_array::<Int32, 4>) -> ()
+{
+    pipeline doubled(value: Int32)
+    {
+        map value * 2 => twice;
+    }
+
+    var result = doubled(values).into_fixed(values);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(10, 18, 10, 52),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline sink 'into_fixed' expects 0 argument(s) but 1 were provided.",
                 .related_information = {},
             }
         };

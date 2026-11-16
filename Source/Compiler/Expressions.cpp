@@ -1238,6 +1238,16 @@ namespace iris::compiler
             }
         }
 
+        if (left_hand_side.type.has_value() && iris::is_fixed_capacity_array_type_reference(left_hand_side.type.value()) && expression.member_name == "capacity")
+        {
+            return Value_and_type
+            {
+                .name = "",
+                .value = llvm::ConstantInt::get(llvm::Type::getInt64Ty(parameters.llvm_context), iris::get_fixed_capacity_array_capacity(left_hand_side.type.value())),
+                .type = create_integer_type_type_reference(64, false)
+            };
+        }
+
         if (left_hand_side.type.has_value())
         {
             std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(left_hand_side.type.value());
@@ -1512,6 +1522,51 @@ namespace iris::compiler
         create_check_failure_instructions(error_message, parameters);
 
         llvm_builder.SetInsertPoint(pass_block);
+    }
+
+    // A Fixed_capacity_array is laid out as { values: [N x T], length: i64 }.
+    // A value returned by a call is not a place, so it gets one.
+    static llvm::Value* get_fixed_capacity_array_pointer(
+        Value_and_type const& fixed_capacity_array_value,
+        llvm::Type* const fixed_capacity_array_llvm_type,
+        Expression_parameters const& parameters
+    )
+    {
+        if (fixed_capacity_array_value.value->getType()->isPointerTy())
+            return fixed_capacity_array_value.value;
+
+        llvm::AllocaInst* const temporary = create_alloca_instruction(parameters.llvm_builder, parameters.llvm_data_layout, *parameters.llvm_parent_function, fixed_capacity_array_llvm_type, "fixed_capacity_array_value");
+        create_store_instruction(parameters.llvm_builder, parameters.llvm_data_layout, fixed_capacity_array_value.value, temporary);
+        return temporary;
+    }
+
+    static llvm::Value* load_fixed_capacity_array_length(
+        llvm::Value* const fixed_capacity_array_pointer,
+        llvm::Type* const fixed_capacity_array_llvm_type,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::Value* const length_pointer = parameters.llvm_builder.CreateStructGEP(fixed_capacity_array_llvm_type, fixed_capacity_array_pointer, 1);
+        return create_load_instruction(parameters.llvm_builder, parameters.llvm_data_layout, llvm::Type::getInt64Ty(parameters.llvm_context), length_pointer);
+    }
+
+    static llvm::Value* create_fixed_capacity_array_element_pointer(
+        llvm::Value* const fixed_capacity_array_pointer,
+        llvm::Type* const fixed_capacity_array_llvm_type,
+        llvm::Value* const index_value,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+        llvm::Type* const values_llvm_type = llvm::cast<llvm::StructType>(fixed_capacity_array_llvm_type)->getElementType(0);
+        llvm::Value* const values_pointer = llvm_builder.CreateStructGEP(fixed_capacity_array_llvm_type, fixed_capacity_array_pointer, 0);
+        llvm::Value* const index_i64 = llvm_builder.CreateIntCast(index_value, llvm::Type::getInt64Ty(parameters.llvm_context), false);
+        return llvm_builder.CreateGEP(
+            values_llvm_type,
+            values_pointer,
+            {llvm_builder.getInt32(0), index_i64},
+            "fixed_capacity_array_element_pointer"
+        );
     }
 
     static void create_decimal_range_check_instructions(
@@ -1908,6 +1963,33 @@ namespace iris::compiler
                 data_pointer,
                 llvm::ArrayRef<llvm::Value*>{index_llvm_value},
                 "array_slice_element_pointer"
+            );
+
+            return Value_and_type
+            {
+                .name = "",
+                .value = element_pointer,
+                .type = element_type
+            };
+        }
+
+        if (is_fixed_capacity_array_type_reference(*left_hand_side_expression_value.type))
+        {
+            llvm::Type* const fixed_capacity_array_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, left_hand_side_expression_value.type.value(), type_database);
+            llvm::Value* const fixed_capacity_array_pointer = get_fixed_capacity_array_pointer(left_hand_side_expression_value, fixed_capacity_array_llvm_type, parameters);
+
+            if (parameters.enable_bounds_checks)
+            {
+                llvm::Value* const length = load_fixed_capacity_array_length(fixed_capacity_array_pointer, fixed_capacity_array_llvm_type, parameters);
+                std::string const error_message = std::format("Out-of-bounds Fixed_capacity_array access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                create_bounds_check_instructions(index_llvm_value, length, error_message, parameters);
+            }
+
+            llvm::Value* const element_pointer = create_fixed_capacity_array_element_pointer(
+                fixed_capacity_array_pointer,
+                fixed_capacity_array_llvm_type,
+                index_llvm_value,
+                parameters
             );
 
             return Value_and_type
@@ -3916,6 +3998,124 @@ namespace iris::compiler
         );
     }
 
+    // `a.push(v)`, `a.pop()` and `a.clear()` on a Fixed_capacity_array, emitted inline.
+    // `a.push(v)`, `a.pop()` and `a.clear()` on a Fixed_capacity_array, or the same through a
+    // pointer, `p->push(v)`, emitted inline.
+    static std::optional<Value_and_type> create_fixed_capacity_array_method_call_value(
+        Call_expression const& expression,
+        iris::Expression_index const receiver_index,
+        std::string_view const member_name,
+        bool const is_through_pointer,
+        Statement const& statement,
+        Expression_parameters const& parameters
+    )
+    {
+        std::optional<std::string_view> const builtin_name = iris::get_fixed_capacity_array_method_builtin_name(member_name);
+        if (!builtin_name.has_value())
+            return std::nullopt;
+
+        // Only a Fixed_capacity_array receiver has these methods; ask the analysis instead of
+        // emitting the receiver, which the regular call path would emit a second time.
+        Scope const scope = create_type_analysis_scope(parameters);
+        std::optional<Type_reference> const receiver_type = get_expression_type(
+            parameters.core_module.name,
+            parameters.function_declaration.has_value() ? parameters.function_declaration.value() : nullptr,
+            scope,
+            statement,
+            statement.expressions[receiver_index.expression_index],
+            std::nullopt,
+            parameters.declaration_database
+        );
+        if (!receiver_type.has_value())
+            return std::nullopt;
+
+        std::optional<Type_reference> const fixed_capacity_array_type_optional =
+            is_through_pointer ?
+            (is_pointer(receiver_type.value()) ? remove_pointer(receiver_type.value()) : std::nullopt) :
+            receiver_type;
+        if (!fixed_capacity_array_type_optional.has_value() || !is_fixed_capacity_array_type_reference(fixed_capacity_array_type_optional.value()))
+            return std::nullopt;
+
+        llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+        llvm::LLVMContext& llvm_context = parameters.llvm_context;
+
+        Type_reference const& fixed_capacity_array_type = fixed_capacity_array_type_optional.value();
+        Type_reference const value_type = iris::get_fixed_capacity_array_value_type(fixed_capacity_array_type).value();
+        std::uint64_t const capacity = iris::get_fixed_capacity_array_capacity(fixed_capacity_array_type);
+
+        llvm::Type* const fixed_capacity_array_llvm_type = type_reference_to_llvm_type(llvm_context, parameters.llvm_data_layout, fixed_capacity_array_type, parameters.type_database);
+
+        // Through a pointer, the pointer's value is the array's address; otherwise the receiver is
+        // the array's own storage.
+        Value_and_type const receiver_value =
+            is_through_pointer ?
+            create_loaded_expression_value(receiver_index.expression_index, statement, parameters) :
+            create_expression_value(receiver_index.expression_index, statement, parameters);
+        if (receiver_value.value == nullptr || !receiver_value.value->getType()->isPointerTy())
+            throw Compile_error{ std::format("'{}' needs a Fixed_capacity_array variable or a pointer to one.", member_name), parameters.source_position };
+
+        llvm::Value* const fixed_capacity_array_pointer = receiver_value.value;
+        llvm::Value* const length_pointer = llvm_builder.CreateStructGEP(fixed_capacity_array_llvm_type, fixed_capacity_array_pointer, 1);
+
+        std::string_view const function_name = parameters.function_declaration.has_value() && *parameters.function_declaration ? std::string_view{(*parameters.function_declaration)->name} : std::string_view{"?"};
+
+        if (builtin_name.value() == "fixed_capacity_array_push")
+        {
+            if (expression.arguments.size() != 1)
+                throw Compile_error{ "Fixed_capacity_array.push() expects 1 argument.", parameters.source_position };
+
+            Expression_parameters argument_parameters = parameters;
+            argument_parameters.expression_type = value_type;
+            Value_and_type const argument_value = create_loaded_expression_value(expression.arguments[0].expression_index, statement, argument_parameters);
+
+            llvm::Value* const length = create_load_instruction(llvm_builder, parameters.llvm_data_layout, llvm::Type::getInt64Ty(llvm_context), length_pointer);
+
+            if (parameters.enable_bounds_checks)
+            {
+                std::string const error_message = std::format("Fixed_capacity_array push on a full array in '{}.{}'!", parameters.core_module.name, function_name);
+                create_bounds_check_instructions(length, llvm_builder.getInt64(capacity), error_message, parameters);
+            }
+
+            llvm::Value* const element_pointer = create_fixed_capacity_array_element_pointer(fixed_capacity_array_pointer, fixed_capacity_array_llvm_type, length, parameters);
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, argument_value.value, element_pointer);
+
+            llvm::Value* const new_length = llvm_builder.CreateAdd(length, llvm_builder.getInt64(1), "fixed_capacity_array_length", true, true);
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, new_length, length_pointer);
+
+            return Value_and_type{ .name = "", .value = nullptr, .type = std::nullopt };
+        }
+        else if (builtin_name.value() == "fixed_capacity_array_pop")
+        {
+            if (!expression.arguments.empty())
+                throw Compile_error{ "Fixed_capacity_array.pop() expects no arguments.", parameters.source_position };
+
+            llvm::Value* const length = create_load_instruction(llvm_builder, parameters.llvm_data_layout, llvm::Type::getInt64Ty(llvm_context), length_pointer);
+
+            if (parameters.enable_bounds_checks)
+            {
+                std::string const error_message = std::format("Fixed_capacity_array pop on an empty array in '{}.{}'!", parameters.core_module.name, function_name);
+                create_bounds_check_instructions(llvm_builder.getInt64(0), length, error_message, parameters);
+            }
+
+            llvm::Value* const new_length = llvm_builder.CreateSub(length, llvm_builder.getInt64(1), "fixed_capacity_array_length", true, true);
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, new_length, length_pointer);
+
+            llvm::Value* const element_pointer = create_fixed_capacity_array_element_pointer(fixed_capacity_array_pointer, fixed_capacity_array_llvm_type, new_length, parameters);
+            llvm::Type* const element_llvm_type = type_reference_to_llvm_type(llvm_context, parameters.llvm_data_layout, value_type, parameters.type_database);
+            llvm::Value* const element_value = create_load_instruction(llvm_builder, parameters.llvm_data_layout, element_llvm_type, element_pointer);
+
+            return Value_and_type{ .name = "", .value = element_value, .type = value_type };
+        }
+        else
+        {
+            if (!expression.arguments.empty())
+                throw Compile_error{ "Fixed_capacity_array.clear() expects no arguments.", parameters.source_position };
+
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, llvm_builder.getInt64(0), length_pointer);
+            return Value_and_type{ .name = "", .value = nullptr, .type = std::nullopt };
+        }
+    }
+
     std::optional<Value_and_type> create_builtin_call_expression_value(
         Call_expression const& expression,
         Statement const& statement,
@@ -3923,6 +4123,35 @@ namespace iris::compiler
     )
     {
         iris::Expression const& left_hand_side = statement.expressions[expression.expression.expression_index];
+
+        if (std::holds_alternative<iris::Access_expression>(left_hand_side.data))
+        {
+            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(left_hand_side.data);
+            std::optional<Value_and_type> value = create_fixed_capacity_array_method_call_value(
+                expression,
+                access_expression.expression,
+                access_expression.member_name,
+                false,
+                statement,
+                parameters
+            );
+            if (value.has_value())
+                return value;
+        }
+        else if (std::holds_alternative<iris::Dereference_and_access_expression>(left_hand_side.data))
+        {
+            iris::Dereference_and_access_expression const& access_expression = std::get<iris::Dereference_and_access_expression>(left_hand_side.data);
+            std::optional<Value_and_type> value = create_fixed_capacity_array_method_call_value(
+                expression,
+                access_expression.expression,
+                access_expression.member_name,
+                true,
+                statement,
+                parameters
+            );
+            if (value.has_value())
+                return value;
+        }
 
         if (std::holds_alternative<iris::Access_expression>(left_hand_side.data))
         {
@@ -5504,6 +5733,29 @@ namespace iris::compiler
                         .value = load_address,
                         .type = value_type.value()
                     };
+
+                    // `p->length` and `p->capacity` on a *Fixed_capacity_array.
+                    if (is_fixed_capacity_array_type_reference(value_type.value()))
+                    {
+                        if (dereference_and_access_expression.member_name == "capacity")
+                        {
+                            return Value_and_type
+                            {
+                                .name = "",
+                                .value = llvm::ConstantInt::get(llvm::Type::getInt64Ty(parameters.llvm_context), iris::get_fixed_capacity_array_capacity(value_type.value())),
+                                .type = create_integer_type_type_reference(64, false)
+                            };
+                        }
+
+                        iris::Struct_declaration const struct_declaration = iris::try_get_builtin_struct_declaration(value_type.value()).value();
+                        return create_access_struct_member(
+                            loaded_left_hand_side,
+                            dereference_and_access_expression.member_name,
+                            "iris.builtin",
+                            struct_declaration,
+                            parameters
+                        );
+                    }
 
                     if (std::holds_alternative<Custom_type_reference>(value_type.value().data))
                     {
@@ -7204,10 +7456,21 @@ namespace iris::compiler
                     if (value_expression.type.has_value())
                         element_type.push_back(value_expression.type.value());
 
+                    // Some accesses compute their value instead of naming storage, such as
+                    // `Fixed_capacity_array.capacity` or `Soa_array.length`. Give those a temporary
+                    // so there is an address to take.
+                    llvm::Value* address = value_expression.value;
+                    if (address != nullptr && !address->getType()->isPointerTy() && parameters.llvm_parent_function != nullptr)
+                    {
+                        llvm::AllocaInst* const temporary = create_alloca_instruction(llvm_builder, llvm_data_layout, *parameters.llvm_parent_function, address->getType(), "address_of_value");
+                        create_store_instruction(llvm_builder, llvm_data_layout, address, temporary);
+                        address = temporary;
+                    }
+
                     return
                     {
                         .name = "",
-                        .value = value_expression.value,
+                        .value = address,
                         .type = create_pointer_type_type_reference(std::move(element_type), true)
                     };
                 }
@@ -7369,6 +7632,31 @@ namespace iris::compiler
             Type_reference const& source_type = value.type.value();
             Type_reference const& expected_type = parameters.expression_type.value();
             
+            if (is_fixed_capacity_array_type_reference(source_type) && is_array_slice_type_reference(expected_type))
+            {
+                llvm::Type* const fixed_capacity_array_llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, source_type, parameters.type_database);
+                llvm::Value* const fixed_capacity_array_pointer = get_fixed_capacity_array_pointer(value, fixed_capacity_array_llvm_type, parameters);
+
+                std::optional<Type_reference> const expected_element_type = get_element_or_pointee_type(expected_type);
+                std::pmr::vector<iris::Type_reference> const element_type{expected_element_type.value()};
+
+                Value_and_type const data_value
+                {
+                    .name = "",
+                    .value = create_fixed_capacity_array_element_pointer(fixed_capacity_array_pointer, fixed_capacity_array_llvm_type, parameters.llvm_builder.getInt64(0), parameters),
+                    .type = std::nullopt,
+                };
+
+                Value_and_type const length_value
+                {
+                    .name = "",
+                    .value = load_fixed_capacity_array_length(fixed_capacity_array_pointer, fixed_capacity_array_llvm_type, parameters),
+                    .type = create_integer_type_type_reference(64, false),
+                };
+
+                return instantiate_array_slice(element_type, data_value, length_value, parameters);
+            }
+
             if (is_constant_array_type_reference(source_type) && is_array_slice_type_reference(expected_type))
             {
                 llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;

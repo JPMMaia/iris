@@ -103,7 +103,8 @@ for $pipeline0_i in 0u64 to values.length
 | Input type | v1 | Notes |
 |---|---|---|
 | `Array_slice::<T>` | yes | Length from `.length`. |
-| `Constant_array::<T, N>` | yes | Length is the constant `N`. Enables the fixed-capacity sink. |
+| `Constant_array::<T, N>` | yes | Length is the constant `N`. Enables the `into_fixed` sink. |
+| `Fixed_capacity_array::<T, N>` | yes | Length is its fill count, `.length`. Enables the `into_fixed` sink, so its results chain. |
 | `Soa_array_view::<T>` | yes (phase 4) | The parameter is bound per field: the expansion reads only the fields the stages use, so unused columns are never loaded. |
 
 An input's element type must equal the matching parameter type.
@@ -119,7 +120,7 @@ An input's element type must equal the matching parameter type.
 | first | `p(inputs).first()` | `Optional::<U>` (see `optional_type.md`) | None |
 | fold | `p(inputs).fold(init, lambda (acc, v) => expression)` or `p(inputs).fold(init, f)` | type of `init` | None |
 | in place | `p.in_place(list)` | `Array_slice::<mutable T>`, the kept prefix | Overwrites `list` |
-| fixed capacity | `p(constant_array)` used as a value | `Fixed_capacity_array::<U, N>` (deferred, see Future work) | Stack |
+| into fixed | `p(inputs).into_fixed()` | `Fixed_capacity_array::<U, N>`, where every input is a `Constant_array::<_, N>` or a `Fixed_capacity_array::<_, N>` | Stack |
 | separated into | `p(inputs).separate([scratch]).into(out)` | as `into` | `out`, plus `scratch` when a stage produces a type other than `U` (see Step 5) |
 
 Bounds:
@@ -209,7 +210,8 @@ Analysis computes the type of each `map` binding in order and the output element
 Validation errors:
 - A `filter` expression is not `Bool`.
 - A `map` binding shadows a parameter or an earlier binding.
-- A pipeline call is used without a sink (`var x = p(list);` with a non-`Constant_array` input, or passed as an argument).
+- A pipeline call is used without a sink (`var x = p(list);`, or passed as an argument).
+- `into_fixed` is used with an input whose size is not known at compile time, or with inputs of different sizes.
 - An input element type does not match its parameter type.
 - An in-place sink is used with several parameters, mismatched types or an immutable slice.
 - `any` / `all` are used when the output element is not `Bool`.
@@ -304,7 +306,7 @@ var written = ${
 
 1. Grammar, core representation, analysis and validation, plus the for-loop sink with `map` / `filter` and single or multiple parameters.
 2. `Statement_block_expression` (core, analysis, codegen), then the `into` sink with its inline assert, `count`, `any`, `all`, `fold`, `first`.
-3. In place. (Fixed capacity is deferred until the `Fixed_capacity_array` builtin type exists; see Future work.)
+3. In place, then the `Fixed_capacity_array` builtin type and the `into_fixed` sink.
 4. `Soa_array_view` inputs.
 5. `separate`, `take_while`, `enumerate`.
 
@@ -314,7 +316,7 @@ Phase 1 is implemented (grammar, core nodes, converter, formatter, analysis, val
 
 Phase 2 is implemented: `Statement_block_expression` (core, analysis, codegen, formatter) and the `count`, `any`, `all`, `into`, `fold` and `first` value sinks. They work in any expression position: runtime tests cover a `while` condition (re-run on every check), the right of `&&` (short-circuited) and call arguments (evaluated in order). The equal-length and `into` capacity asserts are covered by `Examples/Pipeline_asserts`, run one test at a time because an abort ends the run.
 
-Phase 3 is implemented: the `in_place` sink. The fixed-capacity sink is deferred: its result type needs a home first, because Iris has no anonymous struct types. It will use a new `Fixed_capacity_array` builtin type (see Future work).
+Phase 3 is implemented: the `in_place` sink, the `Fixed_capacity_array::<T, N>` builtin type and the `into_fixed` sink (see "Fixed_capacity_array and into_fixed" below).
 
 Phase 4 is implemented: `Soa_array_view::<T>` inputs (mutable or not), alone or in lockstep with other inputs.
 
@@ -341,7 +343,7 @@ Decisions taken while implementing:
 - A `Soa_array_view` parameter `p` is bound per field when every use of it, and of its immutable copies (`var q = p;`, which is what a for-each loop variable or a `map p => q` becomes), is a member access `p.field`. Each used field is read once at the top of the iteration, `var $pipeline<N>_<p>_<field> = input->field[$pipeline<N>_i];`, the accesses are rewritten to that local, and the copies are removed. Reading at the top keeps the semantics of `var p = input[i];` even when the body writes to the view. Any other use (passing `p` to a function, storing it, a `mutable` copy, a lambda parameter of the same name) falls back to `var p = input[i];`. So does any expression whose nested statements the pass's walker does not know how to reach, so a use can never be missed.
 - `take_while <expression>;` expands to `if !(<expression>) { break; }` at its position among the stages, so it stops the whole loop, and after a `filter` it only sees the kept elements. Its expression must be `Bool`. `enumerate => <name>;` expands to `var <name> = $pipeline<N>_i;`: the index in the inputs, before any filter, typed `Uint64`. It is a binding like a map binding (same collision rules) but never the output element. Both are keywords only inside a pipeline body; the corpus checks they stay usable as identifiers elsewhere. The new `Pipeline_stage_kind` values are appended.
 - The JSON serializer's `Generated.cppm` is regenerated from `Core.cppm` at build time, and its parser takes a comment inside an enum body for an enum value, so enum comments go above the enum.
-- Zero cost is tested in `Compiler.tests.cpp` ("Pipelines compile to the same optimized code as the hand-written loops"). `Examples/txt/pipeline_zero_cost.iris` and `pipeline_zero_cost_hand_written.iris` define the same six functions (a for-each with filter and map, a two-input `fold`, `count`, `any`, `in_place`, and a `Soa_array_view` input), as pipelines and as hand-written loops. Both are compiled at O2, with and without bounds checks, and each pair must be the same code. They are separate modules so that `MergeFunctionsPass` cannot fold one into the other. The comparison renames locals and labels in order of appearance, drops IR comments, masks error-message lengths (they embed the module name and path) and lets the `phi`s at the start of a block appear in any order (that order follows variable declaration order). The hand-written SoA loop reads its fields at the top of the iteration, as the expansion does; reading one inside the `if` gives the same instructions without bounds checks but a different block layout with them.
+- Zero cost is tested in `Compiler.tests.cpp` ("Pipelines compile to the same optimized code as the hand-written loops"). `Examples/txt/pipeline_zero_cost.iris` and `pipeline_zero_cost_hand_written.iris` define the same functions (a for-each with filter and map, a two-input `fold`, `count`, `any`, `in_place`, a `Soa_array_view` input, a `fold` with a named function, and `into_fixed`), as pipelines and as hand-written loops. Both are compiled at O2, with and without bounds checks, and each pair must be the same code. They are separate modules so that `MergeFunctionsPass` cannot fold one into the other. The comparison renames locals and labels in order of appearance, drops IR comments, masks error-message lengths (they embed the module name and path) and lets the `phi`s at the start of a block appear in any order (that order follows variable declaration order). The hand-written SoA loop reads its fields at the top of the iteration, as the expansion does; reading one inside the `if` gives the same instructions without bounds checks but a different block layout with them.
 - Getting O2 to run at all fixed two latent bugs in `initialize_llvm` / `optimize_llvm_module`, since nothing had ever compiled with `is_optimized` (`Source/Builder/main.cpp` still hard-codes it to false). The `PassBuilder` was a local, but the analyses it registers call back into it, so it now lives in `Optimization_managers` (declared first, so it outlives the managers) and gets the target machine. And the module pass manager was built once per `LLVM_data` and reused; the O1+ pipelines contain `ModuleInlinerWrapperPass`, which moves its inner CGSCC pipeline out on its first run, so the second module crashed on null passes. The pipeline is now built on each `optimize_llvm_module` call, and the analysis caches are cleared afterwards, since they are keyed by IR addresses a later module may reuse.
 - `first` expands to `mutable $r: Optional::<U> = {};` and, for the first kept element, `$r = create_optional(<output>); break;`.
 - The test runner (`share/iris/source/tests_main.cpp`) calls `_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT)` on Windows. The Debug CRT otherwise shows an "abort() has been called" message box before raising `SIGABRT`, which hung every headless run with a failing `assert`.
@@ -357,6 +359,50 @@ Known gaps:
 - Language server: scopes inside pipelines and for-each bodies are computed, but hover / go-to / completion have no pipeline-specific handling.
 - `separate` only feeds `into`, and its stages form a linear chain (see Step 5).
 
+## Fixed_capacity_array and into_fixed
+
+`Fixed_capacity_array::<T, N>` is a builtin type: a stack array of capacity `N` with a fill count. `into_fixed` collects a pipeline into one, so a pipeline over `Constant_array` inputs needs no caller-provided buffer.
+
+```
+mutable values: Fixed_capacity_array::<Int32, 4> = {};
+values.push(1);
+var last = values.pop();
+values[0] = 2;
+var n = values.length;      // Uint64, read-only
+var c = values.capacity;    // Uint64, the constant N
+values.clear();
+sum(values);                // converts to Array_slice::<Int32> of the filled part
+
+var squares = odd_squares(constant_array).into_fixed();   // Fixed_capacity_array::<Int32, N>
+```
+
+Decisions taken while implementing:
+- Layout `{ values: Constant_array::<T, N>; length: Uint64 }`. `values` is internal: validation rejects it ("Member 'values' does not exist ..."). `{}` is the only initializer; any member gives "A Fixed_capacity_array can only be initialized empty, with '{}'. Use push() to add elements.".
+- `N` is a literal, like `Constant_array`. A generic `N` is not supported.
+- `Fixed_capacity_array_type` is appended at the end of the `Type_reference` variant, because the hash includes the variant index. Like `Optional::<T>`, its record is synthesized per `T, N` by `try_get_builtin_struct_declaration`, named `Fixed_capacity_array_<T>_<N>` (the C header uses the same name), and collected per module for LLVM, Clang and the C header exporter. The exporter writes these records after the records their members use.
+- `push`, `pop` and `clear` are typed as builtin references (`fixed_capacity_array_push` and so on), like `Soa_array.view`, and are emitted inline in `create_builtin_call_expression_value`. They need a mutable receiver ("Cannot call 'push' on an immutable Fixed_capacity_array."). `pop` returns `T`.
+- Through a pointer, `p->push(v)`, `p->pop()`, `p->clear()`, `p->length` and `p->capacity` work too. The methods need a `*mutable` pointer ("Cannot call 'push' through a pointer that is not mutable. ..."), and `p->values` is rejected like `a.values`.
+- With bounds checks on, `a[i]` checks `i < length` ("Out-of-bounds Fixed_capacity_array access"), `push` checks `length < N` ("Fixed_capacity_array push on a full array") and `pop` checks `length > 0` ("Fixed_capacity_array pop on an empty array"). Without bounds checks they are unchecked, like other indexing.
+- The conversion to `Array_slice::<T>` follows `Constant_array`'s: `can_assign_type` allows it, and `convert_to_expected_type_if_needed` builds `{ &values[0], length }`.
+- The sink is an explicit call, `p(inputs).into_fixed()`, like the other value sinks, rather than the pipeline call used as a value. So "Pipeline 'p' is not a value" stays unconditional. It expands to:
+
+  ```
+  var result = ${
+      mutable $pipeline0_result: Fixed_capacity_array::<U, N> = {};
+      for $pipeline0_i in 0u64 to N
+      {
+          ... stages ...
+          $pipeline0_result.push(<output>);
+      }
+      yield $pipeline0_result;
+  };
+  ```
+
+  It uses `push` rather than writing to `values`, so the field stays internal. This costs nothing: with bounds checks, `push`'s `length < N` check is the same one a `values[length]` store would make. The zero-cost test compares it against a hand-written `push` loop.
+- Taking the address of an access whose value is computed rather than stored (`.capacity`, `Soa_array.length`) now spills it to a temporary. `check(a.capacity == 4u64)` needed this, because the test-mode rewrite of `check(x == y)` passes `&x` and `&y` to `print_json_difference`.
+- Debug info names the record `Fixed_capacity_array<T,N>`, which `share/iris/visualizers/iris_fixed_capacity_array.natvis` matches, showing the first `length` values.
+- Not done: compile-time reflection reports the type kind as `Custom`, because a new kind would change `Builtin.iris`. `p[i]` on a pointer stays pointer indexing; write `(*p)[i]` to index the array.
+
 ## Verification
 
 - `Examples/txt/pipeline_*.iris`: one file per sink, plus multiple parameters, captured locals and nested pipelines inside `for` bodies.
@@ -369,25 +415,6 @@ Known gaps:
 - Tree-sitter: confirm `map` / `filter` still work as ordinary identifiers outside pipeline bodies.
 
 ## Future work
-
-- **`Fixed_capacity_array::<T, N>` builtin type, then the fixed-capacity sink.**
-  1. Add the type as a builtin, following `Optional::<T>` (its own `Type_reference` alternative, appended at the end of the variant): grammar for `Fixed_capacity_array::<T, N>`, core, converter, formatter, JSON / binary serializers, analysis, validation, LLVM type mapping, debug info (and a natvis visualizer like `Soa_array`), and the C header exporter. Its layout is `{ values: Constant_array::<T, N>; length: Uint64 }`, it defaults to empty with `{}`, and it is usable by users directly, as a stack-allocated array with a fill count. Consider a way to view it as an `Array_slice::<T>` of its filled part.
-  2. Then the sink: a pipeline call whose inputs are all `Constant_array::<_, N>` becomes a valid value of type `Fixed_capacity_array::<U, N>` (lift the "Pipeline 'p' is not a value" error only for that case). It expands like `into`, with the block declaring the result itself and no capacity assert, since `map` keeps the count and `filter` only removes elements:
-
-     ```
-     var result = ${
-         mutable $pipeline0_result: Fixed_capacity_array::<U, N> = {};
-         for $pipeline0_i in 0u64 to N
-         {
-             ... stages ...
-             $pipeline0_result.values[$pipeline0_result.length] = <output>;
-             $pipeline0_result.length += 1u64;
-         }
-         yield $pipeline0_result;
-     };
-     ```
-
-  A `type_constructor` in `Builtin.iris` was considered and rejected: it would add a declaration to every module, changing builtin hashes and serialized output for a language-level type.
 
 - **User-facing value blocks** (separate plan). Expose `Statement_block_expression` as syntax. Open questions: an explicit `yield value;` (preferred, it fits Iris's explicitness) or a trailing expression without `;`; what `return`, `break`, `continue` and `defer` do inside a value block; and whether `if` / `switch` should become value-producing on top of it.
 - **Module-level and exported pipelines.** These need a parameter story for outside values and binary serialization.

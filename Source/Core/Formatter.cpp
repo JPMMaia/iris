@@ -1950,6 +1950,15 @@ namespace iris
             add_integer_text(buffer, value.size);
             add_text(buffer, ">");
         }
+        else if (std::holds_alternative<Fixed_capacity_array_type>(type.data))
+        {
+            Fixed_capacity_array_type const& value = std::get<Fixed_capacity_array_type>(type.data);
+            add_text(buffer, "Fixed_capacity_array::<");
+            add_format_type_name(buffer, value.value_type, options);
+            add_text(buffer, ", ");
+            add_integer_text(buffer, value.capacity);
+            add_text(buffer, ">");
+        }
         else if (std::holds_alternative<Optional_type>(type.data))
         {
             Optional_type const& value = std::get<Optional_type>(type.data);

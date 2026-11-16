@@ -221,6 +221,53 @@ struct Array_slice_my_namespace_My_struct
         test_c_exporter(source, {}, {}, expected);
     }
 
+    TEST_CASE("Export Fixed_capacity_array type", "[C_header_exporter][Fixed_capacity_array]")
+    {
+        std::string_view const source = R"RAW(module my.namespace;
+
+export struct My_struct
+{
+    a: Fixed_capacity_array::<Int32, 4> = {};
+    b: Fixed_capacity_array::<Optional::<Int32>, 2> = {};
+}
+)RAW";
+
+        std::string_view const expected = R"RAW(
+struct Fixed_capacity_array_Int32_4
+{
+    int32_t values[4];
+    uint64_t length;
+};
+
+struct Optional_Int32
+{
+    int32_t value;
+    bool has_value;
+};
+
+struct Fixed_capacity_array_Optional_Int32_2
+{
+    struct Optional_Int32 values[2];
+    uint64_t length;
+};
+
+/** IRIS_META v=1 module=my.namespace name=My_struct kind=struct */
+struct my_namespace_My_struct
+{
+    struct Fixed_capacity_array_Int32_4 a;
+    struct Fixed_capacity_array_Optional_Int32_2 b;
+};
+
+struct Array_slice_my_namespace_My_struct
+{
+    struct my_namespace_My_struct* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(source, {}, {}, expected);
+    }
+
     TEST_CASE("Export structs")
     {
         std::string_view const input = R"RAW(module my.namespace;

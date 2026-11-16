@@ -323,6 +323,28 @@ namespace iris::compiler
 
             return constant_array_type.value_type[0];
         }
+        else if (std::holds_alternative<iris::Fixed_capacity_array_type>(underlying_type->data))
+        {
+            return iris::get_fixed_capacity_array_value_type(underlying_type.value());
+        }
+
+        return std::nullopt;
+    }
+
+    std::optional<std::uint64_t> get_pipeline_input_static_capacity(
+        iris::Declaration_database const& declaration_database,
+        iris::Type_reference const& input_type
+    )
+    {
+        std::optional<iris::Type_reference> const underlying_type = get_underlying_type(declaration_database, input_type);
+        if (!underlying_type.has_value())
+            return std::nullopt;
+
+        if (std::holds_alternative<iris::Constant_array_type>(underlying_type->data))
+            return std::get<iris::Constant_array_type>(underlying_type->data).size;
+
+        if (std::holds_alternative<iris::Fixed_capacity_array_type>(underlying_type->data))
+            return std::get<iris::Fixed_capacity_array_type>(underlying_type->data).capacity;
 
         return std::nullopt;
     }
@@ -413,7 +435,7 @@ namespace iris::compiler
 
     bool is_pipeline_sink_name(std::string_view const name)
     {
-        return name == "count" || name == "any" || name == "all" || name == "into" || name == "fold" || name == "first" || name == "in_place";
+        return name == "count" || name == "any" || name == "all" || name == "into" || name == "fold" || name == "first" || name == "in_place" || name == "into_fixed";
     }
 
     // When the expression at `index` is `p(inputs).separate(...)` and `p` is a pipeline in scope.
@@ -698,6 +720,26 @@ namespace iris::compiler
                 return std::nullopt;
 
             return create_array_slice_type_reference({ std::move(output_type.value()) }, true);
+        }
+
+        if (sink_call.sink_name == "into_fixed")
+        {
+            if (sink_call.input_arguments.empty())
+                return std::nullopt;
+
+            std::optional<iris::Type_reference> const first_input_type = get_expression_type(module_name, function_declaration, scope, statement, statement.expressions[sink_call.input_arguments[0].expression_index], std::nullopt, declaration_database);
+            if (!first_input_type.has_value())
+                return std::nullopt;
+
+            std::optional<std::uint64_t> const capacity = get_pipeline_input_static_capacity(declaration_database, first_input_type.value());
+            if (!capacity.has_value())
+                return std::nullopt;
+
+            std::optional<iris::Type_reference> output_type = get_pipeline_output_type(module_name, function_declaration, scope, *sink_call.pipeline, declaration_database);
+            if (!output_type.has_value())
+                return std::nullopt;
+
+            return create_fixed_capacity_array_type_reference({ std::move(output_type.value()) }, capacity.value());
         }
 
         return std::nullopt;
@@ -2166,6 +2208,27 @@ namespace iris::compiler
 
                 return std::nullopt;
             }
+            else if (std::holds_alternative<iris::Fixed_capacity_array_type>(type_reference.value().data))
+            {
+                if (data.member_name == "length" || data.member_name == "capacity")
+                {
+                    return Type_info
+                    {
+                        .type = iris::create_integer_type_type_reference(64, false),
+                        .is_mutable = false,
+                    };
+                }
+                else if (std::optional<std::string_view> const method_name = get_fixed_capacity_array_method_builtin_name(data.member_name); method_name.has_value())
+                {
+                    return Type_info
+                    {
+                        .type = create_builtin_type_reference(std::pmr::string{method_name.value()}),
+                        .is_mutable = false,
+                    };
+                }
+
+                return std::nullopt;
+            }
             else if (std::holds_alternative<iris::Optional_type>(type_reference.value().data))
             {
                 iris::Optional_type const& optional_type = std::get<iris::Optional_type>(type_reference.value().data);
@@ -2457,6 +2520,18 @@ namespace iris::compiler
                     .is_mutable = lhs_type_info->is_mutable,
                 };
             }
+            else if (std::holds_alternative<iris::Fixed_capacity_array_type>(lhs_type_reference->data))
+            {
+                iris::Fixed_capacity_array_type const& array_type = std::get<iris::Fixed_capacity_array_type>(lhs_type_reference->data);
+                if (array_type.value_type.empty())
+                    return std::nullopt;
+
+                return Type_info
+                {
+                    .type = array_type.value_type[0],
+                    .is_mutable = lhs_type_info->is_mutable,
+                };
+            }
             else if (std::holds_alternative<iris::Soa_array_type>(lhs_type_reference->data))
             {
                 iris::Soa_array_type const& array_type = std::get<iris::Soa_array_type>(lhs_type_reference->data);
@@ -2553,6 +2628,41 @@ namespace iris::compiler
                 if (builtin_type_reference.value == "check")
                 {
                     return std::nullopt;
+                }
+                else if (builtin_type_reference.value == "fixed_capacity_array_push" || builtin_type_reference.value == "fixed_capacity_array_clear")
+                {
+                    return std::nullopt;
+                }
+                else if (builtin_type_reference.value == "fixed_capacity_array_pop")
+                {
+                    // The receiver is `a` in `a.pop()`, or the pointer `p` in `p->pop()`.
+                    iris::Expression const& callable_expression = statement.expressions[data.expression.expression_index];
+                    std::optional<iris::Expression_index> receiver_index = std::nullopt;
+                    if (std::holds_alternative<iris::Access_expression>(callable_expression.data))
+                        receiver_index = std::get<iris::Access_expression>(callable_expression.data).expression;
+                    else if (std::holds_alternative<iris::Dereference_and_access_expression>(callable_expression.data))
+                        receiver_index = std::get<iris::Dereference_and_access_expression>(callable_expression.data).expression;
+                    if (!receiver_index.has_value())
+                        return std::nullopt;
+
+                    std::optional<iris::Type_reference> receiver_type = get_expression_type(module_name, nullptr, scope, statement, statement.expressions[receiver_index->expression_index], std::nullopt, declaration_database);
+                    if (!receiver_type.has_value())
+                        return std::nullopt;
+
+                    if (is_pointer(receiver_type.value()))
+                        receiver_type = remove_pointer(receiver_type.value());
+                    if (!receiver_type.has_value())
+                        return std::nullopt;
+
+                    std::optional<iris::Type_reference> value_type = iris::get_fixed_capacity_array_value_type(receiver_type.value());
+                    if (!value_type.has_value())
+                        return std::nullopt;
+
+                    return Type_info
+                    {
+                        .type = std::move(value_type.value()),
+                        .is_mutable = false,
+                    };
                 }
                 else if (builtin_type_reference.value == "create_array_slice_from_pointer")
                 {
@@ -2841,6 +2951,30 @@ namespace iris::compiler
             std::optional<Type_reference> const left_side_value_type = remove_pointer(left_side_type.value());
             if (!left_side_value_type.has_value())
                 return std::nullopt;
+
+            // `p->length`, `p->capacity` and `p->push(...)` on a *Fixed_capacity_array. The methods
+            // can mutate only through a *mutable pointer, which validation checks.
+            if (std::holds_alternative<iris::Fixed_capacity_array_type>(left_side_value_type->data))
+            {
+                if (data.member_name == "length" || data.member_name == "capacity")
+                {
+                    return Type_info
+                    {
+                        .type = iris::create_integer_type_type_reference(64, false),
+                        .is_mutable = false,
+                    };
+                }
+                else if (std::optional<std::string_view> const method_name = get_fixed_capacity_array_method_builtin_name(data.member_name); method_name.has_value())
+                {
+                    return Type_info
+                    {
+                        .type = create_builtin_type_reference(std::pmr::string{method_name.value()}),
+                        .is_mutable = false,
+                    };
+                }
+
+                return std::nullopt;
+            }
 
             std::optional<Type_reference> const underlying_type =
                 std::holds_alternative<iris::Custom_type_reference>(left_side_value_type->data) ?
@@ -3187,7 +3321,7 @@ namespace iris::compiler
                 };
             }
 
-            if (std::holds_alternative<iris::Optional_type>(type_to_instantiate->data))
+            if (std::holds_alternative<iris::Optional_type>(type_to_instantiate->data) || std::holds_alternative<iris::Fixed_capacity_array_type>(type_to_instantiate->data))
             {
                 return Type_info
                 {

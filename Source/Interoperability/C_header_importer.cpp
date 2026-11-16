@@ -2291,6 +2291,20 @@ namespace iris::c
                 );
             }
         }
+        else if (std::holds_alternative<iris::Fixed_capacity_array_type>(type.data))
+        {
+            iris::Fixed_capacity_array_type& data = std::get<iris::Fixed_capacity_array_type>(type.data);
+
+            for (iris::Type_reference& reference : data.value_type)
+            {
+                convert_typedef_to_integer_type_if_necessary(
+                    reference,
+                    alias_type_declarations,
+                    integer_alias_names,
+                    integer_alias_indices
+                );
+            }
+        }
         else if (std::holds_alternative<iris::Optional_type>(type.data))
         {
             iris::Optional_type& data = std::get<iris::Optional_type>(type.data);

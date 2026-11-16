@@ -95,3 +95,14 @@ export function sum_of_odd_cubes(values: Array_slice::<Int32>) -> (result: Int32
 
     return odd(values).fold(0, add_cube);
 }
+
+export function odd_squares(values: Constant_array::<Int32, 8>) -> (result: Fixed_capacity_array::<Int32, 8>)
+{
+    pipeline odd_squares_of(value: Int32)
+    {
+        filter value % 2 == 1;
+        map value * value => squared;
+    }
+
+    return odd_squares_of(values).into_fixed();
+}

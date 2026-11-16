@@ -1,0 +1,26 @@
+module Fixed_capacity_array;
+
+function sum(values: Array_slice::<Int32>) -> (result: Int32)
+{
+    mutable total = 0;
+    for index in 0u64 to values.length
+    {
+        total += values[index];
+    }
+    return total;
+}
+
+export function run() -> (result: Int32)
+{
+    mutable values: Fixed_capacity_array::<Int32, 4> = {};
+    values.push(1);
+    values.push(2);
+    values.push(3);
+    var last = values.pop();
+    values[0] = values[1] + last;
+    var length = values.length;
+    var capacity = values.capacity;
+    var total = sum(values);
+    values.clear();
+    return total + (length as Int32) + (capacity as Int32);
+}

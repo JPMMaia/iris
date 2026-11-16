@@ -732,9 +732,10 @@ namespace iris::compiler
         };
     }
 
-    // Collects the synthetic struct declaration of every distinct Optional::<T> used in a module.
+    // Collects the synthetic struct declaration of every distinct Optional::<T> and
+    // Fixed_capacity_array::<T, N> used in a module, because their layouts depend on T.
     // Optionals of pointers are skipped: they are represented as the bare pointer and have no record.
-    std::pmr::vector<Struct_declaration> collect_optional_struct_declarations(
+    std::pmr::vector<Struct_declaration> collect_builtin_struct_declarations(
         Module const& core_module
     )
     {
@@ -750,7 +751,11 @@ namespace iris::compiler
                     {
                         std::optional<Struct_declaration> struct_declaration = iris::try_get_builtin_struct_declaration(nested_type_reference);
 
-                        if (struct_declaration.has_value() && std::holds_alternative<Optional_type>(nested_type_reference.data))
+                        bool const is_per_type_record =
+                            std::holds_alternative<Optional_type>(nested_type_reference.data) ||
+                            std::holds_alternative<Fixed_capacity_array_type>(nested_type_reference.data);
+
+                        if (struct_declaration.has_value() && is_per_type_record)
                         {
                             bool const already_collected = std::any_of(
                                 result.begin(),
@@ -784,9 +789,9 @@ namespace iris::compiler
         LLVM_type_map& llvm_type_map = type_database.name_to_llvm_type[core_module.name];
 
         {
-            std::pmr::vector<Struct_declaration> const optional_struct_declarations = collect_optional_struct_declarations(core_module);
+            std::pmr::vector<Struct_declaration> const builtin_struct_declarations = collect_builtin_struct_declarations(core_module);
             LLVM_type_map& builtin_llvm_type_map = type_database.name_to_llvm_type["iris.builtin"];
-            add_struct_declarations(clang_module_data, "iris.builtin", optional_struct_declarations, builtin_llvm_type_map);
+            add_struct_declarations(clang_module_data, "iris.builtin", builtin_struct_declarations, builtin_llvm_type_map);
         }
 
         add_enum_types(llvm_context, core_module.export_declarations.enum_declarations, llvm_type_map);
@@ -1085,6 +1090,89 @@ namespace iris::compiler
         );
 
         return array_type;
+    }
+
+    llvm::DIType* fixed_capacity_array_type_to_llvm_debug_type(
+        llvm::DIBuilder& llvm_debug_builder,
+        llvm::DIScope& llvm_debug_scope,
+        llvm::DataLayout const& llvm_data_layout,
+        iris::Module const& core_module,
+        Fixed_capacity_array_type const& type,
+        Debug_type_database const& debug_type_database
+    )
+    {
+        llvm::DIType* const element_type =
+            !type.value_type.empty() ?
+            type_reference_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, type.value_type[0], debug_type_database) :
+            llvm_debug_builder.createUnspecifiedParameter();
+
+        std::uint64_t const element_size_in_bits = element_type->getSizeInBits();
+        std::uint32_t const element_alignment_in_bits = std::max(element_type->getAlignInBits(), 8u);
+        std::uint64_t const values_size_in_bits = element_size_in_bits * type.capacity;
+
+        std::array<llvm::Metadata*, 1> const subscripts
+        {
+            llvm_debug_builder.getOrCreateSubrange(0, static_cast<std::int64_t>(type.capacity))
+        };
+
+        llvm::DICompositeType* const values_type = llvm_debug_builder.createArrayType(
+            values_size_in_bits,
+            element_alignment_in_bits,
+            element_type,
+            llvm_debug_builder.getOrCreateArray(subscripts)
+        );
+
+        llvm::DIType* const length_type = llvm_debug_builder.createBasicType("Uint64", 64, llvm::dwarf::DW_ATE_unsigned);
+
+        std::uint32_t const alignment_in_bits = std::max(element_alignment_in_bits, 64u);
+        std::uint64_t const length_offset_in_bits = align_to(values_size_in_bits, 64);
+        std::uint64_t const size_in_bits = align_to(length_offset_in_bits + 64, alignment_in_bits);
+
+        std::array<llvm::Metadata*, 2> const elements
+        {
+            llvm_debug_builder.createMemberType(
+                &llvm_debug_scope,
+                "values",
+                nullptr,
+                0,
+                values_size_in_bits,
+                element_alignment_in_bits,
+                0,
+                llvm::DINode::DIFlags::FlagZero,
+                values_type
+            ),
+            llvm_debug_builder.createMemberType(
+                &llvm_debug_scope,
+                "length",
+                nullptr,
+                0,
+                64,
+                64,
+                length_offset_in_bits,
+                llvm::DINode::DIFlags::FlagZero,
+                length_type
+            )
+        };
+
+        std::pmr::string const debug_type_name = format_debug_type_name(
+            core_module,
+            iris::Type_reference{ .data = type },
+            debug_type_database,
+            {},
+            {}
+        );
+
+        return llvm_debug_builder.createStructType(
+            &llvm_debug_scope,
+            debug_type_name.c_str(),
+            nullptr,
+            0,
+            size_in_bits,
+            alignment_in_bits,
+            llvm::DINode::DIFlags::FlagZero,
+            nullptr,
+            llvm_debug_builder.getOrCreateArray(elements)
+        );
     }
 
     static llvm::StructType* create_soa_array_llvm_type(
@@ -1562,6 +1650,18 @@ namespace iris::compiler
 
             return location->second;
         }
+        else if (std::holds_alternative<Fixed_capacity_array_type>(type_reference.data))
+        {
+            Fixed_capacity_array_type const& data = std::get<Fixed_capacity_array_type>(type_reference.data);
+            std::pmr::string const record_name = iris::mangle_fixed_capacity_array_type_name(data.value_type, data.capacity);
+
+            LLVM_type_map const& llvm_type_map = type_database.name_to_llvm_type.at("iris.builtin");
+            auto const location = llvm_type_map.find(record_name);
+            if (location == llvm_type_map.end())
+                throw std::runtime_error{ std::format("Could not find {} LLVM type!{}", record_name, format_source_location(type_reference.source_range)) };
+
+            return location->second;
+        }
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             // Builtin_type_reference const& data = std::get<Builtin_type_reference>(type_reference.data);
@@ -1669,6 +1769,13 @@ namespace iris::compiler
                 : bool_llvm_type;
 
             return llvm::StructType::create({ value_llvm_type, bool_llvm_type }, "__hl_optional");
+        }
+        else if (std::holds_alternative<Fixed_capacity_array_type>(type_reference.data))
+        {
+            Fixed_capacity_array_type const& data = std::get<Fixed_capacity_array_type>(type_reference.data);
+            llvm::Type* const llvm_element_type = type_reference_to_llvm_type_on_demand(llvm_context, llvm_data_layout, data.value_type, declaration_database, clang_context);
+            llvm::Type* const uint64_type = llvm::Type::getInt64Ty(llvm_context);
+            return llvm::StructType::create({ llvm::ArrayType::get(llvm_element_type, data.capacity), uint64_type }, "__hl_fixed_capacity_array");
         }
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
@@ -1802,6 +1909,11 @@ namespace iris::compiler
         {
             Optional_type const& data = std::get<Optional_type>(type_reference.data);
             return optional_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
+        }
+        if (std::holds_alternative<Fixed_capacity_array_type>(type_reference.data))
+        {
+            Fixed_capacity_array_type const& data = std::get<Fixed_capacity_array_type>(type_reference.data);
+            return fixed_capacity_array_type_to_llvm_debug_type(llvm_debug_builder, llvm_debug_scope, llvm_data_layout, core_module, data, debug_type_database);
         }
         if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {

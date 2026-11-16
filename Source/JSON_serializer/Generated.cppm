@@ -503,6 +503,22 @@ namespace iris::json
     }
 
     EXPORT template <>
+    JSON to_json(Fixed_capacity_array_type const& value)
+    {
+        JSON data;
+        data["value_type"] = to_json(value.value_type);
+        data["capacity"] = to_json(value.capacity);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Fixed_capacity_array_type& value)
+    {
+        if (data.contains("value_type")) from_json(data.at("value_type"), value.value_type);
+        from_json(data.at("capacity"), value.capacity);
+    }
+
+    EXPORT template <>
     JSON to_json(Soa_array_type const& value)
     {
         JSON data;

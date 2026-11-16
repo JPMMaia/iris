@@ -129,6 +129,51 @@ namespace iris
         return std::holds_alternative<Constant_array_type>(type.data);
     }
 
+    Type_reference create_fixed_capacity_array_type_reference(std::pmr::vector<Type_reference> value_type, std::uint64_t const capacity)
+    {
+        return Type_reference
+        {
+            .data = Fixed_capacity_array_type
+            {
+                .value_type = std::move(value_type),
+                .capacity = capacity,
+            }
+        };
+    }
+
+    bool is_fixed_capacity_array_type_reference(Type_reference const& type)
+    {
+        return std::holds_alternative<Fixed_capacity_array_type>(type.data);
+    }
+
+    std::optional<Type_reference> get_fixed_capacity_array_value_type(Type_reference const& type)
+    {
+        if (!std::holds_alternative<Fixed_capacity_array_type>(type.data))
+            return std::nullopt;
+
+        Fixed_capacity_array_type const& fixed_capacity_array_type = std::get<Fixed_capacity_array_type>(type.data);
+        if (fixed_capacity_array_type.value_type.empty())
+            return std::nullopt;
+
+        return fixed_capacity_array_type.value_type.front();
+    }
+
+    std::uint64_t get_fixed_capacity_array_capacity(Type_reference const& type)
+    {
+        return std::get<Fixed_capacity_array_type>(type.data).capacity;
+    }
+
+    std::optional<std::string_view> get_fixed_capacity_array_method_builtin_name(std::string_view const member_name)
+    {
+        if (member_name == "push")
+            return "fixed_capacity_array_push";
+        if (member_name == "pop")
+            return "fixed_capacity_array_pop";
+        if (member_name == "clear")
+            return "fixed_capacity_array_clear";
+        return std::nullopt;
+    }
+
     Type_reference create_soa_array_type_reference(std::pmr::vector<Type_reference> value_type, std::uint64_t const size)
     {
         return Type_reference
@@ -762,6 +807,10 @@ namespace iris
 
             return constant_array_type.value_type.front();
         }
+        else if (std::holds_alternative<Fixed_capacity_array_type>(type.data))
+        {
+            return get_fixed_capacity_array_value_type(type);
+        }
         else if (std::holds_alternative<Soa_array_type>(type.data))
         {
             return get_soa_element_type(type);
@@ -936,6 +985,19 @@ namespace iris
                 output += '_';
                 output += std::to_string(constant_array_type.size);
             }
+            else if (std::holds_alternative<Fixed_capacity_array_type>(type.data))
+            {
+                Fixed_capacity_array_type const& fixed_capacity_array_type = std::get<Fixed_capacity_array_type>(type.data);
+                output += "Fixed_capacity_array_";
+
+                if (fixed_capacity_array_type.value_type.empty())
+                    output += "void";
+                else
+                    append_mangled_type_name(output, fixed_capacity_array_type.value_type.front());
+
+                output += '_';
+                output += std::to_string(fixed_capacity_array_type.capacity);
+            }
             else if (std::holds_alternative<Optional_type>(type.data))
             {
                 Optional_type const& optional_type = std::get<Optional_type>(type.data);
@@ -1006,8 +1068,60 @@ namespace iris
         };
     }
 
+    std::pmr::string mangle_fixed_capacity_array_type_name(std::pmr::vector<Type_reference> const& value_type, std::uint64_t const capacity)
+    {
+        std::pmr::string result;
+        append_mangled_type_name(result, create_fixed_capacity_array_type_reference(value_type, capacity));
+        return result;
+    }
+
+    iris::Struct_declaration create_fixed_capacity_array_type_struct_declaration(std::pmr::vector<Type_reference> const& value_type, std::uint64_t const capacity)
+    {
+        return iris::Struct_declaration
+        {
+            .name = mangle_fixed_capacity_array_type_name(value_type, capacity),
+            .member_types = {
+                iris::create_constant_array_type_reference(value_type, capacity),
+                iris::create_integer_type_type_reference(64, false)
+            },
+            .member_names = {
+                "values",
+                "length"
+            },
+            .member_bit_fields = {
+                std::nullopt,
+                std::nullopt
+            },
+            .member_default_values = {
+                iris::Statement{
+                    .expressions = {
+                        iris::Expression{ .data = iris::Instantiate_expression{} }
+                    }
+                },
+                iris::Statement{
+                    .expressions = {
+                        iris::Expression{
+                            .data = iris::Constant_expression {
+                                .type = iris::create_integer_type_type_reference(64, false),
+                                .data = "0"
+                            }
+                        }
+                    }
+                }
+            },
+            .is_packed = false,
+            .is_literal = false,
+        };
+    }
+
     std::optional<iris::Struct_declaration> try_get_builtin_struct_declaration(Type_reference const& type_reference)
     {
+        if (std::holds_alternative<iris::Fixed_capacity_array_type>(type_reference.data))
+        {
+            iris::Fixed_capacity_array_type const& fixed_capacity_array_type = std::get<iris::Fixed_capacity_array_type>(type_reference.data);
+            return create_fixed_capacity_array_type_struct_declaration(fixed_capacity_array_type.value_type, fixed_capacity_array_type.capacity);
+        }
+
         if (std::holds_alternative<iris::Array_slice_type>(type_reference.data))
         {
             iris::Array_slice_type const& array_slice_type = std::get<iris::Array_slice_type>(type_reference.data);
@@ -1123,6 +1237,15 @@ namespace iris
             {
                 Constant_array_type& constant_array_type = std::get<Constant_array_type>(type_reference.data);
                 for (Type_reference& value_type : constant_array_type.value_type)
+                {
+                    if (!replace_parameter_types_by_instance_arguments_impl(value_type, constructor_parameters, instance_arguments))
+                        return false;
+                }
+            }
+            else if (std::holds_alternative<Fixed_capacity_array_type>(type_reference.data))
+            {
+                Fixed_capacity_array_type& fixed_capacity_array_type = std::get<Fixed_capacity_array_type>(type_reference.data);
+                for (Type_reference& value_type : fixed_capacity_array_type.value_type)
                 {
                     if (!replace_parameter_types_by_instance_arguments_impl(value_type, constructor_parameters, instance_arguments))
                         return false;

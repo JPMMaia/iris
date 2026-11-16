@@ -802,7 +802,8 @@ namespace iris::compiler
     }
 
     // Runs every pipeline expansion and checks its results: map, filter, several inputs, Constant_array
-    // inputs, captured locals, break and continue, nested pipelines and generated name hygiene.
+    // inputs, captured locals, break and continue, nested pipelines, generated name hygiene, and
+    // Fixed_capacity_array with the into_fixed sink.
     TEST_CASE("Build and run Pipelines in test mode", "[Builder][Pipeline]")
     {
         iris::compiler::Target const target = iris::compiler::get_default_target();
@@ -827,9 +828,10 @@ namespace iris::compiler
         );
     }
 
-    // Each test of Pipeline_asserts breaks a precondition of a pipeline expansion. The assert that the
-    // expansion emits must stop the test, and the runner must report it rather than hang. An abort
-    // ends the run, so each test is run on its own.
+    // Each test of Pipeline_asserts breaks a precondition of a pipeline expansion or of a
+    // Fixed_capacity_array operation. The check that the expansion or operation emits must stop the
+    // test, and the runner must report it rather than hang. An abort ends the run, so each test is
+    // run on its own.
     TEST_CASE("Pipeline expansions assert their preconditions at run time", "[Builder][Pipeline]")
     {
         iris::compiler::Target const target = iris::compiler::get_default_target();
@@ -895,6 +897,51 @@ namespace iris::compiler
             );
 
             CHECK(result.output.find("assert 'Pipeline scratch buffer is large enough' failed!") != std::string::npos);
+            CHECK(result.output.find("CRASH") != std::string::npos);
+            CHECK(result.output.find("1 tests selected, 1 run, 0 passed, 1 failed (1 crashed), 0 not run") != std::string::npos);
+            CHECK(result.exit_code != 0);
+        }
+
+        {
+            Test_run_output const result = run_test_executable_and_capture(
+                build_directory_path,
+                target,
+                "pipeline_asserts.iris.test",
+                " --test-name=pipeline_asserts.test_a_push_on_a_full_fixed_capacity_array",
+                "full_fixed_capacity_array_output.txt"
+            );
+
+            CHECK(result.output.find("Fixed_capacity_array push on a full array in 'pipeline_asserts.test_a_push_on_a_full_fixed_capacity_array'!") != std::string::npos);
+            CHECK(result.output.find("CRASH") != std::string::npos);
+            CHECK(result.output.find("1 tests selected, 1 run, 0 passed, 1 failed (1 crashed), 0 not run") != std::string::npos);
+            CHECK(result.exit_code != 0);
+        }
+
+        {
+            Test_run_output const result = run_test_executable_and_capture(
+                build_directory_path,
+                target,
+                "pipeline_asserts.iris.test",
+                " --test-name=pipeline_asserts.test_a_pop_on_an_empty_fixed_capacity_array",
+                "empty_fixed_capacity_array_output.txt"
+            );
+
+            CHECK(result.output.find("Fixed_capacity_array pop on an empty array in 'pipeline_asserts.test_a_pop_on_an_empty_fixed_capacity_array'!") != std::string::npos);
+            CHECK(result.output.find("CRASH") != std::string::npos);
+            CHECK(result.output.find("1 tests selected, 1 run, 0 passed, 1 failed (1 crashed), 0 not run") != std::string::npos);
+            CHECK(result.exit_code != 0);
+        }
+
+        {
+            Test_run_output const result = run_test_executable_and_capture(
+                build_directory_path,
+                target,
+                "pipeline_asserts.iris.test",
+                " --test-name=pipeline_asserts.test_an_index_past_the_length_of_a_fixed_capacity_array",
+                "fixed_capacity_array_index_output.txt"
+            );
+
+            CHECK(result.output.find("Out-of-bounds Fixed_capacity_array access in 'pipeline_asserts.test_an_index_past_the_length_of_a_fixed_capacity_array'!") != std::string::npos);
             CHECK(result.output.find("CRASH") != std::string::npos);
             CHECK(result.output.find("1 tests selected, 1 run, 0 passed, 1 failed (1 crashed), 0 not run") != std::string::npos);
             CHECK(result.exit_code != 0);

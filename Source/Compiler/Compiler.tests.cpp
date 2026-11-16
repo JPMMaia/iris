@@ -505,6 +505,153 @@ attributes #0 = { convergent "no-trapping-math"="true" "stack-protector-buffer-s
     test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
   }
 
+  TEST_CASE("Compile Fixed_capacity_array type", "[LLVM_IR]")
+  {
+    char const* const input_file = "fixed_capacity_array.iris";
+
+    std::pmr::unordered_map<std::pmr::string, std::filesystem::path> const module_name_to_file_path_map
+    {
+    };
+
+    std::string const expected_llvm_ir = std::format(R"(
+%struct.iris_builtin_Fixed_capacity_array_Int32_4 = type {{ [4 x i32], i64 }}
+%struct.iris_builtin_Generic_array_slice = type {{ ptr, i64 }}
+
+; Function Attrs: convergent
+define i32 @Fixed_capacity_array_run() #0 {{
+entry:
+  %values = alloca %struct.iris_builtin_Fixed_capacity_array_Int32_4, align 8
+  %last = alloca i32, align 4
+  %length = alloca i64, align 8
+  %capacity = alloca i64, align 8
+  %0 = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %total = alloca i32, align 4
+  %1 = getelementptr inbounds %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 0
+  call void @llvm.memset.p0.i64(ptr align 4 %1, i8 0, i64 16, i1 false)
+  %2 = getelementptr inbounds %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 1
+  store i64 0, ptr %2, align 8
+  %3 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 1
+  %4 = load i64, ptr %3, align 8
+  %5 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 0
+  %fixed_capacity_array_element_pointer = getelementptr [4 x i32], ptr %5, i32 0, i64 %4
+  store i32 1, ptr %fixed_capacity_array_element_pointer, align 4
+  %fixed_capacity_array_length = add nuw nsw i64 %4, 1
+  store i64 %fixed_capacity_array_length, ptr %3, align 8
+  %6 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 1
+  %7 = load i64, ptr %6, align 8
+  %8 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 0
+  %fixed_capacity_array_element_pointer1 = getelementptr [4 x i32], ptr %8, i32 0, i64 %7
+  store i32 2, ptr %fixed_capacity_array_element_pointer1, align 4
+  %fixed_capacity_array_length2 = add nuw nsw i64 %7, 1
+  store i64 %fixed_capacity_array_length2, ptr %6, align 8
+  %9 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 1
+  %10 = load i64, ptr %9, align 8
+  %11 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 0
+  %fixed_capacity_array_element_pointer3 = getelementptr [4 x i32], ptr %11, i32 0, i64 %10
+  store i32 3, ptr %fixed_capacity_array_element_pointer3, align 4
+  %fixed_capacity_array_length4 = add nuw nsw i64 %10, 1
+  store i64 %fixed_capacity_array_length4, ptr %9, align 8
+  %12 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 1
+  %13 = load i64, ptr %12, align 8
+  %fixed_capacity_array_length5 = sub nuw nsw i64 %13, 1
+  store i64 %fixed_capacity_array_length5, ptr %12, align 8
+  %14 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 0
+  %fixed_capacity_array_element_pointer6 = getelementptr [4 x i32], ptr %14, i32 0, i64 %fixed_capacity_array_length5
+  %15 = load i32, ptr %fixed_capacity_array_element_pointer6, align 4
+  store i32 %15, ptr %last, align 4
+  %16 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 0
+  %fixed_capacity_array_element_pointer7 = getelementptr [4 x i32], ptr %16, i32 0, i64 0
+  %17 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 0
+  %fixed_capacity_array_element_pointer8 = getelementptr [4 x i32], ptr %17, i32 0, i64 1
+  %18 = load i32, ptr %fixed_capacity_array_element_pointer8, align 4
+  %19 = load i32, ptr %last, align 4
+  %20 = add i32 %18, %19
+  store i32 %20, ptr %fixed_capacity_array_element_pointer7, align 4
+  %21 = getelementptr inbounds %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 1
+  %22 = load i64, ptr %21, align 8
+  store i64 %22, ptr %length, align 8
+  store i64 4, ptr %capacity, align 8
+  %23 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 0
+  %fixed_capacity_array_element_pointer9 = getelementptr [4 x i32], ptr %23, i32 0, i64 0
+  %24 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 1
+  %25 = load i64, ptr %24, align 8
+  %26 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 0
+  store ptr %fixed_capacity_array_element_pointer9, ptr %26, align 8
+  %27 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %0, i32 0, i32 1
+  store i64 %25, ptr %27, align 8
+  %28 = getelementptr inbounds {{ ptr, i64 }}, ptr %0, i32 0, i32 0
+  %29 = load ptr, ptr %28, align 8
+  %30 = getelementptr inbounds {{ ptr, i64 }}, ptr %0, i32 0, i32 1
+  %31 = load i64, ptr %30, align 8
+  %32 = call i32 @Fixed_capacity_array_sum(ptr %29, i64 %31)
+  store i32 %32, ptr %total, align 4
+  %33 = getelementptr inbounds nuw %struct.iris_builtin_Fixed_capacity_array_Int32_4, ptr %values, i32 0, i32 1
+  store i64 0, ptr %33, align 8
+  %34 = load i32, ptr %total, align 4
+  %35 = load i64, ptr %length, align 8
+  %36 = trunc i64 %35 to i32
+  %37 = add i32 %34, %36
+  %38 = load i64, ptr %capacity, align 8
+  %39 = trunc i64 %38 to i32
+  %40 = add i32 %37, %39
+  ret i32 %40
+}}
+
+; Function Attrs: convergent
+define private i32 @Fixed_capacity_array_sum(ptr %"arguments[0].values_0", i64 %"arguments[0].values_1") #0 {{
+entry:
+  %values = alloca %struct.iris_builtin_Generic_array_slice, align 8
+  %total = alloca i32, align 4
+  %index = alloca i64, align 8
+  %0 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 0
+  store ptr %"arguments[0].values_0", ptr %0, align 8
+  %1 = getelementptr inbounds {{ ptr, i64 }}, ptr %values, i32 0, i32 1
+  store i64 %"arguments[0].values_1", ptr %1, align 8
+  store i32 0, ptr %total, align 4
+  store i64 0, ptr %index, align 8
+  br label %for_loop_condition
+
+for_loop_condition:                               ; preds = %for_loop_update_index, %entry
+  %2 = getelementptr inbounds %struct.iris_builtin_Generic_array_slice, ptr %values, i32 0, i32 1
+  %3 = load i64, ptr %2, align 8
+  %4 = load i64, ptr %index, align 8
+  %5 = icmp ult i64 %4, %3
+  %6 = zext i1 %5 to i8
+  %7 = trunc i8 %6 to i1
+  br i1 %7, label %for_loop_then, label %for_loop_after
+
+for_loop_then:                                    ; preds = %for_loop_condition
+  %8 = load i32, ptr %total, align 4
+  %9 = load i64, ptr %index, align 8
+  %10 = getelementptr inbounds nuw %struct.iris_builtin_Generic_array_slice, ptr %values, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  %array_slice_element_pointer = getelementptr i32, ptr %11, i64 %9
+  %12 = load i32, ptr %array_slice_element_pointer, align 4
+  %13 = add i32 %8, %12
+  store i32 %13, ptr %total, align 4
+  br label %for_loop_update_index
+
+for_loop_update_index:                            ; preds = %for_loop_then
+  %14 = load i64, ptr %index, align 8
+  %15 = add i64 %14, 1
+  store i64 %15, ptr %index, align 8
+  br label %for_loop_condition
+
+for_loop_after:                                   ; preds = %for_loop_condition
+  %16 = load i32, ptr %total, align 4
+  ret i32 %16
+}}
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+
+attributes #0 = {{ convergent "no-trapping-math"="true" "stack-protector-buffer-size"="0" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" }}
+attributes #1 = {{ nocallback nofree nounwind willreturn memory(argmem: write) }}
+)");
+
+    test_create_llvm_module(input_file, module_name_to_file_path_map, expected_llvm_ir);
+  }
+
   TEST_CASE("Compile Optional type", "[LLVM_IR]")
   {
     char const* const input_file = "optional_type_codegen.iris";
@@ -14382,7 +14529,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
   // the other, and are compared after canonicalizing names.
   TEST_CASE("Pipelines compile to the same optimized code as the hand-written loops", "[LLVM_IR][Pipeline]")
   {
-    std::array<std::string_view, 7> const function_names
+    std::array<std::string_view, 8> const function_names
     {
       "sum_of_even_squares",
       "weighted_sum",
@@ -14391,6 +14538,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
       "keep_positive",
       "sum_of_x",
       "sum_of_odd_cubes",
+      "odd_squares",
     };
 
     for (bool const enable_bounds_checks : { false, true })

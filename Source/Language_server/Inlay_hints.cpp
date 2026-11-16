@@ -371,6 +371,34 @@ namespace iris::language_server
                 }
             );
         }
+        else if (std::holds_alternative<iris::Fixed_capacity_array_type>(type.data))
+        {
+            iris::Fixed_capacity_array_type const& fixed_capacity_array_type = std::get<iris::Fixed_capacity_array_type>(type.data);
+            if (fixed_capacity_array_type.value_type.empty())
+                return;
+
+            parts.push_back(
+                lsp::InlayHintLabelPart
+                {
+                    .value = "Fixed_capacity_array::<",
+                }
+            );
+
+            create_inlay_hint_variable_type_label_aux(
+                parts,
+                core_module,
+                declaration_database,
+                fixed_capacity_array_type.value_type[0],
+                temporaries_allocator
+            );
+
+            parts.push_back(
+                lsp::InlayHintLabelPart
+                {
+                    .value = std::format(", {}>", fixed_capacity_array_type.capacity),
+                }
+            );
+        }
         else if (std::holds_alternative<iris::Function_pointer_type>(type.data))
         {
             iris::Function_pointer_type const& function_pointer_type = std::get<iris::Function_pointer_type>(type.data);

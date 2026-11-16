@@ -111,3 +111,17 @@ export function sum_of_odd_cubes(values: Array_slice::<Int32>) -> (result: Int32
     }
     return total;
 }
+
+export function odd_squares(values: Constant_array::<Int32, 8>) -> (result: Fixed_capacity_array::<Int32, 8>)
+{
+    mutable squares: Fixed_capacity_array::<Int32, 8> = {};
+    for index in 0u64 to 8u64
+    {
+        var value = values[index];
+        if value % 2 == 1
+        {
+            squares.push(value * value);
+        }
+    }
+    return squares;
+}

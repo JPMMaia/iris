@@ -102,6 +102,13 @@ namespace iris::compiler
         iris::Type_reference const& input_type
     );
 
+    // The length of an input known at compile time: N for Constant_array::<T, N>, or the most it
+    // can hold for Fixed_capacity_array::<T, N>. This is the capacity of an into_fixed() result.
+    export std::optional<std::uint64_t> get_pipeline_input_static_capacity(
+        iris::Declaration_database const& declaration_database,
+        iris::Type_reference const& input_type
+    );
+
     // The name of the output element: the last map binding or, with no map, the single parameter.
     export std::optional<std::string_view> get_pipeline_output_name(
         Pipeline_expression const& pipeline

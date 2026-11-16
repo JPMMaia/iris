@@ -65,6 +65,12 @@ namespace iris::c
             if (!optional_type.value_type.empty())
                 add_type_reference_declaration(sorted_declarations, core_module, optional_type.value_type[0]);
         }
+        else if (std::holds_alternative<iris::Fixed_capacity_array_type>(type_reference.data))
+        {
+            iris::Fixed_capacity_array_type const& fixed_capacity_array_type = std::get<iris::Fixed_capacity_array_type>(type_reference.data);
+            if (!fixed_capacity_array_type.value_type.empty())
+                add_type_reference_declaration(sorted_declarations, core_module, fixed_capacity_array_type.value_type[0]);
+        }
         else if (std::holds_alternative<iris::Custom_type_reference>(type_reference.data))
         {
             iris::Custom_type_reference const& custom_type_reference = std::get<iris::Custom_type_reference>(type_reference.data);
@@ -711,6 +717,14 @@ namespace iris::c
             if (variable_name.has_value())
                 stream << ' ' << variable_name.value();
         }
+        else if (std::holds_alternative<iris::Fixed_capacity_array_type>(type_reference.data))
+        {
+            iris::Fixed_capacity_array_type const& data = std::get<iris::Fixed_capacity_array_type>(type_reference.data);
+            stream << "struct " << iris::mangle_fixed_capacity_array_type_name(data.value_type, data.capacity);
+
+            if (variable_name.has_value())
+                stream << ' ' << variable_name.value();
+        }
         else if (std::holds_alternative<iris::Builtin_type_reference>(type_reference.data))
         {
             iris::Builtin_type_reference const& data = std::get<iris::Builtin_type_reference>(type_reference.data);
@@ -831,16 +845,17 @@ namespace iris::c
         // TODO
     }
 
-    // Emits `struct Optional_<T> { <T> value; bool has_value; };`. Both the member names and their
-    // types come from the same synthetic declaration the compiler lays out, so the exported header
-    // and the compiled type cannot drift apart.
-    void write_c_optional_struct(
+    // Emits `struct Optional_<T> { <T> value; bool has_value; };` or
+    // `struct Fixed_capacity_array_<T>_<N> { <T> values[N]; uint64_t length; };`. Both the member
+    // names and their types come from the same synthetic declaration the compiler lays out, so the
+    // exported header and the compiled type cannot drift apart.
+    void write_c_builtin_struct(
         String_stream& stream,
         iris::Declaration_database const declaration_database,
-        iris::Type_reference const& optional_type_reference
+        iris::Type_reference const& builtin_type_reference
     )
     {
-        std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(optional_type_reference);
+        std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(builtin_type_reference);
         if (!struct_declaration.has_value())
             return;
 
@@ -854,6 +869,42 @@ namespace iris::c
         }
 
         stream << "};\n\n";
+    }
+
+    // Collects the per-type builtin records that type_reference uses, each after the records its
+    // members use, so that a C struct is always written after the structs it contains.
+    static void collect_c_builtin_struct_type_references(
+        std::pmr::vector<iris::Type_reference>& output_types,
+        std::pmr::vector<std::pmr::string>& output_names,
+        iris::Type_reference const& type_reference
+    )
+    {
+        iris::visit_type_references_recursively(
+            type_reference,
+            [&](iris::Type_reference const& nested_type_reference) -> bool
+            {
+                bool const is_optional_record =
+                    std::holds_alternative<iris::Optional_type>(nested_type_reference.data) &&
+                    !iris::is_optional_represented_as_pointer(nested_type_reference);
+                bool const is_fixed_capacity_array = std::holds_alternative<iris::Fixed_capacity_array_type>(nested_type_reference.data);
+                if (!is_optional_record && !is_fixed_capacity_array)
+                    return false;
+
+                std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(nested_type_reference);
+                if (!struct_declaration.has_value())
+                    return false;
+
+                if (std::find(output_names.begin(), output_names.end(), struct_declaration->name) != output_names.end())
+                    return false;
+
+                for (iris::Type_reference const& member_type : struct_declaration->member_types)
+                    collect_c_builtin_struct_type_references(output_types, output_names, member_type);
+
+                output_types.push_back(nested_type_reference);
+                output_names.push_back(struct_declaration->name);
+                return false;
+            }
+        );
     }
 
     void write_c_array_slice_struct(
@@ -1136,50 +1187,24 @@ namespace iris::c
         write_includes(stream, core_module, dependencies_c_file_paths);
         write_extern_c_begin(stream);
 
-        // Every distinct Optional::<T> needs its own C struct, emitted before anything that names one.
-        // Optionals of pointers are skipped: they are spelled as the bare pointer.
+        // Every distinct Optional::<T> and Fixed_capacity_array::<T, N> needs its own C struct, emitted
+        // before anything that names one. Optionals of pointers are skipped: they are spelled as the
+        // bare pointer.
         {
-            std::pmr::vector<iris::Type_reference> optional_type_references{temporaries_allocator};
+            std::pmr::vector<iris::Type_reference> builtin_type_references{temporaries_allocator};
+            std::pmr::vector<std::pmr::string> builtin_type_names{temporaries_allocator};
 
             iris::visit_type_references(
                 core_module,
                 [&](std::string_view const, iris::Type_reference const& type_reference) -> bool
                 {
-                    iris::visit_type_references_recursively(
-                        type_reference,
-                        [&](iris::Type_reference const& nested_type_reference) -> bool
-                        {
-                            if (!std::holds_alternative<iris::Optional_type>(nested_type_reference.data))
-                                return false;
-
-                            if (iris::is_optional_represented_as_pointer(nested_type_reference))
-                                return false;
-
-                            iris::Optional_type const& optional_type = std::get<iris::Optional_type>(nested_type_reference.data);
-                            std::pmr::string const name = iris::mangle_optional_type_name(optional_type.value_type);
-
-                            bool const already_collected = std::any_of(
-                                optional_type_references.begin(),
-                                optional_type_references.end(),
-                                [&](iris::Type_reference const& existing)
-                                {
-                                    return iris::mangle_optional_type_name(std::get<iris::Optional_type>(existing.data).value_type) == name;
-                                }
-                            );
-
-                            if (!already_collected)
-                                optional_type_references.push_back(nested_type_reference);
-
-                            return false;
-                        }
-                    );
-
+                    collect_c_builtin_struct_type_references(builtin_type_references, builtin_type_names, type_reference);
                     return false;
                 }
             );
 
-            for (iris::Type_reference const& optional_type_reference : optional_type_references)
-                write_c_optional_struct(stream, declaration_database, optional_type_reference);
+            for (iris::Type_reference const& builtin_type_reference : builtin_type_references)
+                write_c_builtin_struct(stream, declaration_database, builtin_type_reference);
         }
 
         for (iris::Declaration const& declaration : declarations)

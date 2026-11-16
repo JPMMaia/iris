@@ -560,11 +560,11 @@ namespace iris::compiler
         return clang_function_declaration;
     }
 
-    static void ensure_clang_optional_type_declaration(
+    static void ensure_clang_builtin_type_declaration(
         clang::ASTContext& clang_ast_context,
         Declaration_database const& declaration_database,
         Clang_declaration_database& clang_declaration_database,
-        Type_reference const& optional_type_reference
+        Type_reference const& builtin_type_reference
     );
 
     void add_clang_struct_declaration(
@@ -732,9 +732,10 @@ namespace iris::compiler
             add_clang_union_declaration(instance_iterator->second.union_declarations, clang_ast_context, core_module, union_declaration);
         }
 
-        // Each distinct Optional::<T> in this module needs its own record, because its layout depends
-        // on T (unlike Array_slice, where one type-erased record serves every T). Mint them before any
-        // struct definition or function signature that might refer to one.
+        // Each distinct Optional::<T> and Fixed_capacity_array::<T, N> in this module needs its own
+        // record, because its layout depends on T (unlike Array_slice, where one type-erased record
+        // serves every T). Mint them before any struct definition or function signature that might
+        // refer to one.
         visit_type_references(
             core_module,
             [&](std::string_view const, iris::Type_reference const& type_reference) -> bool
@@ -743,9 +744,9 @@ namespace iris::compiler
                     type_reference,
                     [&](iris::Type_reference const& nested_type_reference) -> bool
                     {
-                        if (std::holds_alternative<iris::Optional_type>(nested_type_reference.data))
+                        if (std::holds_alternative<iris::Optional_type>(nested_type_reference.data) || std::holds_alternative<iris::Fixed_capacity_array_type>(nested_type_reference.data))
                         {
-                            ensure_clang_optional_type_declaration(
+                            ensure_clang_builtin_type_declaration(
                                 clang_ast_context,
                                 declaration_database,
                                 clang_declaration_database,
@@ -2225,26 +2226,46 @@ namespace iris::compiler
         return record_declaration;
     }
 
-    // Optional::<T> has no user declaration to look up: its record is synthesized per T, because
-    // unlike Array_slice (pointer + length for every T) its layout depends on T.
-    static void ensure_clang_optional_type_declaration(
+    // Optional::<T> and Fixed_capacity_array::<T, N> have no user declaration to look up: their
+    // records are synthesized per T, because unlike Array_slice (pointer + length for every T)
+    // their layouts depend on T.
+    static void ensure_clang_builtin_type_declaration(
         clang::ASTContext& clang_ast_context,
         Declaration_database const& declaration_database,
         Clang_declaration_database& clang_declaration_database,
-        Type_reference const& optional_type_reference
+        Type_reference const& builtin_type_reference
     )
     {
         // Optional of a pointer is a bare pointer; only the pointee needs a declaration.
-        if (iris::is_optional_represented_as_pointer(optional_type_reference))
+        if (iris::is_optional_represented_as_pointer(builtin_type_reference))
             return;
 
-        std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(optional_type_reference);
+        std::optional<iris::Struct_declaration> const struct_declaration = iris::try_get_builtin_struct_declaration(builtin_type_reference);
         if (!struct_declaration.has_value())
             return;
 
         auto iterator = clang_declaration_database.map.emplace("iris.builtin", Clang_module_declarations{}).first;
         if (iterator->second.struct_declarations.contains(struct_declaration->name))
             return;
+
+        // A member may itself be a per-type builtin record (Fixed_capacity_array::<Optional::<T>, N>),
+        // which must exist before this record's definition refers to it.
+        for (iris::Type_reference const& member_type : struct_declaration->member_types)
+        {
+            visit_type_references_recursively(
+                member_type,
+                [&](iris::Type_reference const& nested_type_reference) -> bool
+                {
+                    if (std::holds_alternative<iris::Optional_type>(nested_type_reference.data) || std::holds_alternative<iris::Fixed_capacity_array_type>(nested_type_reference.data))
+                    {
+                        ensure_clang_builtin_type_declaration(clang_ast_context, declaration_database, clang_declaration_database, nested_type_reference);
+                        return true;
+                    }
+
+                    return false;
+                }
+            );
+        }
 
         clang::RecordDecl* const record_declaration = create_clang_struct_declaration(clang_ast_context, "iris.builtin", struct_declaration.value());
         iterator->second.struct_declarations.emplace(struct_declaration->name, record_declaration);
@@ -2295,9 +2316,9 @@ namespace iris::compiler
                 return false;
             }
 
-            if (std::holds_alternative<Optional_type>(type_reference.data))
+            if (std::holds_alternative<Optional_type>(type_reference.data) || std::holds_alternative<Fixed_capacity_array_type>(type_reference.data))
             {
-                ensure_clang_optional_type_declaration(
+                ensure_clang_builtin_type_declaration(
                     clang_ast_context,
                     declaration_database,
                     clang_declaration_database,
@@ -2920,6 +2941,22 @@ namespace iris::compiler
 
             clang::RecordDecl* const record_declaration = optional_type_location->second;
             return clang_ast_context.getCanonicalTypeDeclType(record_declaration);
+        }
+        else if (std::holds_alternative<iris::Fixed_capacity_array_type>(type_reference.data))
+        {
+            iris::Fixed_capacity_array_type const& fixed_capacity_array_type = std::get<iris::Fixed_capacity_array_type>(type_reference.data);
+            std::pmr::string const record_name = iris::mangle_fixed_capacity_array_type_name(fixed_capacity_array_type.value_type, fixed_capacity_array_type.capacity);
+
+            auto const module_declarations_location = clang_declaration_database.map.find("iris.builtin");
+            if (module_declarations_location == clang_declaration_database.map.end())
+                throw std::runtime_error{"Cannot find Builtin module!"};
+            Clang_module_declarations const& module_declarations = module_declarations_location->second;
+
+            auto const location = module_declarations.struct_declarations.find(record_name.c_str());
+            if (location == module_declarations.struct_declarations.end())
+                throw std::runtime_error{ std::format("Cannot find Builtin.{}!", record_name) };
+
+            return clang_ast_context.getCanonicalTypeDeclType(location->second);
         }
         else if (std::holds_alternative<iris::Builtin_type_reference>(type_reference.data))
         {

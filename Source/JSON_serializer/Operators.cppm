@@ -453,6 +453,25 @@ namespace iris::json::operators
             return output_stream;
         }
 
+        export std::istream& operator>>(std::istream& input_stream, Fixed_capacity_array_type& value)
+        {
+            JSON data{};
+            input_stream >> data;
+
+            from_json(data, value);
+
+            return input_stream;
+        }
+
+        export std::ostream& operator<<(std::ostream& output_stream, Fixed_capacity_array_type const& value)
+        {
+            JSON const data = to_json(value);
+
+            output_stream << data.dump(4) << '\n';
+
+            return output_stream;
+        }
+
         export std::istream& operator>>(std::istream& input_stream, Soa_array_type& value)
         {
             JSON data{};

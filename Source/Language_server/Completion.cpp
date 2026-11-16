@@ -560,6 +560,23 @@ namespace iris::language_server
             };
         }
 
+        if (is_fixed_capacity_array_type_reference(expression_type))
+        {
+            std::vector<lsp::CompletionItem> items = {};
+            items.push_back(create_completion_item("length", lsp::CompletionItemKind::Field));
+            items.push_back(create_completion_item("capacity", lsp::CompletionItemKind::Field));
+            items.push_back(create_completion_item("push", lsp::CompletionItemKind::Method));
+            items.push_back(create_completion_item("pop", lsp::CompletionItemKind::Method));
+            items.push_back(create_completion_item("clear", lsp::CompletionItemKind::Method));
+
+            return lsp::CompletionList
+            {
+                .isIncomplete = false,
+                .items = std::move(items),
+                .itemDefaults = std::nullopt,
+            };
+        }
+
         if (is_soa_array_type_reference(expression_type))
         {
             std::vector<lsp::CompletionItem> items = {};
