@@ -420,5 +420,213 @@ lambda Comparator$CURSOR_POSITION(a: Int32, b: Int32) -> (result: Int32);
         std::uint32_t const expected_line = find_lambda_declaration_line(source);
         CHECK(find_location_in_result(result, expected_line));
     }
+
+    // ============================================================================
+    // Pipeline Go to Definition Tests
+    // ============================================================================
+
+    namespace
+    {
+        // The single location of a go-to result.
+        static lsp::Location get_single_location(
+            lsp::TextDocument_DefinitionResult const& result
+        )
+        {
+            REQUIRE(!result.isNull());
+            REQUIRE(std::holds_alternative<lsp::Definition>(*result));
+            lsp::Definition const& definition = result.get<lsp::Definition>();
+            REQUIRE(std::holds_alternative<std::vector<lsp::Location>>(definition));
+            std::vector<lsp::Location> const& locations = std::get<std::vector<lsp::Location>>(definition);
+            REQUIRE(locations.size() == 1);
+            return locations[0];
+        }
+
+        // The zero-based position of the `occurrence`-th match of `text` in `source`.
+        static lsp::Position find_text_position(
+            std::string_view const source,
+            std::string_view const text,
+            std::size_t const occurrence = 0
+        )
+        {
+            std::size_t index = source.find(text);
+            for (std::size_t count = 0; count < occurrence && index != std::string_view::npos; ++count)
+                index = source.find(text, index + 1);
+            REQUIRE(index != std::string_view::npos);
+
+            std::uint32_t line = 0;
+            std::uint32_t column = 0;
+            for (std::size_t i = 0; i < index; ++i)
+            {
+                if (source[i] == '\n')
+                {
+                    ++line;
+                    column = 0;
+                }
+                else
+                {
+                    ++column;
+                }
+            }
+            return lsp::Position{.line = line, .character = column};
+        }
+
+        // Positions in the expected source are counted without the cursor marker.
+        static std::string remove_cursor_marker(std::string_view const source)
+        {
+            return extract_cursor_position(std::string{source}).source;
+        }
+    }
+
+    TEST_CASE("Go to definition on a pipeline use navigates to the pipeline name", "[Language_server][Go_to_location][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        filter input > threshold;
+    }
+
+    for v in proc$CURSOR_POSITIONess(list)
+    {
+    }
+}
+)";
+
+        lsp::Location const location = get_single_location(run_go_to_definition_test(source));
+        lsp::Position const expected = find_text_position(remove_cursor_marker(source), "process(input");
+        CHECK(location.range.start.line == expected.line);
+        CHECK(location.range.start.character == expected.character);
+        CHECK(location.range.end.character == expected.character + 7);
+    }
+
+    TEST_CASE("Go to definition on a pipeline used by a sink navigates to the pipeline name", "[Language_server][Go_to_location][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<mutable Int32>, threshold: Int32) -> ()
+{
+    pipeline keep(input: Int32)
+    {
+        filter input > threshold;
+    }
+
+    var kept = ke$CURSOR_POSITIONep.in_place(list);
+}
+)";
+
+        lsp::Location const location = get_single_location(run_go_to_definition_test(source));
+        lsp::Position const expected = find_text_position(remove_cursor_marker(source), "keep(input");
+        CHECK(location.range.start.line == expected.line);
+        CHECK(location.range.start.character == expected.character);
+    }
+
+    TEST_CASE("Go to definition on a pipeline binding navigates to the name after =>", "[Language_server][Go_to_location][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input * 2 => doubled;
+        filter doub$CURSOR_POSITIONled > threshold;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::Location const location = get_single_location(run_go_to_definition_test(source));
+        lsp::Position const expected = find_text_position(remove_cursor_marker(source), "doubled;");
+        CHECK(location.range.start.line == expected.line);
+        CHECK(location.range.start.character == expected.character);
+    }
+
+    TEST_CASE("Go to definition on a pipeline parameter navigates to the parameter name", "[Language_server][Go_to_location][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        filter inp$CURSOR_POSITIONut > threshold;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::Location const location = get_single_location(run_go_to_definition_test(source));
+        lsp::Position const expected = find_text_position(remove_cursor_marker(source), "input: Int32");
+        CHECK(location.range.start.line == expected.line);
+        CHECK(location.range.start.character == expected.character);
+    }
+
+    TEST_CASE("Go to definition on a for-each loop variable navigates to its name", "[Language_server][Go_to_location][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+function use(value: Int32) -> ()
+{
+}
+
+export function run(list: Array_slice::<Int32>) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input * 2 => doubled;
+    }
+
+    for element in process(list)
+    {
+        use(elem$CURSOR_POSITIONent);
+    }
+}
+)";
+
+        lsp::Location const location = get_single_location(run_go_to_definition_test(source));
+        lsp::Position const expected = find_text_position(remove_cursor_marker(source), "element in");
+        CHECK(location.range.start.line == expected.line);
+        CHECK(location.range.start.character == expected.character);
+    }
+
+    TEST_CASE("Go to definition on a pipeline declared inside a lambda body", "[Language_server][Go_to_location][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+lambda Counter(values: Array_slice::<Int32>) -> (result: Uint64);
+
+export function run(threshold: Int32) -> ()
+{
+    var counter: Counter = lambda (values) =>
+    {
+        pipeline large(input: Int32)
+        {
+            filter input > threshold;
+        }
+
+        return lar$CURSOR_POSITIONge(values).count();
+    };
+}
+)";
+
+        lsp::Location const location = get_single_location(run_go_to_definition_test(source));
+        lsp::Position const expected = find_text_position(remove_cursor_marker(source), "large(input");
+        CHECK(location.range.start.line == expected.line);
+        CHECK(location.range.start.character == expected.character);
+    }
 }
 

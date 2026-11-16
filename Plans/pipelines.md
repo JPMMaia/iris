@@ -355,8 +355,17 @@ Decisions taken while implementing:
   - `get_expected_expression_type` gave every expression of a statement the statement's expected type. So in `lambda (xs) => p(xs).fold(0, lambda (a, b) => a + b)`, the inner lambda was "expected" to be the outer lambda's return type. A lambda literal nested in a statement is now typed by its context (call argument, fold, typed declaration) first, and falls back to the statement's type only when nothing applies.
   - Capture analysis did not look inside ternary branches or switch cases, which are statements of their own. So `lambda (v) => v > 0 ? weight : 0` failed with "Undefined variable 'weight'". It now collects names from them too.
 
+Language server:
+- `Pipeline_expression::name_source_position`, `Pipeline_stage::binding_name_source_position` and `For_each_expression::variable_name_source_position` record where names are written, so go-to lands on the name rather than on `pipeline`, `map` or `for`.
+- `visit_statements_using_scope` adds the parameters, then visits each stage before pushing its binding (`add_pipeline_parameters_to_scope`, `add_pipeline_stage_binding_to_scope`), so a stage sees only earlier bindings. `is_add_scope_expression` includes `Pipeline_expression`, so `calculate_scope` descends into stages.
+- Hover: the pipeline name (declaration or use) shows `pipeline p(input: T) => U`, where `U` is the output element type. Parameters, bindings and the for-each variable show `name: Type`. A sink name shows its signature, such as `into(out: Array_slice::<mutable U>) -> Array_slice::<mutable U>`. These come from `create_pipeline_signature` and `create_pipeline_sink_signature` in `iris.language_server.location`, which signature help shares.
+- Go-to: a pipeline use goes to its name. Go-to now walks lambda bodies too.
+- Completion: pipeline names appear in value lists. `p(xs).` offers the sinks plus `separate` (`any` / `all` only for a `Bool` output, `into_fixed` only when the first input has a static size), `p.` offers `in_place`, and `p(xs).separate(s).` offers `into`. The start of a stage offers `map`, `filter`, `take_while` and `enumerate`. Access completion after a call now completes on the whole call, not on its `)` token.
+- Signature help covers `p(`, `p.in_place(` and sink arguments. The innermost call wins, so `p(f(|))` is answered for `f`.
+- Inlay hints: `: Type` after each map binding and after the for-each variable.
+- Tests are tagged `[Pipeline]` in the language server test files.
+
 Known gaps:
-- Language server: scopes inside pipelines and for-each bodies are computed, but hover / go-to / completion have no pipeline-specific handling.
 - `separate` only feeds `into`, and its stages form a linear chain (see Step 5).
 
 ## Fixed_capacity_array and into_fixed

@@ -3,6 +3,7 @@ module;
 #include <format>
 #include <memory_resource>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include <lsp/types.h>
@@ -136,6 +137,35 @@ namespace iris::language_server
         );
     }
 
+    // `: <type>` right after a name written at `name_position`.
+    static void add_name_type_inlay_hint(
+        std::pmr::vector<lsp::InlayHint>& output,
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database,
+        iris::Source_position const& name_position,
+        std::string_view const name,
+        iris::Type_reference const& type,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        lsp::Position const position
+        {
+            .line = name_position.line - 1,
+            .character = name_position.column - 1 + static_cast<std::uint32_t>(name.size()),
+        };
+
+        output.push_back(
+            lsp::InlayHint
+            {
+                .position = position,
+                .label = create_inlay_hint_variable_type_label(core_module, declaration_database, type, temporaries_allocator),
+                .kind = lsp::InlayHintKind::Type,
+                .textEdits = std::nullopt,
+                .tooltip = std::nullopt,
+            }
+        );
+    }
+
     std::pmr::vector<lsp::InlayHint> create_function_inlay_hints(
         iris::Module const& core_module,
         iris::Function_declaration const& function_declaration,
@@ -231,6 +261,71 @@ namespace iris::language_server
                 };
 
                 output.push_back(std::move(inlay_hint));
+            }
+            else if (std::holds_alternative<iris::Pipeline_expression>(expression.data))
+            {
+                iris::Pipeline_expression const& pipeline = std::get<iris::Pipeline_expression>(expression.data);
+
+                // Each map binding gets the type it was deduced to, after its name. Enumerate
+                // bindings are always Uint64 and parameters are always annotated.
+                iris::compiler::Scope binding_scope = scope;
+                iris::compiler::add_pipeline_parameters_to_scope(binding_scope, pipeline);
+
+                for (iris::Pipeline_stage const& stage : pipeline.stages)
+                {
+                    std::size_t const variable_count = binding_scope.variables.size();
+                    iris::compiler::add_pipeline_stage_binding_to_scope(core_module.name, &function_declaration, binding_scope, stage, declaration_database);
+
+                    if (stage.kind != iris::Pipeline_stage_kind::Map || !stage.binding_name.has_value() || !stage.binding_name_source_position.has_value())
+                        continue;
+
+                    if (binding_scope.variables.size() == variable_count)
+                        continue;
+
+                    add_name_type_inlay_hint(
+                        output,
+                        core_module,
+                        declaration_database,
+                        stage.binding_name_source_position.value(),
+                        stage.binding_name.value(),
+                        binding_scope.variables.back().type,
+                        temporaries_allocator
+                    );
+                }
+            }
+            else if (std::holds_alternative<iris::For_each_expression>(expression.data))
+            {
+                iris::For_each_expression const& for_each_expression = std::get<iris::For_each_expression>(expression.data);
+                if (!for_each_expression.variable_name_source_position.has_value())
+                    return;
+
+                iris::Pipeline_expression const* const pipeline = iris::compiler::get_pipeline_from_call_expression(
+                    scope,
+                    statement,
+                    statement.expressions[for_each_expression.range_expression.expression_index]
+                );
+                if (pipeline == nullptr)
+                    return;
+
+                std::optional<iris::Type_reference> const type = iris::compiler::get_pipeline_output_type(
+                    core_module.name,
+                    &function_declaration,
+                    scope,
+                    *pipeline,
+                    declaration_database
+                );
+                if (!type.has_value())
+                    return;
+
+                add_name_type_inlay_hint(
+                    output,
+                    core_module,
+                    declaration_database,
+                    for_each_expression.variable_name_source_position.value(),
+                    for_each_expression.variable_name,
+                    type.value(),
+                    temporaries_allocator
+                );
             }
         };
 

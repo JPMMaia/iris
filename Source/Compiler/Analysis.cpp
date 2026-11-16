@@ -376,12 +376,9 @@ namespace iris::compiler
         return (*pipeline.input_parameter_source_positions)[index];
     }
 
-    void add_pipeline_bindings_to_scope(
-        std::string_view const module_name,
-        iris::Function_declaration const* const function_declaration,
+    void add_pipeline_parameters_to_scope(
         Scope& scope,
-        Pipeline_expression const& pipeline,
-        iris::Declaration_database const& declaration_database
+        Pipeline_expression const& pipeline
     )
     {
         for (std::size_t index = 0; index < pipeline.input_parameter_names.size() && index < pipeline.input_parameter_types.size(); ++index)
@@ -396,46 +393,93 @@ namespace iris::compiler
                 )
             );
         }
+    }
+
+    // Where the binding name of a stage was written, or the start of the stage when that is unknown.
+    static std::optional<iris::Source_position> get_pipeline_stage_binding_source_position(
+        iris::Pipeline_stage const& stage
+    )
+    {
+        if (stage.binding_name_source_position.has_value())
+            return stage.binding_name_source_position;
+
+        if (stage.source_range.has_value())
+            return stage.source_range->start;
+
+        return std::nullopt;
+    }
+
+    void add_pipeline_stage_binding_to_scope(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope& scope,
+        iris::Pipeline_stage const& stage,
+        iris::Declaration_database const& declaration_database
+    )
+    {
+        if (!stage.binding_name.has_value())
+            return;
+
+        if (stage.kind == iris::Pipeline_stage_kind::Enumerate)
+        {
+            scope.variables.push_back(
+                create_variable(stage.binding_name.value(), create_integer_type_type_reference(64, false), false, false, get_pipeline_stage_binding_source_position(stage))
+            );
+            return;
+        }
+
+        if (stage.kind != iris::Pipeline_stage_kind::Map)
+            return;
+
+        std::optional<iris::Type_reference> const type_reference = get_expression_type(
+            module_name,
+            function_declaration,
+            scope,
+            stage.expression,
+            std::nullopt,
+            declaration_database
+        );
+        if (!type_reference.has_value())
+            return;
+
+        scope.variables.push_back(
+            create_variable(
+                stage.binding_name.value(),
+                type_reference.value(),
+                false,
+                false,
+                get_pipeline_stage_binding_source_position(stage)
+            )
+        );
+    }
+
+    void add_pipeline_bindings_to_scope(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope& scope,
+        Pipeline_expression const& pipeline,
+        iris::Declaration_database const& declaration_database
+    )
+    {
+        add_pipeline_parameters_to_scope(scope, pipeline);
 
         for (iris::Pipeline_stage const& stage : pipeline.stages)
-        {
-            if (stage.kind == iris::Pipeline_stage_kind::Enumerate && stage.binding_name.has_value())
-            {
-                scope.variables.push_back(
-                    create_variable(stage.binding_name.value(), create_integer_type_type_reference(64, false), false, false, stage.source_range)
-                );
-                continue;
-            }
+            add_pipeline_stage_binding_to_scope(module_name, function_declaration, scope, stage, declaration_database);
+    }
 
-            if (stage.kind != iris::Pipeline_stage_kind::Map || !stage.binding_name.has_value())
-                continue;
+    static constexpr std::array<std::string_view, 8> g_pipeline_sink_names
+    {
+        "count", "any", "all", "into", "fold", "first", "in_place", "into_fixed"
+    };
 
-            std::optional<iris::Type_reference> const type_reference = get_expression_type(
-                module_name,
-                function_declaration,
-                scope,
-                stage.expression,
-                std::nullopt,
-                declaration_database
-            );
-            if (!type_reference.has_value())
-                continue;
-
-            scope.variables.push_back(
-                create_variable(
-                    stage.binding_name.value(),
-                    type_reference.value(),
-                    false,
-                    false,
-                    stage.source_range
-                )
-            );
-        }
+    std::span<std::string_view const> get_pipeline_sink_names()
+    {
+        return g_pipeline_sink_names;
     }
 
     bool is_pipeline_sink_name(std::string_view const name)
     {
-        return name == "count" || name == "any" || name == "all" || name == "into" || name == "fold" || name == "first" || name == "in_place" || name == "into_fixed";
+        return std::find(g_pipeline_sink_names.begin(), g_pipeline_sink_names.end(), name) != g_pipeline_sink_names.end();
     }
 
     // When the expression at `index` is `p(inputs).separate(...)` and `p` is a pipeline in scope.
@@ -1294,6 +1338,8 @@ namespace iris::compiler
                 if (type_reference.has_value())
                 {
                     scope.variables.push_back(
+                        data.variable_name_source_position.has_value() ?
+                        create_variable(data.variable_name, type_reference.value(), false, false, data.variable_name_source_position) :
                         create_variable(data.variable_name, type_reference.value(), false, false, expression.source_range)
                     );
                 }
@@ -1319,20 +1365,14 @@ namespace iris::compiler
 
             std::size_t const original_count = scope.variables.size();
 
-            for (std::size_t index = 0; index < data.input_parameter_names.size() && index < data.input_parameter_types.size(); ++index)
-            {
-                scope.variables.push_back(
-                    create_variable(data.input_parameter_names[index], data.input_parameter_types[index], false, false, expression.source_range)
-                );
-            }
+            add_pipeline_parameters_to_scope(scope, data);
 
             // Each stage sees the parameters and every earlier map binding.
             for (iris::Pipeline_stage& stage : data.stages)
             {
                 if (stage.kind == iris::Pipeline_stage_kind::Enumerate)
                 {
-                    if (stage.binding_name.has_value())
-                        scope.variables.push_back(create_variable(stage.binding_name.value(), create_integer_type_type_reference(64, false), false, false, stage.source_range));
+                    add_pipeline_stage_binding_to_scope(core_module.name, function_declaration, scope, stage, declaration_database);
                     continue;
                 }
 
@@ -1348,16 +1388,7 @@ namespace iris::compiler
                     temporaries_allocator
                 );
 
-                if (stage.kind == iris::Pipeline_stage_kind::Map && stage.binding_name.has_value())
-                {
-                    std::optional<iris::Type_reference> const type_reference = get_expression_type(core_module.name, function_declaration, scope, stage.expression, std::nullopt, declaration_database);
-                    if (type_reference.has_value())
-                    {
-                        scope.variables.push_back(
-                            create_variable(stage.binding_name.value(), type_reference.value(), false, false, stage.source_range)
-                        );
-                    }
-                }
+                add_pipeline_stage_binding_to_scope(core_module.name, function_declaration, scope, stage, declaration_database);
             }
 
             while (scope.variables.size() > original_count)

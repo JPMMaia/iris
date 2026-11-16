@@ -3,7 +3,9 @@ module;
 #include <functional>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
+#include <vector>
 #include <variant>
 
 #include <lsp/types.h>
@@ -14,6 +16,7 @@ import iris.compiler.analysis;
 import iris.compiler.validation;
 import iris.core;
 import iris.core.declarations;
+import iris.core.formatter;
 import iris.core.types;
 import iris.language_server.core;
 
@@ -271,5 +274,175 @@ namespace iris::language_server
                 process_expression
             );
         }
+    }
+
+    std::optional<iris::Source_range> create_name_source_range(
+        std::optional<iris::Source_position> const& position,
+        std::string_view const name
+    )
+    {
+        if (!position.has_value())
+            return std::nullopt;
+
+        return iris::Source_range
+        {
+            .start = position.value(),
+            .end = iris::Source_position{ .line = position->line, .column = position->column + static_cast<std::uint32_t>(name.size()) },
+        };
+    }
+
+    std::string format_type_for_display(
+        iris::Module const& core_module,
+        iris::Type_reference const& type
+    )
+    {
+        std::pmr::string const text = iris::format_type_reference(core_module.dependencies, type, {}, {});
+        return std::string{text.begin(), text.end()};
+    }
+
+    iris::compiler::Scope_pipeline const* find_pipeline_reference(
+        iris::compiler::Scope const& scope,
+        iris::Expression const& expression
+    )
+    {
+        if (!std::holds_alternative<iris::Variable_expression>(expression.data))
+            return nullptr;
+
+        std::string_view const name = std::get<iris::Variable_expression>(expression.data).name;
+        if (iris::compiler::find_variable_from_scope(scope, name) != nullptr)
+            return nullptr;
+
+        return iris::compiler::find_scope_pipeline(scope, name);
+    }
+
+    Pipeline_signature create_pipeline_signature(
+        iris::Module const& core_module,
+        Declaration_database const& declaration_database,
+        iris::Function_declaration const* const function_declaration,
+        iris::compiler::Scope const& scope,
+        iris::Pipeline_expression const& pipeline
+    )
+    {
+        Pipeline_signature signature;
+        signature.label = "pipeline ";
+        signature.label += std::string_view{pipeline.name};
+        signature.label += '(';
+
+        for (std::size_t index = 0; index < pipeline.input_parameter_names.size() && index < pipeline.input_parameter_types.size(); ++index)
+        {
+            if (index > 0)
+                signature.label += ", ";
+
+            std::string parameter{std::string_view{pipeline.input_parameter_names[index]}};
+            parameter += ": ";
+            parameter += format_type_for_display(core_module, pipeline.input_parameter_types[index]);
+
+            signature.label += parameter;
+            signature.parameters.push_back(std::move(parameter));
+        }
+
+        signature.label += ')';
+
+        std::optional<iris::Type_reference> const output_type = iris::compiler::get_pipeline_output_type(
+            core_module.name,
+            function_declaration,
+            scope,
+            pipeline,
+            declaration_database
+        );
+        if (output_type.has_value())
+        {
+            signature.label += " => ";
+            signature.label += format_type_for_display(core_module, output_type.value());
+        }
+
+        return signature;
+    }
+
+    std::optional<Pipeline_signature> create_pipeline_sink_signature(
+        iris::Module const& core_module,
+        Declaration_database const& declaration_database,
+        iris::Function_declaration const* const function_declaration,
+        iris::compiler::Scope const& scope,
+        iris::Statement const& statement,
+        iris::compiler::Pipeline_sink_call const& sink_call
+    )
+    {
+        if (sink_call.pipeline == nullptr)
+            return std::nullopt;
+
+        std::string_view const sink_name = sink_call.sink_name;
+        if (!iris::compiler::is_pipeline_sink_name(sink_name) && sink_name != "separate")
+            return std::nullopt;
+
+        iris::Pipeline_expression const& pipeline = *sink_call.pipeline;
+
+        std::optional<iris::Type_reference> const output_type = iris::compiler::get_pipeline_output_type(
+            core_module.name,
+            function_declaration,
+            scope,
+            pipeline,
+            declaration_database
+        );
+
+        std::optional<iris::Type_reference> const sink_type =
+            sink_name != "separate" ?
+            iris::compiler::get_pipeline_sink_type(core_module.name, function_declaration, scope, statement, sink_call, declaration_database) :
+            std::nullopt;
+
+        auto const format_mutable_slice = [&](std::optional<iris::Type_reference> const& element_type) -> std::string
+        {
+            if (!element_type.has_value())
+                return "Array_slice::<mutable T>";
+
+            return format_type_for_display(core_module, iris::create_array_slice_type_reference({ element_type.value() }, true));
+        };
+
+        std::vector<std::string> parameters;
+
+        if (sink_name == "into")
+        {
+            parameters.push_back("out: " + format_mutable_slice(output_type));
+        }
+        else if (sink_name == "in_place")
+        {
+            for (std::size_t index = 0; index < pipeline.input_parameter_names.size() && index < pipeline.input_parameter_types.size(); ++index)
+                parameters.push_back(std::string{std::string_view{pipeline.input_parameter_names[index]}} + ": " + format_mutable_slice(pipeline.input_parameter_types[index]));
+        }
+        else if (sink_name == "fold")
+        {
+            std::string const accumulator_type = sink_type.has_value() ? format_type_for_display(core_module, sink_type.value()) : std::string{"T"};
+            std::string const element_type = output_type.has_value() ? format_type_for_display(core_module, output_type.value()) : std::string{"U"};
+
+            parameters.push_back("init: " + accumulator_type);
+            parameters.push_back("function: (" + accumulator_type + ", " + element_type + ") -> " + accumulator_type);
+        }
+        else if (sink_name == "separate")
+        {
+            parameters.push_back("scratch: Array_slice::<mutable T>");
+        }
+
+        Pipeline_signature signature;
+        signature.label = std::string{sink_name};
+        signature.label += '(';
+
+        for (std::size_t index = 0; index < parameters.size(); ++index)
+        {
+            if (index > 0)
+                signature.label += ", ";
+
+            signature.label += parameters[index];
+        }
+
+        signature.label += ')';
+        signature.parameters = std::move(parameters);
+
+        if (sink_type.has_value())
+        {
+            signature.label += " -> ";
+            signature.label += format_type_for_display(core_module, sink_type.value());
+        }
+
+        return signature;
     }
 }

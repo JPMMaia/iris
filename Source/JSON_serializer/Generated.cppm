@@ -1243,6 +1243,7 @@ namespace iris::json
         data["variable_name"] = to_json(value.variable_name);
         data["range_expression"] = to_json(value.range_expression);
         data["then_statements"] = to_json(value.then_statements);
+        if (value.variable_name_source_position.has_value()) data["variable_name_source_position"] = to_json(value.variable_name_source_position);
         return data;
     }
 
@@ -1252,6 +1253,7 @@ namespace iris::json
         from_json(data.at("variable_name"), value.variable_name);
         from_json(data.at("range_expression"), value.range_expression);
         if (data.contains("then_statements")) from_json(data.at("then_statements"), value.then_statements);
+        if (data.contains("variable_name_source_position")) from_json(data.at("variable_name_source_position"), value.variable_name_source_position);
     }
 
     EXPORT template <>
@@ -1446,6 +1448,7 @@ namespace iris::json
         data["expression"] = to_json(value.expression);
         if (value.binding_name.has_value()) data["binding_name"] = to_json(value.binding_name);
         if (value.source_range.has_value()) data["source_range"] = to_json(value.source_range);
+        if (value.binding_name_source_position.has_value()) data["binding_name_source_position"] = to_json(value.binding_name_source_position);
         return data;
     }
 
@@ -1456,6 +1459,7 @@ namespace iris::json
         from_json(data.at("expression"), value.expression);
         if (data.contains("binding_name")) from_json(data.at("binding_name"), value.binding_name);
         if (data.contains("source_range")) from_json(data.at("source_range"), value.source_range);
+        if (data.contains("binding_name_source_position")) from_json(data.at("binding_name_source_position"), value.binding_name_source_position);
     }
 
     EXPORT template <>
@@ -1467,6 +1471,7 @@ namespace iris::json
         data["input_parameter_types"] = to_json(value.input_parameter_types);
         data["stages"] = to_json(value.stages);
         if (value.input_parameter_source_positions.has_value()) data["input_parameter_source_positions"] = to_json(value.input_parameter_source_positions);
+        if (value.name_source_position.has_value()) data["name_source_position"] = to_json(value.name_source_position);
         return data;
     }
 
@@ -1478,6 +1483,7 @@ namespace iris::json
         if (data.contains("input_parameter_types")) from_json(data.at("input_parameter_types"), value.input_parameter_types);
         if (data.contains("stages")) from_json(data.at("stages"), value.stages);
         if (data.contains("input_parameter_source_positions")) from_json(data.at("input_parameter_source_positions"), value.input_parameter_source_positions);
+        if (data.contains("name_source_position")) from_json(data.at("name_source_position"), value.name_source_position);
     }
 
     EXPORT template <>

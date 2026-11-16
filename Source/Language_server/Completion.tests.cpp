@@ -353,5 +353,215 @@ export function main() -> ()
         lsp::TextDocument_CompletionResult const result = run_completion_test(source);
         CHECK(find_completion_item(result, "Inner"));
     }
+
+    // ============================================================================
+    // Pipeline Completion Tests
+    // ============================================================================
+
+    TEST_CASE("Completes pipeline parameters and earlier bindings inside a stage", "[Language_server][Completion][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input * 2 => doubled;
+        filter doubled > $CURSOR_POSITIONthreshold;
+        map doubled + 1 => incremented;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_CompletionResult const result = run_completion_test(source);
+        CHECK(find_completion_item(result, "input"));
+        CHECK(find_completion_item(result, "doubled"));
+        CHECK(find_completion_item(result, "threshold"));
+        CHECK_FALSE(find_completion_item(result, "incremented"));
+    }
+
+    TEST_CASE("Completes the members of a pipeline binding", "[Language_server][Completion][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+struct Complex
+{
+    real: Float32 = 0.0f32;
+    imaginary: Float32 = 0.0f32;
+}
+
+function square(value: Complex) -> (result: Complex)
+{
+    return value;
+}
+
+export function run(list: Array_slice::<Complex>, threshold: Float32) -> ()
+{
+    pipeline process(input: Complex)
+    {
+        map square(input) => v0;
+        filter v0.$CURSOR_POSITIONreal > threshold;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_CompletionResult const result = run_completion_test(source);
+        CHECK(find_completion_item(result, "real"));
+        CHECK(find_completion_item(result, "imaginary"));
+    }
+
+    TEST_CASE("Completes pipeline names as values", "[Language_server][Completion][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline large(input: Int32)
+    {
+        filter input > threshold;
+    }
+
+    var count = $CURSOR_POSITION
+}
+)";
+
+        lsp::TextDocument_CompletionResult const result = run_completion_test(source);
+        CHECK(find_completion_item(result, "large"));
+        CHECK(find_completion_item(result, "list"));
+    }
+
+    TEST_CASE("Completes sinks after a pipeline call", "[Language_server][Completion][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline large(input: Int32)
+    {
+        filter input > threshold;
+    }
+
+    var count = large(list).$CURSOR_POSITION
+}
+)";
+
+        lsp::TextDocument_CompletionResult const result = run_completion_test(source);
+        CHECK(find_completion_item(result, "count"));
+        CHECK(find_completion_item(result, "into"));
+        CHECK(find_completion_item(result, "fold"));
+        CHECK(find_completion_item(result, "first"));
+        CHECK(find_completion_item(result, "separate"));
+        CHECK_FALSE(find_completion_item(result, "any"));
+        CHECK_FALSE(find_completion_item(result, "all"));
+        CHECK_FALSE(find_completion_item(result, "into_fixed"));
+        CHECK_FALSE(find_completion_item(result, "in_place"));
+    }
+
+    TEST_CASE("Completes any, all and into_fixed when they apply", "[Language_server][Completion][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(threshold: Int32) -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 2, 3];
+
+    pipeline is_large(input: Int32)
+    {
+        map input > threshold => large;
+    }
+
+    var result = is_large(values).$CURSOR_POSITION
+}
+)";
+
+        lsp::TextDocument_CompletionResult const result = run_completion_test(source);
+        CHECK(find_completion_item(result, "any"));
+        CHECK(find_completion_item(result, "all"));
+        CHECK(find_completion_item(result, "into_fixed"));
+    }
+
+    TEST_CASE("Completes in_place after a pipeline name", "[Language_server][Completion][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<mutable Int32>, threshold: Int32) -> ()
+{
+    pipeline large(input: Int32)
+    {
+        filter input > threshold;
+    }
+
+    var kept = large.$CURSOR_POSITION
+}
+)";
+
+        lsp::TextDocument_CompletionResult const result = run_completion_test(source);
+        CHECK(find_completion_item(result, "in_place"));
+        CHECK_FALSE(find_completion_item(result, "count"));
+    }
+
+    TEST_CASE("Completes stage keywords at the start of a stage", "[Language_server][Completion][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input * 2 => doubled;
+        $CURSOR_POSITION
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_CompletionResult const result = run_completion_test(source);
+        CHECK(find_completion_item(result, "map"));
+        CHECK(find_completion_item(result, "filter"));
+        CHECK(find_completion_item(result, "take_while"));
+        CHECK(find_completion_item(result, "enumerate"));
+    }
+
+    TEST_CASE("Does not complete stage keywords inside a stage expression", "[Language_server][Completion][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input * 2 => doubled;
+        filter $CURSOR_POSITIONdoubled > threshold;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_CompletionResult const result = run_completion_test(source);
+        CHECK_FALSE(find_completion_item(result, "map"));
+        CHECK(find_completion_item(result, "doubled"));
+    }
 }
 

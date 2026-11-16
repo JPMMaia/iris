@@ -114,6 +114,23 @@ namespace iris::compiler
         Pipeline_expression const& pipeline
     );
 
+    // Adds the pipeline parameters to the scope.
+    export void add_pipeline_parameters_to_scope(
+        Scope& scope,
+        Pipeline_expression const& pipeline
+    );
+
+    // Adds the binding of one stage (a map or enumerate name) to the scope, with the type that
+    // analysis deduces for it. Does nothing for stages without a binding or whose type cannot be
+    // deduced. Later stages see it; the stage itself and earlier ones do not.
+    export void add_pipeline_stage_binding_to_scope(
+        std::string_view const module_name,
+        iris::Function_declaration const* function_declaration,
+        Scope& scope,
+        iris::Pipeline_stage const& stage,
+        iris::Declaration_database const& declaration_database
+    );
+
     // Adds the pipeline parameters to the scope, then each map binding in order, with the types
     // that analysis deduces for them. Bindings whose type cannot be deduced are skipped.
     export void add_pipeline_bindings_to_scope(
@@ -194,6 +211,9 @@ namespace iris::compiler
     export std::pmr::vector<std::pmr::string> get_statement_free_names(
         iris::Statement const& statement
     );
+
+    // Every sink a pipeline can be consumed by, other than the for-each loop and `separate`.
+    export std::span<std::string_view const> get_pipeline_sink_names();
 
     export bool is_pipeline_sink_name(std::string_view const name);
 
@@ -577,6 +597,8 @@ namespace iris::compiler
                         if (type_reference.has_value())
                         {
                             scope.variables.push_back(
+                                for_each_expression.variable_name_source_position.has_value() ?
+                                create_variable(for_each_expression.variable_name, type_reference.value(), false, false, for_each_expression.variable_name_source_position) :
                                 create_variable(for_each_expression.variable_name, type_reference.value(), false, false, expression.source_range)
                             );
                         }
@@ -591,11 +613,14 @@ namespace iris::compiler
                     iris::Pipeline_expression const& pipeline_expression = std::get<iris::Pipeline_expression>(expression.data);
 
                     std::size_t const variable_count = scope.variables.size();
-                    add_pipeline_bindings_to_scope(module_name, function_declaration, scope, pipeline_expression, declaration_database);
+                    // Each stage sees the parameters and the bindings of the stages before it.
+                    add_pipeline_parameters_to_scope(scope, pipeline_expression);
                     for (iris::Pipeline_stage const& stage : pipeline_expression.stages)
                     {
                         if (!stage.expression.expressions.empty())
                             visit_statement(stage.expression);
+
+                        add_pipeline_stage_binding_to_scope(module_name, function_declaration, scope, stage, declaration_database);
                     }
                     scope.variables.erase(scope.variables.begin() + variable_count, scope.variables.end());
 

@@ -1,6 +1,8 @@
 module;
 
+#include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <variant>
 #include <vector>
@@ -149,6 +151,82 @@ namespace iris::language_server
         }
 
         return create_hover({format_type(core_module, type)});
+    }
+
+    // True when the position is on the member name of an access, `count` in `p(xs).count`. The
+    // member name is the end of the access expression's range.
+    static bool is_position_on_access_member_name(
+        iris::Expression const& expression,
+        iris::Source_position const& source_position
+    )
+    {
+        if (!std::holds_alternative<iris::Access_expression>(expression.data) || !expression.source_range.has_value())
+            return false;
+
+        std::string_view const member_name = std::get<iris::Access_expression>(expression.data).member_name;
+        iris::Source_position const end = expression.source_range->end;
+        if (end.column <= member_name.size())
+            return false;
+
+        iris::Source_range const member_range
+        {
+            .start = iris::Source_position{ .line = end.line, .column = end.column - static_cast<std::uint32_t>(member_name.size()) },
+            .end = end,
+        };
+
+        return range_contains_position_inclusive(member_range, source_position);
+    }
+
+    // The part of a pipeline declaration under the cursor: its name gives the signature, a parameter
+    // or a binding name gives `name: Type`. Nullopt anywhere else, including inside the stages, which
+    // are statements of their own.
+    static std::optional<std::string> format_pipeline_declaration_part(
+        Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Function_declaration const* const function_declaration,
+        iris::compiler::Scope const& scope,
+        iris::Pipeline_expression const& pipeline,
+        iris::Source_position const& source_position
+    )
+    {
+        auto const is_on_name = [&](std::optional<iris::Source_position> const& position, std::string_view const name) -> bool
+        {
+            std::optional<iris::Source_range> const range = create_name_source_range(position, name);
+            return range.has_value() && range_contains_position_inclusive(range.value(), source_position);
+        };
+
+        if (is_on_name(pipeline.name_source_position, pipeline.name))
+            return create_pipeline_signature(core_module, declaration_database, function_declaration, scope, pipeline).label;
+
+        iris::compiler::Scope binding_scope = scope;
+        iris::compiler::add_pipeline_parameters_to_scope(binding_scope, pipeline);
+
+        if (pipeline.input_parameter_source_positions.has_value())
+        {
+            std::span<iris::Source_position const> const positions = pipeline.input_parameter_source_positions.value();
+
+            for (std::size_t index = 0; index < positions.size() && index < pipeline.input_parameter_names.size() && index < pipeline.input_parameter_types.size(); ++index)
+            {
+                if (is_on_name(positions[index], pipeline.input_parameter_names[index]))
+                    return std::string{std::string_view{pipeline.input_parameter_names[index]}} + ": " + format_type(core_module, pipeline.input_parameter_types[index]);
+            }
+        }
+
+        for (iris::Pipeline_stage const& stage : pipeline.stages)
+        {
+            iris::compiler::add_pipeline_stage_binding_to_scope(core_module.name, function_declaration, binding_scope, stage, declaration_database);
+
+            if (!stage.binding_name.has_value() || !is_on_name(stage.binding_name_source_position, stage.binding_name.value()))
+                continue;
+
+            iris::compiler::Variable const* const binding = iris::compiler::find_variable_from_scope(binding_scope, stage.binding_name.value());
+            if (binding == nullptr)
+                return std::nullopt;
+
+            return std::string{std::string_view{binding->name}} + ": " + format_type(core_module, binding->type);
+        }
+
+        return std::nullopt;
     }
 
     lsp::TextDocument_HoverResult compute_hover(
@@ -312,9 +390,92 @@ namespace iris::language_server
 
                     return true;
                 }
+                else if (std::holds_alternative<iris::Pipeline_expression>(expression.data))
+                {
+                    std::optional<std::string> text = format_pipeline_declaration_part(
+                        declaration_database,
+                        core_module,
+                        function->declaration,
+                        scope,
+                        std::get<iris::Pipeline_expression>(expression.data),
+                        source_position
+                    );
+                    if (!text.has_value())
+                        return false;
+
+                    contents.push_back(std::move(text.value()));
+                    return true;
+                }
+                else if (std::holds_alternative<iris::For_each_expression>(expression.data))
+                {
+                    iris::For_each_expression const& for_each_expression = std::get<iris::For_each_expression>(expression.data);
+
+                    std::optional<iris::Source_range> const name_range = create_name_source_range(
+                        for_each_expression.variable_name_source_position,
+                        for_each_expression.variable_name
+                    );
+                    if (!name_range.has_value() || !range_contains_position_inclusive(name_range.value(), source_position))
+                        return false;
+
+                    iris::Pipeline_expression const* const pipeline = iris::compiler::get_pipeline_from_call_expression(
+                        scope,
+                        statement,
+                        statement.expressions[for_each_expression.range_expression.expression_index]
+                    );
+                    if (pipeline == nullptr)
+                        return false;
+
+                    std::optional<iris::Type_reference> const type = iris::compiler::get_pipeline_output_type(
+                        core_module.name,
+                        function->declaration,
+                        scope,
+                        *pipeline,
+                        declaration_database
+                    );
+                    if (!type.has_value())
+                        return false;
+
+                    contents.push_back(std::string{std::string_view{for_each_expression.variable_name}} + ": " + format_type(core_module, type.value()));
+                    return true;
+                }
+                else if (std::holds_alternative<iris::Call_expression>(expression.data))
+                {
+                    // A sink is answered on its own name, `count` in `p(xs).count()`. The rest of the
+                    // call is left to the expressions it contains.
+                    std::optional<iris::compiler::Pipeline_sink_call> const sink_call = iris::compiler::get_pipeline_sink_call(scope, statement, expression);
+                    if (!sink_call.has_value())
+                        return false;
+
+                    iris::Expression const& callee = statement.expressions[sink_call->call_expression->expression.expression_index];
+                    if (!is_position_on_access_member_name(callee, source_position))
+                        return false;
+
+                    std::optional<Pipeline_signature> signature = create_pipeline_sink_signature(
+                        core_module,
+                        declaration_database,
+                        function->declaration,
+                        scope,
+                        statement,
+                        sink_call.value()
+                    );
+                    if (!signature.has_value())
+                        return false;
+
+                    contents.push_back(std::move(signature->label));
+                    return true;
+                }
                 else if (std::holds_alternative<iris::Variable_expression>(expression.data))
                 {
                     iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
+
+                    iris::compiler::Scope_pipeline const* const scope_pipeline = find_pipeline_reference(scope, expression);
+                    if (scope_pipeline != nullptr)
+                    {
+                        contents.push_back(
+                            create_pipeline_signature(core_module, declaration_database, function->declaration, scope, *scope_pipeline->pipeline).label
+                        );
+                        return true;
+                    }
 
                     iris::compiler::Variable const* const variable = iris::compiler::find_variable_from_scope(scope, variable_expression.name);
                     if (variable == nullptr)

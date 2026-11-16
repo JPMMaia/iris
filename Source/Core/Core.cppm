@@ -641,6 +641,7 @@ namespace iris
         std::pmr::string variable_name;
         Expression_index range_expression;
         std::pmr::vector<Statement> then_statements;
+        std::optional<Source_position> variable_name_source_position;  // where the loop variable name was written
 
         friend bool operator==(For_each_expression const&, For_each_expression const&) = default;
     };
@@ -760,6 +761,7 @@ namespace iris
         Statement expression;
         std::optional<std::pmr::string> binding_name;  // Map and Enumerate
         std::optional<Source_range> source_range;
+        std::optional<Source_position> binding_name_source_position;  // where the binding name after `=>` was written
 
         friend bool operator==(Pipeline_stage const&, Pipeline_stage const&) = default;
     };
@@ -773,6 +775,7 @@ namespace iris
         std::pmr::vector<Type_reference> input_parameter_types;
         std::pmr::vector<Pipeline_stage> stages;
         std::optional<std::pmr::vector<Source_position>> input_parameter_source_positions;
+        std::optional<Source_position> name_source_position;  // where the pipeline name was written
 
         friend bool operator==(Pipeline_expression const&, Pipeline_expression const&) = default;
     };

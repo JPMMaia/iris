@@ -1709,6 +1709,99 @@ namespace iris::language_server
         return signature_help;
     }
 
+    // A call of a pipeline, `p(xs)`, or of one of its sinks, `p(xs).into(out)` or `p.in_place(xs)`.
+    // Pipelines are not declarations, so they are found through the scope at the call.
+    static std::optional<Pipeline_signature> find_called_pipeline_signature(
+        Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Source_position const& source_position
+    )
+    {
+        std::optional<Pipeline_signature> signature = std::nullopt;
+        std::optional<iris::Source_range> call_range = std::nullopt;
+
+        auto const is_more_nested_range = [](iris::Source_range const& lhs, iris::Source_range const& rhs) -> bool
+        {
+            bool const lhs_starts_later =
+                lhs.start.line > rhs.start.line ||
+                (lhs.start.line == rhs.start.line && lhs.start.column >= rhs.start.column);
+            bool const lhs_ends_earlier =
+                lhs.end.line < rhs.end.line ||
+                (lhs.end.line == rhs.end.line && lhs.end.column <= rhs.end.column);
+
+            return lhs_starts_later && lhs_ends_earlier;
+        };
+
+        visit_expressions_that_contain_position(
+            declaration_database,
+            core_module,
+            source_position,
+            [&](iris::Function_declaration const* function_declaration, iris::compiler::Scope const& scope, iris::Statement const& statement, iris::Expression const& expression) -> bool
+            {
+                if (!std::holds_alternative<iris::Call_expression>(expression.data) || !expression.source_range.has_value())
+                    return false;
+
+                if (call_range.has_value() && !is_more_nested_range(expression.source_range.value(), call_range.value()))
+                    return false;
+
+                std::optional<Pipeline_signature> found_signature = std::nullopt;
+
+                iris::Pipeline_expression const* const pipeline = iris::compiler::get_pipeline_from_call_expression(scope, statement, expression);
+                if (pipeline != nullptr)
+                {
+                    found_signature = create_pipeline_signature(core_module, declaration_database, function_declaration, scope, *pipeline);
+                }
+                else
+                {
+                    std::optional<iris::compiler::Pipeline_sink_call> const sink_call = iris::compiler::get_pipeline_sink_call(scope, statement, expression);
+                    if (sink_call.has_value())
+                        found_signature = create_pipeline_sink_signature(core_module, declaration_database, function_declaration, scope, statement, sink_call.value());
+                }
+
+                // The innermost call decides, so `p(f(|))` is answered for `f`, not for `p`.
+                call_range = expression.source_range;
+                signature = std::move(found_signature);
+                return false;
+            }
+        );
+
+        return signature;
+    }
+
+    static lsp::TextDocument_SignatureHelpResult create_pipeline_signature_help(
+        Pipeline_signature const& signature,
+        std::uint32_t const active_parameter
+    )
+    {
+        std::vector<lsp::ParameterInformation> parameters;
+        parameters.reserve(signature.parameters.size());
+
+        std::size_t search_start = 0;
+        for (std::string const& parameter : signature.parameters)
+        {
+            std::size_t const parameter_start = signature.label.find(parameter, search_start);
+            if (parameter_start == std::string::npos)
+                break;
+
+            std::size_t const parameter_end = parameter_start + parameter.size();
+            search_start = parameter_end;
+
+            lsp::ParameterInformation parameter_info;
+            parameter_info.label = lsp::Tuple<lsp::uint, lsp::uint>{static_cast<lsp::uint>(parameter_start), static_cast<lsp::uint>(parameter_end)};
+            parameters.push_back(std::move(parameter_info));
+        }
+
+        lsp::SignatureInformation signature_info;
+        signature_info.label = signature.label;
+        signature_info.parameters = std::move(parameters);
+
+        lsp::SignatureHelp signature_help;
+        signature_help.signatures.push_back(std::move(signature_info));
+        signature_help.activeSignature = 0;
+        signature_help.activeParameter = active_parameter;
+        return signature_help;
+    }
+
     lsp::TextDocument_SignatureHelpResult compute_function_signature_help(
         iris::Module const& core_module,
         iris::Function_declaration const& function_declaration,
@@ -2326,6 +2419,21 @@ namespace iris::language_server
 
         if (kind == Signature_help_kind::Function)
         {
+            std::optional<Pipeline_signature> const pipeline_signature = find_called_pipeline_signature(
+                declaration_database,
+                core_module,
+                to_source_position(position)
+            );
+            if (pipeline_signature.has_value())
+            {
+                std::optional<std::uint32_t> const pipeline_active_parameter = find_function_call_active_parameter(
+                    parse_tree,
+                    position
+                );
+
+                return create_pipeline_signature_help(pipeline_signature.value(), pipeline_active_parameter.value_or(0));
+            }
+
             std::optional<Signature_help_name> const name = find_function_call_module_and_function_name(
                 declaration_database,
                 parse_tree,

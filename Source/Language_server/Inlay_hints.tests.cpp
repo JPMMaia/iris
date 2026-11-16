@@ -662,4 +662,101 @@ export function main() -> ()
         CHECK(found_a);
         CHECK(found_b);
     }
+
+    // ============================================================================
+    // Pipeline Inlay Hints Tests
+    // ============================================================================
+
+    namespace
+    {
+        // The zero-based position just after the first match of `text` in `source`.
+        static lsp::Position find_position_after_text(
+            std::string_view const source,
+            std::string_view const text
+        )
+        {
+            std::size_t const index = source.find(text);
+            REQUIRE(index != std::string_view::npos);
+
+            std::uint32_t line = 0;
+            std::uint32_t column = 0;
+            for (std::size_t i = 0; i < index + text.size(); ++i)
+            {
+                if (source[i] == '\n')
+                {
+                    ++line;
+                    column = 0;
+                }
+                else
+                {
+                    ++column;
+                }
+            }
+            return lsp::Position{.line = line, .character = column};
+        }
+
+        static std::optional<std::string> find_inlay_hint_label_at(
+            std::span<lsp::InlayHint const> const hints,
+            lsp::Position const& position
+        )
+        {
+            for (lsp::InlayHint const& hint : hints)
+            {
+                if (hint.position.line == position.line && hint.position.character == position.character)
+                    return get_inlay_hint_label(hint);
+            }
+
+            return std::nullopt;
+        }
+    }
+
+    TEST_CASE("Pipeline inlay hints for map bindings and the for-each variable", "[Language_server][Inlay_hints][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input * 2 => doubled;
+        map doubled > 4 => is_large;
+        enumerate => index;
+    }
+
+    for element in process(list)
+    {
+    }
+}
+)";
+
+        std::pmr::vector<lsp::InlayHint> const inlay_hints = run_inlay_hints_test(source);
+
+        CHECK(find_inlay_hint_label_at(inlay_hints, find_position_after_text(source, "=> doubled")) == std::optional<std::string>{": Int32"});
+        CHECK(find_inlay_hint_label_at(inlay_hints, find_position_after_text(source, "=> is_large")) == std::optional<std::string>{": Bool"});
+        CHECK_FALSE(find_inlay_hint_label_at(inlay_hints, find_position_after_text(source, "=> index")).has_value());
+        CHECK(find_inlay_hint_label_at(inlay_hints, find_position_after_text(source, "for element")) == std::optional<std::string>{": Bool"});
+    }
+
+    TEST_CASE("Pipeline inlay hints for fold lambda parameters", "[Language_server][Inlay_hints][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>) -> (result: Int32)
+{
+    pipeline doubled(input: Int32)
+    {
+        map input * 2 => result;
+    }
+
+    return doubled(list).fold(0, lambda (total, element) => total + element);
+}
+)";
+
+        std::pmr::vector<lsp::InlayHint> const inlay_hints = run_inlay_hints_test(source);
+
+        CHECK(find_inlay_hint_label_at(inlay_hints, find_position_after_text(source, "lambda (total")) == std::optional<std::string>{": Int32"});
+        CHECK(find_inlay_hint_label_at(inlay_hints, find_position_after_text(source, ", element")) == std::optional<std::string>{": Int32"});
+    }
 }

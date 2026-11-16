@@ -565,4 +565,325 @@ export function main() -> ()
         CHECK(has_hover_with_content(result, "base"));
         CHECK(has_hover_with_content(result, "Int32"));
     }
+
+    // ============================================================================
+    // Pipeline Hover Tests
+    // ============================================================================
+
+    TEST_CASE("Hover on pipeline name at its declaration shows the pipeline signature", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+function square(value: Int32) -> (result: Int32)
+{
+    return value * value;
+}
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline proc$CURSOR_POSITIONess(input: Int32)
+    {
+        map square(input) => v0;
+        filter v0 > threshold;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "pipeline process(input: Int32) => Int32"));
+    }
+
+    TEST_CASE("Hover on pipeline name in a for-each shows the pipeline signature", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input * 2 => doubled;
+        filter doubled > threshold;
+    }
+
+    for v in proc$CURSOR_POSITIONess(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "pipeline process(input: Int32) => Int32"));
+    }
+
+    TEST_CASE("Hover on pipeline name in a value sink shows the pipeline signature", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> (result: Uint64)
+{
+    pipeline large(input: Int32)
+    {
+        filter input > threshold;
+    }
+
+    return la$CURSOR_POSITIONrge(list).count();
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "pipeline large(input: Int32) => Int32"));
+    }
+
+    TEST_CASE("Hover on pipeline parameter inside a stage shows its type", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map in$CURSOR_POSITIONput * 2 => doubled;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "input: Int32"));
+    }
+
+    TEST_CASE("Hover on pipeline binding inside a later stage shows its type", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input > 0 => is_positive;
+        filter is_pos$CURSOR_POSITIONitive;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "is_positive: Bool"));
+    }
+
+    TEST_CASE("Hover on pipeline binding name after => shows its type", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input > 0 => is_pos$CURSOR_POSITIONitive;
+        enumerate => index;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "is_positive: Bool"));
+    }
+
+    TEST_CASE("Hover on pipeline enumerate binding name shows Uint64", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        enumerate => ind$CURSOR_POSITIONex;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "index: Uint64"));
+    }
+
+    TEST_CASE("Hover on pipeline parameter in its declaration shows its type", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>) -> ()
+{
+    pipeline process(inp$CURSOR_POSITIONut: Int32)
+    {
+        map input * 2 => doubled;
+    }
+
+    for v in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "input: Int32"));
+    }
+
+    TEST_CASE("Hover on for-each loop variable shows the pipeline output type", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input > 0 => is_positive;
+    }
+
+    for valu$CURSOR_POSITIONe in process(list)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "value: Bool"));
+    }
+
+    TEST_CASE("Hover on for-each loop variable use shows the pipeline output type", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+function use(value: Bool) -> ()
+{
+}
+
+export function run(list: Array_slice::<Int32>) -> ()
+{
+    pipeline process(input: Int32)
+    {
+        map input > 0 => is_positive;
+    }
+
+    for value in process(list)
+    {
+        use(val$CURSOR_POSITIONue);
+    }
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "value: Bool"));
+    }
+
+    TEST_CASE("Hover on count sink shows its signature", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, threshold: Int32) -> (result: Uint64)
+{
+    pipeline large(input: Int32)
+    {
+        filter input > threshold;
+    }
+
+    return large(list).cou$CURSOR_POSITIONnt();
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "count() -> Uint64"));
+    }
+
+    TEST_CASE("Hover on into sink shows its signature", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>, output: Array_slice::<mutable Int32>) -> ()
+{
+    pipeline doubled(input: Int32)
+    {
+        map input * 2 => result;
+    }
+
+    var written = doubled(list).in$CURSOR_POSITIONto(output);
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "into(out: Array_slice::<mutable Int32>) -> Array_slice::<mutable Int32>"));
+    }
+
+    TEST_CASE("Hover on fold sink shows its signature", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(list: Array_slice::<Int32>) -> (result: Int32)
+{
+    pipeline doubled(input: Int32)
+    {
+        map input * 2 => result;
+    }
+
+    return doubled(list).fo$CURSOR_POSITIONld(0, lambda (accumulator, value) => accumulator + value);
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "fold(init: Int32, function: (Int32, Int32) -> Int32) -> Int32"));
+    }
+
+    TEST_CASE("Hover on pipeline declared inside a lambda body", "[Language_server][Hover][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+lambda Counter(values: Array_slice::<Int32>) -> (result: Uint64);
+
+export function run(threshold: Int32) -> ()
+{
+    var counter: Counter = lambda (values) =>
+    {
+        pipeline large(input: Int32)
+        {
+            filter input > threshold;
+        }
+
+        return lar$CURSOR_POSITIONge(values).count();
+    };
+}
+)";
+
+        lsp::TextDocument_HoverResult const result = run_hover_test(source);
+        CHECK(has_hover_with_content(result, "pipeline large(input: Int32) => Int32"));
+    }
 }

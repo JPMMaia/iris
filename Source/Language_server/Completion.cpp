@@ -201,7 +201,7 @@ namespace iris::language_server
         iris::compiler::Scope const& scope
     )
     {
-        items.reserve(items.size() + scope.variables.size());
+        items.reserve(items.size() + scope.variables.size() + scope.pipelines.size());
 
         for (iris::compiler::Variable const& variable : scope.variables)
         {
@@ -209,6 +209,111 @@ namespace iris::language_server
                 create_completion_item(variable.name, lsp::CompletionItemKind::Variable)
             );
         }
+
+        for (iris::compiler::Scope_pipeline const& scope_pipeline : scope.pipelines)
+        {
+            lsp::CompletionItem item = create_completion_item(scope_pipeline.pipeline->name, lsp::CompletionItemKind::Function);
+            item.detail = "pipeline";
+            items.push_back(std::move(item));
+        }
+    }
+
+    static lsp::CompletionList create_completion_list(
+        std::vector<lsp::CompletionItem> items
+    )
+    {
+        return lsp::CompletionList
+        {
+            .isIncomplete = false,
+            .items = std::move(items),
+            .itemDefaults = std::nullopt,
+        };
+    }
+
+    // What follows `.` after a pipeline: the sinks after `p(xs).`, `in_place` after `p.`, and `into`
+    // after `p(xs).separate(scratch).`. Nullopt when the accessed expression is not a pipeline.
+    static std::optional<lsp::CompletionList> create_pipeline_sink_completion_list(
+        Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Function_declaration const* const function_declaration,
+        iris::compiler::Scope const& scope,
+        iris::Statement const& statement
+    )
+    {
+        if (statement.expressions.empty())
+            return std::nullopt;
+
+        iris::Expression const& expression = statement.expressions[0];
+
+        if (find_pipeline_reference(scope, expression) != nullptr)
+        {
+            std::vector<lsp::CompletionItem> items = {};
+            items.push_back(create_completion_item("in_place", lsp::CompletionItemKind::Method));
+            return create_completion_list(std::move(items));
+        }
+
+        iris::Pipeline_expression const* const pipeline = iris::compiler::get_pipeline_from_call_expression(scope, statement, expression);
+        if (pipeline == nullptr)
+        {
+            std::optional<iris::compiler::Pipeline_sink_call> const sink_call = iris::compiler::get_pipeline_sink_call(scope, statement, expression);
+            if (sink_call.has_value() && sink_call->sink_name == "separate")
+            {
+                std::vector<lsp::CompletionItem> items = {};
+                items.push_back(create_completion_item("into", lsp::CompletionItemKind::Method));
+                return create_completion_list(std::move(items));
+            }
+
+            return std::nullopt;
+        }
+
+        std::optional<iris::Type_reference> const output_type = iris::compiler::get_pipeline_output_type(
+            core_module.name,
+            function_declaration,
+            scope,
+            *pipeline,
+            declaration_database
+        );
+        bool const is_bool_output = output_type.has_value() && iris::is_bool(output_type.value());
+
+        // into_fixed needs every input to have a size known at compile time; the first one decides
+        // here, validation reports the rest.
+        iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
+        bool has_static_capacity = false;
+        if (!call_expression.arguments.empty())
+        {
+            std::optional<iris::Type_reference> const input_type = iris::compiler::get_expression_type(
+                core_module.name,
+                function_declaration,
+                scope,
+                statement,
+                statement.expressions[call_expression.arguments[0].expression_index],
+                std::nullopt,
+                declaration_database
+            );
+            has_static_capacity =
+                input_type.has_value() &&
+                iris::compiler::get_pipeline_input_static_capacity(declaration_database, input_type.value()).has_value();
+        }
+
+        std::vector<lsp::CompletionItem> items = {};
+
+        for (std::string_view const sink_name : iris::compiler::get_pipeline_sink_names())
+        {
+            if (sink_name == "in_place")
+                continue;
+
+            if ((sink_name == "any" || sink_name == "all") && !is_bool_output)
+                continue;
+
+            if (sink_name == "into_fixed" && !has_static_capacity)
+                continue;
+
+            items.push_back(create_completion_item(sink_name, lsp::CompletionItemKind::Method));
+        }
+
+        items.push_back(create_completion_item("separate", lsp::CompletionItemKind::Method));
+
+        return create_completion_list(std::move(items));
     }
 
     static void add_import_module_name_items(
@@ -628,6 +733,31 @@ namespace iris::language_server
         return std::nullopt;
     }
 
+    // The outermost call that ends where `node` ends, or `node` itself when it does not end a call.
+    static iris::parser::Parse_node find_call_node_ending_with(
+        iris::parser::Parse_node const& node
+    )
+    {
+        iris::Source_position const end = iris::parser::get_node_source_range(node).end;
+
+        iris::parser::Parse_node result = node;
+        std::optional<iris::parser::Parse_node> current = iris::parser::get_parent_node(node);
+
+        while (current.has_value())
+        {
+            iris::Source_position const current_end = iris::parser::get_node_source_range(current.value()).end;
+            if (current_end.line != end.line || current_end.column != end.column)
+                break;
+
+            if (iris::parser::get_node_symbol(current.value()) == "Expression_call")
+                result = current.value();
+
+            current = iris::parser::get_parent_node(current.value());
+        }
+
+        return result;
+    }
+
     static std::optional<lsp::CompletionList> create_access_value_completion_list(
         Declaration_database const& declaration_database,
         iris::parser::Parse_tree const& parse_tree,
@@ -639,13 +769,16 @@ namespace iris::language_server
         iris::Source_position const source_position
     )
     {
-        std::optional<iris::parser::Parse_node> const node_to_access = iris::parser::find_node_before_source_position(
+        std::optional<iris::parser::Parse_node> const node_before_access = iris::parser::find_node_before_source_position(
             parse_tree,
             hint_node,
             get_access_operator_source_position(access_operator, source_position)
         );
-        if (!node_to_access.has_value())
+        if (!node_before_access.has_value())
             return std::nullopt;
+
+        // Before `.` in `p(xs).` sits the `)` token; what is accessed is the whole call.
+        std::optional<iris::parser::Parse_node> const node_to_access = find_call_node_ending_with(node_before_access.value());
 
         std::string_view const node_to_access_value = iris::parser::get_node_value(parse_tree, node_to_access.value());
         iris::Import_module_with_alias const* import_module = find_import_module_with_alias(
@@ -716,6 +849,20 @@ namespace iris::language_server
 
             if (scope.has_value())
             {
+                // A pipeline call has no type, so its sinks are found before the type-based path.
+                if (access_operator == ".")
+                {
+                    std::optional<lsp::CompletionList> pipeline_completion_list = create_pipeline_sink_completion_list(
+                        declaration_database,
+                        core_module,
+                        function_declaration,
+                        scope.value(),
+                        access_statement
+                    );
+                    if (pipeline_completion_list.has_value())
+                        return pipeline_completion_list;
+                }
+
                 std::optional<iris::Type_reference> const expression_type = iris::compiler::get_expression_type(
                     core_module.name,
                     function_declaration,
@@ -922,6 +1069,84 @@ namespace iris::language_server
         }
 
         return false;
+    }
+
+    static bool is_inside_pipeline_stages(
+        iris::parser::Parse_node const& node
+    )
+    {
+        std::optional<iris::parser::Parse_node> current = node;
+
+        while (current.has_value())
+        {
+            std::string_view const symbol = iris::parser::get_node_symbol(current.value());
+            if (symbol == "Expression_pipeline_stages")
+                return true;
+
+            // A stage's own expression is not where a new stage starts.
+            if (symbol == "Generic_expression" || symbol == "Function_definition" || symbol == "Module")
+                return false;
+
+            current = iris::parser::get_parent_node(current.value());
+        }
+
+        return false;
+    }
+
+    // At the start of a stage in a pipeline body: after `{` or `;`, maybe with the keyword half
+    // written. The text decides, since a half-written stage does not parse.
+    static bool is_at_pipeline_stage_start(
+        iris::parser::Parse_tree const& parse_tree,
+        iris::parser::Parse_node const& root_node,
+        iris::parser::Parse_node const& smallest_node,
+        iris::Source_position const source_position
+    )
+    {
+        if (!is_inside_pipeline_stages(smallest_node))
+            return false;
+
+        std::uint32_t current_byte = iris::parser::calculate_byte(parse_tree, root_node, source_position);
+
+        auto const is_identifier_character = [](char8_t const character) -> bool
+        {
+            return (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || character == '_';
+        };
+
+        while (current_byte > 0 && is_identifier_character(parse_tree.text[current_byte - 1]))
+            current_byte -= 1;
+
+        while (current_byte > 0)
+        {
+            char8_t const character = parse_tree.text[current_byte - 1];
+            if (character == ' ' || character == '\t' || character == '\n' || character == '\r')
+            {
+                current_byte -= 1;
+                continue;
+            }
+
+            return character == '{' || character == ';';
+        }
+
+        return false;
+    }
+
+    static lsp::CompletionList create_pipeline_stage_keyword_completion_list()
+    {
+        static constexpr std::array<std::string_view, 4> keywords
+        {
+            "enumerate",
+            "filter",
+            "map",
+            "take_while",
+        };
+
+        std::vector<lsp::CompletionItem> items = {};
+        items.reserve(keywords.size());
+
+        for (std::string_view const keyword : keywords)
+            items.push_back(create_completion_item(keyword, lsp::CompletionItemKind::Keyword));
+
+        return create_completion_list(std::move(items));
     }
 
     static bool is_at_import_module_name(std::string_view const node_before_value)
@@ -1169,6 +1394,9 @@ namespace iris::language_server
 
         if (function.has_value())
         {
+            if (is_at_pipeline_stage_start(parse_tree, root_node, smallest_node, source_position))
+                return create_pipeline_stage_keyword_completion_list();
+
             std::vector<lsp::CompletionItem> items = {};
 
             std::optional<std::string_view> const partial_type_prefix =

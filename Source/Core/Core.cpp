@@ -701,6 +701,7 @@ namespace iris
             || std::holds_alternative<iris::For_each_expression>(expression.data)
             || std::holds_alternative<iris::For_loop_expression>(expression.data)
             || std::holds_alternative<iris::If_expression>(expression.data)
+            || std::holds_alternative<iris::Pipeline_expression>(expression.data)
             || std::holds_alternative<iris::Switch_expression>(expression.data)
             || std::holds_alternative<iris::While_loop_expression>(expression.data);
     }

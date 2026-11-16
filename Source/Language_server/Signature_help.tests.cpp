@@ -2116,4 +2116,101 @@ export function main() -> ()
         REQUIRE(result->signatures[0].parameters.has_value());
         REQUIRE(result->signatures[0].parameters->size() == 2);
     }
+
+    // ============================================================================
+    // Pipeline Signature Help Tests
+    // ============================================================================
+
+    TEST_CASE("Computes signature help for a pipeline call", "[Language_server][Signature_help][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(values: Array_slice::<Int32>, weights: Array_slice::<Float32>) -> ()
+{
+    pipeline weighted(value: Int32, weight: Float32)
+    {
+        map (value as Float32) * weight => result;
+    }
+
+    for v in weighted(values, $CURSOR_POSITIONweights)
+    {
+    }
+}
+)";
+
+        lsp::TextDocument_SignatureHelpResult const result = run_signature_help_test(source);
+
+        REQUIRE(!result.isNull());
+        REQUIRE(result->signatures.size() == 1);
+        CHECK(result->signatures[0].label == "pipeline weighted(value: Int32, weight: Float32) => Float32");
+        CHECK(has_active_parameter(result, 1));
+        REQUIRE(result->signatures[0].parameters.has_value());
+        CHECK(result->signatures[0].parameters->size() == 2);
+    }
+
+    TEST_CASE("Computes signature help for the first argument of a pipeline call", "[Language_server][Signature_help][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(values: Array_slice::<Int32>, threshold: Int32) -> (result: Uint64)
+{
+    pipeline large(value: Int32)
+    {
+        filter value > threshold;
+    }
+
+    return large($CURSOR_POSITIONvalues).count();
+}
+)";
+
+        lsp::TextDocument_SignatureHelpResult const result = run_signature_help_test(source);
+
+        CHECK(has_signature_with_label(result, "pipeline large(value: Int32) => Int32"));
+        CHECK(has_active_parameter(result, 0));
+    }
+
+    TEST_CASE("Computes signature help for an in_place sink", "[Language_server][Signature_help][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(values: Array_slice::<mutable Int32>, threshold: Int32) -> ()
+{
+    pipeline large(value: Int32)
+    {
+        filter value > threshold;
+    }
+
+    var kept = large.in_place($CURSOR_POSITIONvalues);
+}
+)";
+
+        lsp::TextDocument_SignatureHelpResult const result = run_signature_help_test(source);
+
+        CHECK(has_signature_with_label(result, "in_place(value: Array_slice::<mutable Int32>) -> Array_slice::<mutable Int32>"));
+        CHECK(has_active_parameter(result, 0));
+    }
+
+    TEST_CASE("Computes signature help for an into sink", "[Language_server][Signature_help][Pipeline]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(values: Array_slice::<Int32>, output: Array_slice::<mutable Int32>) -> ()
+{
+    pipeline doubled(value: Int32)
+    {
+        map value * 2 => result;
+    }
+
+    var written = doubled(values).into($CURSOR_POSITIONoutput);
+}
+)";
+
+        lsp::TextDocument_SignatureHelpResult const result = run_signature_help_test(source);
+
+        CHECK(has_signature_with_label(result, "into(out: Array_slice::<mutable Int32>) -> Array_slice::<mutable Int32>"));
+    }
 }

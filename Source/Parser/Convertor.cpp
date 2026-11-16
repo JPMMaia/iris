@@ -2898,7 +2898,10 @@ namespace iris::parser
 
         std::optional<Parse_node> const variable_node = get_child_node(tree, node, "Expression_for_loop_variable");
         if (variable_node.has_value())
+        {
             output.variable_name = create_string(get_node_value(tree, variable_node.value()), output_allocator);
+            output.variable_name_source_position = get_node_source_range(variable_node.value()).start;
+        }
 
         std::optional<Parse_node> const range_node = get_child_node(tree, node, "Expression_for_each_range");
         if (range_node.has_value())
@@ -2947,7 +2950,10 @@ namespace iris::parser
 
         std::optional<Parse_node> const name_node = get_child_node(tree, node, "Expression_pipeline_name");
         if (name_node.has_value())
+        {
             output.name = create_string(get_node_value(tree, name_node.value()), output_allocator);
+            output.name_source_position = get_node_source_range(name_node.value()).start;
+        }
 
         std::pmr::vector<Parse_node> const parameter_nodes = get_child_nodes_of_parent(tree, node, "Expression_pipeline_input_parameters", "Function_parameter", temporaries_allocator);
         output.input_parameter_source_positions = std::pmr::vector<Source_position>{};
@@ -2995,7 +3001,10 @@ namespace iris::parser
             {
                 std::optional<Parse_node> const binding_node = get_child_node(tree, stage_node.value(), "Expression_pipeline_map_name");
                 if (binding_node.has_value())
+                {
                     stage.binding_name = create_string(get_node_value(tree, binding_node.value()), output_allocator);
+                    stage.binding_name_source_position = get_node_source_range(binding_node.value()).start;
+                }
             }
 
             output.stages.push_back(std::move(stage));
