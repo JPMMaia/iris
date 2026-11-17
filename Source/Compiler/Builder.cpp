@@ -1894,6 +1894,7 @@ namespace iris::compiler
                             job.additional_flags,
                             use_clang_cl,
                             compilation_options.debug,
+                            compilation_options.is_optimized,
                             output,
                             task_allocator
                         );

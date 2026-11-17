@@ -21,6 +21,7 @@ namespace iris::compiler
         std::span<std::pmr::string const> const additional_flags,
         bool const use_clang_cl,
         bool const debug,
+        bool const optimize,
         std::pmr::string& output,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
@@ -39,6 +40,7 @@ namespace iris::compiler
         std::span<std::pmr::string const> const additional_flags,
         bool const use_clang_cl,
         bool const debug,
+        bool const optimize,
         std::pmr::polymorphic_allocator<> const& output_allocator
     );
 }
