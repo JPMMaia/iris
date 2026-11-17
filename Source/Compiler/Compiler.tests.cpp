@@ -14529,7 +14529,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
   // the other, and are compared after canonicalizing names.
   TEST_CASE("Pipelines compile to the same optimized code as the hand-written loops", "[LLVM_IR][Pipeline]")
   {
-    std::array<std::string_view, 8> const function_names
+    std::array<std::string_view, 9> const function_names
     {
       "sum_of_even_squares",
       "weighted_sum",
@@ -14537,6 +14537,7 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: write) }
       "any_negative",
       "keep_positive",
       "sum_of_x",
+      "sum_of_moving_z",
       "sum_of_odd_cubes",
       "odd_squares",
     };

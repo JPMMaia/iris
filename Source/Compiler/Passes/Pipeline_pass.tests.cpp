@@ -839,6 +839,108 @@ export function run(view: Soa_array_view::<Particle>) -> ()
         test_pipeline_pass_on_module(input, expected);
     }
 
+    TEST_CASE("Pipeline pass reads the element in place when only its fields are used", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+    history: Constant_array::<Float32, 4> = zero_initialized {};
+}
+
+function get_x(particle: Particle) -> (result: Float32)
+{
+    return particle.x;
+}
+
+function read(value: *Float32) -> (result: Float32)
+{
+    return *value;
+}
+
+export function run(list: Array_slice::<Particle>) -> ()
+{
+    pipeline fast(particle: Particle)
+    {
+        filter particle.x > 1.5f32;
+    }
+
+    mutable total = 0.0f32;
+    for fast_particle in fast(list)
+    {
+        total += fast_particle.y + read(&fast_particle.history[0u64]);
+    }
+
+    var fast_count = fast(list).count();
+
+    pipeline whole(particle: Particle)
+    {
+        map get_x(particle) => x;
+    }
+
+    for x in whole(list)
+    {
+        total += x;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+    history: Constant_array::<Float32, 4> = zero_initialized {};
+}
+
+function get_x(particle: Particle) -> (result: Float32)
+{
+    return particle.x;
+}
+
+function read(value: *Float32) -> (result: Float32)
+{
+    return *value;
+}
+
+export function run(list: Array_slice::<Particle>) -> ()
+{
+    mutable total = 0.0f32;
+    for $pipeline0_i in 0u64 to list.length
+    {
+        var $pipeline0_particle = &list[$pipeline0_i];
+        if $pipeline0_particle->x > 1.5f32
+        {
+            total += $pipeline0_particle->y + read(&$pipeline0_particle->history[0u64]);
+        }
+    }
+    var fast_count = ${
+        mutable $pipeline1_count = 0u64;
+        for $pipeline1_i in 0u64 to list.length
+        {
+            var $pipeline1_particle = &list[$pipeline1_i];
+            if $pipeline1_particle->x > 1.5f32
+            {
+                $pipeline1_count += 1u64;
+            }
+        }
+        yield $pipeline1_count;
+    };
+    for $pipeline2_i in 0u64 to list.length
+    {
+        var particle = list[$pipeline2_i];
+        var x = get_x(particle);
+        total += x;
+    }
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
     TEST_CASE("Pipeline pass stops the loop at take_while and binds the index of enumerate", "[Pipeline_pass][Passes][Pipeline]")
     {
         std::string_view const input = R"(module Pipeline_pass_test;

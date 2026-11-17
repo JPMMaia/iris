@@ -749,18 +749,19 @@ namespace iris::compiler
             return std::string_view{ declaration.name };
         }
 
-        // For a Soa_array_view input, reads only the fields that the loop body uses instead of the whole
-        // element: when every use of the parameter (or of an immutable copy of it, such as a for-each
-        // loop variable) is a member access `p.field`, each used field is read once into a generated
-        // local at the top of the iteration and the accesses read that local. Reading at the top keeps
-        // the semantics of `var p = input[i];` even when the body writes to the view. Returns the field
-        // bindings to insert, or nullopt when the whole element has to be read.
-        std::optional<std::pmr::vector<iris::Statement>> bind_soa_fields(
+        struct Element_field_uses
+        {
+            // The parameter followed by its immutable copies, such as a for-each loop variable.
+            std::pmr::vector<std::pmr::string> names;
+            // The members read through any of `names`, in order of first use.
+            std::pmr::vector<std::pmr::string> fields;
+        };
+
+        // The fields `body` reads from the element `parameter_name`, when every use of it (or of an
+        // immutable copy of it) is a member access `p.field`. Nullopt when the whole element is used.
+        std::optional<Element_field_uses> find_element_field_uses(
             std::pmr::vector<iris::Statement>& body,
-            std::string_view const parameter_name,
-            Pipeline_input const& input,
-            std::size_t const pipeline_index,
-            std::string_view const index_name
+            std::string_view const parameter_name
         )
         {
             std::pmr::vector<std::pmr::string> names;
@@ -843,12 +844,22 @@ namespace iris::compiler
             if (!only_member_accesses)
                 return std::nullopt;
 
-            auto const get_field_local_name = [&](std::string_view const field) -> std::pmr::string
+            return Element_field_uses
             {
-                return get_pipeline_local_name(pipeline_index, std::format("{}_{}", parameter_name, field));
+                .names = std::move(names),
+                .fields = std::move(fields),
             };
+        }
 
-            // Rewrite `p.field` to the field's local, and drop the copies, which are now unused.
+        // Drops the immutable copies of the element from `body`, which the rewrite leaves unused, and
+        // calls `rewrite(statement, access_index)` on every member access `p.field` of the element.
+        template <typename Function_t>
+        void rewrite_element_field_uses(
+            std::pmr::vector<iris::Statement>& body,
+            std::span<std::pmr::string const> const names,
+            Function_t const& rewrite
+        )
+        {
             visit_statement_lists(
                 body,
                 [&](std::pmr::vector<iris::Statement>& statements)
@@ -862,18 +873,54 @@ namespace iris::compiler
                     {
                         for (std::size_t index = 0; index < statement.expressions.size(); ++index)
                         {
-                            iris::Expression& expression = statement.expressions[index];
+                            iris::Expression const& expression = statement.expressions[index];
                             if (!std::holds_alternative<iris::Access_expression>(expression.data))
                                 continue;
 
-                            iris::Access_expression const access_expression = std::get<iris::Access_expression>(expression.data);
+                            iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
                             if (!is_variable_named(statement.expressions[access_expression.expression.expression_index], names))
                                 continue;
 
-                            expression.data = iris::Variable_expression{ .name = get_field_local_name(access_expression.member_name) };
-                            invalidate_expression_and_descendants(statement, access_expression.expression.expression_index, {});
+                            rewrite(statement, index);
                         }
                     }
+                }
+            );
+        }
+
+        // For a Soa_array_view input, reads only the fields that the loop body uses instead of the whole
+        // element: when every use of the parameter is a member access (see find_element_field_uses), each
+        // used field is read once into a generated local at the top of the iteration and the accesses read
+        // that local. Reading at the top keeps the semantics of `var p = input[i];` even when the body
+        // writes to the view. Returns the field bindings to insert, or nullopt when the whole element has
+        // to be read.
+        std::optional<std::pmr::vector<iris::Statement>> bind_soa_fields(
+            std::pmr::vector<iris::Statement>& body,
+            std::string_view const parameter_name,
+            Pipeline_input const& input,
+            std::size_t const pipeline_index,
+            std::string_view const index_name
+        )
+        {
+            std::optional<Element_field_uses> const uses = find_element_field_uses(body, parameter_name);
+            if (!uses.has_value())
+                return std::nullopt;
+
+            std::pmr::vector<std::pmr::string> const& fields = uses->fields;
+
+            auto const get_field_local_name = [&](std::string_view const field) -> std::pmr::string
+            {
+                return get_pipeline_local_name(pipeline_index, std::format("{}_{}", parameter_name, field));
+            };
+
+            rewrite_element_field_uses(
+                body,
+                uses->names,
+                [&](iris::Statement& statement, std::size_t const access_index) -> void
+                {
+                    iris::Access_expression const access_expression = std::get<iris::Access_expression>(statement.expressions[access_index].data);
+                    statement.expressions[access_index].data = iris::Variable_expression{ .name = get_field_local_name(access_expression.member_name) };
+                    invalidate_expression_and_descendants(statement, access_expression.expression.expression_index, {});
                 }
             );
 
@@ -907,8 +954,70 @@ namespace iris::compiler
             return field_bindings;
         }
 
+        // For any other input, reads the element in place instead of copying it: when every use of the
+        // parameter is a member access (see find_element_field_uses), the element's address is taken
+        // once at the top of the iteration and `p.field` becomes `$pipeline<N>_<p>->field`. Unlike the
+        // copy, the fields are read when used, so writes the body makes to the element before reading
+        // a field are visible, as in a hand-written `var p = &input[i];` loop. Returns the binding to
+        // insert (none when no field is read), or nullopt when the whole element has to be copied.
+        std::optional<std::pmr::vector<iris::Statement>> bind_element_in_place(
+            std::pmr::vector<iris::Statement>& body,
+            std::string_view const parameter_name,
+            Pipeline_input const& input,
+            std::size_t const pipeline_index,
+            std::string_view const index_name
+        )
+        {
+            std::optional<Element_field_uses> const uses = find_element_field_uses(body, parameter_name);
+            if (!uses.has_value())
+                return std::nullopt;
+
+            std::pmr::string const pointer_name = get_pipeline_local_name(pipeline_index, parameter_name);
+
+            rewrite_element_field_uses(
+                body,
+                uses->names,
+                [&](iris::Statement& statement, std::size_t const access_index) -> void
+                {
+                    iris::Access_expression const access_expression = std::get<iris::Access_expression>(statement.expressions[access_index].data);
+                    statement.expressions[access_expression.expression.expression_index].data = iris::Variable_expression{ .name = pointer_name };
+                    statement.expressions[access_index].data = iris::Dereference_and_access_expression
+                    {
+                        .expression = access_expression.expression,
+                        .member_name = access_expression.member_name,
+                    };
+                }
+            );
+
+            std::pmr::vector<iris::Statement> bindings;
+            if (uses->fields.empty())
+                return bindings;
+
+            // var $pipeline<N>_<p> = &<input>[<index>];
+            iris::Statement value;
+            std::uint64_t const address_index = add_expression(value, iris::Expression{ .data = iris::Unary_expression{} });
+            std::uint64_t const access_index = add_expression(value, iris::Expression{ .data = iris::Access_array_expression{} });
+            std::uint64_t const input_index = add_expression(value, create_variable_expression(input.variable_name));
+            std::uint64_t const element_index = add_expression(value, create_variable_expression(std::pmr::string{ index_name }));
+
+            std::get<iris::Access_array_expression>(value.expressions[access_index].data) = iris::Access_array_expression
+            {
+                .expression = to_index(input_index),
+                .index = to_index(element_index),
+            };
+            std::get<iris::Unary_expression>(value.expressions[address_index].data) = iris::Unary_expression
+            {
+                .expression = to_index(access_index),
+                .operation = iris::Unary_operation::Address_of,
+            };
+
+            bindings.push_back(create_variable_declaration_statement(pointer_name, value));
+            return bindings;
+        }
+
         // Binds the parameters to the elements at the expansion's index, at the top of `body`. A
-        // Soa_array_view parameter whose fields `body` only reads one by one gets one local per field.
+        // parameter whose fields `body` only reads one by one is not copied: a Soa_array_view parameter
+        // gets one local per field, and any other one a pointer to the element.
         void insert_input_bindings(
             Pipeline_expansion const& expansion,
             std::pmr::vector<iris::Statement>& body
@@ -921,14 +1030,15 @@ namespace iris::compiler
                 Pipeline_input const& input = expansion.inputs[input_index - 1];
                 std::string_view const parameter_name = pipeline.input_parameter_names[input_index - 1];
 
-                if (input.is_soa)
+                std::optional<std::pmr::vector<iris::Statement>> const field_bindings =
+                    input.is_soa ?
+                    bind_soa_fields(body, parameter_name, input, expansion.pipeline_index, expansion.index_name) :
+                    bind_element_in_place(body, parameter_name, input, expansion.pipeline_index, expansion.index_name);
+
+                if (field_bindings.has_value())
                 {
-                    std::optional<std::pmr::vector<iris::Statement>> field_bindings = bind_soa_fields(body, parameter_name, input, expansion.pipeline_index, expansion.index_name);
-                    if (field_bindings.has_value())
-                    {
-                        body.insert(body.begin(), field_bindings->begin(), field_bindings->end());
-                        continue;
-                    }
+                    body.insert(body.begin(), field_bindings->begin(), field_bindings->end());
+                    continue;
                 }
 
                 body.insert(body.begin(), create_input_element_statement(parameter_name, input, expansion.index_name));

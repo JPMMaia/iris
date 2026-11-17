@@ -912,6 +912,81 @@ function test_into_fixed_collects_the_kept_elements() -> ()
     check(sum_of_slice(next) == 38);
 }
 
+struct Body
+{
+    alive: Bool = false;
+    mass: Float32 = 0.0f32;
+    history: Constant_array::<Float32, 2> = zero_initialized {};
+}
+
+function read_float(value: *Float32) -> (result: Float32)
+{
+    return *value;
+}
+
+function sum_living_history(bodies: Array_slice::<mutable Body>) -> (result: Float32)
+{
+    pipeline living(body: Body)
+    {
+        filter body.alive;
+    }
+
+    mutable sum = 0.0f32;
+    for body in living(bodies)
+    {
+        sum += body.mass + read_float(&body.history[1u64]);
+    }
+    return sum;
+}
+
+@test
+function test_an_element_read_only_through_fields_is_read_in_place() -> ()
+{
+    mutable bodies: Constant_array::<Body, 3> = zero_initialized {};
+    bodies[0] = { alive: true, mass: 1.0f32, history: [0.0f32, 10.0f32] };
+    bodies[1] = { alive: false, mass: 2.0f32, history: [0.0f32, 20.0f32] };
+    bodies[2] = { alive: true, mass: 3.0f32, history: [0.0f32, 30.0f32] };
+    var slice: Array_slice::<mutable Body> = bodies;
+
+    check(sum_living_history(slice) == 44.0f32);
+
+    pipeline living(body: Body)
+    {
+        filter body.alive;
+    }
+
+    check(living(slice).count() == 2u64);
+
+    mutable fixed: Fixed_capacity_array::<Body, 4> = {};
+    fixed.push(bodies[0]);
+    fixed.push(bodies[1]);
+    check(living(fixed).fold(0.0f32, lambda (total, body) => total + body.mass) == 1.0f32);
+}
+
+@test
+function test_an_element_read_in_place_sees_writes_made_before_the_read() -> ()
+{
+    mutable bodies: Constant_array::<Body, 2> = zero_initialized {};
+    bodies[0] = { alive: true, mass: 1.0f32, history: [0.0f32, 0.0f32] };
+    bodies[1] = { alive: true, mass: 2.0f32, history: [0.0f32, 0.0f32] };
+    var slice: Array_slice::<mutable Body> = bodies;
+
+    pipeline every(body: Body)
+    {
+    }
+
+    mutable sum = 0.0f32;
+    for body in every(slice)
+    {
+        slice[0].mass = 100.0f32;
+        slice[1].mass = 100.0f32;
+        sum += body.mass;
+    }
+
+    // Unlike a copy, the field is read where it is used, after the body wrote to it.
+    check(sum == 200.0f32);
+}
+
 @unique_name("main")
 export function main() -> (result: Int32)
 {
