@@ -1,7 +1,8 @@
 module pipeline_asserts;
 
-// Each test breaks a precondition of a pipeline expansion or of a Fixed_capacity_array operation,
-// so the check it emits must stop the test. They are expected to fail.
+// Each test breaks a precondition of a pipeline expansion, a Fixed_capacity_array operation or a
+// view, so the check it emits must stop the test. They are expected to fail, except
+// test_a_large_enough_buffer.
 
 @test
 function test_inputs_of_different_lengths() -> ()
@@ -102,6 +103,51 @@ function test_an_index_past_the_length_of_a_fixed_capacity_array() -> ()
     mutable values: Fixed_capacity_array::<Int32, 4> = {};
     values.push(1);
     check(values[1] == 0);
+}
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+@test
+function test_a_soa_view_that_ends_past_its_receiver() -> ()
+{
+    mutable particles: Soa_array::<Particle, 4> = [];
+    var all: Soa_array_view::<mutable Particle> = particles.view();
+    var past = all.view(2u64, 5u64);
+    check(past.length == 3u64);
+}
+
+@test
+function test_a_slice_view_that_starts_after_it_ends() -> ()
+{
+    var values: Constant_array::<Int32, 4> = [1, 2, 3, 4];
+    var slice: Array_slice::<Int32> = values;
+    var reversed = slice.view(3u64, 1u64);
+    check(reversed.length == 0u64);
+}
+
+@test
+function test_an_index_past_the_end_of_a_soa_sub_view() -> ()
+{
+    mutable particles: Soa_array::<Particle, 4> = [];
+    var all: Soa_array_view::<mutable Particle> = particles.view();
+    var inner = all.view(1u64, 2u64);
+    check(inner->x[1] == 0.0f32);
+}
+
+@test
+function test_a_range_and_a_slice_of_different_lengths() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [1, 2, 3];
+
+    pipeline weighted(row: Uint32, value: Int32)
+    {
+        map value * (row as Int32) => product;
+    }
+
+    check(weighted(0u32 to 4u32, values).count() == 3u64);
 }
 
 @unique_name("main")

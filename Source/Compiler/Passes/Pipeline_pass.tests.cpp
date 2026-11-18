@@ -941,6 +941,317 @@ export function run(list: Array_slice::<Particle>) -> ()
         test_pipeline_pass_on_module(input, expected);
     }
 
+    TEST_CASE("Pipeline pass lowers a range input alone to a loop over the range", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+function next(value: Uint32) -> (result: Uint32)
+{
+    return value + 1u32;
+}
+
+export function run(count: Uint32) -> ()
+{
+    pipeline even(row: Uint32)
+    {
+        filter row % 2u32 == 0u32;
+    }
+
+    mutable total = 0u32;
+    for row in even(0u32 to count)
+    {
+        total += row;
+    }
+
+    var even_count = even(1u32 to next(count)).count();
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+function next(value: Uint32) -> (result: Uint32)
+{
+    return value + 1u32;
+}
+
+export function run(count: Uint32) -> ()
+{
+    mutable total = 0u32;
+    for row in 0u32 to count
+    {
+        if row % 2u32 == 0u32
+        {
+            total += row;
+        }
+    }
+    var even_count = ${
+        var $pipeline1_input0_end = next(count);
+        mutable $pipeline1_count = 0u64;
+        for row in 1u32 to $pipeline1_input0_end
+        {
+            if row % 2u32 == 0u32
+            {
+                $pipeline1_count += 1u64;
+            }
+        }
+        yield $pipeline1_count;
+    };
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
+    TEST_CASE("Pipeline pass reads a range in lockstep with other inputs by index", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+export function run(first: Uint32, end: Uint32, values: Array_slice::<Int32>) -> ()
+{
+    pipeline weighted(row: Uint32, value: Int32)
+    {
+        map value * (row as Int32) => product;
+    }
+
+    mutable total = 0;
+    for product in weighted(first to end, values)
+    {
+        total += product;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+export function run(first: Uint32, end: Uint32, values: Array_slice::<Int32>) -> ()
+{
+    mutable total = 0;
+    {
+        mutable $pipeline0_input0_length = 0u64;
+        if end > first
+        {
+            $pipeline0_input0_length = (end - first) as Uint64;
+        }
+        assert "Pipeline inputs have equal length" { values.length == $pipeline0_input0_length };
+        for $pipeline0_i in 0u64 to $pipeline0_input0_length
+        {
+            var row = first + $pipeline0_i as Uint32;
+            var value = values[$pipeline0_i];
+            var product = value * (row as Int32);
+            total += product;
+        }
+    }
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
+    TEST_CASE("Pipeline pass writes mutable elements in place", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+struct Body
+{
+    mass: Float32 = 0.0f32;
+    speed: Float32 = 0.0f32;
+}
+
+function keep(body: Body) -> ()
+{
+}
+
+export function run(bodies: Array_slice::<mutable Body>, view: Soa_array_view::<mutable Body>) -> ()
+{
+    pipeline moving(body: mutable Body)
+    {
+        filter body.speed > 0.0f32;
+    }
+
+    for body in moving(bodies)
+    {
+        body.mass += body.speed;
+        keep(body);
+    }
+
+    for body in moving(view)
+    {
+        body.mass = 1.0f32;
+        keep(body);
+    }
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+struct Body
+{
+    mass: Float32 = 0.0f32;
+    speed: Float32 = 0.0f32;
+}
+
+function keep(body: Body) -> ()
+{
+}
+
+export function run(bodies: Array_slice::<mutable Body>, view: Soa_array_view::<mutable Body>) -> ()
+{
+    for $pipeline0_i in 0u64 to bodies.length
+    {
+        var $pipeline0_body = &bodies[$pipeline0_i];
+        if $pipeline0_body->speed > 0.0f32
+        {
+            $pipeline0_body->mass += $pipeline0_body->speed;
+            keep(*$pipeline0_body);
+        }
+    }
+    for $pipeline1_i in 0u64 to view.length
+    {
+        if view->speed[$pipeline1_i] > 0.0f32
+        {
+            view->mass[$pipeline1_i] = 1.0f32;
+            keep(view[$pipeline1_i]);
+        }
+    }
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
+    TEST_CASE("Pipeline pass lowers min_by and max_by to the best-so-far loop", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+function negate(value: Int32) -> (result: Int32)
+{
+    return -value;
+}
+
+export function run(values: Array_slice::<Int32>) -> ()
+{
+    pipeline positive(value: Int32)
+    {
+        filter value > 0;
+    }
+
+    var smallest = positive(values).min_by(lambda (value) => value * value);
+    var largest = positive(values).max_by(negate);
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+function negate(value: Int32) -> (result: Int32)
+{
+    return -value;
+}
+
+export function run(values: Array_slice::<Int32>) -> ()
+{
+    var smallest = ${
+        mutable $pipeline0_result: Optional::<Int32> = {};
+        mutable $pipeline0_key: Optional::<Int32> = {};
+        for $pipeline0_i in 0u64 to values.length
+        {
+            var value = values[$pipeline0_i];
+            if value > 0
+            {
+                var $pipeline0_candidate = value * value;
+                if !$pipeline0_key.has_value || $pipeline0_candidate < $pipeline0_key.value
+                {
+                    $pipeline0_key = create_optional($pipeline0_candidate);
+                    $pipeline0_result = create_optional(value);
+                }
+            }
+        }
+        yield $pipeline0_result;
+    };
+    var largest = ${
+        mutable $pipeline1_result: Optional::<Int32> = {};
+        mutable $pipeline1_key: Optional::<Int32> = {};
+        for $pipeline1_i in 0u64 to values.length
+        {
+            var value = values[$pipeline1_i];
+            if value > 0
+            {
+                var $pipeline1_candidate = negate(value);
+                if !$pipeline1_key.has_value || $pipeline1_key.value < $pipeline1_candidate
+                {
+                    $pipeline1_key = create_optional($pipeline1_candidate);
+                    $pipeline1_result = create_optional(value);
+                }
+            }
+        }
+        yield $pipeline1_result;
+    };
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
+    TEST_CASE("Pipeline pass expands a module-level pipeline in every function that consumes it", "[Pipeline_pass][Passes][Pipeline]")
+    {
+        std::string_view const input = R"(module Pipeline_pass_test;
+
+pipeline positive(value: Int32)
+{
+    filter value > 0;
+}
+
+export function count_positive(values: Array_slice::<Int32>) -> (result: Uint64)
+{
+    return positive(values).count();
+}
+
+export function sum_positive(values: Array_slice::<Int32>) -> (result: Int32)
+{
+    mutable sum = 0;
+    for value in positive(values)
+    {
+        sum += value;
+    }
+    return sum;
+}
+)";
+
+        std::string_view const expected = R"(module Pipeline_pass_test;
+
+export function count_positive(values: Array_slice::<Int32>) -> (result: Uint64)
+{
+    return ${
+        mutable $pipeline0_count = 0u64;
+        for $pipeline0_i in 0u64 to values.length
+        {
+            var value = values[$pipeline0_i];
+            if value > 0
+            {
+                $pipeline0_count += 1u64;
+            }
+        }
+        yield $pipeline0_count;
+    };
+}
+
+export function sum_positive(values: Array_slice::<Int32>) -> (result: Int32)
+{
+    mutable sum = 0;
+    for $pipeline0_i in 0u64 to values.length
+    {
+        var value = values[$pipeline0_i];
+        if value > 0
+        {
+            sum += value;
+        }
+    }
+    return sum;
+}
+)";
+
+        test_pipeline_pass_on_module(input, expected);
+    }
+
     TEST_CASE("Pipeline pass stops the loop at take_while and binds the index of enumerate", "[Pipeline_pass][Passes][Pipeline]")
     {
         std::string_view const input = R"(module Pipeline_pass_test;

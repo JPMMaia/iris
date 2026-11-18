@@ -244,6 +244,7 @@ namespace iris::language_server
                 function->declaration->type.input_parameter_types,
                 function->declaration->input_parameter_source_positions
             );
+            iris::compiler::add_module_pipelines_to_scope(scope, core_module);
 
             visit_statements_using_scope_including_lambda_bodies(
                 declaration_database,
@@ -335,6 +336,8 @@ namespace iris::language_server
 
             std::string parameter{std::string_view{pipeline.input_parameter_names[index]}};
             parameter += ": ";
+            if (iris::compiler::is_pipeline_parameter_mutable(pipeline, index))
+                parameter += "mutable ";
             parameter += format_type_for_display(core_module, pipeline.input_parameter_types[index]);
 
             signature.label += parameter;
@@ -420,6 +423,11 @@ namespace iris::language_server
         else if (sink_name == "separate")
         {
             parameters.push_back("scratch: Array_slice::<mutable T>");
+        }
+        else if (sink_name == "min_by" || sink_name == "max_by")
+        {
+            std::string const element_type = output_type.has_value() ? format_type_for_display(core_module, output_type.value()) : std::string{"U"};
+            parameters.push_back("key: (" + element_type + ") -> K");
         }
 
         Pipeline_signature signature;

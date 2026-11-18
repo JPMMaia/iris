@@ -776,6 +776,9 @@ namespace iris
         std::pmr::vector<Pipeline_stage> stages;
         std::optional<std::pmr::vector<Source_position>> input_parameter_source_positions;
         std::optional<Source_position> name_source_position;  // where the pipeline name was written
+        // Whether each parameter was declared `mutable`, so the loop body can write the element. Empty
+        // means none were.
+        std::pmr::vector<bool> input_parameter_is_mutable;
 
         friend bool operator==(Pipeline_expression const&, Pipeline_expression const&) = default;
     };
@@ -811,6 +814,16 @@ namespace iris
         Statement result;
 
         friend bool operator==(Statement_block_expression const&, Statement_block_expression const&) = default;
+    };
+
+    // <begin> to <end>: the integers from begin up to, but not including, end. Only valid as a pipeline
+    // input; Pipeline_pass lowers it to a loop over the range.
+    export struct Range_expression
+    {
+        Expression_index begin;
+        Expression_index end;
+
+        friend bool operator==(Range_expression const&, Range_expression const&) = default;
     };
 
     export struct Switch_case_expression_pair
@@ -949,7 +962,8 @@ namespace iris
             While_loop_expression,
             For_each_expression,
             Pipeline_expression,
-            Statement_block_expression
+            Statement_block_expression,
+            Range_expression
         > ;
 
         Data_type data;
@@ -1036,6 +1050,9 @@ namespace iris
         std::pmr::vector<Function_constructor> function_constructors;
         std::pmr::vector<Type_constructor> type_constructors;
         std::pmr::vector<Lambda_declaration> lambda_declarations;
+        // Pipelines declared at module level. Every function of the module can consume them; their
+        // stages read only their parameters and module-level names.
+        std::pmr::vector<Pipeline_expression> pipeline_declarations;
 
         friend bool operator==(Module_declarations const&, Module_declarations const&) = default;
     };

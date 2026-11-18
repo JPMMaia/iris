@@ -947,6 +947,37 @@ namespace iris::compiler
             CHECK(result.exit_code != 0);
         }
 
+        struct Expected_check_failure
+        {
+            std::string_view test_name;
+            std::string_view message;
+        };
+
+        std::array<Expected_check_failure, 4> const view_and_range_failures
+        {
+            Expected_check_failure{ "test_a_soa_view_that_ends_past_its_receiver", "Out-of-bounds view in 'pipeline_asserts.test_a_soa_view_that_ends_past_its_receiver'!" },
+            Expected_check_failure{ "test_a_slice_view_that_starts_after_it_ends", "Out-of-bounds view in 'pipeline_asserts.test_a_slice_view_that_starts_after_it_ends'!" },
+            Expected_check_failure{ "test_an_index_past_the_end_of_a_soa_sub_view", "Out-of-bounds SOA array view access in 'pipeline_asserts.test_an_index_past_the_end_of_a_soa_sub_view'!" },
+            Expected_check_failure{ "test_a_range_and_a_slice_of_different_lengths", "assert 'Pipeline inputs have equal length' failed!" },
+        };
+
+        for (Expected_check_failure const& expected : view_and_range_failures)
+        {
+            CAPTURE(expected.test_name);
+
+            Test_run_output const result = run_test_executable_and_capture(
+                build_directory_path,
+                target,
+                "pipeline_asserts.iris.test",
+                std::format(" --test-name=pipeline_asserts.{}", expected.test_name),
+                std::format("{}_output.txt", expected.test_name)
+            );
+
+            CHECK(result.output.find(expected.message) != std::string::npos);
+            CHECK(result.output.find("1 tests selected, 1 run, 0 passed, 1 failed (1 crashed), 0 not run") != std::string::npos);
+            CHECK(result.exit_code != 0);
+        }
+
         {
             Test_run_output const result = run_test_executable_and_capture(
                 build_directory_path,

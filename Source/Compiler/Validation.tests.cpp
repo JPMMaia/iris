@@ -913,6 +913,57 @@ function run() -> ()
         test_validate_module(input, {}, expected_diagnostics);
     }
 
+    TEST_CASE("Validates that a view of a Soa_array_view or an Array_slice takes a start and an end", "[Validation][SoA]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+function run(view: Soa_array_view::<mutable Particle>, slice: Array_slice::<Int32>, count: Uint32) -> ()
+{
+    var a: Soa_array_view::<mutable Particle> = view.view(0u64, count as Uint64);
+    var b: Array_slice::<Int32> = slice.view(1u64, 2u64);
+    var c = view.view();
+    var d = slice.view(1u64);
+    var e: Array_slice::<mutable Int32> = slice.view(0u64, 1u64);
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics =
+        {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(12, 13, 12, 24),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Function expects 2 arguments (start and end), but 0 were provided.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(13, 13, 13, 29),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Function expects 2 arguments (start and end), but 1 were provided.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(14, 43, 14, 65),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Expression type 'Array_slice::<Int32>' does not match expected type 'Array_slice::<mutable Int32>'.",
+                .related_information = {},
+            }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
     TEST_CASE("Validates that Soa_array_view with immutable element type cannot be assigned to Soa_array_view with mutable element type", "[Validation][SoA]")
     {
         std::string_view const input = R"(module Test;
@@ -9497,9 +9548,266 @@ export function run(value: Int32) -> ()
                 .range = create_source_range(10, 25, 10, 30),
                 .source = Diagnostic_source::Compiler,
                 .severity = Diagnostic_severity::Error,
-                .message = "Pipeline input type 'Int32' is not supported. Expected 'Array_slice::<T>', 'Constant_array::<T, N>' or 'Soa_array_view::<T>'.",
+                .message = "Pipeline input type 'Int32' is not supported. Expected 'Array_slice::<T>', 'Constant_array::<T, N>', 'Fixed_capacity_array::<T, N>', 'Soa_array_view::<T>' or a range '<begin> to <end>'.",
                 .related_information = {},
             }
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates module-level pipelines", "[Validation][Pipeline]")
+    {
+        std::string_view const input = R"(module Test;
+
+var g_limit: Int32 = 2;
+
+pipeline above(value: Int32)
+{
+    filter value > g_limit;
+}
+
+pipeline broken(value: Int32)
+{
+    filter value + 1;
+}
+
+export pipeline shared(value: Int32)
+{
+    filter value > 0;
+}
+
+export function run(values: Array_slice::<Int32>) -> ()
+{
+    var a = above(values).count();
+}
+
+export function shadow(values: Array_slice::<Int32>, g_limit: Int32) -> ()
+{
+    var b = above(values).count();
+}
+)";
+
+        auto const create_error = [](iris::Source_range const range, std::string_view const message) -> iris::compiler::Diagnostic
+        {
+            return iris::compiler::Diagnostic
+            {
+                .range = range,
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = std::pmr::string{ message },
+                .related_information = {},
+            };
+        };
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            create_error(create_source_range(12, 12, 12, 21), "Pipeline filter expression type 'Int32' does not match expected type 'Bool'."),
+            create_error(create_source_range(15, 17, 15, 23), "Pipeline 'shared' cannot be exported: declare it without 'export'."),
+            create_error(create_source_range(27, 13, 27, 26), "Pipeline 'above' reads 'g_limit', which is hidden here by a variable of the same name."),
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates the key of min_by and max_by", "[Validation][Pipeline]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Target
+{
+    distance: Float32 = 0.0f32;
+}
+
+function distance_of(target: Target) -> (result: Float32)
+{
+    return target.distance;
+}
+
+function wrong(value: Int32) -> (result: Float32)
+{
+    return 0.0f32;
+}
+
+export function run(targets: Array_slice::<Target>) -> ()
+{
+    pipeline all(target: Target)
+    {
+    }
+
+    var a = all(targets).min_by(lambda (target) => target.distance);
+    var b = all(targets).max_by(distance_of);
+    var c = all(targets).min_by(lambda (first, second) => first.distance);
+    var d = all(targets).min_by(lambda (target) => target);
+    var e = all(targets).max_by(wrong);
+    var f = all(targets).min_by();
+}
+)";
+
+        auto const create_error = [](iris::Source_range const range, std::string_view const message) -> iris::compiler::Diagnostic
+        {
+            return iris::compiler::Diagnostic
+            {
+                .range = range,
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = std::pmr::string{ message },
+                .related_information = {},
+            };
+        };
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            create_error(create_source_range(26, 33, 26, 73), "The lambda of pipeline sink 'min_by' takes 1 parameter, the element, but 2 were provided."),
+            create_error(create_source_range(27, 33, 27, 58), "The key of pipeline sink 'min_by' must be a number compared with '<', but it is 'Target'."),
+            create_error(create_source_range(28, 33, 28, 38), "Pipeline sink 'max_by' expects a function of type '(Target) -> K', but got 'function<(value: Int32) -> (result: Float32)>'."),
+            create_error(create_source_range(29, 13, 29, 34), "Pipeline sink 'min_by' expects 1 argument(s) but 0 were provided."),
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates mutable pipeline parameters", "[Validation][Pipeline]")
+    {
+        std::string_view const input = R"(module Test;
+
+struct Body
+{
+    mass: Float32 = 0.0f32;
+}
+
+export function run(bodies: Array_slice::<mutable Body>, fixed: Array_slice::<Body>, out: Array_slice::<mutable Body>) -> ()
+{
+    pipeline every(body: mutable Body)
+    {
+    }
+
+    for body in every(bodies)
+    {
+        body.mass = 1.0f32;
+    }
+
+    for body in every(fixed)
+    {
+    }
+
+    var a = every.in_place(bodies);
+    var b = every(bodies).separate().into(out);
+
+    pipeline reading(body: Body)
+    {
+    }
+
+    for body in reading(bodies)
+    {
+        body.mass = 2.0f32;
+    }
+
+    pipeline masses(body: Body)
+    {
+        map body.mass => mass;
+    }
+
+    for mass in masses(bodies)
+    {
+        var total = mass + body.mass;
+        var body = 3.0f32;
+    }
+}
+)";
+
+        auto const create_error = [](iris::Source_range const range, std::string_view const message) -> iris::compiler::Diagnostic
+        {
+            return iris::compiler::Diagnostic
+            {
+                .range = range,
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = std::pmr::string{ message },
+                .related_information = {},
+            };
+        };
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            create_error(create_source_range(19, 23, 19, 28), "Pipeline parameter 'body' is mutable, but its input is not."),
+            create_error(create_source_range(23, 13, 23, 35), "Pipeline sink 'in_place' cannot be used with mutable parameter 'body'."),
+            create_error(create_source_range(24, 13, 24, 47), "Pipeline sink 'separate' cannot be used with mutable parameter 'body'."),
+            create_error(create_source_range(32, 9, 32, 27), "Cannot modify non-mutable value."),
+            create_error(create_source_range(43, 13, 43, 17), "Duplicate variable name 'body'."),
+        };
+
+        test_validate_module(input, {}, expected_diagnostics);
+    }
+
+    TEST_CASE("Validates range inputs", "[Validation][Pipeline]")
+    {
+        std::string_view const input = R"(module Test;
+
+export function run(count: Uint32, wide: Uint64, scale: Float32, values: Array_slice::<mutable Uint32>) -> ()
+{
+    pipeline rows(row: Uint32)
+    {
+        filter row > 1u32;
+    }
+
+    var a = rows(0u32 to count).count();
+    var b = rows(0u32 to wide).count();
+    var c = rows(0.0f32 to scale).count();
+    var d = rows(0 to 3).count();
+    var e = rows.in_place(0u32 to count);
+    var f = rows(0u32 to 4u32).into_fixed();
+    var g: Uint32 = 0u32 to count;
+}
+)";
+
+        std::pmr::vector<iris::compiler::Diagnostic> expected_diagnostics = {
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(11, 18, 11, 30),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "The bounds of a range must have the same type, but got 'Uint32' and 'Uint64'.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(12, 18, 12, 33),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "The bounds of a range must be integers, but got 'Float32'.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(13, 18, 13, 24),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .code = Diagnostic_code::Type_mismatch,
+                .message = "Pipeline input element type 'Int32' does not match type 'Uint32' of parameter 'row'.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(14, 27, 14, 40),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline sink 'in_place' cannot take a range: there is nothing to write back to.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(15, 18, 15, 30),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "Pipeline sink 'into_fixed' cannot take a range, whose length is not known at compile time. Use 'into(out)'.",
+                .related_information = {},
+            },
+            iris::compiler::Diagnostic
+            {
+                .range = create_source_range(16, 21, 16, 34),
+                .source = Diagnostic_source::Compiler,
+                .severity = Diagnostic_severity::Error,
+                .message = "A range can only be a pipeline input, as in 'p(0u32 to count)'.",
+                .related_information = {},
+            },
         };
 
         test_validate_module(input, {}, expected_diagnostics);

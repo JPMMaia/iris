@@ -1472,6 +1472,7 @@ namespace iris::json
         data["stages"] = to_json(value.stages);
         if (value.input_parameter_source_positions.has_value()) data["input_parameter_source_positions"] = to_json(value.input_parameter_source_positions);
         if (value.name_source_position.has_value()) data["name_source_position"] = to_json(value.name_source_position);
+        data["input_parameter_is_mutable"] = to_json(value.input_parameter_is_mutable);
         return data;
     }
 
@@ -1484,6 +1485,7 @@ namespace iris::json
         if (data.contains("stages")) from_json(data.at("stages"), value.stages);
         if (data.contains("input_parameter_source_positions")) from_json(data.at("input_parameter_source_positions"), value.input_parameter_source_positions);
         if (data.contains("name_source_position")) from_json(data.at("name_source_position"), value.name_source_position);
+        if (data.contains("input_parameter_is_mutable")) from_json(data.at("input_parameter_is_mutable"), value.input_parameter_is_mutable);
     }
 
     EXPORT template <>
@@ -1546,6 +1548,22 @@ namespace iris::json
     {
         if (data.contains("statements")) from_json(data.at("statements"), value.statements);
         from_json(data.at("result"), value.result);
+    }
+
+    EXPORT template <>
+    JSON to_json(Range_expression const& value)
+    {
+        JSON data;
+        data["begin"] = to_json(value.begin);
+        data["end"] = to_json(value.end);
+        return data;
+    }
+
+    EXPORT template <>
+    void from_json(JSON const& data, Range_expression& value)
+    {
+        from_json(data.at("begin"), value.begin);
+        from_json(data.at("end"), value.end);
     }
 
     EXPORT template <>
@@ -1856,6 +1874,7 @@ namespace iris::json
         data["function_constructors"] = to_json(value.function_constructors);
         data["type_constructors"] = to_json(value.type_constructors);
         data["lambda_declarations"] = to_json(value.lambda_declarations);
+        data["pipeline_declarations"] = to_json(value.pipeline_declarations);
         return data;
     }
 
@@ -1872,6 +1891,7 @@ namespace iris::json
         if (data.contains("function_constructors")) from_json(data.at("function_constructors"), value.function_constructors);
         if (data.contains("type_constructors")) from_json(data.at("type_constructors"), value.type_constructors);
         if (data.contains("lambda_declarations")) from_json(data.at("lambda_declarations"), value.lambda_declarations);
+        if (data.contains("pipeline_declarations")) from_json(data.at("pipeline_declarations"), value.pipeline_declarations);
     }
 
     EXPORT template <>

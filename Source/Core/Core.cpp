@@ -552,6 +552,12 @@ namespace iris
         else if (std::holds_alternative<iris::Pipeline_expression>(current_expression.data))
         {
         }
+        else if (std::holds_alternative<iris::Range_expression>(current_expression.data))
+        {
+            Range_expression& data = std::get<Range_expression>(current_expression.data);
+            data.begin = copy_expressions_to_new_statement(destination_statement, source_statement, data.begin);
+            data.end = copy_expressions_to_new_statement(destination_statement, source_statement, data.end);
+        }
         else if (std::holds_alternative<iris::Lambda_expression>(current_expression.data))
         {
         }

@@ -1011,6 +1011,11 @@ namespace iris::compiler
         Expression_parameters const& parameters
     );
 
+    static llvm::Value* load_soa_array_view_capacity(
+        Value_and_type const& soa_value,
+        Expression_parameters const& parameters
+    );
+
     static llvm::Value* load_soa_array_view_length(
         Value_and_type const& soa_value,
         Expression_parameters const& parameters
@@ -1524,6 +1529,33 @@ namespace iris::compiler
         llvm_builder.SetInsertPoint(pass_block);
     }
 
+    // Fails unless start <= end <= length, the range a view can take.
+    static void create_view_range_check_instructions(
+        llvm::Value* const start_value,
+        llvm::Value* const end_value,
+        llvm::Value* const length_value,
+        std::string_view const error_message,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::LLVMContext& llvm_context = parameters.llvm_context;
+        llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+
+        llvm::Value* const is_ordered = llvm_builder.CreateICmpULE(start_value, end_value, "view_range_is_ordered");
+        llvm::Value* const is_inside = llvm_builder.CreateICmpULE(end_value, length_value, "view_range_is_inside");
+        llvm::Value* const in_bounds = llvm_builder.CreateAnd(is_ordered, is_inside, "view_range_in_bounds");
+
+        llvm::BasicBlock* const pass_block = llvm::BasicBlock::Create(llvm_context, "view_range_check_pass", parameters.llvm_parent_function);
+        llvm::BasicBlock* const fail_block = llvm::BasicBlock::Create(llvm_context, "view_range_check_fail", parameters.llvm_parent_function);
+
+        llvm_builder.CreateCondBr(in_bounds, pass_block, fail_block);
+
+        llvm_builder.SetInsertPoint(fail_block);
+        create_check_failure_instructions(error_message, parameters);
+
+        llvm_builder.SetInsertPoint(pass_block);
+    }
+
     // A Fixed_capacity_array is laid out as { values: [N x T], length: i64 }.
     // A value returned by a call is not a place, so it gets one.
     static llvm::Value* get_fixed_capacity_array_pointer(
@@ -1760,12 +1792,12 @@ namespace iris::compiler
                 llvm::Type* const member_llvm_type = type_reference_to_llvm_type(llvm_context, llvm_data_layout, member_type, type_database);
 
                 llvm::Value* const data_pointer = load_soa_array_view_data_pointer(soa_value, parameters);
-                llvm::Value* const length_value = load_soa_array_view_length(soa_value, parameters);
+                llvm::Value* const capacity_value = load_soa_array_view_capacity(soa_value, parameters);
 
                 if (parameters.enable_bounds_checks)
                 {
                     std::string const error_message = std::format("Out-of-bounds SOA array view access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
-                    create_bounds_check_instructions(index_llvm_value, length_value, error_message, parameters);
+                    create_bounds_check_instructions(index_llvm_value, load_soa_array_view_length(soa_value, parameters), error_message, parameters);
                 }
 
                 llvm::Value* const adjusted_index = create_soa_array_view_adjusted_index(soa_value, index_llvm_value, parameters);
@@ -1773,7 +1805,7 @@ namespace iris::compiler
                     data_pointer,
                     soa_info.layout.members,
                     member_index,
-                    length_value,
+                    capacity_value,
                     member_llvm_type,
                     adjusted_index,
                     parameters
@@ -1864,12 +1896,12 @@ namespace iris::compiler
         {
             Soa_array_view_type_info const soa_info = get_soa_array_view_type_info(left_hand_side_expression_value.type.value(), parameters);
             llvm::Value* const data_pointer = load_soa_array_view_data_pointer(left_hand_side_expression_value, parameters);
-            llvm::Value* const length_value = load_soa_array_view_length(left_hand_side_expression_value, parameters);
+            llvm::Value* const capacity_value = load_soa_array_view_capacity(left_hand_side_expression_value, parameters);
 
             if (parameters.enable_bounds_checks)
             {
                 std::string const error_message = std::format("Out-of-bounds SOA array view access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
-                create_bounds_check_instructions(index_llvm_value, length_value, error_message, parameters);
+                create_bounds_check_instructions(index_llvm_value, load_soa_array_view_length(left_hand_side_expression_value, parameters), error_message, parameters);
             }
 
             llvm::Value* const adjusted_index = create_soa_array_view_adjusted_index(left_hand_side_expression_value, index_llvm_value, parameters);
@@ -1898,7 +1930,7 @@ namespace iris::compiler
                     data_pointer,
                     soa_info.layout.members,
                     member_index,
-                    length_value,
+                    capacity_value,
                     member_llvm_type,
                     adjusted_index,
                     parameters
@@ -2387,9 +2419,16 @@ namespace iris::compiler
                 {
                     Soa_array_view_type_info const soa_info = get_soa_array_view_type_info(array_value.type.value(), parameters);
                     llvm::Value* const data_pointer = load_soa_array_view_data_pointer(array_value, parameters);
-                    llvm::Value* const length_value = load_soa_array_view_length(array_value, parameters);
+                    llvm::Value* const capacity_value = load_soa_array_view_capacity(array_value, parameters);
 
                     Value_and_type const index_value = create_loaded_expression_value(access_array_expression.index.expression_index, statement, parameters);
+
+                    if (parameters.enable_bounds_checks)
+                    {
+                        std::string const error_message = std::format("Out-of-bounds SOA array view access in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+                        create_bounds_check_instructions(index_value.value, load_soa_array_view_length(array_value, parameters), error_message, parameters);
+                    }
+
                     llvm::Value* const adjusted_index = create_soa_array_view_adjusted_index(array_value, index_value.value, parameters);
 
                     llvm::Type* const element_llvm_type = type_reference_to_llvm_type(
@@ -2435,7 +2474,7 @@ namespace iris::compiler
                             data_pointer,
                             soa_info.layout.members,
                             member_index,
-                            length_value,
+                            capacity_value,
                             member_llvm_type,
                             adjusted_index,
                             parameters
@@ -3695,7 +3734,8 @@ namespace iris::compiler
         );
     }
 
-    static llvm::Value* load_soa_array_view_length(
+    // The capacity of the array the view looks into: the distance between two columns.
+    static llvm::Value* load_soa_array_view_capacity(
         Value_and_type const& soa_value,
         Expression_parameters const& parameters
     )
@@ -3706,6 +3746,17 @@ namespace iris::compiler
             llvm::Type::getInt64Ty(parameters.llvm_context),
             parameters
         );
+    }
+
+    // The number of elements the view covers: end_index - start_index.
+    static llvm::Value* load_soa_array_view_length(
+        Value_and_type const& soa_value,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::Value* const start_index = load_soa_array_view_field(soa_value, 0, llvm::Type::getInt64Ty(parameters.llvm_context), parameters);
+        llvm::Value* const end_index = load_soa_array_view_field(soa_value, 1, llvm::Type::getInt64Ty(parameters.llvm_context), parameters);
+        return parameters.llvm_builder.CreateSub(end_index, start_index, "soa_view_length");
     }
 
     static llvm::Value* load_soa_array_view_start_index(
@@ -4116,6 +4167,92 @@ namespace iris::compiler
         }
     }
 
+    // <receiver>.view(start, end) on a Soa_array_view or an Array_slice: the receiver's elements from
+    // start to end, with indices relative to the receiver, as a value of the receiver's own type.
+    static Value_and_type create_sub_view_value(
+        Value_and_type const& receiver_value,
+        Type_reference const& receiver_type,
+        iris::Call_expression const& expression,
+        Statement const& statement,
+        Expression_parameters const& parameters
+    )
+    {
+        llvm::IRBuilder<>& llvm_builder = parameters.llvm_builder;
+        llvm::Type* const uint64_type = llvm::Type::getInt64Ty(parameters.llvm_context);
+
+        if (parameters.llvm_parent_function == nullptr)
+            throw Compile_error{ "view() requires a parent function.", parameters.source_position };
+
+        llvm::Type* const view_llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, receiver_type, parameters.type_database);
+
+        // A value returned by a call is not a place, so it gets one.
+        Value_and_type receiver = receiver_value;
+        if (!receiver.value->getType()->isPointerTy())
+        {
+            llvm::AllocaInst* const temporary = create_alloca_instruction(llvm_builder, parameters.llvm_data_layout, *parameters.llvm_parent_function, view_llvm_type, "view_receiver");
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, receiver.value, temporary);
+            receiver.value = temporary;
+        }
+
+        Expression_parameters argument_parameters = parameters;
+        argument_parameters.expression_type = create_integer_type_type_reference(64, false);
+        Value_and_type const start_argument = create_loaded_expression_value(expression.arguments[0].expression_index, statement, argument_parameters);
+        Value_and_type const end_argument = create_loaded_expression_value(expression.arguments[1].expression_index, statement, argument_parameters);
+        llvm::Value* const start = llvm_builder.CreateIntCast(start_argument.value, uint64_type, false, "view_start");
+        llvm::Value* const end = llvm_builder.CreateIntCast(end_argument.value, uint64_type, false, "view_end");
+
+        std::string const error_message = std::format("Out-of-bounds view in '{}.{}'!", parameters.core_module.name, parameters.function_declaration.has_value() && *parameters.function_declaration ? (*parameters.function_declaration)->name : "?");
+
+        llvm::AllocaInst* const view_alloca = create_alloca_instruction(llvm_builder, parameters.llvm_data_layout, *parameters.llvm_parent_function, view_llvm_type, "view");
+
+        if (std::holds_alternative<Soa_array_view_type>(receiver_type.data))
+        {
+            // { start_index, end_index, capacity, data }: the sub-view looks into the same columns.
+            if (parameters.enable_bounds_checks)
+                create_view_range_check_instructions(start, end, load_soa_array_view_length(receiver, parameters), error_message, parameters);
+
+            llvm::Value* const receiver_start = load_soa_array_view_field(receiver, 0, uint64_type, parameters);
+            llvm::Value* const capacity = load_soa_array_view_capacity(receiver, parameters);
+            llvm::Value* const data_pointer = load_soa_array_view_data_pointer(receiver, parameters);
+
+            llvm::Value* const view_start = llvm_builder.CreateAdd(receiver_start, start, "view_start_index");
+            llvm::Value* const view_end = llvm_builder.CreateAdd(receiver_start, end, "view_end_index");
+
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, view_start, llvm_builder.CreateStructGEP(view_llvm_type, view_alloca, 0));
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, view_end, llvm_builder.CreateStructGEP(view_llvm_type, view_alloca, 1));
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, capacity, llvm_builder.CreateStructGEP(view_llvm_type, view_alloca, 2));
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, data_pointer, llvm_builder.CreateStructGEP(view_llvm_type, view_alloca, 3));
+        }
+        else
+        {
+            // { data, length }
+            Array_slice_type const& slice_type = std::get<Array_slice_type>(receiver_type.data);
+            if (slice_type.element_type.empty())
+                throw Compile_error{ "Array_slice element type is not specified for view().", parameters.source_position };
+
+            llvm::Type* const pointer_type = llvm::PointerType::get(parameters.llvm_context, 0);
+            llvm::Value* const data_pointer = create_load_instruction(llvm_builder, parameters.llvm_data_layout, pointer_type, llvm_builder.CreateStructGEP(view_llvm_type, receiver.value, 0));
+            llvm::Value* const length = create_load_instruction(llvm_builder, parameters.llvm_data_layout, uint64_type, llvm_builder.CreateStructGEP(view_llvm_type, receiver.value, 1));
+
+            if (parameters.enable_bounds_checks)
+                create_view_range_check_instructions(start, end, length, error_message, parameters);
+
+            llvm::Type* const element_llvm_type = type_reference_to_llvm_type(parameters.llvm_context, parameters.llvm_data_layout, slice_type.element_type[0], parameters.type_database);
+            llvm::Value* const view_data = llvm_builder.CreateGEP(element_llvm_type, data_pointer, start, "view_data");
+            llvm::Value* const view_length = llvm_builder.CreateSub(end, start, "view_length");
+
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, view_data, llvm_builder.CreateStructGEP(view_llvm_type, view_alloca, 0));
+            create_store_instruction(llvm_builder, parameters.llvm_data_layout, view_length, llvm_builder.CreateStructGEP(view_llvm_type, view_alloca, 1));
+        }
+
+        return Value_and_type
+        {
+            .name = "",
+            .value = view_alloca,
+            .type = receiver_type
+        };
+    }
+
     std::optional<Value_and_type> create_builtin_call_expression_value(
         Call_expression const& expression,
         Statement const& statement,
@@ -4159,10 +4296,25 @@ namespace iris::compiler
 
             if (access_expression.member_name == "view")
             {
+                Value_and_type const receiver_value = create_expression_value(access_expression.expression.expression_index, statement, parameters);
+                std::optional<Type_reference> const underlying_view_receiver_type =
+                    receiver_value.type.has_value() ?
+                    get_underlying_type(parameters.declaration_database, receiver_value.type.value()) :
+                    std::nullopt;
+
+                if (underlying_view_receiver_type.has_value() &&
+                    (std::holds_alternative<Soa_array_view_type>(underlying_view_receiver_type->data) || std::holds_alternative<Array_slice_type>(underlying_view_receiver_type->data)))
+                {
+                    if (expression.arguments.size() != 2)
+                        throw Compile_error{ "view() of a view or a slice expects 2 arguments.", parameters.source_position };
+
+                    return create_sub_view_value(receiver_value, underlying_view_receiver_type.value(), expression, statement, parameters);
+                }
+
                 if (expression.arguments.size() != 0 && expression.arguments.size() != 2)
                     throw Compile_error{ "Soa_array.view() expects 0 or 2 arguments.", parameters.source_position };
 
-                Value_and_type const soa_value = create_expression_value(access_expression.expression.expression_index, statement, parameters);
+                Value_and_type const& soa_value = receiver_value;
                 if (!soa_value.type.has_value())
                     throw Compile_error{ "Cannot deduce Soa_array receiver type for view().", parameters.source_position };
 
@@ -4221,8 +4373,9 @@ namespace iris::compiler
                     Value_and_type const start_index_argument = create_loaded_expression_value(expression.arguments[0].expression_index, statement, argument_parameters);
                     Value_and_type const end_index_argument = create_loaded_expression_value(expression.arguments[1].expression_index, statement, argument_parameters);
 
-                    start_index_value = start_index_argument.value;
-                    end_index_value = end_index_argument.value;
+                    // The fields are 64-bit, but the bounds may be any integer type.
+                    start_index_value = parameters.llvm_builder.CreateIntCast(start_index_argument.value, llvm::Type::getInt64Ty(parameters.llvm_context), false, "view_start");
+                    end_index_value = parameters.llvm_builder.CreateIntCast(end_index_argument.value, llvm::Type::getInt64Ty(parameters.llvm_context), false, "view_end");
                 }
 
                 llvm::Value* const start_index_field = parameters.llvm_builder.CreateStructGEP(soa_view_llvm_type, soa_view_alloca, 0);
@@ -6319,8 +6472,11 @@ namespace iris::compiler
                 }
                 else
                 {
+                    // The default values of a builtin record (Optional::<T>, Fixed_capacity_array::<T, N>)
+                    // name only its type arguments, which the module using the record can name too.
+                    bool const is_declared_here = module_name == parameters.core_module.name || module_name == "iris.builtin";
                     iris::Module const& struct_core_module =
-                        module_name == parameters.core_module.name ?
+                        is_declared_here ?
                         parameters.core_module :
                         *parameters.core_module_dependencies.at(module_name.data());
                     Expression_parameters new_parameters = enter_declaration_scope(parameters, struct_core_module);

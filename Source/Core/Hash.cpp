@@ -290,6 +290,12 @@ namespace iris
             iris::Parenthesis_expression const& data = std::get<iris::Parenthesis_expression>(expression.data);
             update_hash(state, statement, data.expression);
         }
+        else if (std::holds_alternative<iris::Range_expression>(expression.data))
+        {
+            iris::Range_expression const& data = std::get<iris::Range_expression>(expression.data);
+            update_hash(state, statement, data.begin);
+            update_hash(state, statement, data.end);
+        }
         else if (std::holds_alternative<iris::Type_expression>(expression.data))
         {
             iris::Type_expression const& data = std::get<iris::Type_expression>(expression.data);

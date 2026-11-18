@@ -1078,6 +1078,7 @@ namespace iris::binary_serializer
         serialize(serializer, value.stages);
         serialize(serializer, value.input_parameter_source_positions);
         serialize(serializer, value.name_source_position);
+        serialize(serializer, value.input_parameter_is_mutable);
     }
 
     template <>
@@ -1089,6 +1090,7 @@ namespace iris::binary_serializer
         deserialize(deserializer, value.stages);
         deserialize(deserializer, value.input_parameter_source_positions);
         deserialize(deserializer, value.name_source_position);
+        deserialize(deserializer, value.input_parameter_is_mutable);
     }
 
     template <>
@@ -1143,6 +1145,20 @@ namespace iris::binary_serializer
     {
         deserialize(deserializer, value.statements);
         deserialize(deserializer, value.result);
+    }
+
+    template <>
+    void serialize(Serializer& serializer, Range_expression const& value)
+    {
+        serialize(serializer, value.begin);
+        serialize(serializer, value.end);
+    }
+
+    template <>
+    void deserialize(Deserializer& deserializer, Range_expression& value)
+    {
+        deserialize(deserializer, value.begin);
+        deserialize(deserializer, value.end);
     }
 
     template <>
@@ -1418,6 +1434,7 @@ namespace iris::binary_serializer
         serialize(serializer, value.function_constructors);
         serialize(serializer, value.type_constructors);
         serialize(serializer, value.lambda_declarations);
+        serialize(serializer, value.pipeline_declarations);
     }
 
     template <>
@@ -1433,6 +1450,7 @@ namespace iris::binary_serializer
         deserialize(deserializer, value.function_constructors);
         deserialize(deserializer, value.type_constructors);
         deserialize(deserializer, value.lambda_declarations);
+        deserialize(deserializer, value.pipeline_declarations);
     }
 
     template <>

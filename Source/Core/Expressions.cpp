@@ -265,6 +265,11 @@ namespace iris
             {
                 offset_index(data.expression);
             }
+            else if constexpr (std::is_same_v<T, Range_expression>)
+            {
+                offset_index(data.begin);
+                offset_index(data.end);
+            }
             else if constexpr (std::is_same_v<T, Reflection_expression>)
             {
                 for (Expression_index& arg : data.arguments)

@@ -137,6 +137,7 @@ namespace iris::compiler
         scope.variables.reserve(64);
 
         add_parameters_to_scope(scope, function_declaration.input_parameter_names, function_declaration.type.input_parameter_types, function_declaration.input_parameter_source_positions);
+        add_module_pipelines_to_scope(scope, core_module);
 
         for (iris::Function_condition& condition : function_declaration.preconditions)
         {
@@ -376,6 +377,72 @@ namespace iris::compiler
         return (*pipeline.input_parameter_source_positions)[index];
     }
 
+    void add_module_pipelines_to_scope(
+        Scope& scope,
+        iris::Module const& core_module
+    )
+    {
+        for (Module_declarations const* declarations : { &core_module.internal_declarations, &core_module.export_declarations })
+        {
+            for (Pipeline_expression const& pipeline : declarations->pipeline_declarations)
+                scope.pipelines.push_back(Scope_pipeline{ .pipeline = &pipeline, .visible_variable_count = 0 });
+        }
+    }
+
+    bool is_pipeline_parameter_mutable(
+        Pipeline_expression const& pipeline,
+        std::size_t const index
+    )
+    {
+        return index < pipeline.input_parameter_is_mutable.size() && pipeline.input_parameter_is_mutable[index];
+    }
+
+    bool is_pipeline_for_each_variable_mutable(
+        Pipeline_expression const& pipeline,
+        std::string_view const variable_name
+    )
+    {
+        std::optional<std::string_view> const output_name = get_pipeline_output_name(pipeline);
+        if (!output_name.has_value() || output_name.value() != variable_name)
+            return false;
+
+        for (std::size_t index = 0; index < pipeline.input_parameter_names.size(); ++index)
+        {
+            if (pipeline.input_parameter_names[index] == variable_name)
+                return is_pipeline_parameter_mutable(pipeline, index);
+        }
+
+        return false;
+    }
+
+    void add_for_each_variables_to_scope(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope& scope,
+        Pipeline_expression const& pipeline,
+        std::string_view const variable_name,
+        std::optional<iris::Source_position> const variable_source_position,
+        iris::Declaration_database const& declaration_database
+    )
+    {
+        std::optional<iris::Type_reference> const output_type = get_pipeline_output_type(module_name, function_declaration, scope, pipeline, declaration_database);
+
+        add_pipeline_bindings_to_scope(module_name, function_declaration, scope, pipeline, declaration_database);
+
+        if (!output_type.has_value())
+            return;
+
+        scope.variables.push_back(
+            create_variable(
+                std::pmr::string{ variable_name },
+                output_type.value(),
+                is_pipeline_for_each_variable_mutable(pipeline, variable_name),
+                false,
+                variable_source_position
+            )
+        );
+    }
+
     void add_pipeline_parameters_to_scope(
         Scope& scope,
         Pipeline_expression const& pipeline
@@ -387,7 +454,7 @@ namespace iris::compiler
                 create_variable(
                     pipeline.input_parameter_names[index],
                     pipeline.input_parameter_types[index],
-                    false,
+                    is_pipeline_parameter_mutable(pipeline, index),
                     false,
                     get_pipeline_parameter_source_position(pipeline, index)
                 )
@@ -467,9 +534,9 @@ namespace iris::compiler
             add_pipeline_stage_binding_to_scope(module_name, function_declaration, scope, stage, declaration_database);
     }
 
-    static constexpr std::array<std::string_view, 8> g_pipeline_sink_names
+    static constexpr std::array<std::string_view, 10> g_pipeline_sink_names
     {
-        "count", "any", "all", "into", "fold", "first", "in_place", "into_fixed"
+        "count", "any", "all", "into", "fold", "first", "in_place", "into_fixed", "min_by", "max_by"
     };
 
     std::span<std::string_view const> get_pipeline_sink_names()
@@ -730,6 +797,85 @@ namespace iris::compiler
         return create_lambda_type_type_reference(std::move(input_parameter_types), std::move(output_parameter_types));
     }
 
+    bool is_pipeline_key_sink_name(std::string_view const name)
+    {
+        return name == "min_by" || name == "max_by";
+    }
+
+    std::optional<iris::Type_reference> get_pipeline_key_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope const& scope,
+        iris::Statement const& statement,
+        Pipeline_sink_call const& sink_call,
+        iris::Declaration_database const& declaration_database
+    )
+    {
+        if (!is_pipeline_key_sink_name(sink_call.sink_name) || sink_call.call_expression->arguments.size() != 1)
+            return std::nullopt;
+
+        iris::Expression const& key_expression = statement.expressions[sink_call.call_expression->arguments[0].expression_index];
+
+        // lambda (element) => key: the type of the body, with the element in scope.
+        if (std::holds_alternative<iris::Lambda_expression>(key_expression.data))
+        {
+            iris::Lambda_expression const& lambda_expression = std::get<iris::Lambda_expression>(key_expression.data);
+            if (lambda_expression.parameter_names.size() != 1 || lambda_expression.body.expressions.empty())
+                return std::nullopt;
+
+            if (lambda_expression.return_type.has_value())
+                return lambda_expression.return_type;
+
+            std::optional<iris::Type_reference> output_type = get_pipeline_output_type(module_name, function_declaration, scope, *sink_call.pipeline, declaration_database);
+            if (!output_type.has_value())
+                return std::nullopt;
+
+            Scope lambda_scope = scope;
+            lambda_scope.variables.push_back(create_variable(lambda_expression.parameter_names[0], std::move(output_type.value()), false, false, std::optional<iris::Source_position>{}));
+
+            return get_expression_type(module_name, function_declaration, lambda_scope, lambda_expression.body, lambda_expression.body.expressions[0], std::nullopt, declaration_database);
+        }
+
+        // A function or a lambda value: its output type.
+        std::optional<iris::Type_reference> const function_type = get_expression_type(module_name, function_declaration, scope, statement, key_expression, std::nullopt, declaration_database);
+        if (function_type.has_value() && is_function_pointer(function_type.value()))
+        {
+            iris::Function_type const& callable_type = std::get<iris::Function_pointer_type>(function_type->data).type;
+            if (callable_type.output_parameter_types.size() == 1)
+                return callable_type.output_parameter_types[0];
+        }
+        else if (std::optional<iris::Lambda_type> const lambda_type = resolve_lambda_type(declaration_database, function_type); lambda_type.has_value())
+        {
+            if (lambda_type->output_parameter_types.size() == 1)
+                return lambda_type->output_parameter_types[0];
+        }
+
+        return std::nullopt;
+    }
+
+    std::optional<iris::Type_reference> get_pipeline_key_lambda_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope const& scope,
+        iris::Statement const& statement,
+        Pipeline_sink_call const& sink_call,
+        iris::Declaration_database const& declaration_database
+    )
+    {
+        std::optional<iris::Type_reference> key_type = get_pipeline_key_type(module_name, function_declaration, scope, statement, sink_call, declaration_database);
+        std::optional<iris::Type_reference> output_type = get_pipeline_output_type(module_name, function_declaration, scope, *sink_call.pipeline, declaration_database);
+        if (!key_type.has_value() || !output_type.has_value())
+            return std::nullopt;
+
+        std::pmr::vector<iris::Type_reference> input_parameter_types;
+        input_parameter_types.push_back(std::move(output_type.value()));
+
+        std::pmr::vector<iris::Type_reference> output_parameter_types;
+        output_parameter_types.push_back(std::move(key_type.value()));
+
+        return create_lambda_type_type_reference(std::move(input_parameter_types), std::move(output_parameter_types));
+    }
+
     std::optional<iris::Type_reference> get_pipeline_sink_type(
         std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
@@ -742,7 +888,7 @@ namespace iris::compiler
         if (sink_call.sink_name == "fold")
             return get_pipeline_fold_initial_type(module_name, function_declaration, scope, statement, sink_call, declaration_database);
 
-        if (sink_call.sink_name == "first")
+        if (sink_call.sink_name == "first" || is_pipeline_key_sink_name(sink_call.sink_name))
         {
             std::optional<iris::Type_reference> output_type = get_pipeline_output_type(module_name, function_declaration, scope, *sink_call.pipeline, declaration_database);
             if (!output_type.has_value())
@@ -1334,15 +1480,12 @@ namespace iris::compiler
             );
             if (pipeline != nullptr)
             {
-                std::optional<iris::Type_reference> const type_reference = get_pipeline_output_type(core_module.name, function_declaration, scope, *pipeline, declaration_database);
-                if (type_reference.has_value())
-                {
-                    scope.variables.push_back(
-                        data.variable_name_source_position.has_value() ?
-                        create_variable(data.variable_name, type_reference.value(), false, false, data.variable_name_source_position) :
-                        create_variable(data.variable_name, type_reference.value(), false, false, expression.source_range)
-                    );
-                }
+                std::optional<iris::Source_position> const variable_source_position =
+                    data.variable_name_source_position.has_value() ?
+                    data.variable_name_source_position :
+                    (expression.source_range.has_value() ? std::optional<iris::Source_position>{ expression.source_range->start } : std::nullopt);
+
+                add_for_each_variables_to_scope(core_module.name, function_declaration, scope, *pipeline, data.variable_name, variable_source_position, declaration_database);
             }
 
             process_block(
@@ -2097,6 +2240,38 @@ namespace iris::compiler
         return value;
     }
 
+    // get_expression_type_info recurses once per nested expression, so its stack frame bounds how deep
+    // an expression can be. Branches that need temporaries of their own call these helpers instead.
+    static Type_info get_view_member_type_info()
+    {
+        return Type_info
+        {
+            .type = create_builtin_type_reference("soa_array_view"),
+            .is_mutable = false,
+        };
+    }
+
+    static Type_info get_sub_view_type_info(iris::Type_reference const& receiver_type)
+    {
+        return Type_info
+        {
+            .type = receiver_type,
+            .is_mutable = false,
+        };
+    }
+
+    // A range is typed as its elements, the type of its bounds.
+    static std::optional<Type_info> get_range_expression_type_info(
+        std::string_view const module_name,
+        Scope const& scope,
+        iris::Statement const& statement,
+        iris::Range_expression const& range,
+        iris::Declaration_database const& declaration_database
+    )
+    {
+        return get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[range.begin.expression_index], std::nullopt, declaration_database);
+    }
+
     std::optional<Type_info> get_expression_type_info(
         std::string_view const module_name,
         iris::Function_declaration const* const function_declaration,
@@ -2236,6 +2411,10 @@ namespace iris::compiler
                         .is_mutable = false,
                     };
                 }
+                else if (data.member_name == "view")
+                {
+                    return get_view_member_type_info();
+                }
 
                 return std::nullopt;
             }
@@ -2306,11 +2485,7 @@ namespace iris::compiler
                 }
                 else if (data.member_name == "view")
                 {
-                    return Type_info
-                    {
-                        .type = create_builtin_type_reference("soa_array_view"),
-                        .is_mutable = false,
-                    };
+                    return get_view_member_type_info();
                 }
 
                 return std::nullopt;
@@ -2332,6 +2507,10 @@ namespace iris::compiler
                         .type = iris::create_integer_type_type_reference(64, false),
                         .is_mutable = false,
                     };
+                }
+                else if (data.member_name == "view")
+                {
+                    return get_view_member_type_info();
                 }
 
                 return std::nullopt;
@@ -2823,7 +3002,14 @@ namespace iris::compiler
                         declaration_database,
                         receiver_type_info->type
                     );
-                    if (!underlying_receiver_type.has_value() || !std::holds_alternative<iris::Soa_array_type>(underlying_receiver_type->data))
+                    if (!underlying_receiver_type.has_value())
+                        return std::nullopt;
+
+                    // A view of a view or of a slice has the receiver's own type.
+                    if (std::holds_alternative<iris::Soa_array_view_type>(underlying_receiver_type->data) || std::holds_alternative<iris::Array_slice_type>(underlying_receiver_type->data))
+                        return get_sub_view_type_info(underlying_receiver_type.value());
+
+                    if (!std::holds_alternative<iris::Soa_array_type>(underlying_receiver_type->data))
                         return std::nullopt;
 
                     iris::Soa_array_type const& soa_array_type = std::get<iris::Soa_array_type>(underlying_receiver_type->data);
@@ -3418,6 +3604,10 @@ namespace iris::compiler
         {
             Parenthesis_expression const& data = std::get<iris::Parenthesis_expression>(expression.data);
             return get_expression_type_info(module_name, nullptr, scope, statement, statement.expressions[data.expression.expression_index], std::nullopt, declaration_database);
+        }
+        else if (std::holds_alternative<iris::Range_expression>(expression.data))
+        {
+            return get_range_expression_type_info(module_name, scope, statement, std::get<iris::Range_expression>(expression.data), declaration_database);
         }
         else if (std::holds_alternative<iris::Statement_block_expression>(expression.data))
         {
@@ -4277,6 +4467,7 @@ namespace iris::compiler
             function_declaration.type.input_parameter_types,
             function_declaration.input_parameter_source_positions
         );
+        iris::compiler::add_module_pipelines_to_scope(scope, core_module);
 
         iris::compiler::visit_statements_using_scope(
             core_module.name,

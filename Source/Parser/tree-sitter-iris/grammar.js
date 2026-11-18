@@ -34,7 +34,8 @@ module.exports = grammar({
       $.Union,
       $.Function,
       $.Type_constructor,
-      $.Function_constructor
+      $.Function_constructor,
+      $.Expression_pipeline
     )),
     Declaration_attribute: $ => seq($.Reflection_identifier, optional(seq("(", optional(seq($.Generic_expression, repeat(seq(",", $.Generic_expression)))), ")"))),
     Type: $ => choice(
@@ -162,8 +163,10 @@ module.exports = grammar({
     ),
     Generic_expression_or_instantiate: $ => choice(
       $.Expression_instantiate,
-      $.Generic_expression
+      $.Generic_expression,
+      $.Expression_range
     ),
+    Expression_range: $ => seq($.Generic_expression, "to", $.Generic_expression),
     Expression_access: $ => prec.left(13, seq($.Generic_expression, ".", $.Expression_access_member_name)),
     Expression_access_member_name: $ => $.Identifier,
     Expression_access_array: $ => prec.left(13, seq($.Generic_expression, "[", $.Generic_expression, "]")),
@@ -263,7 +266,9 @@ module.exports = grammar({
     Expression_null_pointer: $ => "null",
     Expression_pipeline: $ => seq("pipeline", $.Expression_pipeline_name, $.Expression_pipeline_input_parameters, $.Expression_pipeline_stages),
     Expression_pipeline_name: $ => $.Identifier,
-    Expression_pipeline_input_parameters: $ => seq("(", optional(seq($.Function_parameter, repeat(seq(",", $.Function_parameter)))), ")"),
+    Expression_pipeline_input_parameters: $ => seq("(", optional(seq($.Expression_pipeline_parameter, repeat(seq(",", $.Expression_pipeline_parameter)))), ")"),
+    Expression_pipeline_parameter: $ => seq($.Function_parameter_name, ":", optional($.Expression_pipeline_parameter_mutability), $.Function_parameter_type),
+    Expression_pipeline_parameter_mutability: $ => "mutable",
     Expression_pipeline_stages: $ => seq("{", repeat($.Expression_pipeline_stage), "}"),
     Expression_pipeline_stage: $ => choice(
       $.Expression_pipeline_map,

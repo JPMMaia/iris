@@ -538,6 +538,13 @@ namespace iris
             Parenthesis_expression const& value = std::get<Parenthesis_expression>(expression.data);
             add_format_expression_parenthesis(buffer, statement, value, options);
         }
+        else if (std::holds_alternative<Range_expression>(expression.data))
+        {
+            Range_expression const& value = std::get<Range_expression>(expression.data);
+            add_format_expression(buffer, statement, get_expression(statement, value.begin), 0, options);
+            add_text(buffer, " to ");
+            add_format_expression(buffer, statement, get_expression(statement, value.end), 0, options);
+        }
         else if (std::holds_alternative<Reflection_expression>(expression.data))
         {
             Reflection_expression const& value = std::get<Reflection_expression>(expression.data);
@@ -1475,16 +1482,19 @@ namespace iris
     {
         add_text(buffer, "pipeline ");
         add_text(buffer, expression.name);
-        add_format_function_parameters(
-            buffer,
-            expression.input_parameter_names,
-            expression.input_parameter_types,
-            expression.input_parameter_source_positions,
-            false,
-            true,
-            outside_indentation,
-            options
-        );
+        add_text(buffer, "(");
+        for (std::size_t index = 0; index < expression.input_parameter_names.size() && index < expression.input_parameter_types.size(); ++index)
+        {
+            if (index > 0)
+                add_text(buffer, ", ");
+
+            add_text(buffer, expression.input_parameter_names[index]);
+            add_text(buffer, ": ");
+            if (index < expression.input_parameter_is_mutable.size() && expression.input_parameter_is_mutable[index])
+                add_text(buffer, "mutable ");
+            add_format_type_name(buffer, expression.input_parameter_types[index], options);
+        }
+        add_text(buffer, ")");
 
         add_new_line(buffer);
         add_indentation(buffer, outside_indentation);

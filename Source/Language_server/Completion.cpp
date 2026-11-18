@@ -180,6 +180,10 @@ namespace iris::language_server
         items.push_back(
             create_completion_item("length", lsp::CompletionItemKind::Field)
         );
+
+        items.push_back(
+            create_completion_item("view", lsp::CompletionItemKind::Method)
+        );
     }
 
     static void add_optional_member_items(
@@ -704,6 +708,7 @@ namespace iris::language_server
             items.push_back(create_completion_item("length", lsp::CompletionItemKind::Field));
             items.push_back(create_completion_item("start_index", lsp::CompletionItemKind::Field));
             items.push_back(create_completion_item("end_index", lsp::CompletionItemKind::Field));
+            items.push_back(create_completion_item("view", lsp::CompletionItemKind::Method));
 
             return lsp::CompletionList
             {

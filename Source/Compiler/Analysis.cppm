@@ -63,6 +63,14 @@ namespace iris::compiler
         Pipeline_expression const& pipeline
     );
 
+    // Adds the module-level pipelines of `core_module`, which every function body can consume. No
+    // variable of the function is visible to their stages, so one that shares a name with something a
+    // stage reads is reported as hiding it.
+    export void add_module_pipelines_to_scope(
+        Scope& scope,
+        iris::Module const& core_module
+    );
+
     export Scope_pipeline const* find_scope_pipeline(
         Scope const& scope,
         std::string_view const name
@@ -114,6 +122,19 @@ namespace iris::compiler
         Pipeline_expression const& pipeline
     );
 
+    // Whether parameter `index` was declared `mutable`, so the loop body can write the element.
+    export bool is_pipeline_parameter_mutable(
+        Pipeline_expression const& pipeline,
+        std::size_t index
+    );
+
+    // Whether a for-each variable named `variable_name` writes through to the element: it is the
+    // pipeline's output, and that output is a mutable parameter (there is no map).
+    export bool is_pipeline_for_each_variable_mutable(
+        Pipeline_expression const& pipeline,
+        std::string_view variable_name
+    );
+
     // Adds the pipeline parameters to the scope.
     export void add_pipeline_parameters_to_scope(
         Scope& scope,
@@ -138,6 +159,19 @@ namespace iris::compiler
         iris::Function_declaration const* function_declaration,
         Scope& scope,
         Pipeline_expression const& pipeline,
+        iris::Declaration_database const& declaration_database
+    );
+
+    // The variables a for-each body over `pipeline` sees: the pipeline's parameters and bindings, then
+    // the loop variable, typed as the output element. The loop variable writes through when it is a
+    // mutable parameter itself.
+    export void add_for_each_variables_to_scope(
+        std::string_view const module_name,
+        iris::Function_declaration const* function_declaration,
+        Scope& scope,
+        Pipeline_expression const& pipeline,
+        std::string_view const variable_name,
+        std::optional<iris::Source_position> const variable_source_position,
         iris::Declaration_database const& declaration_database
     );
 
@@ -214,6 +248,30 @@ namespace iris::compiler
 
     // Every sink a pipeline can be consumed by, other than the for-each loop and `separate`.
     export std::span<std::string_view const> get_pipeline_sink_names();
+
+    // min_by and max_by: sinks that keep the element with the smallest or largest key.
+    export bool is_pipeline_key_sink_name(std::string_view name);
+
+    // The type of the key of a min_by or max_by sink: the type of its lambda's body, or the output type
+    // of its function.
+    export std::optional<iris::Type_reference> get_pipeline_key_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* function_declaration,
+        Scope const& scope,
+        iris::Statement const& statement,
+        Pipeline_sink_call const& sink_call,
+        iris::Declaration_database const& declaration_database
+    );
+
+    // (element type) -> key type: the type a key lambda literal is expected to have.
+    export std::optional<iris::Type_reference> get_pipeline_key_lambda_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* function_declaration,
+        Scope const& scope,
+        iris::Statement const& statement,
+        Pipeline_sink_call const& sink_call,
+        iris::Declaration_database const& declaration_database
+    );
 
     export bool is_pipeline_sink_name(std::string_view const name);
 
@@ -593,15 +651,12 @@ namespace iris::compiler
                     iris::Pipeline_expression const* const pipeline = get_pipeline_from_call_expression(scope, statement, statement.expressions[for_each_expression.range_expression.expression_index]);
                     if (pipeline != nullptr)
                     {
-                        std::optional<iris::Type_reference> const type_reference = get_pipeline_output_type(module_name, function_declaration, scope, *pipeline, declaration_database);
-                        if (type_reference.has_value())
-                        {
-                            scope.variables.push_back(
-                                for_each_expression.variable_name_source_position.has_value() ?
-                                create_variable(for_each_expression.variable_name, type_reference.value(), false, false, for_each_expression.variable_name_source_position) :
-                                create_variable(for_each_expression.variable_name, type_reference.value(), false, false, expression.source_range)
-                            );
-                        }
+                        std::optional<iris::Source_position> const variable_source_position =
+                            for_each_expression.variable_name_source_position.has_value() ?
+                            for_each_expression.variable_name_source_position :
+                            (expression.source_range.has_value() ? std::optional<iris::Source_position>{ expression.source_range->start } : std::nullopt);
+
+                        add_for_each_variables_to_scope(module_name, function_declaration, scope, *pipeline, for_each_expression.variable_name, variable_source_position, declaration_database);
                     }
 
                     visit_statements_using_scope(module_name, function_declaration, scope, for_each_expression.then_statements, declaration_database, callback);

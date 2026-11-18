@@ -33,6 +33,7 @@ namespace iris::compiler
         std::string_view const module_name,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition& function_definition,
-        iris::Declaration_database const& declaration_database
+        iris::Declaration_database const& declaration_database,
+        iris::Module const* core_module = nullptr
     );
 }

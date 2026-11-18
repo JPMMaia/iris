@@ -558,6 +558,15 @@ namespace iris::parser
             else
                 core_module.internal_declarations.global_variable_declarations.push_back(std::move(declaration));
         }
+        else if (declaration_type == "Expression_pipeline")
+        {
+            Pipeline_expression declaration = node_to_expression_pipeline(module_info, tree, declaration_value_node.value(), output_allocator, temporaries_allocator);
+
+            if (is_export)
+                core_module.export_declarations.pipeline_declarations.push_back(std::move(declaration));
+            else
+                core_module.internal_declarations.pipeline_declarations.push_back(std::move(declaration));
+        }
         else if (declaration_type == "Lambda")
         {
             Lambda_declaration declaration = node_to_lambda_declaration(module_info, tree, declaration_value_node.value(), declaration_attributes.unique_name, comment, output_allocator, temporaries_allocator);
@@ -2041,6 +2050,10 @@ namespace iris::parser
         {
             expression.data = node_to_expression_parenthesis(statement, module_info, tree, expression_node, output_allocator, temporaries_allocator);
         }
+        else if (expression_type == "Expression_range")
+        {
+            expression.data = node_to_expression_range(statement, module_info, tree, expression_node, output_allocator, temporaries_allocator);
+        }
         else if (expression_type == "Expression_pipeline")
         {
             expression.data = node_to_expression_pipeline(module_info, tree, expression_node, output_allocator, temporaries_allocator);
@@ -2955,7 +2968,7 @@ namespace iris::parser
             output.name_source_position = get_node_source_range(name_node.value()).start;
         }
 
-        std::pmr::vector<Parse_node> const parameter_nodes = get_child_nodes_of_parent(tree, node, "Expression_pipeline_input_parameters", "Function_parameter", temporaries_allocator);
+        std::pmr::vector<Parse_node> const parameter_nodes = get_child_nodes_of_parent(tree, node, "Expression_pipeline_input_parameters", "Expression_pipeline_parameter", temporaries_allocator);
         output.input_parameter_source_positions = std::pmr::vector<Source_position>{};
         add_function_parameters(
             output.input_parameter_names,
@@ -2967,6 +2980,18 @@ namespace iris::parser
             output_allocator,
             temporaries_allocator
         );
+
+        bool const has_mutable_parameter = std::any_of(
+            parameter_nodes.begin(),
+            parameter_nodes.end(),
+            [&](Parse_node const& parameter_node) -> bool { return get_child_node(tree, parameter_node, "Expression_pipeline_parameter_mutability").has_value(); }
+        );
+        if (has_mutable_parameter)
+        {
+            output.input_parameter_is_mutable.reserve(parameter_nodes.size());
+            for (Parse_node const& parameter_node : parameter_nodes)
+                output.input_parameter_is_mutable.push_back(get_child_node(tree, parameter_node, "Expression_pipeline_parameter_mutability").has_value());
+        }
 
         std::pmr::vector<Parse_node> const stage_nodes = get_child_nodes_of_parent(tree, node, "Expression_pipeline_stages", "Expression_pipeline_stage", temporaries_allocator);
         output.stages.reserve(stage_nodes.size());
@@ -3312,6 +3337,28 @@ namespace iris::parser
     iris::Null_pointer_expression node_to_expression_null_pointer()
     {
         return iris::Null_pointer_expression{};
+    }
+
+    iris::Range_expression node_to_expression_range(
+        iris::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        iris::Range_expression output;
+
+        std::optional<Parse_node> const begin_node = get_child_node(tree, node, 0);
+        if (begin_node.has_value())
+            output.begin = node_to_expression(statement, module_info, tree, begin_node.value(), output_allocator, temporaries_allocator);
+
+        std::optional<Parse_node> const end_node = get_child_node(tree, node, 2);
+        if (end_node.has_value())
+            output.end = node_to_expression(statement, module_info, tree, end_node.value(), output_allocator, temporaries_allocator);
+
+        return output;
     }
 
     iris::Parenthesis_expression node_to_expression_parenthesis(

@@ -188,6 +188,7 @@ namespace iris::language_server
             function_declaration.type.input_parameter_types,
             function_declaration.input_parameter_source_positions
         );
+        iris::compiler::add_module_pipelines_to_scope(scope, core_module);
 
         auto const process_statement = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> void
         {

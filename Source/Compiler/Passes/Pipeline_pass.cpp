@@ -25,6 +25,21 @@ namespace iris::compiler
             return std::pmr::string{ std::format("$pipeline{}_input{}", pipeline_index, input_index) };
         }
 
+        struct Pipeline_range_input
+        {
+            // One-expression statements: a constant, a variable, or the generated variable that holds a
+            // bound so it is evaluated once.
+            iris::Statement begin;
+            iris::Statement end;
+            iris::Type_reference element_type;
+            // Elements are numbered by a Uint64 index, which needs no cast to a Uint64 element.
+            bool is_uint64 = false;
+            // The generated variable holding the length, `end - begin` or 0, as a Uint64. It is declared
+            // only when the expansion needs it (see add_range_length_statements).
+            std::pmr::string length_name;
+            bool has_length = false;
+        };
+
         struct Pipeline_input
         {
             // The variable the expansion reads elements from: the user's own variable, or a
@@ -34,6 +49,8 @@ namespace iris::compiler
             std::optional<std::uint64_t> constant_length;
             // Set for Soa_array_view inputs, whose fields are stored in separate columns.
             bool is_soa = false;
+            // Set for range inputs, `<begin> to <end>`, whose elements are integers.
+            std::optional<Pipeline_range_input> range;
         };
 
         std::uint64_t add_expression(iris::Statement& statement, iris::Expression expression)
@@ -56,6 +73,9 @@ namespace iris::compiler
         // <input>.length, or the constant length of a Constant_array.
         std::uint64_t add_input_length_expression(iris::Statement& statement, Pipeline_input const& input)
         {
+            if (input.range.has_value())
+                return add_expression(statement, create_variable_expression(input.range->length_name));
+
             if (input.constant_length.has_value())
                 return add_expression(statement, create_uint64_constant_expression(input.constant_length.value()));
 
@@ -117,6 +137,67 @@ namespace iris::compiler
             return create_variable_declaration_statement(parameter_name, value);
         }
 
+        iris::Statement create_assignment_from_statement(std::string_view const name, iris::Statement const& value);
+        iris::Statement create_mutable_variable_statement(std::string_view const name, iris::Expression value);
+
+        // Appends the expressions of `value` to `statement` and returns the index of its root.
+        iris::Expression_index add_statement_expressions(iris::Statement& statement, iris::Statement const& value)
+        {
+            std::uint64_t const root_index = statement.expressions.size();
+            add_expressions_to_expressions(statement.expressions, value.expressions);
+            return to_index(root_index);
+        }
+
+        // <left> <operation> <right>, where the operands are the roots of `left` and `right`.
+        iris::Statement create_binary_statement(iris::Statement const& left, iris::Binary_operation const operation, iris::Statement const& right)
+        {
+            iris::Statement statement;
+            std::uint64_t const binary_index = add_expression(statement, iris::Expression{ .data = iris::Binary_expression{} });
+            iris::Expression_index const left_index = add_statement_expressions(statement, left);
+            iris::Expression_index const right_index = add_statement_expressions(statement, right);
+
+            std::get<iris::Binary_expression>(statement.expressions[binary_index].data) = iris::Binary_expression
+            {
+                .left_hand_side = left_index,
+                .right_hand_side = right_index,
+                .operation = operation,
+            };
+
+            return statement;
+        }
+
+        // <value> as <type>, where the value is the root of `value`.
+        iris::Statement create_numeric_cast_statement(iris::Statement const& value, iris::Type_reference type)
+        {
+            iris::Statement statement;
+            std::uint64_t const cast_index = add_expression(statement, iris::Expression{ .data = iris::Cast_expression{} });
+            iris::Expression_index const source_index = add_statement_expressions(statement, value);
+
+            std::get<iris::Cast_expression>(statement.expressions[cast_index].data) = iris::Cast_expression
+            {
+                .source = source_index,
+                .destination_type = std::move(type),
+                .cast_type = iris::Cast_type::Numeric,
+            };
+
+            return statement;
+        }
+
+        // (<value>), where the value is the root of `value`.
+        iris::Statement create_parenthesis_statement(iris::Statement const& value)
+        {
+            iris::Statement statement;
+            std::uint64_t const parenthesis_index = add_expression(statement, iris::Expression{ .data = iris::Parenthesis_expression{} });
+            iris::Expression_index const inner_index = add_statement_expressions(statement, value);
+
+            std::get<iris::Parenthesis_expression>(statement.expressions[parenthesis_index].data) = iris::Parenthesis_expression
+            {
+                .expression = inner_index,
+            };
+
+            return statement;
+        }
+
         // if <condition> { <then_statements> }
         iris::Statement create_if_statement(iris::Statement const& condition, std::pmr::vector<iris::Statement> then_statements)
         {
@@ -133,6 +214,72 @@ namespace iris::compiler
             iris::Statement statement;
             add_expression(statement, iris::Expression{ .data = std::move(if_expression) });
             return statement;
+        }
+
+        // var <parameter_name> = <begin> + <index_name> as T;  the range element at the expansion's index.
+        iris::Statement create_range_element_statement(
+            std::string_view const parameter_name,
+            Pipeline_range_input const& range,
+            std::string_view const index_name
+        )
+        {
+            iris::Statement index;
+            add_expression(index, create_variable_expression(std::pmr::string{ index_name }));
+
+            iris::Statement const offset =
+                range.is_uint64 ?
+                index :
+                create_numeric_cast_statement(index, range.element_type);
+
+            return create_variable_declaration_statement(parameter_name, create_binary_statement(range.begin, iris::Binary_operation::Add, offset));
+        }
+
+        // for <parameter_name> in <begin> to <end> { <then_statements> }  the loop a person writes over a range.
+        iris::Statement create_range_loop_statement(
+            std::string_view const parameter_name,
+            Pipeline_range_input const& range,
+            std::pmr::vector<iris::Statement> then_statements
+        )
+        {
+            iris::Statement statement;
+            std::uint64_t const loop_index = add_expression(statement, iris::Expression{ .data = iris::For_loop_expression{} });
+            iris::Expression_index const begin_index = add_statement_expressions(statement, range.begin);
+
+            std::get<iris::For_loop_expression>(statement.expressions[loop_index].data) = iris::For_loop_expression
+            {
+                .variable_name = std::pmr::string{ parameter_name },
+                .range_begin = begin_index,
+                .range_end = range.end,
+                .range_comparison_operation = iris::Binary_operation::Less_than,
+                .step_by = std::nullopt,
+                .then_statements = std::move(then_statements),
+            };
+
+            return statement;
+        }
+
+        // mutable <length> = 0u64;
+        // if <end> > <begin> { <length> = (<end> - <begin>) as Uint64; }
+        // A range whose end is not after its begin has no elements, as in a for loop.
+        void add_range_length_statements(Pipeline_range_input& range, std::pmr::vector<iris::Statement>& statements)
+        {
+            if (range.has_length)
+                return;
+
+            statements.push_back(create_mutable_variable_statement(range.length_name, create_uint64_constant_expression(0)));
+
+            iris::Statement const difference = create_binary_statement(range.end, iris::Binary_operation::Subtract, range.begin);
+            iris::Statement const length =
+                range.is_uint64 ?
+                difference :
+                create_numeric_cast_statement(create_parenthesis_statement(difference), create_integer_type_type_reference(64, false));
+
+            std::pmr::vector<iris::Statement> then_statements;
+            then_statements.push_back(create_assignment_from_statement(range.length_name, length));
+
+            statements.push_back(create_if_statement(create_binary_statement(range.end, iris::Binary_operation::Greater_than, range.begin), std::move(then_statements)));
+
+            range.has_length = true;
         }
 
         // assert "Pipeline inputs have equal length" { <input>.length == <first_input>.length };
@@ -196,6 +343,12 @@ namespace iris::compiler
             iris::Statement range_end;
             add_input_length_expression(range_end, first_input);
             return create_index_loop_statement(index_name, std::move(range_end), std::move(then_statements));
+        }
+
+        bool is_uint64_type(iris::Declaration_database const& declaration_database, iris::Type_reference const& type)
+        {
+            std::optional<iris::Type_reference> const underlying_type = get_underlying_type(declaration_database, type);
+            return underlying_type.has_value() && underlying_type.value() == create_integer_type_type_reference(64, false);
         }
 
         struct Pipeline_pass_context
@@ -513,6 +666,20 @@ namespace iris::compiler
             std::pmr::vector<Pipeline_input> inputs;
         };
 
+        // A single range input, with no stage that needs the position, becomes `for p in begin to end`, the
+        // loop a person writes, instead of an index loop.
+        bool loops_over_range_directly(Pipeline_expansion const& expansion)
+        {
+            if (expansion.inputs.size() != 1 || !expansion.inputs[0].range.has_value())
+                return false;
+
+            return std::none_of(
+                expansion.pipeline->stages.begin(),
+                expansion.pipeline->stages.end(),
+                [](iris::Pipeline_stage const& stage) -> bool { return stage.kind == iris::Pipeline_stage_kind::Enumerate; }
+            );
+        }
+
         // Binds `argument_index` of `statement` to a name the expansion can read repeatedly: the user's own
         // variable, or a generated one declared in the prologue so the argument is evaluated exactly once.
         std::pmr::string bind_argument_once(
@@ -532,6 +699,28 @@ namespace iris::compiler
             return generated_name;
         }
 
+        // A constant or a variable is read where it is used; anything else is bound once in the prologue.
+        iris::Statement bind_range_bound(
+            iris::Statement const& statement,
+            iris::Expression_index const bound_index,
+            std::pmr::string generated_name,
+            std::pmr::vector<iris::Statement>& prologue
+        )
+        {
+            iris::Expression const& bound_expression = statement.expressions[bound_index.expression_index];
+
+            iris::Statement bound;
+            if (std::holds_alternative<iris::Constant_expression>(bound_expression.data) || std::holds_alternative<iris::Variable_expression>(bound_expression.data))
+            {
+                copy_expressions_to_new_statement(bound, statement, bound_index);
+                return bound;
+            }
+
+            std::pmr::string const name = bind_argument_once(statement, bound_index, std::move(generated_name), prologue);
+            add_expression(bound, create_variable_expression(name));
+            return bound;
+        }
+
         std::optional<Pipeline_input> create_pipeline_input(
             Pipeline_pass_context const& context,
             Scope const& scope,
@@ -541,6 +730,45 @@ namespace iris::compiler
             std::pmr::vector<iris::Statement>& prologue
         )
         {
+            if (std::holds_alternative<iris::Range_expression>(statement.expressions[argument_index.expression_index].data))
+            {
+                iris::Range_expression const& range = std::get<iris::Range_expression>(statement.expressions[argument_index.expression_index].data);
+
+                std::optional<iris::Type_reference> element_type = get_expression_type(
+                    context.module_name,
+                    &context.function_declaration,
+                    scope,
+                    statement,
+                    statement.expressions[range.begin.expression_index],
+                    std::nullopt,
+                    context.declaration_database
+                );
+                if (!element_type.has_value())
+                    return std::nullopt;
+
+                bool const is_uint64 = is_uint64_type(context.declaration_database, element_type.value());
+
+                // The begin is bound before the end, so side effects run in source order.
+                iris::Statement begin = bind_range_bound(statement, range.begin, std::pmr::string{ std::format("{}_begin", generated_name) }, prologue);
+                iris::Statement end = bind_range_bound(statement, range.end, std::pmr::string{ std::format("{}_end", generated_name) }, prologue);
+
+                return Pipeline_input
+                {
+                    .variable_name = generated_name,
+                    .constant_length = std::nullopt,
+                    .is_soa = false,
+                    .range = Pipeline_range_input
+                    {
+                        .begin = std::move(begin),
+                        .end = std::move(end),
+                        .element_type = std::move(element_type.value()),
+                        .is_uint64 = is_uint64,
+                        .length_name = std::pmr::string{ std::format("{}_length", generated_name) },
+                        .has_length = false,
+                    },
+                };
+            }
+
             std::optional<iris::Type_reference> const argument_type = get_expression_type(
                 context.module_name,
                 &context.function_declaration,
@@ -616,10 +844,29 @@ namespace iris::compiler
                 expansion.inputs.push_back(std::move(input.value()));
             }
 
+            if (!loops_over_range_directly(expansion))
+            {
+                for (Pipeline_input& input : expansion.inputs)
+                {
+                    if (input.range.has_value())
+                        add_range_length_statements(input.range.value(), expansion.prologue);
+                }
+            }
+
             for (std::size_t input_index = 1; input_index < expansion.inputs.size(); ++input_index)
                 expansion.prologue.push_back(create_equal_length_assert_statement(expansion.inputs[input_index], expansion.inputs[0]));
 
             return expansion;
+        }
+
+        // Declares the lengths of range inputs that the expansion has not needed so far.
+        void add_missing_range_lengths(Pipeline_expansion& expansion, std::pmr::vector<iris::Statement>& statements)
+        {
+            for (Pipeline_input& input : expansion.inputs)
+            {
+                if (input.range.has_value())
+                    add_range_length_statements(input.range.value(), statements);
+            }
         }
 
         // Calls `function` on every statement list reachable from `statements`, outermost first. Returns
@@ -660,6 +907,17 @@ namespace iris::compiler
                                 return visit_statement_lists(data.array_data, function);
                             else if constexpr (std::is_same_v<Data_t, iris::For_loop_expression>)
                                 return visit_statement_lists(data.range_end, function) && visit_statement_lists(data.then_statements, function);
+                            else if constexpr (std::is_same_v<Data_t, iris::For_each_expression>)
+                                return visit_statement_lists(data.then_statements, function);
+                            else if constexpr (std::is_same_v<Data_t, iris::Pipeline_expression>)
+                            {
+                                for (iris::Pipeline_stage& stage : data.stages)
+                                {
+                                    if (!visit_statement_lists(stage.expression, function))
+                                        return false;
+                                }
+                                return true;
+                            }
                             else if constexpr (std::is_same_v<Data_t, iris::If_expression>)
                             {
                                 for (iris::Condition_statement_pair& pair : data.series)
@@ -705,6 +963,7 @@ namespace iris::compiler
                                 std::is_same_v<Data_t, iris::Invalid_expression> ||
                                 std::is_same_v<Data_t, iris::Null_pointer_expression> ||
                                 std::is_same_v<Data_t, iris::Parenthesis_expression> ||
+                                std::is_same_v<Data_t, iris::Range_expression> ||
                                 std::is_same_v<Data_t, iris::Return_expression> ||
                                 std::is_same_v<Data_t, iris::Type_expression> ||
                                 std::is_same_v<Data_t, iris::Unary_expression> ||
@@ -1015,6 +1274,136 @@ namespace iris::compiler
             return bindings;
         }
 
+        // A mutable parameter is never copied, so writes reach the element. Every use of the parameter
+        // `p` in `body` is rewritten:
+        // - Array inputs: `var $pipeline<N>_<p> = &input[i];`, then `p.f` is `$ptr->f` and `p` is `*$ptr`.
+        // - Soa_array_view inputs: `p.f` is `input->f[i]` and `p` is `input[i]`, read or written where used.
+        // Copies of the element (`var u = p;`) stay copies. Returns the binding to insert.
+        std::pmr::vector<iris::Statement> bind_mutable_element(
+            std::pmr::vector<iris::Statement>& body,
+            std::string_view const parameter_name,
+            Pipeline_input const& input,
+            std::size_t const pipeline_index,
+            std::string_view const index_name
+        )
+        {
+            std::pmr::string const pointer_name = get_pipeline_local_name(pipeline_index, parameter_name);
+            bool is_used = false;
+
+            auto const is_parameter = [&](iris::Expression const& expression) -> bool
+            {
+                return std::holds_alternative<iris::Variable_expression>(expression.data) &&
+                    std::get<iris::Variable_expression>(expression.data).name == parameter_name;
+            };
+
+            // input[<index_name>], appended to `statement`.
+            auto const add_element_access = [&](iris::Statement& statement, iris::Expression_index const array_index) -> iris::Expression
+            {
+                std::uint64_t const index_index = add_expression(statement, create_variable_expression(std::pmr::string{ index_name }));
+                return iris::Expression
+                {
+                    .data = iris::Access_array_expression
+                    {
+                        .expression = array_index,
+                        .index = to_index(index_index),
+                    }
+                };
+            };
+
+            visit_statement_lists(
+                body,
+                [&](std::pmr::vector<iris::Statement>& statements)
+                {
+                    for (iris::Statement& statement : statements)
+                    {
+                        // `p.f` first, so that the bare uses left afterwards are the whole element.
+                        std::size_t const original_size = statement.expressions.size();
+                        for (std::size_t index = 0; index < original_size; ++index)
+                        {
+                            if (!std::holds_alternative<iris::Access_expression>(statement.expressions[index].data))
+                                continue;
+
+                            iris::Access_expression const access_expression = std::get<iris::Access_expression>(statement.expressions[index].data);
+                            std::uint64_t const object_index = access_expression.expression.expression_index;
+                            if (!is_parameter(statement.expressions[object_index]))
+                                continue;
+
+                            is_used = true;
+
+                            if (input.is_soa)
+                            {
+                                // input->f[i]: the object becomes the column, the access its element.
+                                std::uint64_t const input_index = add_expression(statement, create_variable_expression(input.variable_name));
+                                statement.expressions[object_index].data = iris::Dereference_and_access_expression
+                                {
+                                    .expression = to_index(input_index),
+                                    .member_name = access_expression.member_name,
+                                };
+                                statement.expressions[index] = add_element_access(statement, access_expression.expression);
+                            }
+                            else
+                            {
+                                statement.expressions[object_index].data = iris::Variable_expression{ .name = pointer_name };
+                                statement.expressions[index].data = iris::Dereference_and_access_expression
+                                {
+                                    .expression = access_expression.expression,
+                                    .member_name = access_expression.member_name,
+                                };
+                            }
+                        }
+
+                        for (std::size_t index = 0; index < original_size; ++index)
+                        {
+                            if (!is_parameter(statement.expressions[index]))
+                                continue;
+
+                            is_used = true;
+
+                            if (input.is_soa)
+                            {
+                                std::uint64_t const input_index = add_expression(statement, create_variable_expression(input.variable_name));
+                                statement.expressions[index] = add_element_access(statement, to_index(input_index));
+                            }
+                            else
+                            {
+                                std::uint64_t const pointer_index = add_expression(statement, create_variable_expression(pointer_name));
+                                statement.expressions[index].data = iris::Unary_expression
+                                {
+                                    .expression = to_index(pointer_index),
+                                    .operation = iris::Unary_operation::Indirection,
+                                };
+                            }
+                        }
+                    }
+                }
+            );
+
+            std::pmr::vector<iris::Statement> bindings;
+            if (input.is_soa || !is_used)
+                return bindings;
+
+            // var $pipeline<N>_<p> = &<input>[<index>];
+            iris::Statement value;
+            std::uint64_t const address_index = add_expression(value, iris::Expression{ .data = iris::Unary_expression{} });
+            std::uint64_t const access_index = add_expression(value, iris::Expression{ .data = iris::Access_array_expression{} });
+            std::uint64_t const input_index = add_expression(value, create_variable_expression(input.variable_name));
+            std::uint64_t const element_index = add_expression(value, create_variable_expression(std::pmr::string{ index_name }));
+
+            std::get<iris::Access_array_expression>(value.expressions[access_index].data) = iris::Access_array_expression
+            {
+                .expression = to_index(input_index),
+                .index = to_index(element_index),
+            };
+            std::get<iris::Unary_expression>(value.expressions[address_index].data) = iris::Unary_expression
+            {
+                .expression = to_index(access_index),
+                .operation = iris::Unary_operation::Address_of,
+            };
+
+            bindings.push_back(create_variable_declaration_statement(pointer_name, value));
+            return bindings;
+        }
+
         // Binds the parameters to the elements at the expansion's index, at the top of `body`. A
         // parameter whose fields `body` only reads one by one is not copied: a Soa_array_view parameter
         // gets one local per field, and any other one a pointer to the element.
@@ -1029,6 +1418,19 @@ namespace iris::compiler
             {
                 Pipeline_input const& input = expansion.inputs[input_index - 1];
                 std::string_view const parameter_name = pipeline.input_parameter_names[input_index - 1];
+
+                if (input.range.has_value())
+                {
+                    body.insert(body.begin(), create_range_element_statement(parameter_name, input.range.value(), expansion.index_name));
+                    continue;
+                }
+
+                if (is_pipeline_parameter_mutable(pipeline, input_index - 1))
+                {
+                    std::pmr::vector<iris::Statement> const bindings = bind_mutable_element(body, parameter_name, input, expansion.pipeline_index, expansion.index_name);
+                    body.insert(body.begin(), bindings.begin(), bindings.end());
+                    continue;
+                }
 
                 std::optional<std::pmr::vector<iris::Statement>> const field_bindings =
                     input.is_soa ?
@@ -1083,6 +1485,9 @@ namespace iris::compiler
                         body.insert(body.begin(), create_variable_copy_statement(stage->binding_name.value(), expansion.index_name));
                 }
             }
+
+            if (loops_over_range_directly(expansion))
+                return create_range_loop_statement(pipeline.input_parameter_names[0], expansion.inputs[0].range.value(), std::move(body));
 
             insert_input_bindings(expansion, body);
 
@@ -1172,6 +1577,7 @@ namespace iris::compiler
 
             std::size_t const pipeline_index = expansion.pipeline_index;
             std::pmr::vector<iris::Statement> statements = std::move(expansion.prologue);
+            add_missing_range_lengths(expansion, statements);
 
             // The scratch argument is written before the sink's own argument, so it is evaluated first.
             std::optional<std::pmr::string> scratch_name;
@@ -1418,6 +1824,111 @@ namespace iris::compiler
                 innermost.push_back(create_assignment_from_statement(accumulator_name, lambda_expression.body));
                 add_expression(result, create_variable_expression(accumulator_name));
             }
+            else if (is_pipeline_key_sink_name(sink_call.sink_name))
+            {
+                // The element with the smallest (min_by) or largest (max_by) key; on a tie, the first one.
+                // The best key is kept in an Optional, so no default value of the key type is needed.
+                if (sink_call_expression.arguments.size() != 1)
+                    return std::nullopt;
+
+                std::optional<iris::Type_reference> output_type = get_pipeline_output_type(context.module_name, &context.function_declaration, scope, *expansion->pipeline, context.declaration_database);
+                std::optional<iris::Type_reference> key_type = get_pipeline_key_type(context.module_name, &context.function_declaration, scope, statement, sink_call, context.declaration_database);
+                if (!output_type.has_value() || !key_type.has_value())
+                    return std::nullopt;
+
+                std::pmr::string const result_name = get_pipeline_local_name(pipeline_index, "result");
+                std::pmr::string const key_name = get_pipeline_local_name(pipeline_index, "key");
+                std::pmr::string const candidate_name = get_pipeline_local_name(pipeline_index, "candidate");
+
+                statements.push_back(create_default_typed_variable_statement(result_name, create_optional_type_reference({ std::move(output_type.value()) })));
+                statements.push_back(create_default_typed_variable_statement(key_name, create_optional_type_reference({ std::move(key_type.value()) })));
+
+                iris::Expression_index const key_function_index = sink_call_expression.arguments[0];
+                iris::Expression const& key_function = statement.expressions[key_function_index.expression_index];
+
+                if (std::holds_alternative<iris::Lambda_expression>(key_function.data))
+                {
+                    iris::Lambda_expression const& lambda_expression = std::get<iris::Lambda_expression>(key_function.data);
+                    if (lambda_expression.parameter_names.size() != 1)
+                        return std::nullopt;
+
+                    if (lambda_expression.parameter_names[0] != expansion->output_name)
+                        innermost.push_back(create_variable_copy_statement(lambda_expression.parameter_names[0], expansion->output_name));
+
+                    innermost.push_back(create_variable_declaration_statement(candidate_name, lambda_expression.body));
+                }
+                else
+                {
+                    iris::Statement callee;
+                    if (is_access_path(statement, key_function_index))
+                    {
+                        copy_expressions_to_new_statement(callee, statement, key_function_index);
+                    }
+                    else
+                    {
+                        std::pmr::string const function_name = bind_argument_once(statement, key_function_index, get_pipeline_local_name(pipeline_index, "function"), statements);
+                        add_expression(callee, create_variable_expression(function_name));
+                    }
+
+                    std::array<std::string_view, 1> const argument_names{ expansion->output_name };
+                    innermost.push_back(create_variable_declaration_statement(candidate_name, create_call_statement(callee, argument_names)));
+                }
+
+                // !$key.has_value || $candidate < $key.value   (max_by: $key.value < $candidate)
+                auto const create_key_access = [&](iris::Statement& condition, std::string_view const member_name) -> std::uint64_t
+                {
+                    std::uint64_t const access_index = add_expression(condition, iris::Expression{ .data = iris::Access_expression{} });
+                    std::uint64_t const key_index = add_expression(condition, create_variable_expression(key_name));
+                    std::get<iris::Access_expression>(condition.expressions[access_index].data) = iris::Access_expression
+                    {
+                        .expression = to_index(key_index),
+                        .member_name = std::pmr::string{ member_name },
+                    };
+                    return access_index;
+                };
+
+                iris::Statement condition;
+                std::uint64_t const or_index = add_expression(condition, iris::Expression{ .data = iris::Binary_expression{} });
+                std::uint64_t const not_index = add_expression(condition, iris::Expression{ .data = iris::Unary_expression{} });
+                std::uint64_t const has_value_index = create_key_access(condition, "has_value");
+                std::get<iris::Unary_expression>(condition.expressions[not_index].data) = iris::Unary_expression
+                {
+                    .expression = to_index(has_value_index),
+                    .operation = iris::Unary_operation::Not,
+                };
+
+                std::uint64_t const less_index = add_expression(condition, iris::Expression{ .data = iris::Binary_expression{} });
+                bool const is_min = sink_call.sink_name == "min_by";
+                std::uint64_t const first_operand_index = is_min ? add_expression(condition, create_variable_expression(candidate_name)) : create_key_access(condition, "value");
+                std::uint64_t const second_operand_index = is_min ? create_key_access(condition, "value") : add_expression(condition, create_variable_expression(candidate_name));
+                std::get<iris::Binary_expression>(condition.expressions[less_index].data) = iris::Binary_expression
+                {
+                    .left_hand_side = to_index(first_operand_index),
+                    .right_hand_side = to_index(second_operand_index),
+                    .operation = iris::Binary_operation::Less_than,
+                };
+
+                std::get<iris::Binary_expression>(condition.expressions[or_index].data) = iris::Binary_expression
+                {
+                    .left_hand_side = to_index(not_index),
+                    .right_hand_side = to_index(less_index),
+                    .operation = iris::Binary_operation::Logical_or,
+                };
+
+                std::pmr::vector<iris::Statement> then_statements;
+                {
+                    iris::Statement key_value;
+                    add_create_optional_call(key_value, candidate_name);
+                    then_statements.push_back(create_assignment_from_statement(key_name, key_value));
+
+                    iris::Statement result_value;
+                    add_create_optional_call(result_value, expansion->output_name);
+                    then_statements.push_back(create_assignment_from_statement(result_name, result_value));
+                }
+                innermost.push_back(create_if_statement(condition, std::move(then_statements)));
+
+                add_expression(result, create_variable_expression(result_name));
+            }
             else if (sink_call.sink_name == "first")
             {
                 std::optional<iris::Type_reference> output_type = get_pipeline_output_type(
@@ -1490,6 +2001,7 @@ namespace iris::compiler
 
                 // map preserves the element count and filter only removes elements, so a buffer as long as
                 // the first input always has room.
+                add_missing_range_lengths(expansion.value(), statements);
                 Pipeline_input const output_input{ .variable_name = output_name, .constant_length = std::nullopt };
                 statements.push_back(create_output_capacity_assert_statement(output_input, expansion->inputs[0]));
                 statements.push_back(create_mutable_variable_statement(count_name, create_uint64_constant_expression(0)));
@@ -1609,10 +2121,15 @@ namespace iris::compiler
         std::string_view const module_name,
         iris::Function_declaration const& function_declaration,
         iris::Function_definition& function_definition,
-        iris::Declaration_database const& declaration_database
+        iris::Declaration_database const& declaration_database,
+        iris::Module const* const core_module
     )
     {
         Scope scope{};
+
+        // Module-level pipelines, which the function's own pipelines are added after.
+        if (core_module != nullptr)
+            add_module_pipelines_to_scope(scope, *core_module);
 
         add_parameters_to_scope(
             scope,
@@ -1680,7 +2197,8 @@ namespace iris::compiler
                 core_module.name,
                 *function_declaration.value(),
                 function_definition,
-                declaration_database
+                declaration_database,
+                &core_module
             );
         }
     }

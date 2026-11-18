@@ -66,14 +66,14 @@ function run(list: Array_slice::<Complex>, weights: Array_slice::<Float32>, thre
               (Expression_pipeline_name
                 (Identifier))
               (Expression_pipeline_input_parameters
-                (Function_parameter
+                (Expression_pipeline_parameter
                   (Function_parameter_name
                     (Identifier))
                   (Function_parameter_type
                     (Type
                       (Type_name
                         (Identifier)))))
-                (Function_parameter
+                (Expression_pipeline_parameter
                   (Function_parameter_name
                     (Identifier))
                   (Function_parameter_type
@@ -277,7 +277,7 @@ function run(list: Array_slice::<Int32>) -> ()
               (Expression_pipeline_name
                 (Identifier))
               (Expression_pipeline_input_parameters
-                (Function_parameter
+                (Expression_pipeline_parameter
                   (Function_parameter_name
                     (Identifier))
                   (Function_parameter_type
@@ -355,3 +355,198 @@ function run(enumerate: Int32) -> ()
                 (Expression_variable
                   (Variable_name
                     (Identifier)))))))))))
+
+=========================
+Range inputs
+=========================
+
+module Pipelines;
+
+function run(count: Uint32, values: Array_slice::<Uint32>) -> ()
+{
+    for row in living(0u32 to count)
+    {
+    }
+
+    var n = living(1u32 to count + 1u32, values).count();
+
+    for index in 0u32 to count
+    {
+    }
+}
+
+---
+
+(Module
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Type_name
+                  (Identifier)))))
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Array_slice_type
+                  (Type
+                    (Type_name
+                      (Identifier))))))))
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_for_each
+              (Expression_for_loop_variable
+                (Identifier))
+              (Expression_for_each_range
+                (Expression_for_loop_number_expression
+                  (Expression_call
+                    (Generic_expression
+                      (Expression_variable
+                        (Variable_name
+                          (Identifier))))
+                    (Expression_call_arguments
+                      (Generic_expression_or_instantiate
+                        (Expression_range
+                          (Generic_expression
+                            (Expression_constant
+                              (Number)))
+                          (Generic_expression
+                            (Expression_variable
+                              (Variable_name
+                                (Identifier))))))))))
+              (Expression_for_loop_statements)))
+          (Statement
+            (Expression_variable_declaration
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Generic_expression
+                (Expression_call
+                  (Generic_expression
+                    (Expression_access
+                      (Generic_expression
+                        (Expression_call
+                          (Generic_expression
+                            (Expression_variable
+                              (Variable_name
+                                (Identifier))))
+                          (Expression_call_arguments
+                            (Generic_expression_or_instantiate
+                              (Expression_range
+                                (Generic_expression
+                                  (Expression_constant
+                                    (Number)))
+                                (Generic_expression
+                                  (Expression_binary
+                                    (Generic_expression
+                                      (Expression_variable
+                                        (Variable_name
+                                          (Identifier))))
+                                    (Generic_expression
+                                      (Expression_constant
+                                        (Number)))))))
+                            (Generic_expression_or_instantiate
+                              (Generic_expression
+                                (Expression_variable
+                                  (Variable_name
+                                    (Identifier))))))))
+                      (Expression_access_member_name
+                        (Identifier))))
+                  (Expression_call_arguments)))))
+          (Statement
+            (Expression_for_loop
+              (Expression_for_loop_head
+                (Expression_for_loop_variable
+                  (Identifier))
+                (Expression_for_loop_range_begin
+                  (Expression_for_loop_number_expression
+                    (Expression_constant
+                      (Number))))
+                (Expression_for_loop_range_end
+                  (Expression_for_loop_number_expression
+                    (Expression_variable
+                      (Variable_name
+                        (Identifier))))))
+              (Expression_for_loop_statements))))))))
+
+=========================
+Mutable pipeline parameters
+=========================
+
+module Pipelines;
+
+function run() -> ()
+{
+    pipeline moving(body: mutable Body, weight: Float32)
+    {
+        filter body.speed > weight;
+    }
+}
+
+---
+
+(Module
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters)
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_pipeline
+              (Expression_pipeline_name
+                (Identifier))
+              (Expression_pipeline_input_parameters
+                (Expression_pipeline_parameter
+                  (Function_parameter_name
+                    (Identifier))
+                  (Expression_pipeline_parameter_mutability)
+                  (Function_parameter_type
+                    (Type
+                      (Type_name
+                        (Identifier)))))
+                (Expression_pipeline_parameter
+                  (Function_parameter_name
+                    (Identifier))
+                  (Function_parameter_type
+                    (Type
+                      (Type_name
+                        (Identifier))))))
+              (Expression_pipeline_stages
+                (Expression_pipeline_stage
+                  (Expression_pipeline_filter
+                    (Generic_expression
+                      (Expression_binary
+                        (Generic_expression
+                          (Expression_access
+                            (Generic_expression
+                              (Expression_variable
+                                (Variable_name
+                                  (Identifier))))
+                            (Expression_access_member_name
+                              (Identifier))))
+                        (Generic_expression
+                          (Expression_variable
+                            (Variable_name
+                              (Identifier))))))))))))))))

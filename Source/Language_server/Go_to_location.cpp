@@ -555,6 +555,7 @@ namespace iris::language_server
                 function->declaration->type.input_parameter_types,
                 function->declaration->input_parameter_source_positions
             );
+            iris::compiler::add_module_pipelines_to_scope(scope, core_module);
 
             visit_statements_using_scope_including_lambda_bodies(
                 declaration_database,

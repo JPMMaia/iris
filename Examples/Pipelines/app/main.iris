@@ -987,6 +987,376 @@ function test_an_element_read_in_place_sees_writes_made_before_the_read() -> ()
     check(sum == 200.0f32);
 }
 
+function next_count(value: Uint32) -> (result: Uint32)
+{
+    return value + 1u32;
+}
+
+@test
+function test_a_range_input_visits_begin_up_to_end() -> ()
+{
+    pipeline even(row: Uint32)
+    {
+        filter row % 2u32 == 0u32;
+    }
+
+    mutable sum = 0u32;
+    mutable visited = 0u32;
+    for row in even(0u32 to 7u32)
+    {
+        sum += row;
+        visited += 1u32;
+    }
+    check(sum == 12u32);
+    check(visited == 4u32);
+
+    check(even(3u32 to 9u32).count() == 3u64);
+    check(even(5u32 to 5u32).count() == 0u64);
+    check(even(9u32 to 3u32).count() == 0u64);
+    check(even(0u32 to next_count(4u32)).count() == 3u64);
+}
+
+@test
+function test_a_uint64_and_a_signed_range() -> ()
+{
+    pipeline every(index: Uint64)
+    {
+    }
+
+    mutable sum = 0u64;
+    for index in every(2u64 to 5u64)
+    {
+        sum += index;
+    }
+    check(sum == 9u64);
+
+    pipeline negative(value: Int32)
+    {
+        filter value < 0;
+    }
+
+    check(negative(-3 to 3).count() == 3u64);
+}
+
+@test
+function test_value_sinks_over_a_range() -> ()
+{
+    pipeline squares(row: Uint32)
+    {
+        map row * row => square;
+    }
+
+    check(squares(1u32 to 4u32).fold(0u32, lambda (total, square) => total + square) == 14u32);
+
+    pipeline is_large(row: Uint32)
+    {
+        map row > 10u32 => large;
+    }
+
+    check(is_large(0u32 to 12u32).any());
+    check(!is_large(0u32 to 11u32).any());
+
+    pipeline odd(row: Uint32)
+    {
+        filter row % 2u32 == 1u32;
+    }
+
+    var first_odd = odd(4u32 to 10u32).first();
+    check(first_odd.has_value);
+    check(first_odd.value == 5u32);
+
+    mutable storage: Constant_array::<Uint32, 8> = [0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32];
+    var buffer: Array_slice::<mutable Uint32> = storage;
+    var written = odd(0u32 to 8u32).into(buffer);
+    check(written.length == 4u64);
+    check(written[3] == 7u32);
+}
+
+@test
+function test_a_range_in_lockstep_with_a_slice_and_a_soa_view() -> ()
+{
+    var values: Constant_array::<Int32, 3> = [10, 20, 30];
+
+    pipeline weighted(row: Uint32, value: Int32)
+    {
+        map value * (row as Int32) => product;
+    }
+
+    mutable sum = 0;
+    for product in weighted(1u32 to 4u32, values)
+    {
+        sum += product;
+    }
+    check(sum == 140);
+
+    mutable particles: Soa_array::<Particle, 3> = [];
+    var view: Soa_array_view::<mutable Particle> = particles.view();
+    view[0] = { x: 1.0f32, y: 0.0f32, alive: true };
+    view[1] = { x: 2.0f32, y: 0.0f32, alive: false };
+    view[2] = { x: 4.0f32, y: 0.0f32, alive: true };
+
+    pipeline living_rows(row: Uint32, particle: Particle)
+    {
+        filter particle.alive;
+        map row => living_row;
+    }
+
+    mutable rows = 0u32;
+    for living_row in living_rows(0u32 to 3u32, view)
+    {
+        rows += living_row;
+    }
+    check(rows == 2u32);
+}
+
+@test
+function test_enumerate_take_while_and_separate_over_a_range() -> ()
+{
+    pipeline positions(row: Uint32)
+    {
+        enumerate => position;
+        map position => at;
+    }
+
+    mutable positions_sum = 0u64;
+    for at in positions(10u32 to 13u32)
+    {
+        positions_sum += at;
+    }
+    check(positions_sum == 3u64);
+
+    pipeline small(row: Uint32)
+    {
+        take_while row < 4u32;
+    }
+
+    check(small(1u32 to 10u32).count() == 3u64);
+
+    pipeline doubled_even(row: Uint32)
+    {
+        map row * 2u32 => doubled;
+        filter doubled % 4u32 == 0u32;
+    }
+
+    mutable storage: Constant_array::<Uint32, 6> = [0u32, 0u32, 0u32, 0u32, 0u32, 0u32];
+    var buffer: Array_slice::<mutable Uint32> = storage;
+    var written = doubled_even(0u32 to 6u32).separate().into(buffer);
+    check(written.length == 3u64);
+    check(written[2] == 8u32);
+}
+
+struct Mover
+{
+    position: Float32 = 0.0f32;
+    speed: Float32 = 0.0f32;
+}
+
+function position_of(mover: Mover) -> (result: Float32)
+{
+    return mover.position;
+}
+
+@test
+function test_writes_through_a_mutable_slice_element_persist() -> ()
+{
+    mutable movers: Constant_array::<Mover, 3> = zero_initialized {};
+    movers[0] = { position: 0.0f32, speed: 1.0f32 };
+    movers[1] = { position: 5.0f32, speed: 0.0f32 };
+    movers[2] = { position: 10.0f32, speed: 2.0f32 };
+    var slice: Array_slice::<mutable Mover> = movers;
+
+    pipeline moving(mover: mutable Mover)
+    {
+        filter mover.speed > 0.0f32;
+    }
+
+    mutable read_after_write = 0.0f32;
+    for mover in moving(slice)
+    {
+        mover.position += mover.speed;
+        read_after_write += position_of(mover);
+    }
+
+    check(movers[0].position == 1.0f32);
+    check(movers[1].position == 5.0f32);
+    check(movers[2].position == 12.0f32);
+    check(read_after_write == 13.0f32);
+
+    check(moving(slice).count() == 2u64);
+}
+
+@test
+function test_a_mutable_constant_array_variable_and_a_whole_element_write() -> ()
+{
+    mutable movers: Constant_array::<Mover, 2> = zero_initialized {};
+    movers[1] = { position: 3.0f32, speed: 1.0f32 };
+
+    pipeline every(mover: mutable Mover)
+    {
+    }
+
+    for mover in every(movers)
+    {
+        mover = { position: mover.position + 1.0f32, speed: mover.speed };
+    }
+
+    check(movers[0].position == 1.0f32);
+    check(movers[1].position == 4.0f32);
+}
+
+@test
+function test_a_copy_of_a_mutable_element_stays_a_copy() -> ()
+{
+    mutable movers: Constant_array::<Mover, 1> = zero_initialized {};
+    var slice: Array_slice::<mutable Mover> = movers;
+
+    pipeline every(mover: mutable Mover)
+    {
+    }
+
+    for snapshot in every(slice)
+    {
+        movers[0].position = 9.0f32;
+        check(snapshot.position == 0.0f32);
+    }
+    check(movers[0].position == 9.0f32);
+}
+
+@test
+function test_writes_through_a_mutable_soa_element_in_lockstep_with_a_range() -> ()
+{
+    mutable particles: Soa_array::<Particle, 4> = [];
+    var all: Soa_array_view::<mutable Particle> = particles.view();
+    all[0] = { x: 1.0f32, y: 0.0f32, alive: true };
+    all[1] = { x: 2.0f32, y: 0.0f32, alive: false };
+    all[2] = { x: 3.0f32, y: 0.0f32, alive: true };
+    all[3] = { x: 4.0f32, y: 0.0f32, alive: true };
+
+    var count = 3u32;
+    var live = all.view(0u64, count as Uint64);
+
+    pipeline living(row: Uint32, particle: mutable Particle)
+    {
+        filter particle.alive;
+        map row as Float32 => offset;
+    }
+
+    for offset in living(0u32 to count, live)
+    {
+        particle.y = particle.x * 10.0f32 + offset;
+    }
+
+    check(all->y[0] == 10.0f32);
+    check(all->y[1] == 0.0f32);
+    check(all->y[2] == 32.0f32);
+    check(all->y[3] == 0.0f32);
+}
+
+struct Candidate
+{
+    row: Uint32 = 0u32;
+    distance: Float32 = 0.0f32;
+}
+
+function distance_from_five(row: Uint32) -> (result: Float32)
+{
+    var difference = (row as Float32) - 5.0f32;
+    return difference * difference;
+}
+
+function candidate_at(row: Uint32) -> (result: Candidate)
+{
+    return { row: row, distance: distance_from_five(row) };
+}
+
+function negative_row(candidate: Candidate) -> (result: Int32)
+{
+    return -(candidate.row as Int32);
+}
+
+@test
+function test_min_by_keeps_the_nearest_candidate() -> ()
+{
+    var alive: Constant_array::<Bool, 8> = [true, true, false, true, false, true, false, true];
+
+    pipeline candidates(row: Uint32)
+    {
+        filter alive[row as Uint64];
+        map candidate_at(row) => candidate;
+        filter candidate.distance <= 9.0f32;
+    }
+
+    var nearest = candidates(0u32 to 8u32).min_by(lambda (candidate) => candidate.distance);
+    check(nearest.has_value);
+    check(nearest.value.row == 5u32);
+
+    var farthest = candidates(0u32 to 8u32).max_by(lambda (candidate) => candidate.distance);
+    check(farthest.has_value);
+    check(farthest.value.row == 3u32);
+
+    var none = candidates(6u32 to 6u32).min_by(lambda (candidate) => candidate.distance);
+    check(!none.has_value);
+}
+
+@test
+function test_min_by_keeps_the_first_of_equal_keys() -> ()
+{
+    pipeline rows(row: Uint32)
+    {
+        map candidate_at(row) => candidate;
+    }
+
+    var nearest = rows(3u32 to 8u32).min_by(lambda (candidate) => (candidate.distance as Int32) / 2);
+    check(nearest.value.row == 4u32);
+
+    var lowest_negative = rows(1u32 to 4u32).max_by(negative_row);
+    check(lowest_negative.value.row == 1u32);
+}
+
+@test
+function test_an_optional_of_a_struct_starts_empty_and_first_returns_one() -> ()
+{
+    mutable empty: Optional::<Candidate> = {};
+    check(!empty.has_value);
+
+    var rows: Constant_array::<Uint32, 2> = [4u32, 5u32];
+
+    pipeline candidates(row: Uint32)
+    {
+        map candidate_at(row) => candidate;
+    }
+
+    var first_candidate = candidates(rows).first();
+    check(first_candidate.has_value);
+    check(first_candidate.value.row == 4u32);
+}
+
+var g_minimum_weight: Int32 = 2;
+
+pipeline heavy(weight: Int32)
+{
+    filter weight >= g_minimum_weight;
+}
+
+function count_heavy(weights: Array_slice::<Int32>) -> (result: Uint64)
+{
+    return heavy(weights).count();
+}
+
+@test
+function test_a_module_level_pipeline_is_shared_by_functions() -> ()
+{
+    var weights: Constant_array::<Int32, 4> = [1, 2, 3, 4];
+    check(count_heavy(weights) == 3u64);
+
+    mutable sum = 0;
+    for weight in heavy(weights)
+    {
+        sum += weight;
+    }
+    check(sum == 9);
+}
+
 @unique_name("main")
 export function main() -> (result: Int32)
 {

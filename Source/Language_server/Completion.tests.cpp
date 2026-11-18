@@ -420,6 +420,43 @@ export function run(list: Array_slice::<Complex>, threshold: Float32) -> ()
         CHECK(find_completion_item(result, "imaginary"));
     }
 
+    TEST_CASE("Completes view on an Array_slice", "[Language_server][Completion]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+export function run(values: Array_slice::<Int32>) -> ()
+{
+    var middle = values.$CURSOR_POSITIONview(1u64, 2u64);
+}
+)";
+
+        lsp::TextDocument_CompletionResult const result = run_completion_test(source);
+        CHECK(find_completion_item(result, "length"));
+        CHECK(find_completion_item(result, "view"));
+    }
+
+    TEST_CASE("Completes view on a Soa_array_view", "[Language_server][Completion]")
+    {
+        std::string_view const source =
+            R"(module A;
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+}
+
+export function run(particles: Soa_array_view::<Particle>) -> ()
+{
+    var live = particles.$CURSOR_POSITIONview(0u64, 1u64);
+}
+)";
+
+        lsp::TextDocument_CompletionResult const result = run_completion_test(source);
+        CHECK(find_completion_item(result, "start_index"));
+        CHECK(find_completion_item(result, "view"));
+    }
+
     TEST_CASE("Completes pipeline names as values", "[Language_server][Completion][Pipeline]")
     {
         std::string_view const source =

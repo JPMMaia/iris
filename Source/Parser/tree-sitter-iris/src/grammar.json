@@ -139,6 +139,10 @@
             {
               "type": "SYMBOL",
               "name": "Function_constructor"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "Expression_pipeline"
             }
           ]
         }
@@ -1855,6 +1859,27 @@
         {
           "type": "SYMBOL",
           "name": "Generic_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Expression_range"
+        }
+      ]
+    },
+    "Expression_range": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "Generic_expression"
+        },
+        {
+          "type": "STRING",
+          "value": "to"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Generic_expression"
         }
       ]
     },
@@ -3396,7 +3421,7 @@
               "members": [
                 {
                   "type": "SYMBOL",
-                  "name": "Function_parameter"
+                  "name": "Expression_pipeline_parameter"
                 },
                 {
                   "type": "REPEAT",
@@ -3409,7 +3434,7 @@
                       },
                       {
                         "type": "SYMBOL",
-                        "name": "Function_parameter"
+                        "name": "Expression_pipeline_parameter"
                       }
                     ]
                   }
@@ -3426,6 +3451,39 @@
           "value": ")"
         }
       ]
+    },
+    "Expression_pipeline_parameter": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "Function_parameter_name"
+        },
+        {
+          "type": "STRING",
+          "value": ":"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "Expression_pipeline_parameter_mutability"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "Function_parameter_type"
+        }
+      ]
+    },
+    "Expression_pipeline_parameter_mutability": {
+      "type": "STRING",
+      "value": "mutable"
     },
     "Expression_pipeline_stages": {
       "type": "SEQ",

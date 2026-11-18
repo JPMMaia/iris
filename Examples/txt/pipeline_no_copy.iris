@@ -1,0 +1,85 @@
+module Pipeline_no_copy;
+
+// Unoptimized builds must not copy whole elements that the source never copies. Body is 128 bytes,
+// so any 128-byte memcpy in these functions is an element copy.
+
+struct Body
+{
+    alive: Bool = false;
+    mass: Float32 = 0.0f32;
+    history: Constant_array::<Float32, 30> = zero_initialized {};
+}
+
+export function count_alive(bodies: Array_slice::<Body>) -> (result: Uint64)
+{
+    pipeline alive(body: Body)
+    {
+        filter body.alive;
+    }
+
+    return alive(bodies).count();
+}
+
+export function sum_alive_mass(bodies: Array_slice::<Body>) -> (result: Float32)
+{
+    pipeline alive(body: Body)
+    {
+        filter body.alive;
+    }
+
+    mutable sum = 0.0f32;
+    for body in alive(bodies)
+    {
+        sum += body.mass + body.history[0u64];
+    }
+    return sum;
+}
+
+export function sum_constant_mass(bodies: Constant_array::<Body, 4>) -> (result: Float32)
+{
+    pipeline masses(body: Body)
+    {
+        map body.mass => mass;
+    }
+
+    return masses(bodies).fold(0.0f32, lambda (total, mass) => total + mass);
+}
+
+export function any_heavy(bodies: Fixed_capacity_array::<Body, 4>) -> (result: Bool)
+{
+    pipeline heavy(body: Body)
+    {
+        map body.mass > 10.0f32 => is_heavy;
+    }
+
+    return heavy(bodies).any();
+}
+
+export function add_mass(bodies: Array_slice::<mutable Body>) -> ()
+{
+    pipeline alive(body: mutable Body)
+    {
+        filter body.alive;
+    }
+
+    for body in alive(bodies)
+    {
+        body.mass += body.history[0u64];
+    }
+}
+
+function mass_of(body: Body) -> (result: Float32)
+{
+    return body.mass;
+}
+
+// Passes the whole element on, so it has to copy it: the control for the check above.
+export function sum_mass_through_a_call(bodies: Array_slice::<Body>) -> (result: Float32)
+{
+    pipeline masses(body: Body)
+    {
+        map mass_of(body) => mass;
+    }
+
+    return masses(bodies).fold(0.0f32, lambda (total, mass) => total + mass);
+}

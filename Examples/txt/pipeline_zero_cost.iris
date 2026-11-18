@@ -96,6 +96,34 @@ export function sum_of_moving_z(particles: Array_slice::<Particle>) -> (result: 
     return sum;
 }
 
+export function sum_of_even_rows(count: Uint32) -> (result: Uint32)
+{
+    pipeline even(row: Uint32)
+    {
+        filter row % 2u32 == 0u32;
+    }
+
+    mutable sum = 0u32;
+    for row in even(0u32 to count)
+    {
+        sum += row;
+    }
+    return sum;
+}
+
+export function advance(particles: Soa_array_view::<mutable Particle>) -> ()
+{
+    pipeline moving(particle: mutable Particle)
+    {
+        filter particle.y > 0.0f32;
+    }
+
+    for particle in moving(particles)
+    {
+        particle.x += particle.y;
+    }
+}
+
 function add_cube(total: Int32, value: Int32) -> (result: Int32)
 {
     return total + value * value * value;

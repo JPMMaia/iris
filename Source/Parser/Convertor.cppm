@@ -410,6 +410,15 @@ namespace iris::parser
 
     iris::Null_pointer_expression node_to_expression_null_pointer();
 
+    iris::Range_expression node_to_expression_range(
+        iris::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     iris::Parenthesis_expression node_to_expression_parenthesis(
         iris::Statement& statement,
         Module_info const& module_info,
