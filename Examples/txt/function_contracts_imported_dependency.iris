@@ -1,0 +1,18 @@
+module Function_contracts_imported_dependency;
+
+export using Count = Uint32;
+
+export function maximum_count() -> (count: Uint32)
+{
+    return 4u32;
+}
+
+export function minimum_result() -> (value: Uint32)
+{
+    return 1u32;
+}
+
+export function is_valid(value: Uint32) -> (result: Bool)
+{
+    return value != 0u32;
+}

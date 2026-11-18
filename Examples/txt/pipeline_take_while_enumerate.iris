@@ -1,0 +1,21 @@
+module Pipeline_take_while_enumerate;
+
+function use(index: Uint64, value: Int32) -> ()
+{
+}
+
+export function run(list: Array_slice::<Int32>) -> ()
+{
+    pipeline positive_prefix(value: Int32)
+    {
+        enumerate => index;
+        take_while value > 0;
+        filter index % 2u64 == 0u64;
+        map value * 2 => doubled;
+    }
+
+    for doubled in positive_prefix(list)
+    {
+        use(0u64, doubled);
+    }
+}

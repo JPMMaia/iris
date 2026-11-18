@@ -107,6 +107,66 @@ namespace iris::compiler
         CHECK(library_info.external_libraries.contains("windows-dynamic-debug"));
     }
 
+    TEST_CASE("Artifact parser parses dynamic library artifacts", "[Artifact]")
+    {
+        std::filesystem::path const temporary_directory = create_clean_temporary_directory("iris_artifact_tests_dynamic_library");
+        std::filesystem::path const artifact_path = temporary_directory / "iris_artifact.json";
+
+        std::ofstream file{ artifact_path };
+        file << R"({
+  "name": "my_plugin",
+  "version": "0.1.0",
+  "type": "dynamic_library",
+  "sources": [
+    {
+      "type": "iris",
+      "include": ["./**/*.iris"]
+    }
+  ],
+  "dynamic_library": {
+    "exports": ["plugin_create", "plugin_destroy"]
+  }
+})";
+        file.close();
+
+        Artifact const artifact = get_artifact(artifact_path);
+        CHECK(artifact.type == Artifact_type::Dynamic_library);
+        REQUIRE(artifact.info.has_value());
+        REQUIRE(std::holds_alternative<Dynamic_library_info>(*artifact.info));
+
+        Dynamic_library_info const& dynamic_library_info = std::get<Dynamic_library_info>(*artifact.info);
+        REQUIRE(dynamic_library_info.exports.size() == 2);
+        CHECK(dynamic_library_info.exports[0] == "plugin_create");
+        CHECK(dynamic_library_info.exports[1] == "plugin_destroy");
+    }
+
+    TEST_CASE("Artifact writer round-trips dynamic library exports", "[Artifact]")
+    {
+        std::filesystem::path const temporary_directory = create_clean_temporary_directory("iris_artifact_tests_dynamic_library_round_trip");
+        std::filesystem::path const artifact_path = temporary_directory / "iris_artifact.json";
+
+        Artifact const artifact
+        {
+            .file_path = artifact_path,
+            .name = "my_plugin",
+            .version = Version{.major = 0, .minor = 1, .patch = 0},
+            .type = Artifact_type::Dynamic_library,
+            .dependencies = {},
+            .sources = {},
+            .public_include_directories = {},
+            .info = Dynamic_library_info{.exports = {std::pmr::string{"plugin_create"}}},
+        };
+
+        write_artifact_to_file(artifact, artifact_path);
+
+        Artifact const parsed = get_artifact(artifact_path);
+        CHECK(parsed.type == Artifact_type::Dynamic_library);
+        REQUIRE(parsed.info.has_value());
+        REQUIRE(std::holds_alternative<Dynamic_library_info>(*parsed.info));
+        REQUIRE(std::get<Dynamic_library_info>(*parsed.info).exports.size() == 1);
+        CHECK(std::get<Dynamic_library_info>(*parsed.info).exports[0] == "plugin_create");
+    }
+
     TEST_CASE("Artifact parser still parses executable artifacts", "[Artifact]")
     {
         std::filesystem::path const temporary_directory = create_clean_temporary_directory("iris_artifact_tests_executable");
@@ -298,5 +358,141 @@ namespace iris::compiler
         std::string output_data{std::istreambuf_iterator<char>{output_file}, std::istreambuf_iterator<char>{}};
         CHECK(output_data.find("${") == std::string::npos);
         CHECK(output_data.find("C:/src/project/main.iris") != std::string::npos);
+    }
+
+    TEST_CASE("Artifact parser reads copy when and exclude, and the writer round-trips them", "[Artifact]")
+    {
+        std::filesystem::path const temporary_directory = create_clean_temporary_directory("iris_artifact_tests_copy_when_exclude");
+        std::filesystem::path const artifact_path = temporary_directory / "iris_artifact.json";
+
+        std::ofstream file{ artifact_path };
+        file << R"({
+  "name": "my_app",
+  "version": "0.1.0",
+  "type": "executable",
+  "copy": [
+    { "source": "a", "destination": "a" },
+    { "source": "b", "destination": "b", "when": "build" },
+    { "source": "c", "destination": "c", "when": "install", "exclude": ["**/cache/**", "*.tmp"] }
+  ],
+  "executable": { "source": "main.iris" }
+})";
+        file.close();
+
+        Artifact const artifact = get_artifact(artifact_path);
+        REQUIRE(artifact.copy_entries.size() == 3);
+        CHECK(artifact.copy_entries[0].when == Copy_when::Always);
+        CHECK(artifact.copy_entries[0].exclude.empty());
+        CHECK(artifact.copy_entries[1].when == Copy_when::Build);
+        CHECK(artifact.copy_entries[2].when == Copy_when::Install);
+        REQUIRE(artifact.copy_entries[2].exclude.size() == 2);
+        CHECK(artifact.copy_entries[2].exclude[0] == "**/cache/**");
+
+        std::filesystem::path const written_path = temporary_directory / "written.json";
+        write_artifact_to_file(artifact, written_path);
+        Artifact const read_back = get_artifact(written_path);
+        REQUIRE(read_back.copy_entries.size() == 3);
+        CHECK(read_back.copy_entries[1].when == Copy_when::Build);
+        CHECK(read_back.copy_entries[2].when == Copy_when::Install);
+        CHECK(read_back.copy_entries[2].exclude.size() == 2);
+    }
+
+    TEST_CASE("Copy exclude patterns match relative paths", "[Artifact]")
+    {
+        CHECK(matches_copy_pattern("*.tmp", "file.tmp"));
+        CHECK_FALSE(matches_copy_pattern("*.tmp", "folder/file.tmp"));
+        CHECK(matches_copy_pattern("**/*.tmp", "file.tmp"));
+        CHECK(matches_copy_pattern("**/*.tmp", "folder/deeper/file.tmp"));
+        CHECK(matches_copy_pattern("generated/**", "generated/terrain/world.usdc"));
+        CHECK_FALSE(matches_copy_pattern("generated/**", "usd/generated.usdc"));
+        CHECK(matches_copy_pattern("**/*.world/cache/**", "usd/terrain/a.world/cache/tile_0.bin"));
+        CHECK_FALSE(matches_copy_pattern("**/*.world/cache/**", "usd/terrain/a.world/tiles/tile_0.bin"));
+        CHECK(matches_copy_pattern("tile_?.bin", "tile_7.bin"));
+        CHECK_FALSE(matches_copy_pattern("tile_?.bin", "tile_17.bin"));
+    }
+
+    static std::filesystem::path write_installer_artifact(std::string_view const directory_name, std::string_view const installer_json)
+    {
+        std::filesystem::path const temporary_directory = create_clean_temporary_directory(directory_name);
+        std::filesystem::path const artifact_path = temporary_directory / "iris_artifact.json";
+
+        std::ofstream file{ artifact_path };
+        file << R"({
+  "name": "my_app",
+  "version": "1.2.3",
+  "type": "executable",
+  "executable": { "source": "main.iris" })";
+        if (!installer_json.empty())
+            file << ",\n  \"installer\": " << installer_json;
+        file << "\n}";
+        file.close();
+
+        return artifact_path;
+    }
+
+    TEST_CASE("Artifact parser reads the installer section and applies defaults", "[Artifact]")
+    {
+        std::filesystem::path const artifact_path = write_installer_artifact(
+            "iris_artifact_tests_installer_defaults",
+            R"({ "manufacturer": "Acme", "upgrade_code": "6b3c1e2a-9f4d-4c1b-8e7a-2d5f0a9b3c41" })"
+        );
+
+        Artifact const artifact = get_artifact(artifact_path);
+        REQUIRE(artifact.installer.has_value());
+        CHECK(artifact.installer->product_name == "my_app");
+        CHECK(artifact.installer->manufacturer == "Acme");
+        CHECK(artifact.installer->upgrade_code == "{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}");
+        CHECK_FALSE(artifact.installer->add_to_path);
+        CHECK(artifact.installer->start_menu_shortcut);
+    }
+
+    TEST_CASE("Artifact without an installer section has none", "[Artifact]")
+    {
+        std::filesystem::path const artifact_path = write_installer_artifact("iris_artifact_tests_installer_absent", "");
+        CHECK_FALSE(get_artifact(artifact_path).installer.has_value());
+    }
+
+    TEST_CASE("Artifact parser rejects an invalid installer section", "[Artifact]")
+    {
+        CHECK_THROWS(get_artifact(write_installer_artifact(
+            "iris_artifact_tests_installer_no_manufacturer",
+            R"({ "upgrade_code": "{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}" })"
+        )));
+        CHECK_THROWS(get_artifact(write_installer_artifact(
+            "iris_artifact_tests_installer_no_upgrade_code",
+            R"({ "manufacturer": "Acme" })"
+        )));
+        CHECK_THROWS(get_artifact(write_installer_artifact(
+            "iris_artifact_tests_installer_bad_guid",
+            R"({ "manufacturer": "Acme", "upgrade_code": "{6B3C1E2A-9F4D-4C1B-8E7A}" })"
+        )));
+    }
+
+    TEST_CASE("Artifact writer round-trips the installer section", "[Artifact]")
+    {
+        std::filesystem::path const artifact_path = write_installer_artifact(
+            "iris_artifact_tests_installer_round_trip",
+            R"({ "product_name": "My App", "manufacturer": "Acme", "upgrade_code": "{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}", "add_to_path": true, "start_menu_shortcut": false })"
+        );
+
+        Artifact const artifact = get_artifact(artifact_path);
+        std::filesystem::path const written_path = artifact_path.parent_path() / "written.json";
+        write_artifact_to_file(artifact, written_path);
+
+        Artifact const read_back = get_artifact(written_path);
+        REQUIRE(read_back.installer.has_value());
+        CHECK(read_back.installer->product_name == "My App");
+        CHECK(read_back.installer->manufacturer == "Acme");
+        CHECK(read_back.installer->upgrade_code == "{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}");
+        CHECK(read_back.installer->add_to_path);
+        CHECK_FALSE(read_back.installer->start_menu_shortcut);
+    }
+
+    TEST_CASE("normalize_guid accepts braced and bare GUIDs", "[Artifact]")
+    {
+        CHECK(normalize_guid("{6b3c1e2a-9f4d-4c1b-8e7a-2d5f0a9b3c41}") == std::pmr::string{"{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}"});
+        CHECK(normalize_guid("6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41") == std::pmr::string{"{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C41}"});
+        CHECK_FALSE(normalize_guid("6B3C1E2A9F4D4C1B8E7A2D5F0A9B3C41").has_value());
+        CHECK_FALSE(normalize_guid("{6B3C1E2A-9F4D-4C1B-8E7A-2D5F0A9B3C4G}").has_value());
     }
 }

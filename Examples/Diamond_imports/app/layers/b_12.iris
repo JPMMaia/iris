@@ -1,0 +1,14 @@
+module diamond_imports.b_12;
+
+import diamond_imports.a_11 as a_11;
+import diamond_imports.b_11 as b_11;
+
+export struct Value
+{
+    left: a_11.Value = {};
+}
+
+export function depth() -> (result: Int32)
+{
+    return b_11.depth() + 1i32;
+}

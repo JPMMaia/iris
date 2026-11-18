@@ -9,8 +9,9 @@ module Comment_module_declaration;
 ---
 
 (Module
+  (Comment)
+  (Comment)
   (Module_declaration
-    (Comment)
     (Module_name
       (Identifier_with_dots
         (Identifier)))))

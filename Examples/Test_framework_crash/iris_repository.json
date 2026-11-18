@@ -1,0 +1,9 @@
+{
+    "name": "Test_framework_crash",
+    "artifacts": [
+        {
+            "name": "crashrepro",
+            "location": "crashrepro/iris_artifact.json"
+        }
+    ]
+}

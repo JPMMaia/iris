@@ -1,0 +1,9 @@
+{
+    "name": "Aggregate_copies",
+    "artifacts": [
+        {
+            "name": "aggregate_copies",
+            "location": "app/iris_artifact.json"
+        }
+    ]
+}

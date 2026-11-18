@@ -76,6 +76,12 @@ namespace iris
         Format_options const& options
     );
 
+    void add_format_lambda_declaration(
+        String_buffer& buffer,
+        Lambda_declaration const& lambda_declaration,
+        Format_options const& options
+    );
+
     void add_format_struct_declaration(
         String_buffer& buffer,
         Struct_declaration const& struct_declaration,
@@ -263,6 +269,28 @@ namespace iris
         String_buffer& buffer,
         Statement const& statement,
         For_loop_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    );
+
+    void add_format_expression_for_each(
+        String_buffer& buffer,
+        Statement const& statement,
+        For_each_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    );
+
+    void add_format_expression_statement_block(
+        String_buffer& buffer,
+        Statement_block_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    );
+
+    void add_format_expression_pipeline(
+        String_buffer& buffer,
+        Pipeline_expression const& expression,
         std::uint32_t outside_indentation,
         Format_options const& options
     );

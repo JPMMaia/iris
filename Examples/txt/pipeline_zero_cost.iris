@@ -1,0 +1,151 @@
+module Pipeline_zero_cost;
+
+// Each function here has a hand-written twin with the same name in
+// pipeline_zero_cost_hand_written.iris. The optimized code of the two must be identical.
+
+struct Particle
+{
+    x: Float32 = 0.0f32;
+    y: Float32 = 0.0f32;
+    z: Float32 = 0.0f32;
+}
+
+export function sum_of_even_squares(values: Array_slice::<Int32>) -> (result: Int32)
+{
+    pipeline even_squares(value: Int32)
+    {
+        filter value % 2 == 0;
+        map value * value => squared;
+    }
+
+    mutable sum = 0;
+    for squared in even_squares(values)
+    {
+        sum += squared;
+    }
+    return sum;
+}
+
+export function weighted_sum(values: Array_slice::<Float32>, weights: Array_slice::<Float32>) -> (result: Float32)
+{
+    pipeline weighted(value: Float32, weight: Float32)
+    {
+        map value * weight => product;
+    }
+
+    return weighted(values, weights).fold(0.0f32, lambda (total, product) => total + product);
+}
+
+export function count_large(values: Array_slice::<Int32>, threshold: Int32) -> (result: Uint64)
+{
+    pipeline large(value: Int32)
+    {
+        filter value > threshold;
+    }
+
+    return large(values).count();
+}
+
+export function any_negative(values: Array_slice::<Int32>) -> (result: Bool)
+{
+    pipeline is_negative(value: Int32)
+    {
+        map value < 0 => negative;
+    }
+
+    return is_negative(values).any();
+}
+
+export function keep_positive(values: Array_slice::<mutable Int32>) -> (result: Array_slice::<mutable Int32>)
+{
+    pipeline positive(value: Int32)
+    {
+        filter value > 0;
+    }
+
+    return positive.in_place(values);
+}
+
+export function sum_of_x(particles: Soa_array_view::<Particle>) -> (result: Float32)
+{
+    pipeline moving(particle: Particle)
+    {
+        filter particle.y > 0.0f32;
+    }
+
+    mutable sum = 0.0f32;
+    for particle in moving(particles)
+    {
+        sum += particle.x;
+    }
+    return sum;
+}
+
+export function sum_of_moving_z(particles: Array_slice::<Particle>) -> (result: Float32)
+{
+    pipeline moving(particle: Particle)
+    {
+        filter particle.y > 0.0f32;
+    }
+
+    mutable sum = 0.0f32;
+    for particle in moving(particles)
+    {
+        sum += particle.z;
+    }
+    return sum;
+}
+
+export function sum_of_even_rows(count: Uint32) -> (result: Uint32)
+{
+    pipeline even(row: Uint32)
+    {
+        filter row % 2u32 == 0u32;
+    }
+
+    mutable sum = 0u32;
+    for row in even(0u32 to count)
+    {
+        sum += row;
+    }
+    return sum;
+}
+
+export function advance(particles: Soa_array_view::<mutable Particle>) -> ()
+{
+    pipeline moving(particle: mutable Particle)
+    {
+        filter particle.y > 0.0f32;
+    }
+
+    for particle in moving(particles)
+    {
+        particle.x += particle.y;
+    }
+}
+
+function add_cube(total: Int32, value: Int32) -> (result: Int32)
+{
+    return total + value * value * value;
+}
+
+export function sum_of_odd_cubes(values: Array_slice::<Int32>) -> (result: Int32)
+{
+    pipeline odd(value: Int32)
+    {
+        filter value % 2 != 0;
+    }
+
+    return odd(values).fold(0, add_cube);
+}
+
+export function odd_squares(values: Constant_array::<Int32, 8>) -> (result: Fixed_capacity_array::<Int32, 8>)
+{
+    pipeline odd_squares_of(value: Int32)
+    {
+        filter value % 2 == 1;
+        map value * value => squared;
+    }
+
+    return odd_squares_of(values).into_fixed();
+}

@@ -1,0 +1,39 @@
+{
+    "name": "my_host",
+    "version": "0.1.0",
+    "type": "executable",
+    "dependencies": [
+        {
+            "name": "C_standard_library"
+        }
+    ],
+    "sources": [
+        {
+            "type": "import_c_header",
+            "headers": [
+                {
+                    "name": "Dynamic_library_loader",
+                    "header": "dynamic_library_loader.h"
+                }
+            ]
+        },
+        {
+            "type": "c++",
+            "include": [
+                "./**/*.cpp"
+            ],
+            "additional_flags": [
+                "-std=c++23"
+            ]
+        },
+        {
+            "type": "iris",
+            "include": [
+                "./**/*.iris"
+            ]
+        }
+    ],
+    "executable": {
+        "source": "my_host.iris"
+    }
+}

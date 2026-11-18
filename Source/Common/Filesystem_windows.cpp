@@ -10,7 +10,7 @@ import iris.common;
 
 namespace iris::common
 {
-    std::filesystem::path get_executable_directory()
+    std::filesystem::path get_executable_path()
     {
         std::pmr::string buffer;
         buffer.resize(1024);
@@ -18,8 +18,12 @@ namespace iris::common
         // Explicitly the narrow variant: linking 7-Zip defines UNICODE for this target.
         int const bytes = GetModuleFileNameA(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
 
-        std::filesystem::path const executable_path = std::string_view{ buffer.data(), buffer.data() + bytes + 1 };
-        return executable_path.parent_path();
+        return std::filesystem::path{ std::string_view{ buffer.data(), static_cast<std::size_t>(bytes) } };
+    }
+
+    std::filesystem::path get_executable_directory()
+    {
+        return get_executable_path().parent_path();
     }
 
     static std::filesystem::path find_default_windows_kit_subdirectory_path(

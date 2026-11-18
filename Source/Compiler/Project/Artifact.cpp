@@ -105,6 +105,8 @@ namespace iris::compiler
             return Artifact_type::Executable;
         else if (string == "library")
             return Artifact_type::Library;
+        else if (string == "dynamic_library")
+            return Artifact_type::Dynamic_library;
 
         iris::common::print_message_and_exit(std::format("Failed to parse artifact type '{}'", string));
         return Artifact_type{};
@@ -278,8 +280,12 @@ namespace iris::compiler
                 .dependencies = parse_string_array_at(element, "dependencies"),
             };
 
-            if (json.contains("allow_errors"))
-                header.allow_errors = json.at("allow_errors").get<bool>();
+            // These read `element`, not `json`: `json` is the array of headers.
+            if (element.contains("allow_errors"))
+                header.allow_errors = element.at("allow_errors").get<bool>();
+
+            if (element.contains("wrap_pointers_as_optional"))
+                header.wrap_pointers_as_optional = element.at("wrap_pointers_as_optional").get<bool>();
 
             headers.push_back(std::move(header));
         }
@@ -304,6 +310,21 @@ namespace iris::compiler
         }
 
         return map;
+    }
+
+    Dynamic_library_info parse_dynamic_library_info(nlohmann::json const& json)
+    {
+        Dynamic_library_info dynamic_library_info;
+
+        if (json.contains("exports"))
+        {
+            for (nlohmann::json const& element : json.at("exports"))
+            {
+                dynamic_library_info.exports.push_back(element.get<std::pmr::string>());
+            }
+        }
+
+        return dynamic_library_info;
     }
 
     Library_info parse_library_info(nlohmann::json const& json, Environment_variables const& environment_variables)
@@ -335,6 +356,9 @@ namespace iris::compiler
 
             if (json.contains("remove_prefixes"))
                 data.remove_prefixes = parse_string_array(json.at("remove_prefixes"));
+
+            if (json.contains("wrap_pointers_as_optional"))
+                data.wrap_pointers_as_optional = json.at("wrap_pointers_as_optional").get<bool>();
 
             return data;
         }
@@ -395,7 +419,7 @@ namespace iris::compiler
         return groups;
     }
 
-    std::optional<std::variant<Executable_info, Library_info>> parse_info(nlohmann::json const& json, Environment_variables const& environment_variables)
+    std::optional<std::variant<Executable_info, Library_info, Dynamic_library_info>> parse_info(nlohmann::json const& json, Environment_variables const& environment_variables)
     {
         if (json.contains("executable"))
         {
@@ -405,10 +429,41 @@ namespace iris::compiler
         {
             return parse_library_info(json.at("library"), environment_variables);
         }
+        else if (json.contains("dynamic_library"))
+        {
+            return parse_dynamic_library_info(json.at("dynamic_library"));
+        }
         else
         {
             return std::nullopt;
         }
+    }
+
+    Copy_when parse_copy_when(std::string_view const when)
+    {
+        if (when == "always")
+            return Copy_when::Always;
+        if (when == "build")
+            return Copy_when::Build;
+        if (when == "install")
+            return Copy_when::Install;
+
+        iris::common::print_message_and_exit(std::format("Unknown copy 'when' value '{}'. Expected 'always', 'build' or 'install'.", when));
+        return Copy_when::Always;
+    }
+
+    std::string_view copy_when_to_string(Copy_when const when)
+    {
+        switch (when)
+        {
+        case Copy_when::Always:
+            return "always";
+        case Copy_when::Build:
+            return "build";
+        case Copy_when::Install:
+            return "install";
+        }
+        return "always";
     }
 
     std::pmr::vector<Copy_entry> parse_copy_entries(nlohmann::json const& json, Environment_variables const& environment_variables)
@@ -423,16 +478,130 @@ namespace iris::compiler
 
         for (nlohmann::json const& entry_json : copy_json)
         {
+            std::pmr::vector<std::pmr::string> exclude;
+            if (entry_json.contains("exclude"))
+            {
+                for (nlohmann::json const& pattern_json : entry_json.at("exclude"))
+                    exclude.push_back(pattern_json.get<std::string>().c_str());
+            }
+
             entries.push_back(
                 Copy_entry
                 {
                     .source = std::filesystem::path{substitute_variables(entry_json.at("source").get<std::string>(), environment_variables, "copy.source")},
                     .destination = std::filesystem::path{substitute_variables(entry_json.at("destination").get<std::string>(), environment_variables, "copy.destination")},
+                    .when = entry_json.contains("when") ? parse_copy_when(entry_json.at("when").get<std::string>()) : Copy_when::Always,
+                    .exclude = std::move(exclude),
                 }
             );
         }
 
         return entries;
+    }
+
+    std::optional<std::pmr::string> normalize_guid(std::string_view value)
+    {
+        if (value.size() == 38 && value.front() == '{' && value.back() == '}')
+            value = value.substr(1, 36);
+
+        if (value.size() != 36)
+            return std::nullopt;
+
+        std::pmr::string result{"{"};
+        for (std::size_t index = 0; index < value.size(); ++index)
+        {
+            char const character = value[index];
+            bool const is_dash_position = index == 8 || index == 13 || index == 18 || index == 23;
+            if (is_dash_position)
+            {
+                if (character != '-')
+                    return std::nullopt;
+            }
+            else if (!std::isxdigit(static_cast<unsigned char>(character)))
+            {
+                return std::nullopt;
+            }
+
+            result.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(character))));
+        }
+        result.push_back('}');
+        return result;
+    }
+
+    std::optional<Installer_info> parse_installer(nlohmann::json const& json, std::string_view const artifact_name, Environment_variables const& environment_variables)
+    {
+        if (!json.contains("installer"))
+            return std::nullopt;
+
+        nlohmann::json const& installer_json = json.at("installer");
+
+        if (!installer_json.contains("manufacturer"))
+            throw std::runtime_error(std::format("Artifact '{}': 'installer.manufacturer' is required.", artifact_name));
+        if (!installer_json.contains("upgrade_code"))
+            throw std::runtime_error(std::format("Artifact '{}': 'installer.upgrade_code' is required. Generate a GUID once and never change it.", artifact_name));
+
+        std::pmr::string const upgrade_code_string = substitute_variables(installer_json.at("upgrade_code").get<std::string>(), environment_variables, "installer.upgrade_code");
+        std::optional<std::pmr::string> upgrade_code = normalize_guid(upgrade_code_string);
+        if (!upgrade_code.has_value())
+            throw std::runtime_error(std::format("Artifact '{}': 'installer.upgrade_code' value '{}' is not a GUID.", artifact_name, upgrade_code_string));
+
+        return Installer_info
+        {
+            .product_name = installer_json.contains("product_name")
+                ? substitute_variables(installer_json.at("product_name").get<std::string>(), environment_variables, "installer.product_name")
+                : std::pmr::string{artifact_name},
+            .manufacturer = substitute_variables(installer_json.at("manufacturer").get<std::string>(), environment_variables, "installer.manufacturer"),
+            .upgrade_code = std::move(upgrade_code.value()),
+            .add_to_path = installer_json.value("add_to_path", false),
+            .start_menu_shortcut = installer_json.value("start_menu_shortcut", true),
+        };
+    }
+
+    bool matches_copy_pattern(std::string_view const pattern, std::string_view const relative_path)
+    {
+        if (pattern.empty())
+            return relative_path.empty();
+
+        if (pattern.starts_with("**"))
+        {
+            std::string_view const rest = pattern.substr(pattern.starts_with("**/") ? 3 : 2);
+            for (std::size_t start = 0; start <= relative_path.size(); ++start)
+            {
+                if (matches_copy_pattern(rest, relative_path.substr(start)))
+                    return true;
+            }
+            return false;
+        }
+
+        if (pattern.front() == '*')
+        {
+            for (std::size_t length = 0; length <= relative_path.size(); ++length)
+            {
+                if (matches_copy_pattern(pattern.substr(1), relative_path.substr(length)))
+                    return true;
+                if (length < relative_path.size() && relative_path[length] == '/')
+                    return false;
+            }
+            return false;
+        }
+
+        if (relative_path.empty())
+            return false;
+
+        bool const character_matches = pattern.front() == '?'
+            ? relative_path.front() != '/'
+            : pattern.front() == relative_path.front();
+
+        return character_matches && matches_copy_pattern(pattern.substr(1), relative_path.substr(1));
+    }
+
+    bool is_copy_excluded(Copy_entry const& entry, std::string_view const relative_path)
+    {
+        return std::any_of(
+            entry.exclude.begin(),
+            entry.exclude.end(),
+            [&](std::pmr::string const& pattern) -> bool { return matches_copy_pattern(pattern, relative_path); }
+        );
     }
 
     Artifact get_artifact(std::filesystem::path const& artifact_file_path)
@@ -466,9 +635,11 @@ namespace iris::compiler
             ? parse_path_array_with_substitution(json.at("public_include_directories"), environment_variables, "public_include_directories")
             : std::pmr::vector<std::filesystem::path>{};
 
-        std::optional<std::variant<Executable_info, Library_info>> info = parse_info(json, environment_variables);
+        std::optional<std::variant<Executable_info, Library_info, Dynamic_library_info>> info = parse_info(json, environment_variables);
 
         std::pmr::vector<Copy_entry> copy_entries = parse_copy_entries(json, environment_variables);
+
+        std::optional<Installer_info> installer = parse_installer(json, name, environment_variables);
 
         std::filesystem::path const root_directory = artifact_file_path.parent_path();
         for (Copy_entry& entry : copy_entries)
@@ -488,6 +659,7 @@ namespace iris::compiler
             .public_include_directories = std::move(public_include_directories),
             .info = std::move(info),
             .copy_entries = std::move(copy_entries),
+            .installer = std::move(installer),
         };
     }
 
@@ -515,6 +687,8 @@ namespace iris::compiler
             json["type"] = "executable";
         else if (artifact.type == Artifact_type::Library)
             json["type"] = "library";
+        else if (artifact.type == Artifact_type::Dynamic_library)
+            json["type"] = "dynamic_library";
         else
             iris::common::print_message_and_exit("Did not handle artifact.type!");
 
@@ -580,6 +754,9 @@ namespace iris::compiler
                                 if (c_header.allow_errors.has_value())
                                     c_header_json["allow_errors"] = c_header.allow_errors.value();
 
+                                if (c_header.wrap_pointers_as_optional.has_value())
+                                    c_header_json["wrap_pointers_as_optional"] = c_header.wrap_pointers_as_optional.value();
+
                                 if (!c_header.dependencies.empty())
                                     c_header_json["dependencies"] = c_header.dependencies;
 
@@ -597,6 +774,9 @@ namespace iris::compiler
 
                         if (!c_headers_group.remove_prefixes.empty())
                             group_json["remove_prefixes"] = c_headers_group.remove_prefixes;
+
+                        if (c_headers_group.wrap_pointers_as_optional.has_value())
+                            group_json["wrap_pointers_as_optional"] = c_headers_group.wrap_pointers_as_optional.value();
                     }
                 }
 
@@ -650,6 +830,18 @@ namespace iris::compiler
                 if (!library_json.empty())
                     json["library"] = std::move(library_json);
             }
+            else if (std::holds_alternative<Dynamic_library_info>(*artifact.info))
+            {
+                Dynamic_library_info const& dynamic_library_info = std::get<Dynamic_library_info>(*artifact.info);
+
+                nlohmann::json dynamic_library_json;
+
+                if (!dynamic_library_info.exports.empty())
+                    dynamic_library_json["exports"] = dynamic_library_info.exports;
+
+                if (!dynamic_library_json.empty())
+                    json["dynamic_library"] = std::move(dynamic_library_json);
+            }
         }
 
         if (!artifact.copy_entries.empty())
@@ -658,16 +850,42 @@ namespace iris::compiler
 
             for (Copy_entry const& entry : artifact.copy_entries)
             {
-                copy_json.push_back(
-                    nlohmann::json
-                    {
-                        { "source", entry.source.generic_string() },
-                        { "destination", entry.destination.generic_string() },
-                    }
-                );
+                nlohmann::json entry_json
+                {
+                    { "source", entry.source.generic_string() },
+                    { "destination", entry.destination.generic_string() },
+                };
+
+                if (entry.when != Copy_when::Always)
+                    entry_json["when"] = copy_when_to_string(entry.when);
+
+                if (!entry.exclude.empty())
+                    entry_json["exclude"] = entry.exclude;
+
+                copy_json.push_back(std::move(entry_json));
             }
 
             json["copy"] = std::move(copy_json);
+        }
+
+        if (artifact.installer.has_value())
+        {
+            Installer_info const& installer = artifact.installer.value();
+
+            nlohmann::json installer_json
+            {
+                { "manufacturer", installer.manufacturer },
+                { "upgrade_code", installer.upgrade_code },
+            };
+
+            if (installer.product_name != artifact.name)
+                installer_json["product_name"] = installer.product_name;
+            if (installer.add_to_path)
+                installer_json["add_to_path"] = true;
+            if (!installer.start_menu_shortcut)
+                installer_json["start_menu_shortcut"] = false;
+
+            json["installer"] = std::move(installer_json);
         }
 
         std::string const json_string = json.dump(4);

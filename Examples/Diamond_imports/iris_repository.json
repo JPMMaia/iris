@@ -1,0 +1,9 @@
+{
+    "name": "Diamond_imports",
+    "artifacts": [
+        {
+            "name": "diamond_imports",
+            "location": "app/iris_artifact.json"
+        }
+    ]
+}

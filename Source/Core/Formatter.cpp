@@ -162,6 +162,11 @@ namespace iris
             Global_variable_declaration const& value = *std::get<Global_variable_declaration const*>(declaration.data);
             return value.comment.has_value() ? std::optional<std::string_view>{value.comment.value()} : std::nullopt;
         }
+        else if (std::holds_alternative<Lambda_declaration const*>(declaration.data))
+        {
+            Lambda_declaration const& value = *std::get<Lambda_declaration const*>(declaration.data);
+            return value.comment.has_value() ? std::optional<std::string_view>{value.comment.value()} : std::nullopt;
+        }
         else if (std::holds_alternative<Struct_declaration const*>(declaration.data))
         {
             Struct_declaration const& value = *std::get<Struct_declaration const*>(declaration.data);
@@ -259,6 +264,10 @@ namespace iris
             {
                 add_format_global_variable_declaration(buffer, *value, options);
             }
+            else if constexpr (std::is_same_v<Declaration_type, Lambda_declaration const*>)
+            {
+                add_format_lambda_declaration(buffer, *value, options);
+            }
             else if constexpr (std::is_same_v<Declaration_type, Struct_declaration const*>)
             {
                 add_format_struct_declaration(buffer, *value, 0, options);
@@ -303,6 +312,13 @@ namespace iris
         Format_options const& options
     );
 
+    void add_format_expression_lambda(
+        String_buffer& buffer,
+        Lambda_expression const& expression,
+        std::uint32_t const indentation,
+        Format_options const& options
+    );
+
     static bool statement_ends_with_semicolon(
         iris::Statement const& statement,
         iris::Expression const& expression
@@ -318,8 +334,10 @@ namespace iris
             std::holds_alternative<iris::Block_expression>(expression.data) ||
             std::holds_alternative<iris::Comment_expression>(expression.data) ||
             std::holds_alternative<iris::Compile_time_expression>(expression.data) ||
+            std::holds_alternative<iris::For_each_expression>(expression.data) ||
             std::holds_alternative<iris::For_loop_expression>(expression.data) ||
             std::holds_alternative<iris::If_expression>(expression.data) ||
+            std::holds_alternative<iris::Pipeline_expression>(expression.data) ||
             std::holds_alternative<iris::Switch_expression>(expression.data) ||
             std::holds_alternative<iris::While_loop_expression>(expression.data);
         return !does_not_end_with_semicolon;
@@ -460,10 +478,25 @@ namespace iris
             Dereference_and_access_expression const& value = std::get<Dereference_and_access_expression>(expression.data);
             add_format_expression_dereference_and_access(buffer, statement, value, options);
         }
+        else if (std::holds_alternative<For_each_expression>(expression.data))
+        {
+            For_each_expression const& value = std::get<For_each_expression>(expression.data);
+            add_format_expression_for_each(buffer, statement, value, indentation, options);
+        }
         else if (std::holds_alternative<For_loop_expression>(expression.data))
         {
             For_loop_expression const& value = std::get<For_loop_expression>(expression.data);
             add_format_expression_for_loop(buffer, statement, value, indentation, options);
+        }
+        else if (std::holds_alternative<Pipeline_expression>(expression.data))
+        {
+            Pipeline_expression const& value = std::get<Pipeline_expression>(expression.data);
+            add_format_expression_pipeline(buffer, value, indentation, options);
+        }
+        else if (std::holds_alternative<Statement_block_expression>(expression.data))
+        {
+            Statement_block_expression const& value = std::get<Statement_block_expression>(expression.data);
+            add_format_expression_statement_block(buffer, value, indentation, options);
         }
         else if (std::holds_alternative<Function_expression>(expression.data))
         {
@@ -474,6 +507,11 @@ namespace iris
         {
             If_expression const& value = std::get<If_expression>(expression.data);
             add_format_expression_if(buffer, statement, value, indentation, options);
+        }
+        else if (std::holds_alternative<Lambda_expression>(expression.data))
+        {
+            Lambda_expression const& value = std::get<Lambda_expression>(expression.data);
+            add_format_expression_lambda(buffer, value, indentation, options);
         }
         else if (std::holds_alternative<Instance_call_expression>(expression.data))
         {
@@ -499,6 +537,13 @@ namespace iris
         {
             Parenthesis_expression const& value = std::get<Parenthesis_expression>(expression.data);
             add_format_expression_parenthesis(buffer, statement, value, options);
+        }
+        else if (std::holds_alternative<Range_expression>(expression.data))
+        {
+            Range_expression const& value = std::get<Range_expression>(expression.data);
+            add_format_expression(buffer, statement, get_expression(statement, value.begin), 0, options);
+            add_text(buffer, " to ");
+            add_format_expression(buffer, statement, get_expression(statement, value.end), 0, options);
         }
         else if (std::holds_alternative<Reflection_expression>(expression.data))
         {
@@ -818,6 +863,45 @@ namespace iris
     )
     {
         add_format_expression_block(buffer, expression.statements, outside_indentation, options);
+    }
+
+    void add_format_expression_lambda(
+        String_buffer& buffer,
+        Lambda_expression const& expression,
+        std::uint32_t const indentation,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "lambda(");
+
+        for (std::size_t i = 0; i < expression.parameter_names.size(); ++i)
+        {
+            if (i > 0)
+                add_text(buffer, ", ");
+
+            add_text(buffer, expression.parameter_names[i]);
+
+            // Inferred parameter types are not written back out.
+            if (i < expression.parameter_types.size() && expression.parameter_types[i].has_value())
+            {
+                add_text(buffer, ": ");
+                add_format_type_name(buffer, expression.parameter_types[i].value(), options);
+            }
+        }
+
+        add_text(buffer, ")");
+
+        // Both `-> Type` and `-> (name: Type)` parse into a single optional type;
+        // the bare form is the canonical one written back out.
+        if (expression.return_type.has_value())
+        {
+            add_text(buffer, " -> ");
+            add_format_type_name(buffer, expression.return_type.value(), options);
+        }
+
+        add_text(buffer, " => ");
+
+        add_format_statement(buffer, expression.body, indentation, options, false);
     }
 
     void add_format_expression_break(
@@ -1342,6 +1426,117 @@ namespace iris
         add_format_expression_block(buffer, expression.then_statements, outside_indentation, options);
     }
 
+    void add_format_expression_for_each(
+        String_buffer& buffer,
+        Statement const& statement,
+        For_each_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "for ");
+        add_text(buffer, expression.variable_name);
+        add_text(buffer, " in ");
+        add_format_expression(buffer, statement, get_expression(statement, expression.range_expression), 0, options);
+
+        add_new_line(buffer);
+        add_indentation(buffer, outside_indentation);
+
+        add_format_expression_block(buffer, expression.then_statements, outside_indentation, options);
+    }
+
+    // Internal node with no source syntax; printed as `${ ...; yield <result>; }` for compiler dumps.
+    void add_format_expression_statement_block(
+        String_buffer& buffer,
+        Statement_block_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "${");
+
+        for (Statement const& statement : expression.statements)
+        {
+            add_new_line(buffer);
+            add_indentation(buffer, outside_indentation + 4);
+            add_format_statement(buffer, statement, outside_indentation + 4, options);
+        }
+
+        add_new_line(buffer);
+        add_indentation(buffer, outside_indentation + 4);
+        add_text(buffer, "yield ");
+        add_format_statement(buffer, expression.result, outside_indentation + 4, options, false);
+        add_text(buffer, ";");
+
+        add_new_line(buffer);
+        add_indentation(buffer, outside_indentation);
+        add_text(buffer, "}");
+    }
+
+    void add_format_expression_pipeline(
+        String_buffer& buffer,
+        Pipeline_expression const& expression,
+        std::uint32_t outside_indentation,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "pipeline ");
+        add_text(buffer, expression.name);
+        add_text(buffer, "(");
+        for (std::size_t index = 0; index < expression.input_parameter_names.size() && index < expression.input_parameter_types.size(); ++index)
+        {
+            if (index > 0)
+                add_text(buffer, ", ");
+
+            add_text(buffer, expression.input_parameter_names[index]);
+            add_text(buffer, ": ");
+            if (index < expression.input_parameter_is_mutable.size() && expression.input_parameter_is_mutable[index])
+                add_text(buffer, "mutable ");
+            add_format_type_name(buffer, expression.input_parameter_types[index], options);
+        }
+        add_text(buffer, ")");
+
+        add_new_line(buffer);
+        add_indentation(buffer, outside_indentation);
+        add_text(buffer, "{");
+
+        for (Pipeline_stage const& stage : expression.stages)
+        {
+            add_new_line(buffer);
+            add_indentation(buffer, outside_indentation + 4);
+
+            switch (stage.kind)
+            {
+            case Pipeline_stage_kind::Map:
+                add_text(buffer, "map ");
+                add_format_statement(buffer, stage.expression, outside_indentation + 4, options, false);
+                add_text(buffer, " => ");
+                if (stage.binding_name.has_value())
+                    add_text(buffer, stage.binding_name.value());
+                break;
+            case Pipeline_stage_kind::Filter:
+                add_text(buffer, "filter ");
+                add_format_statement(buffer, stage.expression, outside_indentation + 4, options, false);
+                break;
+            case Pipeline_stage_kind::Take_while:
+                add_text(buffer, "take_while ");
+                add_format_statement(buffer, stage.expression, outside_indentation + 4, options, false);
+                break;
+            case Pipeline_stage_kind::Enumerate:
+                add_text(buffer, "enumerate => ");
+                if (stage.binding_name.has_value())
+                    add_text(buffer, stage.binding_name.value());
+                break;
+            }
+
+            add_text(buffer, ";");
+        }
+
+        add_new_line(buffer);
+        add_indentation(buffer, outside_indentation);
+        add_text(buffer, "}");
+    }
+
     void add_format_expression_function(
         String_buffer& buffer,
         Function_expression const& expression,
@@ -1713,6 +1908,31 @@ namespace iris
         String_buffer& buffer,
         Type_reference const& type,
         Format_options const& options
+    );
+
+    void add_format_lambda_parameter_types(
+        String_buffer& buffer,
+        std::span<iris::Type_reference const> const parameter_types,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "(");
+
+        for (std::size_t i = 0; i < parameter_types.size(); ++i)
+        {
+            if (i > 0)
+                add_text(buffer, ", ");
+
+            add_format_type_name(buffer, parameter_types[i], options);
+        }
+
+        add_text(buffer, ")");
+    }
+
+    void add_format_type_name(
+        String_buffer& buffer,
+        Type_reference const& type,
+        Format_options const& options
     )
     {
         if (std::holds_alternative<Array_slice_type>(type.data))
@@ -1738,6 +1958,22 @@ namespace iris
             add_format_type_name(buffer, value.value_type, options);
             add_text(buffer, ", ");
             add_integer_text(buffer, value.size);
+            add_text(buffer, ">");
+        }
+        else if (std::holds_alternative<Fixed_capacity_array_type>(type.data))
+        {
+            Fixed_capacity_array_type const& value = std::get<Fixed_capacity_array_type>(type.data);
+            add_text(buffer, "Fixed_capacity_array::<");
+            add_format_type_name(buffer, value.value_type, options);
+            add_text(buffer, ", ");
+            add_integer_text(buffer, value.capacity);
+            add_text(buffer, ">");
+        }
+        else if (std::holds_alternative<Optional_type>(type.data))
+        {
+            Optional_type const& value = std::get<Optional_type>(type.data);
+            add_text(buffer, "Optional::<");
+            add_format_type_name(buffer, value.value_type, options);
             add_text(buffer, ">");
         }
         else if (std::holds_alternative<Custom_type_reference>(type.data))
@@ -1795,6 +2031,15 @@ namespace iris
         {
             Integer_type const& value = std::get<Integer_type>(type.data);
             add_format_integer_type(buffer, value);
+        }
+        else if (std::holds_alternative<Lambda_type>(type.data))
+        {
+            Lambda_type const& value = std::get<Lambda_type>(type.data);
+            add_text(buffer, "lambda<");
+            add_format_lambda_parameter_types(buffer, value.input_parameter_types, options);
+            add_text(buffer, " -> ");
+            add_format_lambda_parameter_types(buffer, value.output_parameter_types, options);
+            add_text(buffer, ">");
         }
         else if (std::holds_alternative<Null_pointer_type>(type.data))
         {
@@ -2329,6 +2574,60 @@ namespace iris
         add_text(buffer, "}");
     }
 
+    void add_format_lambda_parameters(
+        String_buffer& buffer,
+        std::span<std::pmr::string const> const parameter_names,
+        std::span<iris::Type_reference const> const parameter_types,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "(");
+
+        for (std::size_t i = 0; i < parameter_types.size(); ++i)
+        {
+            if (i > 0)
+                add_text(buffer, ", ");
+
+            if (i < parameter_names.size())
+            {
+                add_text(buffer, parameter_names[i]);
+                add_text(buffer, ": ");
+            }
+
+            add_format_type_name(buffer, parameter_types[i], options);
+        }
+
+        add_text(buffer, ")");
+    }
+
+    void add_format_lambda_declaration(
+        String_buffer& buffer,
+        Lambda_declaration const& lambda_declaration,
+        Format_options const& options
+    )
+    {
+        add_text(buffer, "lambda ");
+        add_text(buffer, lambda_declaration.name);
+
+        add_format_lambda_parameters(
+            buffer,
+            lambda_declaration.input_parameter_names,
+            lambda_declaration.input_parameter_types,
+            options
+        );
+
+        add_text(buffer, " -> ");
+
+        add_format_lambda_parameters(
+            buffer,
+            lambda_declaration.output_parameter_names,
+            lambda_declaration.output_parameter_types,
+            options
+        );
+
+        add_text(buffer, ";");
+    }
+
     void add_format_alias_type_declaration(
         String_buffer& buffer,
         Alias_type_declaration const& alias_declaration,
@@ -2406,6 +2705,9 @@ namespace iris
             process(declaration);
 
         for (Global_variable_declaration const& declaration : declarations.global_variable_declarations)
+            process(declaration);
+
+        for (Lambda_declaration const& declaration : declarations.lambda_declarations)
             process(declaration);
 
         for (Struct_declaration const& declaration : declarations.struct_declarations)

@@ -1,0 +1,48 @@
+{
+    "name": "my_app",
+    "version": "0.1.0",
+    "type": "executable",
+    "dependencies": [
+        {
+            "name": "my_library"
+        }
+    ],
+    "sources": [
+        {
+            "type": "iris",
+            "include": [
+                "./**/*.iris"
+            ]
+        }
+    ],
+    "copy": [
+        {
+            "source": "build_manifest.txt",
+            "destination": "manifest.txt",
+            "when": "build"
+        },
+        {
+            "source": "install_manifest.txt",
+            "destination": "manifest.txt",
+            "when": "install"
+        },
+        {
+            "source": "content",
+            "destination": "data",
+            "when": "install",
+            "exclude": [
+                "**/*.world/cache/**",
+                "*.tmp"
+            ]
+        }
+    ],
+    "executable": {
+        "source": "my_app.iris"
+    },
+    "installer": {
+        "product_name": "My App",
+        "manufacturer": "Iris Examples",
+        "upgrade_code": "{3F9A2C71-5D8E-4B06-A1C4-7E2B9D0F6A53}",
+        "add_to_path": true
+    }
+}

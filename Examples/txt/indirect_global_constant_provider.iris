@@ -1,0 +1,7 @@
+module Indirect_global_constant_provider;
+
+export var meters_per_foot = 0.3048f32;
+
+export var seconds_per_round = 6.0f32;
+
+export var speed_30_meters_per_second = 30.0f32 * meters_per_foot / seconds_per_round;

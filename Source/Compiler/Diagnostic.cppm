@@ -3,6 +3,7 @@ export module iris.compiler.diagnostic;
 import std;
 
 import iris.core;
+import iris.parser.parse_tree;
 
 namespace iris::compiler
 {
@@ -57,6 +58,80 @@ namespace iris::compiler
     };
 
     
+
+    export struct Compile_error : std::runtime_error
+    {
+        Compile_error(
+            std::string_view message,
+            std::optional<Source_position> source_position,
+            std::source_location throw_site = std::source_location::current()
+        );
+
+        std::optional<Source_position> source_position;
+        std::source_location throw_site;
+        std::optional<std::filesystem::path> file_path;
+    };
+
+    export struct Compilation_scope
+    {
+        Compilation_scope(std::string_view kind, std::string_view name);
+        Compilation_scope(Compilation_scope const&) = delete;
+        Compilation_scope& operator=(Compilation_scope const&) = delete;
+        ~Compilation_scope();
+    };
+
+    export std::pmr::string format_compilation_context(
+        std::pmr::polymorphic_allocator<> const& output_allocator
+    );
+
+    export struct Compilation_breadcrumb
+    {
+        std::string kind;
+        std::string name;
+    };
+
+    // Number of breadcrumbs on this thread, so that a task can later take only the ones it pushed.
+    export std::size_t get_compilation_breadcrumb_count();
+
+    // Removes and returns this thread's breadcrumbs past `start_count`, and unfreezes the trail.
+    // Called after catching an exception on a worker thread, whose trail would otherwise never
+    // reach the thread that reports the error.
+    export std::vector<Compilation_breadcrumb> take_compilation_breadcrumbs(
+        std::size_t const start_count
+    );
+
+    // Appends breadcrumbs taken on another thread and freezes the trail, as if the exception about
+    // to be rethrown had unwound through those scopes on this thread.
+    export void restore_compilation_breadcrumbs(
+        std::span<Compilation_breadcrumb const> const breadcrumbs
+    );
+
+    export Diagnostic create_error_diagnostic(
+        std::optional<std::filesystem::path> const source_file_path,
+        std::optional<Source_range> const range,
+        std::string_view const message
+    );
+
+    export Diagnostic create_error_diagnostic_with_code(
+        std::optional<std::filesystem::path> const source_file_path,
+        std::optional<Source_range> const range,
+        std::string_view const message,
+        Diagnostic_code const code,
+        Diagnostic_data data
+    );
+
+    export Diagnostic create_warning_diagnostic(
+        std::optional<std::filesystem::path> const source_file_path,
+        std::optional<Source_range> const range,
+        std::string_view const message
+    );
+
+    export std::pmr::vector<Diagnostic> create_parser_diagnostics(
+        std::filesystem::path const& source_file_path,
+        iris::parser::Parse_tree const& parse_tree,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
 
     export std::pmr::string diagnostic_to_string(
         Diagnostic const& diagnostic,

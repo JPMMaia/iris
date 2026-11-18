@@ -1,0 +1,33 @@
+module Decimal_overflow_checks;
+
+export function checked_multiply(x: Decimal4, y: Decimal4) -> (result: Decimal4)
+{
+    return x * y;
+}
+
+export function checked_divide(x: Decimal7, y: Decimal7) -> (result: Decimal7)
+{
+    return x / y;
+}
+
+export function checked_decimal_narrowing_cast(x: Decimal7) -> (result: Decimal4)
+{
+    return x as Decimal4;
+}
+
+export function checked_decimal_widening_cast(x: Decimal4) -> (result: Decimal7)
+{
+    return x as Decimal7;
+}
+
+export function checked_integer_cast(x: Decimal7) -> (result: Int32)
+{
+    return x as Int32;
+}
+
+// The intermediate is already 64 bits wide here, so narrowing to Int64 cannot lose anything and
+// no check is emitted.
+export function unchecked_integer_cast(x: Decimal4) -> (result: Int64)
+{
+    return x as Int64;
+}

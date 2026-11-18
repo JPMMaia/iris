@@ -1,0 +1,166 @@
+module decimal_app;
+
+import c.stdlib as c_stdlib;
+
+// Every row of the behaviour matrix in Plans/bug_decimal64_arithmetic_needs_divti3.md.
+// Rows B, C and D emit 'sdiv i128', which lowers to a call to compiler-rt's __divti3.
+// These tests must LINK and RUN, not merely compile: the bug they guard against was invisible
+// to the IR-text assertions in Compiler.tests.cpp, which never link.
+//
+// IMPORTANT: every operand is laundered through opaque_int32 below. iris hands bitcode to lld,
+// so the link is an LTO link: with literal arguments the optimizer inlines these helpers and
+// constant-folds the 128-bit divides away entirely, the __divti3 reference disappears, and the
+// test silently stops guarding anything. atoi comes from the CRT as a native object rather than
+// bitcode and LLVM has no constant folder for it, so the divides survive to codegen.
+
+function opaque_int32(text: *C_char) -> (result: Int32)
+{
+    return c_stdlib.atoi(text) as Int32;
+}
+
+export function d7_add(a: Decimal7, b: Decimal7) -> (result: Decimal7)
+{
+    return a + b;
+}
+
+export function d7_subtract(a: Decimal7, b: Decimal7) -> (result: Decimal7)
+{
+    return a - b;
+}
+
+export function d7_multiply(a: Decimal7, b: Decimal7) -> (result: Decimal7)
+{
+    return a * b;
+}
+
+export function d7_divide(a: Decimal7, b: Decimal7) -> (result: Decimal7)
+{
+    return a / b;
+}
+
+export function d7_to_int32(a: Decimal7) -> (result: Int32)
+{
+    return a as Int32;
+}
+
+export function d7_to_int64(a: Decimal7) -> (result: Int64)
+{
+    return a as Int64;
+}
+
+export function d7_to_d4(a: Decimal7) -> (result: Decimal4)
+{
+    return a as Decimal4;
+}
+
+export function d4_to_d7(a: Decimal4) -> (result: Decimal7)
+{
+    return a as Decimal7;
+}
+
+export function d4_multiply(a: Decimal4, b: Decimal4) -> (result: Decimal4)
+{
+    return a * b;
+}
+
+export function d4_divide(a: Decimal4, b: Decimal4) -> (result: Decimal4)
+{
+    return a / b;
+}
+
+export function d4_to_int32(a: Decimal4) -> (result: Int32)
+{
+    return a as Int32;
+}
+
+// Row A: Int64-backed add/subtract. Never widened, always worked.
+@test
+function test_decimal_64_add_subtract() -> ()
+{
+    var five: Decimal7 = opaque_int32("5"c) as Decimal7;
+    var two: Decimal7 = opaque_int32("2"c) as Decimal7;
+
+    check(d7_add(five, two) == 7.0000000d7);
+    check(d7_subtract(five, two) == 3.0000000d7);
+}
+
+// Row B: Int64-backed multiply. Emits 'mul i128' then 'sdiv i128, 10000000'.
+@test
+function test_decimal_64_multiply() -> ()
+{
+    var five: Decimal7 = opaque_int32("5"c) as Decimal7;
+    var four: Decimal7 = opaque_int32("4"c) as Decimal7;
+    var negative_four: Decimal7 = opaque_int32("-4"c) as Decimal7;
+
+    check(d7_multiply(five, four) == 20.0000000d7);
+    check(d7_multiply(five, negative_four) == -20.0000000d7);
+}
+
+// Row C: Int64-backed divide. The only site with a genuinely variable 128-bit divisor.
+@test
+function test_decimal_64_divide() -> ()
+{
+    var ten: Decimal7 = opaque_int32("10"c) as Decimal7;
+    var four: Decimal7 = opaque_int32("4"c) as Decimal7;
+    var negative_four: Decimal7 = opaque_int32("-4"c) as Decimal7;
+
+    check(d7_divide(ten, four) == 2.5000000d7);
+    check(d7_divide(ten, negative_four) == -2.5000000d7);
+}
+
+// Row D: narrowing cast with no arithmetic operator in the source. Rounds half away from zero,
+// then divides by 10^7 in 128 bits.
+@test
+function test_decimal_64_cast_to_integer() -> ()
+{
+    var ten: Decimal7 = opaque_int32("10"c) as Decimal7;
+    var four: Decimal7 = opaque_int32("4"c) as Decimal7;
+    var negative_four: Decimal7 = opaque_int32("-4"c) as Decimal7;
+
+    // 10 / 4 == 2.5, which rounds away from zero to 3 / -3.
+    check(d7_to_int32(d7_divide(ten, four)) == 3);
+    check(d7_to_int32(d7_divide(ten, negative_four)) == -3);
+    check(d7_to_int64(d7_divide(ten, four)) == 3i64);
+}
+
+// Scale change across the 32/64-bit backing boundary: also a 128-bit divide when narrowing.
+@test
+function test_decimal_64_cast_between_scales() -> ()
+{
+    var ten: Decimal7 = opaque_int32("10"c) as Decimal7;
+    var four: Decimal7 = opaque_int32("4"c) as Decimal7;
+
+    check(d7_to_d4(d7_divide(ten, four)) == 2.5000d4);
+    check(d4_to_d7(2.5000d4) == 2.5000000d7);
+}
+
+// Rows E and F: the Int32-backed controls. These widen only to i64 and were always fine; they
+// are here so a regression in the shared code path is attributable to the right half.
+@test
+function test_decimal_32_arithmetic_and_casts() -> ()
+{
+    var five: Decimal4 = opaque_int32("5"c) as Decimal4;
+    var four: Decimal4 = opaque_int32("4"c) as Decimal4;
+
+    check(d4_multiply(five, four) == 20.0000d4);
+    check(d4_divide(five, four) == 1.2500d4);
+    check(d4_to_int32(d4_divide(five, four)) == 1);
+}
+
+// The expression from the bug report that sent the reporter to Decimal7 in the first place:
+// the result 4500 does not fit Decimal6's Int32 backing, but Decimal7 holds it.
+@test
+function test_decimal_64_holds_out_of_decimal6_range_result() -> ()
+{
+    var ninety: Decimal7 = opaque_int32("90"c) as Decimal7;
+    var fiftieth: Decimal7 = d7_divide(opaque_int32("1"c) as Decimal7, opaque_int32("50"c) as Decimal7);
+
+    check(fiftieth == 0.0200000d7);
+    check(d7_divide(ninety, fiftieth) == 4500.0000000d7);
+}
+
+@unique_name("main")
+export function main() -> (result: Int32)
+{
+    return 0;
+}

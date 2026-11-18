@@ -1,0 +1,6 @@
+module my_library;
+
+export function hello_from_library() -> (result: Int32)
+{
+    return 0;
+}

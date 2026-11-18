@@ -1,0 +1,28 @@
+module Instantiate_in_place;
+
+struct Inner
+{
+    values: Constant_array::<Int32, 4> = zero_initialized {};
+    count: Int32 = 1;
+}
+
+struct Outer
+{
+    inner: Inner = {};
+    flag: Int32 = 2;
+}
+
+export function reset(target: *mutable Outer) -> ()
+{
+    *target = {};
+}
+
+export function clear(target: *mutable Outer) -> ()
+{
+    *target = zero_initialized {};
+}
+
+export function create() -> ()
+{
+    var outer: Outer = { flag: 3 };
+}

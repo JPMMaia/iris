@@ -1,0 +1,16 @@
+module c_interoperability_opaque_pointer_type_argument;
+
+import my_module as m;
+
+function_constructor size_of_type(T: Type)
+{
+    return function() -> (size: Uint64)
+    {
+        return @size_of::<T>();
+    };
+}
+
+function run() -> (size: Uint64)
+{
+    return size_of_type::<*mutable m.Opaque_thing>();
+}

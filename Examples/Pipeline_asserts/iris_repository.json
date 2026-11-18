@@ -1,0 +1,9 @@
+{
+    "name": "Pipeline_asserts",
+    "artifacts": [
+        {
+            "name": "pipeline_asserts",
+            "location": "app/iris_artifact.json"
+        }
+    ]
+}

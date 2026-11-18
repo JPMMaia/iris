@@ -18,16 +18,17 @@ import C.stdlib as stdlib;
     (Module_name
       (Identifier_with_dots
         (Identifier))))
+  (Comment)
   (Import
-    (Comment)
     (Import_name
       (Identifier_with_dots
         (Identifier)
         (Identifier)))
     (Import_alias
       (Identifier)))
+  (Comment)
+  (Comment)
   (Import
-    (Comment)
     (Import_name
       (Identifier_with_dots
         (Identifier)
@@ -54,16 +55,16 @@ using My_alias = Int32;
     (Module_name
       (Identifier_with_dots
         (Identifier))))
+  (Comment)
   (Import
-    (Comment)
     (Import_name
       (Identifier_with_dots
         (Identifier)
         (Identifier)))
     (Import_alias
       (Identifier)))
+  (Comment)
   (Declaration
-    (Comment)
     (Alias
       (Alias_name
         (Identifier))

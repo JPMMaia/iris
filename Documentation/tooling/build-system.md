@@ -13,6 +13,7 @@ You can also define optional local defaults in `iris_presets.json` to reduce rep
 ```powershell
 iris build [artifact_name] --build-directory build [--repository /path/to/repository --repository ...]
 iris list --build-directory build
+iris install <artifact_name>... --prefix dist/my_app [--archive dist/my_app.zip] [--msi dist/my_app.msi] [--clean] [--debug]
 ```
 
 `artifact_name` is optional. If omitted, Iris discovers all `iris_artifact.json` files recursively from the current directory while skipping `build` and hidden subdirectories.
@@ -23,6 +24,7 @@ Supported commands that read presets are:
 - `iris build`
 - `iris build-tests`
 - `iris test`
+- `iris install`
 - `iris generate-compile-commands`
 - `iris download-dependencies`
 - `iris build-dependencies`
@@ -182,10 +184,137 @@ See [Dependencies](./dependencies.md) for the full reference.
 |---|---|---|---|
 | `name` | string | ✓ | Unique name within the repository |
 | `version` | string | ✓ | Semantic version (`"major.minor.patch"`) |
-| `type` | string | ✓ | `"executable"` or `"library"` |
+| `type` | string | ✓ | `"executable"`, `"library"` or `"dynamic_library"` |
 | `dependencies` | array | — | Artifacts this one depends on (by name) |
 | `sources` | array | ✓ | One or more source groups |
 | `executable` | object | When `type == "executable"` | Entry-point configuration |
+| `dynamic_library` | object | When `type == "dynamic_library"` | Exported symbol names |
+| `copy` | array | — | Files and folders copied into the build directory and installs |
+| `installer` | object | — | Windows Installer package metadata for `iris install --msi` |
+
+### Artifact Types
+
+| `type` value | Output | Notes |
+|---|---|---|
+| `"executable"` | `bin/<name>.exe` | Needs an `executable` block naming the entry point |
+| `"library"` | `lib/<name>.lib` (`.a`) | Statically linked into whatever depends on it |
+| `"dynamic_library"` | `bin/<name>.dll` (`.so`) | Loaded at runtime, not linked against |
+
+### Dynamic Libraries
+
+A `dynamic_library` artifact is built to be loaded at run time. Name every symbol callers resolve
+in the `exports` list — nothing else is exported:
+
+```json
+{
+    "name": "my_plugin",
+    "version": "0.1.0",
+    "type": "dynamic_library",
+    "sources": [
+        { "type": "iris", "include": ["./**/*.iris"] }
+    ],
+    "dynamic_library": {
+        "exports": ["my_plugin_answer"]
+    }
+}
+```
+
+An export must be the symbol's linkage name, which for an Iris function is what `@unique_name`
+gives it:
+
+```iris
+@unique_name("my_plugin_answer")
+export function answer() -> (value: Int32)
+{
+    return 42;
+}
+```
+
+Loading one needs no special language support — SDL's `SDL_LoadObject` / `SDL_LoadFunction`, or any
+other C loader, works. Cast the resolved symbol by writing the function type inline; a `using`
+alias of a function type does not carry its signature through:
+
+```iris
+var answer = reinterpret_as::<function<() -> (value: Int32)>>(symbol);
+```
+
+A dynamic library links its static dependencies into itself, so a host and a plugin that both
+depend on the same static library each get their own copy of it — and therefore their own copy of
+any global state it owns. Keep the boundary a narrow C ABI and pass allocators and handles across
+it explicitly rather than relying on shared globals.
+
+`Examples/Load_dynamic_library` is a complete host-and-plugin pair.
+
+### Copy Entries
+
+Each entry copies a file or a folder (recursively) to a destination relative to the build
+directory, or to the prefix during `iris install`:
+
+```json
+"copy": [
+    { "source": "assets", "destination": "data" },
+    { "source": "dev_manifest.txt", "destination": "manifest.txt", "when": "build" },
+    { "source": "install_manifest.txt", "destination": "manifest.txt", "when": "install" },
+    { "source": "content", "destination": "data", "when": "install", "exclude": ["**/cache/**", "*.tmp"] }
+]
+```
+
+| Field | Description |
+|---|---|
+| `source` | File or folder, relative to the artifact file |
+| `destination` | Path relative to the build directory or the install prefix |
+| `when` | `"always"` (default), `"build"` (only `iris build`/`test`) or `"install"` (only `iris install`) |
+| `exclude` | Patterns matched against paths relative to a copied folder: `**` crosses folders, `*` and `?` do not |
+
+### Installing
+
+`iris install` builds the named artifacts, then fills `--prefix` with the same layout as the build
+directory: `bin/` gets the executables and dynamic libraries of those artifacts and every artifact
+they depend on, plus the external DLLs their libraries name, and every copy entry whose `when` is
+`always` or `install` lands under the prefix. Static libraries, intermediate files and test
+executables are left out.
+
+- Without `--debug`, installs are built without debug information and debug files are not copied.
+- Unless `--build-directory` is given, an install builds into `<build directory>-install`, so the
+  development build cache is not rebuilt with different options.
+- `--clean` deletes the prefix first, so files from earlier installs do not linger.
+- `--archive <file>` also packs the installed folder into a `.zip` or `.7z`.
+- `--msi <file>` also builds a Windows Installer package from the installed folder (Windows only).
+
+`Examples/Install_files` shows build-only and install-only copies and exclude patterns.
+
+### Windows Installer Packages
+
+`iris install --msi dist/my_app.msi` packages everything in the prefix into an `.msi`. Iris writes
+the package itself with the Windows Installer API, so no WiX or other tool is needed. Exactly one of
+the artifacts named on the command line must have an `installer` section:
+
+```json
+"installer": {
+    "product_name": "My App",
+    "manufacturer": "Acme",
+    "upgrade_code": "{3F9A2C71-5D8E-4B06-A1C4-7E2B9D0F6A53}",
+    "add_to_path": true,
+    "start_menu_shortcut": true
+}
+```
+
+| Field | Default | Description |
+|---|---|---|
+| `product_name` | artifact name | Name shown in Apps & Features and used for the folders |
+| `manufacturer` | required | Publisher; the product installs to `Program Files/<manufacturer>/<product_name>` |
+| `upgrade_code` | required | GUID that identifies the product across versions |
+| `add_to_path` | `false` | Append the installed `bin` folder to the system `PATH` |
+| `start_menu_shortcut` | `true` | Add a Start menu shortcut for each executable artifact being installed |
+
+Generate the `upgrade_code` once (for example with `[guid]::NewGuid()` in PowerShell) and never
+change it: Windows Installer uses it to find older versions of the product.
+
+The package installs per machine. The artifact's `version` becomes the product version, so it must
+fit Windows Installer's limits: major and minor at most 255 and patch at most 65535. Installing a
+package removes any installed version up to and including its own, so a rebuilt package with the
+same version replaces the old one. Installing an older version over a newer one is refused.
+Uninstalling removes the files, the shortcuts and the `PATH` entry.
 
 ### Source Group Types
 
@@ -194,7 +323,7 @@ See [Dependencies](./dependencies.md) for the full reference.
 | `"iris"` | Compile all matched `.iris` files as Iris modules |
 | `"export_c_header"` | Additionally emit a C header for each matched module |
 | `"import_c_header"` | Parse a C header and make it importable as an Iris module |
-| `"cpp"` | Compile C++ source files (linked with the artifact) |
+| `"c++"` | Compile C++ source files (linked with the artifact) |
 
 ### `include` Glob Patterns
 

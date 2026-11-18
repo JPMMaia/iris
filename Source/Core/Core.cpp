@@ -306,6 +306,11 @@ namespace iris
         return get_value(name, {}, {}, module.definitions.function_definitions);
     }
 
+    std::optional<Lambda_declaration const*> find_lambda_declaration(iris::Module const& module, std::string_view const name)
+    {
+        return get_value(name, module.export_declarations.lambda_declarations, module.internal_declarations.lambda_declarations, {});
+    }
+
     std::optional<Struct_declaration const*> find_struct_declaration(iris::Module const& module, std::string_view const name)
     {
         return get_value(name, module.export_declarations.struct_declarations, module.internal_declarations.struct_declarations, module.instanced_declarations.struct_declarations);
@@ -504,6 +509,11 @@ namespace iris
             Dereference_and_access_expression& data = std::get<Dereference_and_access_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
         }
+        else if (std::holds_alternative<iris::For_each_expression>(current_expression.data))
+        {
+            For_each_expression& data = std::get<For_each_expression>(current_expression.data);
+            data.range_expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.range_expression);
+        }
         else if (std::holds_alternative<iris::For_loop_expression>(current_expression.data))
         {
             For_loop_expression& data = std::get<For_loop_expression>(current_expression.data);
@@ -538,6 +548,21 @@ namespace iris
         {
             Parenthesis_expression& data = std::get<Parenthesis_expression>(current_expression.data);
             data.expression = copy_expressions_to_new_statement(destination_statement, source_statement, data.expression);
+        }
+        else if (std::holds_alternative<iris::Pipeline_expression>(current_expression.data))
+        {
+        }
+        else if (std::holds_alternative<iris::Range_expression>(current_expression.data))
+        {
+            Range_expression& data = std::get<Range_expression>(current_expression.data);
+            data.begin = copy_expressions_to_new_statement(destination_statement, source_statement, data.begin);
+            data.end = copy_expressions_to_new_statement(destination_statement, source_statement, data.end);
+        }
+        else if (std::holds_alternative<iris::Lambda_expression>(current_expression.data))
+        {
+        }
+        else if (std::holds_alternative<iris::Statement_block_expression>(current_expression.data))
+        {
         }
         else if (std::holds_alternative<iris::Reflection_expression>(current_expression.data))
         {
@@ -635,6 +660,7 @@ namespace iris
     {
         return name == "check" ||
                name == "create_array_slice_from_pointer" ||
+               name == "create_optional" ||
                name == "create_stack_array_uninitialized" ||
                name == "offset_pointer" ||
                name == "reinterpret_as" ||
@@ -678,8 +704,10 @@ namespace iris
     bool is_add_scope_expression(iris::Expression const& expression)
     {
         return std::holds_alternative<iris::Block_expression>(expression.data)
+            || std::holds_alternative<iris::For_each_expression>(expression.data)
             || std::holds_alternative<iris::For_loop_expression>(expression.data)
             || std::holds_alternative<iris::If_expression>(expression.data)
+            || std::holds_alternative<iris::Pipeline_expression>(expression.data)
             || std::holds_alternative<iris::Switch_expression>(expression.data)
             || std::holds_alternative<iris::While_loop_expression>(expression.data);
     }

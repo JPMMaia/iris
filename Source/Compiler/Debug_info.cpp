@@ -236,15 +236,17 @@ namespace iris::compiler
         visit_type_references_recursively(type_reference, process_type);
     }
 
-    void create_requested_dependency_debug_types_auxiliary(
+    // Each module is walked once: a module imported along many paths of the import graph adds the same
+    // names every time, and walking it once per path grows exponentially with the depth of the graph.
+    static void create_requested_dependency_debug_types_auxiliary(
         Debug_type_names_per_module& requested_debug_types,
         Module const& core_module,
         std::pmr::unordered_map<std::pmr::string, Module const*> const& core_module_dependencies,
+        std::pmr::unordered_set<std::pmr::string>& walked_modules,
+        std::pmr::unordered_set<std::pmr::string>& visited_debug_types,
         std::pmr::polymorphic_allocator<> const& allocator
     )
     {
-        std::pmr::unordered_set<std::pmr::string> visited_debug_types{allocator};
-
         for (Import_module_with_alias const& alias_import : core_module.dependencies.alias_imports)
         {
             for (std::pmr::string const& usage : alias_import.usages)
@@ -253,8 +255,12 @@ namespace iris::compiler
                     expand_requested_debug_type(alias_import.module_name, usage, core_module_dependencies, requested_debug_types, visited_debug_types, allocator);
             }
 
+            auto const [_, is_new] = walked_modules.insert(std::pmr::string{alias_import.module_name, allocator});
+            if (!is_new)
+                continue;
+
             Module const* const dependency = core_module_dependencies.at(alias_import.module_name);
-            create_requested_dependency_debug_types_auxiliary(requested_debug_types, *dependency, core_module_dependencies, allocator);
+            create_requested_dependency_debug_types_auxiliary(requested_debug_types, *dependency, core_module_dependencies, walked_modules, visited_debug_types, allocator);
         }
     }
 
@@ -265,8 +271,10 @@ namespace iris::compiler
     )
     {
         Debug_type_names_per_module requested_debug_types{allocator};
+        std::pmr::unordered_set<std::pmr::string> walked_modules{allocator};
+        std::pmr::unordered_set<std::pmr::string> visited_debug_types{allocator};
 
-        create_requested_dependency_debug_types_auxiliary(requested_debug_types, core_module, core_module_dependencies, allocator);
+        create_requested_dependency_debug_types_auxiliary(requested_debug_types, core_module, core_module_dependencies, walked_modules, visited_debug_types, allocator);
         
         for (auto& [_, names] : requested_debug_types)
             std::sort(names.begin(), names.end());

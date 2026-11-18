@@ -5,6 +5,8 @@ import std;
 import iris.compiler.compile_time_pass;
 import iris.compiler.implicit_function_pass;
 import iris.compiler.instantiate_pass;
+import iris.compiler.lambda_pass;
+import iris.compiler.pipeline_pass;
 
 namespace iris::compiler
 {
@@ -13,6 +15,9 @@ namespace iris::compiler
         All_passes_parameters const& parameters
     )
     {
+        // Pipelines expand into ordinary loops first, so that every later pass sees plain code.
+        run_pipeline_pass_on_module(core_module, parameters.declaration_database);
+
         Compile_time_parameters const compile_time_parameters
         {
             .dependencies = parameters.dependencies,
@@ -28,6 +33,7 @@ namespace iris::compiler
 
         run_instantiate_pass_on_module(core_module, parameters);
         run_implicit_function_pass_on_module(core_module, parameters.declaration_database, parameters.is_test_mode);
+        run_lambda_pass_on_module(core_module, parameters.declaration_database, parameters.lambda_database, parameters.is_test_mode);
     }
 
     void run_all_passes_on_function(
@@ -37,6 +43,9 @@ namespace iris::compiler
         All_passes_parameters const& parameters
     )
     {
+        // Pipelines expand into ordinary loops first, so that every later pass sees plain code.
+        run_pipeline_pass_on_function(module_name, function_declaration, function_definition, parameters.declaration_database);
+
         Compile_time_parameters const compile_time_parameters
         {
             .dependencies = parameters.dependencies,

@@ -1,0 +1,8 @@
+module Void_return_in_block;
+
+function run() -> ()
+{
+    {
+        return;
+    }
+}

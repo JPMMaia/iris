@@ -10,6 +10,7 @@ module;
 module iris.language_server.go_to_location;
 
 import iris.compiler.analysis;
+import iris.compiler.validation;
 import iris.core;
 import iris.core.declarations;
 import iris.core.types;
@@ -208,6 +209,18 @@ namespace iris::language_server
             std::visit(process_declaration, declaration_optional->data);
             if (result_optional.has_value())
                 return result_optional.value();
+
+            // The cursor is on the declaration's own name rather than on a type it mentions.
+            std::string_view const declaration_name = get_declaration_name(declaration_optional.value());
+            std::optional<iris::Source_range_location> const declaration_location = get_declaration_source_location(declaration_optional.value());
+            if (declaration_location.has_value())
+            {
+                std::optional<iris::Source_range> const name_range = create_sub_source_range(declaration_location->range, 0, declaration_name.size());
+                if (name_range.has_value() && range_contains_position_inclusive(name_range.value(), source_position))
+                {
+                    return create_result_from_declaration(parse_tree, declaration_optional.value(), client_supports_definition_link);
+                }
+            }
         }
 
         std::optional<iris::Function> const function = find_function_that_contains_source_position(
@@ -246,8 +259,11 @@ namespace iris::language_server
             if (result_optional.has_value())
                 return result_optional.value();
 
-            auto const process_statement = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> bool
+            auto const process_statement = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> void
             {
+                if (result_optional.has_value())
+                    return;
+
                 auto const process_expression = [&](iris::Expression const& expression, iris::Statement const& statement) -> bool
                 {
                     if (!expression.source_range.has_value())
@@ -260,6 +276,17 @@ namespace iris::language_server
                             iris::Access_expression const& access_expression = std::get<iris::Access_expression>(expression.data);
 
                             iris::Expression const& expression_to_access = statement.expressions[access_expression.expression.expression_index];
+
+                            // On the pipeline in `p.in_place(xs)` or `p(xs).count()`, the pipeline
+                            // name answers, through the expressions inside the access.
+                            bool const is_on_accessed_expression =
+                                expression_to_access.source_range.has_value() &&
+                                range_contains_position_inclusive(expression_to_access.source_range.value(), source_position);
+                            bool const is_accessed_pipeline =
+                                find_pipeline_reference(scope, expression_to_access) != nullptr ||
+                                iris::compiler::get_pipeline_from_call_expression(scope, statement, expression_to_access) != nullptr;
+                            if (is_on_accessed_expression && is_accessed_pipeline)
+                                return false;
 
                             std::optional<iris::Type_reference> const expression_to_access_type = iris::compiler::get_expression_type(
                                 core_module.name,
@@ -408,6 +435,72 @@ namespace iris::language_server
                                 }
                             }
                         }
+                        else if (std::holds_alternative<iris::Lambda_expression>(expression.data))
+                        {
+                            iris::Lambda_expression const& lambda_expression = std::get<iris::Lambda_expression>(expression.data);
+
+                            // Only the head of the literal --- the `lambda` keyword and its parameter
+                            // list --- stands for the lambda type. Inside the body the cursor is on
+                            // whatever the body itself mentions.
+                            bool const is_in_body =
+                                !lambda_expression.body.expressions.empty() &&
+                                lambda_expression.body.expressions[0].source_range.has_value() &&
+                                range_contains_position_inclusive(lambda_expression.body.expressions[0].source_range.value(), source_position);
+
+                            if (!is_in_body)
+                            {
+                                std::size_t const expression_index = static_cast<std::size_t>(&expression - statement.expressions.data());
+
+                                std::optional<iris::Type_reference> const expected_type = iris::compiler::get_expected_expression_type(
+                                    core_module.name,
+                                    function->declaration,
+                                    scope,
+                                    declaration_database,
+                                    statement,
+                                    std::nullopt,
+                                    expression_index
+                                );
+                                if (expected_type.has_value())
+                                {
+                                    std::optional<Declaration> const declaration = find_declaration(declaration_database, expected_type.value());
+                                    if (declaration.has_value())
+                                    {
+                                        result_optional = create_result_from_declaration(parse_tree, declaration.value(), client_supports_definition_link);
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                        else if (std::holds_alternative<iris::Call_expression>(expression.data))
+                        {
+                            iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
+
+                            iris::Expression const& callee = statement.expressions[call_expression.expression.expression_index];
+
+                            // Calling a lambda-typed value leads to the lambda declaration, the way
+                            // calling a function leads to the function it names.
+                            if (callee.source_range.has_value() && range_contains_position_inclusive(callee.source_range.value(), source_position))
+                            {
+                                std::optional<iris::Type_reference> const callee_type = iris::compiler::get_expression_type(
+                                    core_module.name,
+                                    function->declaration,
+                                    scope,
+                                    statement,
+                                    callee,
+                                    std::nullopt,
+                                    declaration_database
+                                );
+                                if (callee_type.has_value())
+                                {
+                                    std::optional<Declaration> const declaration = find_declaration(declaration_database, callee_type.value());
+                                    if (declaration.has_value() && std::holds_alternative<iris::Lambda_declaration const*>(declaration->data))
+                                    {
+                                        result_optional = create_result_from_declaration(parse_tree, declaration.value(), client_supports_definition_link);
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
                         else if (std::holds_alternative<iris::Variable_expression>(expression.data))
                         {
                             iris::Variable_expression const& variable_expression = std::get<iris::Variable_expression>(expression.data);
@@ -418,7 +511,24 @@ namespace iris::language_server
                                 result_optional = create_result_from_variable(core_module, *variable, client_supports_definition_link);
                                 return true;
                             }
-                            
+
+                            iris::compiler::Scope_pipeline const* const scope_pipeline = find_pipeline_reference(scope, expression);
+                            if (scope_pipeline != nullptr)
+                            {
+                                iris::Pipeline_expression const& pipeline = *scope_pipeline->pipeline;
+                                std::optional<iris::Source_range> const name_range = create_name_source_range(pipeline.name_source_position, pipeline.name);
+                                if (name_range.has_value() && core_module.source_file_path.has_value())
+                                {
+                                    result_optional = create_result(
+                                        core_module.source_file_path.value(),
+                                        name_range.value(),
+                                        name_range.value(),
+                                        client_supports_definition_link
+                                    );
+                                    return true;
+                                }
+                            }
+
                             std::optional<Declaration> const declaration = find_declaration(declaration_database, core_module.name, variable_expression.name);
                             if (declaration.has_value())
                             {
@@ -431,7 +541,7 @@ namespace iris::language_server
                     return false;
                 };
 
-                return visit_expressions(
+                visit_expressions(
                     statement,
                     process_expression
                 );
@@ -445,13 +555,14 @@ namespace iris::language_server
                 function->declaration->type.input_parameter_types,
                 function->declaration->input_parameter_source_positions
             );
+            iris::compiler::add_module_pipelines_to_scope(scope, core_module);
 
-            iris::compiler::visit_statements_using_scope(
-                core_module.name,
+            visit_statements_using_scope_including_lambda_bodies(
+                declaration_database,
+                core_module,
                 function->declaration,
                 scope,
                 function->definition->statements,
-                declaration_database,
                 process_statement
             );
 

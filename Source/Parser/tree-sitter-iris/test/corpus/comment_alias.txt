@@ -15,8 +15,9 @@ using My_int = Int32;
     (Module_name
       (Identifier_with_dots
         (Identifier))))
+  (Comment)
+  (Comment)
   (Declaration
-    (Comment)
     (Alias
       (Alias_name
         (Identifier))

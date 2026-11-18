@@ -1,0 +1,27 @@
+module Address_of_access_on_call_result;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+function get_second_pair(pairs: *mutable Constant_array::<Pair, 2>) -> (pointer: *mutable Pair)
+{
+    return &(*pairs)[1];
+}
+
+function bytes(raw: *mutable Void) -> (pointer: *mutable Uint8)
+{
+    return reinterpret_as::<*mutable Uint8>(raw);
+}
+
+export function set_values(raw: *mutable Void, pairs: *mutable Constant_array::<Pair, 2>) -> ()
+{
+    var element = &bytes(raw)[3u64];
+    *element = 7u8;
+    var direct = &reinterpret_as::<*mutable Uint8>(raw)[2u64];
+    *direct = 5u8;
+    var second = &get_second_pair(pairs)->second;
+    *second = 7;
+}

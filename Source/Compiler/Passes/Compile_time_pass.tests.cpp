@@ -339,13 +339,106 @@ function run() -> ()
 {
     {
         {
-            foo(0i64);
+            foo(0u64);
         }
         {
-            foo(1i64);
+            foo(1u64);
         }
         {
-            foo(2i64);
+            foo(2u64);
+        }
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Unrolls compile_time for loop with an unsigned index compared in a compile_time if", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_for;
+
+function foo(index: Uint64) -> ()
+{
+}
+
+function run() -> ()
+{
+    compile_time for index in 0u64 to 3u64
+    {
+        compile_time if index > 0u64
+        {
+            foo(index);
+        }
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_for;
+
+function foo(index: Uint64) -> ()
+{
+}
+
+function run() -> ()
+{
+    {
+        {
+            {
+            }
+        }
+        {
+            {
+                foo(1u64);
+            }
+        }
+        {
+            {
+                foo(2u64);
+            }
+        }
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Unrolls compile_time for loop keeping the width of the range begin type", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_for;
+
+function bar(index: Uint32) -> ()
+{
+}
+
+function run() -> ()
+{
+    compile_time for index in 0u32 to 2u32
+    {
+        bar(index);
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_for;
+
+function bar(index: Uint32) -> ()
+{
+}
+
+function run() -> ()
+{
+    {
+        {
+            bar(0u32);
+        }
+        {
+            bar(1u32);
         }
     }
 }
@@ -762,6 +855,275 @@ export function run_member_name() -> ()
         CHECK(expected == actual);
     }
 
+    TEST_CASE("Evaluates compile_time reflection member_access", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_access(pair: Pair) -> ()
+{
+    var value = @member_access::<Pair>(pair, 1u64);
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_access(pair: Pair) -> ()
+{
+    var value = pair.second;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_member_access");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection member_access as an assignment target", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_access_assign(pair: *mutable Pair) -> ()
+{
+    @member_access::<Pair>(pair, 0u64) = 3;
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_member_access_assign(pair: *mutable Pair) -> ()
+{
+    pair.first = 3;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_member_access_assign");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection enum_count", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+enum Stance
+{
+    Aggressive = 0,
+    Defensive = 1,
+    Passive = 2,
+}
+
+export function run_enum_count() -> ()
+{
+    var value = @enum_count::<Stance>();
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+enum Stance
+{
+    Aggressive = 0,
+    Defensive = 1,
+    Passive = 2,
+}
+
+export function run_enum_count() -> ()
+{
+    var value = 3u64;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_enum_count");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection enum_name", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+enum Stance
+{
+    Aggressive = 0,
+    Defensive = 1,
+}
+
+export function run_enum_name() -> ()
+{
+    var value = @enum_name::<Stance>(1u64);
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+enum Stance
+{
+    Aggressive = 0,
+    Defensive = 1,
+}
+
+export function run_enum_name() -> ()
+{
+    var value = "Defensive"c;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_enum_name");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection enum_value for an explicit value", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+enum Component_id
+{
+    Movement = 6,
+    Building = 7,
+    Resource = 8,
+}
+
+export function run_enum_value() -> ()
+{
+    var value = @enum_value::<Component_id>(2u64);
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+enum Component_id
+{
+    Movement = 6,
+    Building = 7,
+    Resource = 8,
+}
+
+export function run_enum_value() -> ()
+{
+    var value = 8;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_enum_value");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection enum_value for an implicit value", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+enum Component_id
+{
+    Movement = 6,
+    Building,
+    Resource,
+}
+
+export function run_enum_value_implicit() -> ()
+{
+    var value = @enum_value::<Component_id>(2u64);
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+enum Component_id
+{
+    Movement = 6,
+    Building,
+    Resource,
+}
+
+export function run_enum_value_implicit() -> ()
+{
+    var value = 8;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_enum_value_implicit");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection member_access inside a compile_time for", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+function consume(value: Int32) -> ()
+{
+}
+
+export function run_member_access_loop(pair: Pair) -> ()
+{
+    compile_time for index in 0u64 to @member_count::<Pair>()
+    {
+        consume(@member_access::<Pair>(pair, index));
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+function consume(value: Int32) -> ()
+{
+}
+
+export function run_member_access_loop(pair: Pair) -> ()
+{
+    {
+        {
+            consume(pair.first);
+        }
+        {
+            consume(pair.second);
+        }
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_member_access_loop");
+
+        CHECK(expected == actual);
+    }
+
     TEST_CASE("Evaluates compile_time reflection get_type_kind", "[Compile_time_pass][Passes]")
     {
         std::string_view const input = R"(module compile_time_reflection;
@@ -860,6 +1222,102 @@ export function run() -> ()
 )";
 
         std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time if comparing a reflection call to Type_kind inline", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+export function run() -> ()
+{
+    compile_time if @get_type_kind::<Int32>() == Type_kind.Int
+    {
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+export function run() -> ()
+{
+    {
+        return 0;
+    }
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection element_type", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_element_type() -> ()
+{
+    var text: @element_type::<*C_char>() = 0;
+    var target: @element_type::<*mutable Pair>() = {};
+    var slice_element: @element_type::<Array_slice::<Float32>>() = 0.0f32;
+    var array_element: @element_type::<Constant_array::<Uint16, 4>>() = 0u16;
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+struct Pair
+{
+    first: Int32 = 0;
+    second: Int32 = 0;
+}
+
+export function run_element_type() -> ()
+{
+    var text: C_char = 0;
+    var target: Pair = {};
+    var slice_element: Float32 = 0.0f32;
+    var array_element: Uint16 = 0u16;
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_element_type");
+
+        CHECK(expected == actual);
+    }
+
+    TEST_CASE("Evaluates compile_time reflection element_type in constructor type argument", "[Compile_time_pass][Passes]")
+    {
+        std::string_view const input = R"(module compile_time_reflection;
+
+export function run_element_type_argument(values: Array_slice::<Float32>) -> ()
+{
+    var value = reinterpret_as::<@element_type::<Array_slice::<Float32>>()>(values.data);
+}
+)";
+
+        std::string_view const expected = R"(module compile_time_reflection;
+
+export function run_element_type_argument(values: Array_slice::<Float32>) -> ()
+{
+    var value = reinterpret_as::<Float32>(values.data);
+}
+)";
+
+        std::pmr::string const actual = run_compile_time_pass_and_format(input, "run_element_type_argument");
 
         CHECK(expected == actual);
     }

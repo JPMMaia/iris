@@ -28,8 +28,24 @@ export function_constructor to_json(value_type: Type)
         }
         else if kind == Type_kind.Struct
         {
-            // TODO if object, go through members
-            stream.write("??"c);
+            stream.write("{"c);
+
+            compile_time for member_index in 0u64 to @member_count::<value_type>()
+            {
+                compile_time if member_index > 0u64
+                {
+                    stream.write(","c);
+                }
+
+                stream.write("\""c);
+                stream.write(@member_name::<value_type>(member_index));
+                stream.write("\":"c);
+
+                var member_value = @member_access::<value_type>(*value, member_index);
+                to_json::<@member_type::<value_type>(member_index)>(stream, &member_value);
+            }
+
+            stream.write("}"c);
         }
         else if kind == Type_kind.Union
         {
@@ -38,8 +54,28 @@ export function_constructor to_json(value_type: Type)
         }
         else if kind == Type_kind.Enum
         {
-            // TODO
-            stream.write("??"c);
+            mutable raw_value = 0;
+            cstring.memcpy_s(&raw_value, 4 as cstring.rsize_t, value, 4 as cstring.rsize_t);
+
+            mutable named = false;
+            compile_time for enum_index in 0u64 to @enum_count::<value_type>()
+            {
+                if !named && (raw_value == @enum_value::<value_type>(enum_index))
+                {
+                    stream.write("\""c);
+                    stream.write(@enum_name::<value_type>(enum_index));
+                    stream.write("\""c);
+                    named = true;
+                }
+            }
+
+            // A value the enum never declared still has to round-trip, so it goes out as a number.
+            if !named
+            {
+                mutable buffer: Constant_array::<C_char, 16> = [];
+                cstdio.snprintf(&buffer[0], 16 as cstdio.rsize_t, "%d"c, raw_value);
+                stream.write(&buffer[0]);
+            }
         }
         else if kind == Type_kind.Pointer
         {

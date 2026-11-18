@@ -1,0 +1,17 @@
+{
+    "name": "Install_files",
+    "artifacts": [
+        {
+            "name": "my_library",
+            "location": "my_library/iris_artifact.json"
+        },
+        {
+            "name": "my_plugin",
+            "location": "my_plugin/iris_artifact.json"
+        },
+        {
+            "name": "my_app",
+            "location": "my_app/iris_artifact.json"
+        }
+    ]
+}

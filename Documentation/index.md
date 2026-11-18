@@ -29,6 +29,7 @@ export function main() -> (result: Int32)
 - Function contracts (preconditions and postconditions)
 - Decimal type
 - Structure of Arrays type
+- Lambdas: callable values that are C ABI compatible
 - Templates/generics
 - Defer statements
 - Some compile time and reflection features
@@ -54,5 +55,7 @@ Iris is still in early development and as such there are many bugs, caveats, and
 | Call a C library | [Interoperability → Importing C](interop/importing-c.md) |
 | Understand the build system | [Tooling → Build System](tooling/build-system.md) |
 | Manage external library dependencies | [Tooling → Dependencies](tooling/dependencies.md) |
+| Pass a callback to Iris or to C | [Language → Lambdas](language/lambdas.md) |
+| Represent a value that might be absent | [Language → Optional](language/optional-type.md) |
 | Write generic/reusable code | [Generic Programming → Function Constructors](generics/function-constructors.md) |
 | Optimise memory layout | [Memory → Structure of Arrays](memory/structure-of-arrays.md) |

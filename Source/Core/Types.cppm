@@ -20,6 +20,13 @@ namespace iris
     export std::uint64_t get_constant_array_type_size(Type_reference const& type_reference);
     export bool is_constant_array_type_reference(Type_reference const& type);
 
+    export Type_reference create_fixed_capacity_array_type_reference(std::pmr::vector<Type_reference> value_type, std::uint64_t capacity);
+    export bool is_fixed_capacity_array_type_reference(Type_reference const& type);
+    export std::optional<Type_reference> get_fixed_capacity_array_value_type(Type_reference const& type);
+    export std::uint64_t get_fixed_capacity_array_capacity(Type_reference const& type);
+    // Maps a Fixed_capacity_array method (push, pop, clear) to the builtin its access is typed as.
+    export std::optional<std::string_view> get_fixed_capacity_array_method_builtin_name(std::string_view member_name);
+
     export Type_reference create_soa_array_type_reference(std::pmr::vector<Type_reference> value_type, std::uint64_t const size);
     export bool is_soa_array_type_reference(Type_reference const& type);
     export bool is_soa_array_view_type_reference(Type_reference const& type);
@@ -35,6 +42,25 @@ namespace iris
     export std::optional<Type_reference> get_function_output_type_reference(Function_type const& function_type, Module const& core_module);
     export std::optional<Type_reference> get_function_output_type_reference(Type_reference const& type, Module const& core_module);
     export bool is_function_pointer(Type_reference const& type);
+
+    export Type_reference create_lambda_type_type_reference(
+        std::pmr::vector<Type_reference> input_parameter_types,
+        std::pmr::vector<Type_reference> output_parameter_types
+    );
+    export bool is_lambda_type(Type_reference const& type);
+    export std::optional<Type_reference> get_lambda_output_type_reference(Lambda_type const& lambda_type);
+
+    // Builds the C-ABI struct that represents a lambda value: a function pointer taking the
+    // lambda's inputs plus a trailing `user_data`, and the `user_data` pointer itself.
+    export Struct_declaration create_lambda_struct_declaration(
+        std::pmr::string name,
+        std::optional<std::pmr::string> unique_name,
+        std::span<Type_reference const> input_parameter_types,
+        std::span<Type_reference const> output_parameter_types,
+        std::span<std::pmr::string const> input_parameter_names
+    );
+    export Struct_declaration create_lambda_struct_declaration(Lambda_declaration const& lambda_declaration);
+    export std::pmr::vector<Struct_declaration> create_lambda_struct_declarations(std::span<Lambda_declaration const> lambda_declarations);
 
     export Type_reference create_fundamental_type_type_reference(Fundamental_type const value);
     export bool is_byte(Type_reference const& type);
@@ -60,6 +86,12 @@ namespace iris
     export Type_reference create_null_pointer_type_type_reference();
     export bool is_null_pointer_type(Type_reference const& type);
 
+    export Type_reference create_optional_type_reference(std::pmr::vector<Type_reference> value_type);
+    export bool is_optional_type_reference(Type_reference const& type);
+    export std::optional<Type_reference> get_optional_value_type(Type_reference const& type);
+    // True when Optional::<T> is represented as a bare pointer instead of a { value, has_value } record.
+    export bool is_optional_represented_as_pointer(Type_reference const& type);
+
     export Type_reference create_pointer_type_type_reference(std::pmr::vector<Type_reference> element_type, bool const is_mutable);
     export std::optional<Type_reference> remove_pointer(Type_reference const& type);
     export bool is_pointer(Type_reference const& type);
@@ -71,6 +103,19 @@ namespace iris
     export std::optional<std::string_view> get_type_module_name(Type_reference const& type);
 
     export iris::Struct_declaration create_array_slice_type_struct_declaration(std::pmr::vector<Type_reference> const& element_type);
+    export iris::Struct_declaration create_optional_type_struct_declaration(std::pmr::vector<Type_reference> const& value_type);
+
+    // Stable, C-identifier-safe record name for one Optional::<T> instantiation. The compiler uses it
+    // as the synthetic Clang record name and the C header exporter as the emitted struct name, so the
+    // compiled layout and the exported header describe the same type by construction.
+    export std::pmr::string mangle_optional_type_name(std::pmr::vector<Type_reference> const& value_type);
+    export std::pmr::string mangle_fixed_capacity_array_type_name(std::pmr::vector<Type_reference> const& value_type, std::uint64_t capacity);
+    export iris::Struct_declaration create_fixed_capacity_array_type_struct_declaration(std::pmr::vector<Type_reference> const& value_type, std::uint64_t capacity);
+
+    // Returns the synthetic struct declaration that describes the members of a builtin
+    // generic type, or nullopt if the type is not one. Member lookup, GEP index computation
+    // and member-access validation are then reused from the ordinary struct machinery.
+    export std::optional<iris::Struct_declaration> try_get_builtin_struct_declaration(Type_reference const& type_reference);
 
     export template <typename Value_t, typename Function_t>
         bool visit_type_references_recursively(
@@ -133,6 +178,28 @@ namespace iris
 
             return false;
         }
+        else if (std::holds_alternative<Optional_type>(type_reference.data))
+        {
+            Optional_type const& data = std::get<Optional_type>(type_reference.data);
+            for (Type_reference const& nested_type_reference : data.value_type)
+            {
+                if (visit_type_references_recursively(nested_type_reference, predicate))
+                    return true;
+            }
+
+            return false;
+        }
+        else if (std::holds_alternative<Fixed_capacity_array_type>(type_reference.data))
+        {
+            Fixed_capacity_array_type const& data = std::get<Fixed_capacity_array_type>(type_reference.data);
+            for (Type_reference const& nested_type_reference : data.value_type)
+            {
+                if (visit_type_references_recursively(nested_type_reference, predicate))
+                    return true;
+            }
+
+            return false;
+        }
         else if (std::holds_alternative<Builtin_type_reference>(type_reference.data))
         {
             return false;
@@ -178,6 +245,22 @@ namespace iris
         }
         else if (std::holds_alternative<Integer_type>(type_reference.data))
         {
+            return false;
+        }
+        else if (std::holds_alternative<Lambda_type>(type_reference.data))
+        {
+            Lambda_type const& data = std::get<Lambda_type>(type_reference.data);
+            for (Type_reference const& nested_type_reference : data.input_parameter_types)
+            {
+                if (visit_type_references_recursively(nested_type_reference, predicate))
+                    return true;
+            }
+            for (Type_reference const& nested_type_reference : data.output_parameter_types)
+            {
+                if (visit_type_references_recursively(nested_type_reference, predicate))
+                    return true;
+            }
+
             return false;
         }
         else if (std::holds_alternative<Null_pointer_type>(type_reference.data))
@@ -320,6 +403,27 @@ namespace iris
 
     export template <typename Function_t>
         bool visit_type_references(
+            iris::Lambda_declaration const& declaration,
+            Function_t predicate
+        )
+    {
+        for (iris::Type_reference const& type_reference : declaration.input_parameter_types)
+        {
+            if (visit_type_references(type_reference, predicate))
+                return true;
+        }
+
+        for (iris::Type_reference const& type_reference : declaration.output_parameter_types)
+        {
+            if (visit_type_references(type_reference, predicate))
+                return true;
+        }
+
+        return false;
+    }
+
+    export template <typename Function_t>
+        bool visit_type_references(
             iris::Function_constructor const& declaration,
             Function_t predicate
         )
@@ -449,6 +553,34 @@ namespace iris
             {
                 Type_expression const& data = std::get<Type_expression>(expression.data);
                 return visit_type_references(data.type, predicate);
+            }
+            else if (std::holds_alternative<Lambda_expression>(expression.data))
+            {
+                Lambda_expression const& data = std::get<Lambda_expression>(expression.data);
+
+                for (std::optional<Type_reference> const& parameter_type : data.parameter_types)
+                {
+                    if (parameter_type.has_value() && visit_type_references(parameter_type.value(), predicate))
+                        return true;
+                }
+
+                if (data.return_type.has_value() && visit_type_references(data.return_type.value(), predicate))
+                    return true;
+
+                return false;
+            }
+            else if (std::holds_alternative<Pipeline_expression>(expression.data))
+            {
+                Pipeline_expression const& data = std::get<Pipeline_expression>(expression.data);
+
+                for (Type_reference const& parameter_type : data.input_parameter_types)
+                {
+                    if (visit_type_references(parameter_type, predicate))
+                        return true;
+                }
+
+                // Stage expressions are reached through visit_expressions.
+                return false;
             }
             else if (std::holds_alternative<Struct_expression>(expression.data))
             {
@@ -848,6 +980,16 @@ namespace iris
             Constant_array_expression const& data = std::get<Constant_array_expression>(expression.data);
             return visit_expressions(data.array_data, predicate);
         }
+        else if (std::holds_alternative<Lambda_expression>(expression.data))
+        {
+            Lambda_expression const& data = std::get<Lambda_expression>(expression.data);
+            return visit_expressions(data.body, predicate);
+        }
+        else if (std::holds_alternative<For_each_expression>(expression.data))
+        {
+            For_each_expression const& data = std::get<For_each_expression>(expression.data);
+            return visit_expressions(data.then_statements, predicate);
+        }
         else if (std::holds_alternative<For_loop_expression>(expression.data))
         {
             For_loop_expression const& data = std::get<For_loop_expression>(expression.data);
@@ -856,6 +998,27 @@ namespace iris
                 return true;
 
             return visit_expressions(data.then_statements, predicate);
+        }
+        else if (std::holds_alternative<Pipeline_expression>(expression.data))
+        {
+            Pipeline_expression const& data = std::get<Pipeline_expression>(expression.data);
+
+            for (Pipeline_stage const& stage : data.stages)
+            {
+                if (visit_expressions(stage.expression, predicate))
+                    return true;
+            }
+
+            return false;
+        }
+        else if (std::holds_alternative<Statement_block_expression>(expression.data))
+        {
+            Statement_block_expression const& data = std::get<Statement_block_expression>(expression.data);
+
+            if (visit_expressions(data.statements, predicate))
+                return true;
+
+            return visit_expressions(data.result, predicate);
         }
         else if (std::holds_alternative<If_expression>(expression.data))
         {
@@ -955,6 +1118,18 @@ namespace iris
         Function_t predicate
     )
     {
+        for (Function_condition const& condition : declaration.preconditions)
+        {
+            if (visit_expressions(condition.condition, predicate))
+                return true;
+        }
+
+        for (Function_condition const& condition : declaration.postconditions)
+        {
+            if (visit_expressions(condition.condition, predicate))
+                return true;
+        }
+
         return false;
     }
 
@@ -1022,6 +1197,12 @@ namespace iris
         }
 
         for (Struct_declaration const& declaration : declarations.struct_declarations)
+        {
+            if (visit_expressions(declaration, predicate))
+                return true;
+        }
+
+        for (Function_declaration const& declaration : declarations.function_declarations)
         {
             if (visit_expressions(declaration, predicate))
                 return true;

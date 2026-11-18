@@ -10,6 +10,7 @@ target_sources(Iris_common
          "Common.cppm"
          "Filesystem_common.cppm"
          "Filesystem.cppm"
+         "Msi.cppm"
    PRIVATE
       "Archive.cpp"
       "Common.cpp"
@@ -19,10 +20,15 @@ target_sources(Iris_common
 if(WIN32)
    target_sources(Iris_common PRIVATE
       "Filesystem_windows.cpp"
+      "Msi_windows.cpp"
    )
+   # Windows Installer database API, cabinet creation (FCI), CoCreateGuid and SHA-1 for
+   # name-based GUIDs.
+   target_link_libraries(Iris_common PRIVATE Msi Cabinet Ole32 Bcrypt)
 else()
    target_sources(Iris_common PRIVATE
       "Filesystem_linux.cpp"
+      "Msi_linux.cpp"
    )
 endif()
 
@@ -77,6 +83,11 @@ if(BUILD_TESTING)
    target_sources(Iris_common_tests PRIVATE
       "Archive.tests.cpp"
    )
+
+   if(WIN32)
+      target_sources(Iris_common_tests PRIVATE "Msi.tests.cpp")
+      target_link_libraries(Iris_common_tests PRIVATE Msi)
+   endif()
 
    include(Catch)
    catch_discover_tests(Iris_common_tests)

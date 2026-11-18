@@ -70,6 +70,18 @@ namespace iris::parser
         test_convertor(input_file);
     }
 
+    TEST_CASE("Converts optional_type.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "optional_type.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts fixed_capacity_array.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "fixed_capacity_array.iris";
+        test_convertor(input_file);
+    }
+
     TEST_CASE("Converts assert_expressions.iris", "[Convertor]")
     {
         std::string_view const input_file = "assert_expressions.iris";
@@ -259,6 +271,12 @@ namespace iris::parser
     TEST_CASE("Converts comment_unions.iris", "[Convertor]")
     {
         std::string_view const input_file = "comment_unions.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts comment_switch_expressions.iris", "[Convertor]")
+    {
+        std::string_view const input_file = "comment_switch_expressions.iris";
         test_convertor(input_file);
     }
 
@@ -631,6 +649,102 @@ namespace iris::parser
     TEST_CASE("Converts while_loop_expressions.iris", "[Convertor]")
     {
         std::string_view const input_file = "while_loop_expressions.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_declaration.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_declaration.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_inline_body.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_inline_body.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_explicit_types.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_explicit_types.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_block_body.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_block_body.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_with_captures.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_with_captures.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_captures.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_captures.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_named_type.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_named_type.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_call.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_call.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_mixed.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_mixed.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_multiple.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_multiple.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_nested.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_nested.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_return_lambda.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_return_lambda.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts lambda_no_captures.iris", "[Convertor][Lambda]")
+    {
+        std::string_view const input_file = "lambda_no_captures.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts pipeline_for_loop.iris", "[Convertor][Pipeline]")
+    {
+        std::string_view const input_file = "pipeline_for_loop.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts pipeline_multiple_parameters.iris", "[Convertor][Pipeline]")
+    {
+        std::string_view const input_file = "pipeline_multiple_parameters.iris";
+        test_convertor(input_file);
+    }
+
+    TEST_CASE("Converts pipeline_take_while_enumerate.iris", "[Convertor][Pipeline]")
+    {
+        std::string_view const input_file = "pipeline_take_while_enumerate.iris";
         test_convertor(input_file);
     }
 

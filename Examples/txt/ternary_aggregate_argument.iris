@@ -1,0 +1,25 @@
+module Ternary_aggregate_argument;
+
+struct Quad
+{
+    a: Float64 = 0.0f64;
+    b: Float64 = 0.0f64;
+    c: Float64 = 0.0f64;
+    d: Float64 = 0.0f64;
+}
+
+function sum(value: Quad) -> (result: Float64)
+{
+    return value.a + value.b + value.c + value.d;
+}
+
+function make(a: Float64) -> (value: Quad)
+{
+    return explicit { a: a, b: 0.0f64, c: 0.0f64, d: 0.0f64 };
+}
+
+export function pass_chosen(first: Bool) -> (result: Float64)
+{
+    var fallback: Quad = {};
+    return sum(first ? make(1.0f64) : fallback);
+}

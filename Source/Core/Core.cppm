@@ -162,6 +162,13 @@ namespace iris
         friend bool operator==(Null_pointer_type const& lhs, Null_pointer_type const& rhs) = default;
     };
 
+    export struct Optional_type
+    {
+        std::pmr::vector<Type_reference> value_type;
+
+        friend bool operator==(Optional_type const& lhs, Optional_type const& rhs) = default;
+    };
+
     export struct Pointer_type
     {
         std::pmr::vector<Type_reference> element_type;
@@ -183,6 +190,14 @@ namespace iris
         std::uint64_t size;
 
         friend bool operator==(Constant_array_type const&, Constant_array_type const&) = default;
+    };
+
+    export struct Fixed_capacity_array_type
+    {
+        std::pmr::vector<Type_reference> value_type;
+        std::uint64_t capacity;
+
+        friend bool operator==(Fixed_capacity_array_type const&, Fixed_capacity_array_type const&) = default;
     };
 
     export struct Soa_array_type
@@ -224,6 +239,14 @@ namespace iris
         friend bool operator==(Parameter_type const&, Parameter_type const&) = default;
     };
 
+    export struct Lambda_type
+    {
+        std::pmr::vector<Type_reference> input_parameter_types;
+        std::pmr::vector<Type_reference> output_parameter_types;
+
+        friend bool operator==(Lambda_type const&, Lambda_type const&) = default;
+    };
+
     export struct Type_reference
     {
         using Data_type = std::variant<
@@ -235,12 +258,15 @@ namespace iris
             Fundamental_type,
             Function_pointer_type,
             Integer_type,
+            Lambda_type,
             Null_pointer_type,
+            Optional_type,
             Parameter_type,
             Pointer_type,
             Soa_array_type,
             Soa_array_view_type,
-            Type_instance
+            Type_instance,
+            Fixed_capacity_array_type
         >;
 
         Data_type data;
@@ -392,6 +418,34 @@ namespace iris
         std::optional<std::pmr::vector<Source_position>> output_parameter_source_positions;
 
         friend bool operator==(Function_declaration const&, Function_declaration const&) = default;
+    };
+
+    export struct Lambda_declaration
+    {
+        std::pmr::string name;
+        std::optional<std::pmr::string> unique_name;
+        std::pmr::vector<Type_reference> input_parameter_types;
+        std::pmr::vector<Type_reference> output_parameter_types;
+        std::pmr::vector<std::pmr::string> input_parameter_names;
+        std::pmr::vector<std::pmr::string> output_parameter_names;
+        std::optional<std::pmr::string> comment;
+        std::optional<Source_range_location> source_location;
+
+        friend bool operator==(Lambda_declaration const&, Lambda_declaration const&) = default;
+    };
+
+    export struct Lambda_expression
+    {
+        std::pmr::vector<std::pmr::string> parameter_names;
+        std::pmr::vector<std::optional<Type_reference>> parameter_types;  // explicit types; nullopt = inferred
+        std::pmr::vector<Source_position> parameter_source_positions;  // where each parameter name was written
+        std::optional<Source_range> input_parameters_source_range;  // the `(...)` list, so tooling can point just past it
+        std::optional<Type_reference> return_type;  // explicit return type; nullopt = inferred
+        Statement body;  // either an inline expression or a block
+        std::optional<std::pmr::vector<std::pmr::string>> captured_variables;  // variables captured from outer scope
+        std::optional<Source_range> source_range;
+
+        friend bool operator==(Lambda_expression const&, Lambda_expression const&) = default;
     };
 
     export struct Function_definition
@@ -580,6 +634,18 @@ namespace iris
         friend bool operator==(Dereference_and_access_expression const&, Dereference_and_access_expression const&) = default;
     };
 
+    // for <variable_name> in <range_expression> { ... }
+    // Only valid when the range expression is a call to a pipeline. Pipeline_pass lowers it to a For_loop_expression.
+    export struct For_each_expression
+    {
+        std::pmr::string variable_name;
+        Expression_index range_expression;
+        std::pmr::vector<Statement> then_statements;
+        std::optional<Source_position> variable_name_source_position;  // where the loop variable name was written
+
+        friend bool operator==(For_each_expression const&, For_each_expression const&) = default;
+    };
+
     export struct For_loop_expression
     {
         std::pmr::string variable_name;
@@ -678,6 +744,45 @@ namespace iris
         friend bool operator==(Parenthesis_expression const&, Parenthesis_expression const&) = default;
     };
 
+    // New kinds are appended, since binary serialization stores the value. Take_while stops the
+    // whole loop at the first element whose expression is false. Enumerate has no expression and
+    // binds the element's index in the inputs.
+    export enum class Pipeline_stage_kind
+    {
+        Map,
+        Filter,
+        Take_while,
+        Enumerate
+    };
+
+    export struct Pipeline_stage
+    {
+        Pipeline_stage_kind kind;
+        Statement expression;
+        std::optional<std::pmr::string> binding_name;  // Map and Enumerate
+        std::optional<Source_range> source_range;
+        std::optional<Source_position> binding_name_source_position;  // where the binding name after `=>` was written
+
+        friend bool operator==(Pipeline_stage const&, Pipeline_stage const&) = default;
+    };
+
+    // A function-local, compile-time recipe of map/filter stages. It is never a runtime value:
+    // Pipeline_pass expands it inline at every sink that consumes it, then removes the declaration.
+    export struct Pipeline_expression
+    {
+        std::pmr::string name;
+        std::pmr::vector<std::pmr::string> input_parameter_names;
+        std::pmr::vector<Type_reference> input_parameter_types;
+        std::pmr::vector<Pipeline_stage> stages;
+        std::optional<std::pmr::vector<Source_position>> input_parameter_source_positions;
+        std::optional<Source_position> name_source_position;  // where the pipeline name was written
+        // Whether each parameter was declared `mutable`, so the loop body can write the element. Empty
+        // means none were.
+        std::pmr::vector<bool> input_parameter_is_mutable;
+
+        friend bool operator==(Pipeline_expression const&, Pipeline_expression const&) = default;
+    };
+
     export struct Reflection_expression
     {
         std::pmr::string name;
@@ -699,6 +804,26 @@ namespace iris
         Struct_declaration declaration;
 
         friend bool operator==(Struct_expression const&, Struct_expression const&) = default;
+    };
+
+    // Runs `statements` in a new scope, then evaluates `result` as the value of the whole expression.
+    // Only compiler passes create it (Pipeline_pass expands value sinks into it); the parser never does.
+    export struct Statement_block_expression
+    {
+        std::pmr::vector<Statement> statements;
+        Statement result;
+
+        friend bool operator==(Statement_block_expression const&, Statement_block_expression const&) = default;
+    };
+
+    // <begin> to <end>: the integers from begin up to, but not including, end. Only valid as a pipeline
+    // input; Pipeline_pass lowers it to a loop over the range.
+    export struct Range_expression
+    {
+        Expression_index begin;
+        Expression_index end;
+
+        friend bool operator==(Range_expression const&, Range_expression const&) = default;
     };
 
     export struct Switch_case_expression_pair
@@ -795,6 +920,8 @@ namespace iris
 
     export struct Expression
     {
+        // New alternatives are appended rather than sorted, so that the indices of existing
+        // alternatives stay stable: hashes and binary serialization depend on them.
         using Data_type = std::variant <
             Access_expression,
             Access_array_expression,
@@ -818,6 +945,7 @@ namespace iris
             If_expression,
             Instantiate_expression,
             Invalid_expression,
+            Lambda_expression,
             Null_pointer_expression,
             Parenthesis_expression,
             Reflection_expression,
@@ -831,7 +959,11 @@ namespace iris
             Variable_declaration_expression,
             Variable_declaration_with_type_expression,
             Variable_expression,
-            While_loop_expression
+            While_loop_expression,
+            For_each_expression,
+            Pipeline_expression,
+            Statement_block_expression,
+            Range_expression
         > ;
 
         Data_type data;
@@ -917,6 +1049,10 @@ namespace iris
         std::pmr::vector<Function_declaration> function_declarations;
         std::pmr::vector<Function_constructor> function_constructors;
         std::pmr::vector<Type_constructor> type_constructors;
+        std::pmr::vector<Lambda_declaration> lambda_declarations;
+        // Pipelines declared at module level. Every function of the module can consume them; their
+        // stages read only their parameters and module-level names.
+        std::pmr::vector<Pipeline_expression> pipeline_declarations;
 
         friend bool operator==(Module_declarations const&, Module_declarations const&) = default;
     };
@@ -974,6 +1110,7 @@ namespace iris
     export std::optional<Function_declaration const*> find_function_declaration(Module const& module, std::string_view name);
     export std::optional<Function_definition const*> find_function_definition(Module const& module, std::string_view name);
     export std::optional<Global_variable_declaration const*> find_global_variable_declaration(Module const& module, std::string_view name);
+    export std::optional<Lambda_declaration const*> find_lambda_declaration(Module const& module, std::string_view name);
     export std::optional<Struct_declaration const*> find_struct_declaration(Module const& module, std::string_view name);
     export std::optional<Union_declaration const*> find_union_declaration(Module const& module, std::string_view name);
 

@@ -1,0 +1,54 @@
+=========================
+Fixed capacity array type
+=========================
+
+module Fixed_capacity_array_type;
+
+export function run(a: Fixed_capacity_array::<Int32, 4>) -> ()
+{
+    mutable b: Fixed_capacity_array::<Int32, 8> = {};
+}
+
+---
+
+(Module
+  (Module_declaration
+    (Module_name
+      (Identifier_with_dots
+        (Identifier))))
+  (Declaration
+    (Function
+      (Function_declaration
+        (Function_name
+          (Identifier))
+        (Function_input_parameters
+          (Function_parameter
+            (Function_parameter_name
+              (Identifier))
+            (Function_parameter_type
+              (Type
+                (Fixed_capacity_array_type
+                  (Type
+                    (Type_name
+                      (Identifier)))
+                  (Fixed_capacity_array_capacity
+                    (Number)))))))
+        (Function_output_parameters))
+      (Function_definition
+        (Block
+          (Statement
+            (Expression_variable_declaration_with_type
+              (Expression_variable_mutability)
+              (Variable_name
+                (Identifier))
+              (Expression_variable_declaration_type
+                (Type
+                  (Fixed_capacity_array_type
+                    (Type
+                      (Type_name
+                        (Identifier)))
+                    (Fixed_capacity_array_capacity
+                      (Number)))))
+              (Generic_expression_or_instantiate
+                (Expression_instantiate
+                  (Expression_instantiate_members))))))))))

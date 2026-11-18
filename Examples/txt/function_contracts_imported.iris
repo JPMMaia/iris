@@ -1,0 +1,17 @@
+module Function_contracts_imported;
+
+import Function_contracts_imported_dependency as limits;
+
+export function make(count: Uint32) -> (result: Uint32)
+    precondition "count <= maximum_count" { count > 0u32 && count <= limits.maximum_count() }
+    precondition "count fits in Count" { (count as limits.Count) < 16u32 }
+    postcondition "result >= minimum_result" { result >= limits.minimum_result() }
+{
+    return validate(count);
+}
+
+function validate(value: Uint32) -> (result: Uint32)
+    precondition "value is valid" { limits.is_valid(value) }
+{
+    return value;
+}

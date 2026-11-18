@@ -1287,6 +1287,75 @@ namespace iris::language_server
         return Signature_help_kind::None;
     }
 
+    // A call whose callee is a lambda-typed value is answered by the lambda declaration, which is
+    // where its parameter names and types are written.
+    static std::optional<Signature_help_name> find_called_lambda_name(
+        Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Source_position const& source_position
+    )
+    {
+        std::optional<Signature_help_name> name = std::nullopt;
+        std::optional<iris::Source_range> call_range = std::nullopt;
+
+        auto const is_more_nested_range = [](iris::Source_range const& lhs, iris::Source_range const& rhs) -> bool
+        {
+            bool const lhs_starts_later =
+                lhs.start.line > rhs.start.line ||
+                (lhs.start.line == rhs.start.line && lhs.start.column >= rhs.start.column);
+            bool const lhs_ends_earlier =
+                lhs.end.line < rhs.end.line ||
+                (lhs.end.line == rhs.end.line && lhs.end.column <= rhs.end.column);
+
+            return lhs_starts_later && lhs_ends_earlier;
+        };
+
+        visit_expressions_that_contain_position(
+            declaration_database,
+            core_module,
+            source_position,
+            [&](iris::Function_declaration const* function_declaration, iris::compiler::Scope const& scope, iris::Statement const& statement, iris::Expression const& expression) -> bool
+            {
+                if (!std::holds_alternative<iris::Call_expression>(expression.data) || !expression.source_range.has_value())
+                    return false;
+
+                if (call_range.has_value() && !is_more_nested_range(expression.source_range.value(), call_range.value()))
+                    return false;
+
+                iris::Call_expression const& call_expression = std::get<iris::Call_expression>(expression.data);
+                iris::Expression const& callee = statement.expressions[call_expression.expression.expression_index];
+
+                std::optional<iris::Type_reference> const callee_type = iris::compiler::get_expression_type(
+                    core_module.name,
+                    function_declaration,
+                    scope,
+                    statement,
+                    callee,
+                    std::nullopt,
+                    declaration_database
+                );
+                if (!callee_type.has_value())
+                    return false;
+
+                std::optional<Declaration> const declaration = find_declaration(declaration_database, callee_type.value());
+                if (!declaration.has_value() || !std::holds_alternative<iris::Lambda_declaration const*>(declaration->data))
+                    return false;
+
+                iris::Lambda_declaration const& lambda_declaration = *std::get<iris::Lambda_declaration const*>(declaration->data);
+
+                call_range = expression.source_range;
+                name = Signature_help_name
+                {
+                    .module_name = declaration->module_name,
+                    .declaration_name = lambda_declaration.name,
+                };
+                return false;
+            }
+        );
+
+        return name;
+    }
+
     std::optional<Signature_help_name> find_function_call_module_and_function_name(
         Declaration_database const& declaration_database,
         iris::parser::Parse_tree const& parse_tree,
@@ -1295,6 +1364,15 @@ namespace iris::language_server
     )
     {
         iris::Source_position const source_position = to_source_position(position);
+
+        std::optional<Signature_help_name> const lambda_name = find_called_lambda_name(
+            declaration_database,
+            core_module,
+            source_position
+        );
+        if (lambda_name.has_value())
+            return lambda_name;
+
         iris::parser::Parse_node const root_node = iris::parser::get_root_node(parse_tree);
         iris::parser::Parse_node const smallest_node = iris::parser::get_smallest_node_that_contains_position(
             root_node,
@@ -1523,6 +1601,205 @@ namespace iris::language_server
         }
 
         return best_result;
+    }
+
+    static std::string build_lambda_signature_label(
+        iris::Module const& core_module,
+        iris::Lambda_declaration const& declaration,
+        std::vector<lsp::ParameterInformation>& parameters,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        std::string label = "lambda ";
+        label += std::string_view(declaration.name);
+        label += '(';
+
+        for (std::size_t index = 0; index < declaration.input_parameter_names.size(); ++index)
+        {
+            if (index > 0)
+                label += ", ";
+
+            lsp::uint const parameter_start = static_cast<lsp::uint>(label.size());
+
+            label += std::string_view(declaration.input_parameter_names[index]);
+            label += ": ";
+
+            std::pmr::string const type_text = iris::format_type_reference(
+                core_module.dependencies,
+                declaration.input_parameter_types[index],
+                output_allocator,
+                temporaries_allocator
+            );
+            label.append(type_text.data(), type_text.size());
+
+            lsp::uint const parameter_end = static_cast<lsp::uint>(label.size());
+
+            lsp::ParameterInformation parameter_info;
+            parameter_info.label = lsp::Tuple<lsp::uint, lsp::uint>{parameter_start, parameter_end};
+
+            if (declaration.comment.has_value())
+            {
+                std::optional<std::string> const parameter_doc =
+                    extract_parameter_doc(declaration.comment.value(), declaration.input_parameter_names[index]);
+                if (parameter_doc.has_value())
+                    parameter_info.documentation = parameter_doc.value();
+            }
+
+            parameters.push_back(std::move(parameter_info));
+        }
+
+        label += ')';
+        label += " -> (";
+
+        for (std::size_t index = 0; index < declaration.output_parameter_names.size(); ++index)
+        {
+            if (index > 0)
+                label += ", ";
+
+            label += std::string_view(declaration.output_parameter_names[index]);
+            label += ": ";
+
+            std::pmr::string const type_text = iris::format_type_reference(
+                core_module.dependencies,
+                declaration.output_parameter_types[index],
+                output_allocator,
+                temporaries_allocator
+            );
+            label.append(type_text.data(), type_text.size());
+        }
+
+        label += ')';
+        return label;
+    }
+
+    static lsp::TextDocument_SignatureHelpResult compute_lambda_signature_help(
+        iris::Module const& core_module,
+        iris::Lambda_declaration const& lambda_declaration,
+        std::uint32_t const active_parameter
+    )
+    {
+        std::pmr::polymorphic_allocator<> const output_allocator;
+        std::pmr::polymorphic_allocator<> const temporaries_allocator;
+
+        std::vector<lsp::ParameterInformation> parameters;
+        std::string const label = build_lambda_signature_label(
+            core_module,
+            lambda_declaration,
+            parameters,
+            output_allocator,
+            temporaries_allocator
+        );
+
+        lsp::SignatureInformation signature_info;
+        signature_info.label = label;
+        signature_info.parameters = std::move(parameters);
+
+        if (lambda_declaration.comment.has_value())
+        {
+            std::optional<std::string> const doc = extract_function_doc(lambda_declaration.comment.value());
+            if (doc.has_value())
+                signature_info.documentation = doc.value();
+        }
+
+        lsp::SignatureHelp signature_help;
+        signature_help.signatures.push_back(std::move(signature_info));
+        signature_help.activeSignature = 0;
+        signature_help.activeParameter = active_parameter;
+        return signature_help;
+    }
+
+    // A call of a pipeline, `p(xs)`, or of one of its sinks, `p(xs).into(out)` or `p.in_place(xs)`.
+    // Pipelines are not declarations, so they are found through the scope at the call.
+    static std::optional<Pipeline_signature> find_called_pipeline_signature(
+        Declaration_database const& declaration_database,
+        iris::Module const& core_module,
+        iris::Source_position const& source_position
+    )
+    {
+        std::optional<Pipeline_signature> signature = std::nullopt;
+        std::optional<iris::Source_range> call_range = std::nullopt;
+
+        auto const is_more_nested_range = [](iris::Source_range const& lhs, iris::Source_range const& rhs) -> bool
+        {
+            bool const lhs_starts_later =
+                lhs.start.line > rhs.start.line ||
+                (lhs.start.line == rhs.start.line && lhs.start.column >= rhs.start.column);
+            bool const lhs_ends_earlier =
+                lhs.end.line < rhs.end.line ||
+                (lhs.end.line == rhs.end.line && lhs.end.column <= rhs.end.column);
+
+            return lhs_starts_later && lhs_ends_earlier;
+        };
+
+        visit_expressions_that_contain_position(
+            declaration_database,
+            core_module,
+            source_position,
+            [&](iris::Function_declaration const* function_declaration, iris::compiler::Scope const& scope, iris::Statement const& statement, iris::Expression const& expression) -> bool
+            {
+                if (!std::holds_alternative<iris::Call_expression>(expression.data) || !expression.source_range.has_value())
+                    return false;
+
+                if (call_range.has_value() && !is_more_nested_range(expression.source_range.value(), call_range.value()))
+                    return false;
+
+                std::optional<Pipeline_signature> found_signature = std::nullopt;
+
+                iris::Pipeline_expression const* const pipeline = iris::compiler::get_pipeline_from_call_expression(scope, statement, expression);
+                if (pipeline != nullptr)
+                {
+                    found_signature = create_pipeline_signature(core_module, declaration_database, function_declaration, scope, *pipeline);
+                }
+                else
+                {
+                    std::optional<iris::compiler::Pipeline_sink_call> const sink_call = iris::compiler::get_pipeline_sink_call(scope, statement, expression);
+                    if (sink_call.has_value())
+                        found_signature = create_pipeline_sink_signature(core_module, declaration_database, function_declaration, scope, statement, sink_call.value());
+                }
+
+                // The innermost call decides, so `p(f(|))` is answered for `f`, not for `p`.
+                call_range = expression.source_range;
+                signature = std::move(found_signature);
+                return false;
+            }
+        );
+
+        return signature;
+    }
+
+    static lsp::TextDocument_SignatureHelpResult create_pipeline_signature_help(
+        Pipeline_signature const& signature,
+        std::uint32_t const active_parameter
+    )
+    {
+        std::vector<lsp::ParameterInformation> parameters;
+        parameters.reserve(signature.parameters.size());
+
+        std::size_t search_start = 0;
+        for (std::string const& parameter : signature.parameters)
+        {
+            std::size_t const parameter_start = signature.label.find(parameter, search_start);
+            if (parameter_start == std::string::npos)
+                break;
+
+            std::size_t const parameter_end = parameter_start + parameter.size();
+            search_start = parameter_end;
+
+            lsp::ParameterInformation parameter_info;
+            parameter_info.label = lsp::Tuple<lsp::uint, lsp::uint>{static_cast<lsp::uint>(parameter_start), static_cast<lsp::uint>(parameter_end)};
+            parameters.push_back(std::move(parameter_info));
+        }
+
+        lsp::SignatureInformation signature_info;
+        signature_info.label = signature.label;
+        signature_info.parameters = std::move(parameters);
+
+        lsp::SignatureHelp signature_help;
+        signature_help.signatures.push_back(std::move(signature_info));
+        signature_help.activeSignature = 0;
+        signature_help.activeParameter = active_parameter;
+        return signature_help;
     }
 
     lsp::TextDocument_SignatureHelpResult compute_function_signature_help(
@@ -2142,6 +2419,21 @@ namespace iris::language_server
 
         if (kind == Signature_help_kind::Function)
         {
+            std::optional<Pipeline_signature> const pipeline_signature = find_called_pipeline_signature(
+                declaration_database,
+                core_module,
+                to_source_position(position)
+            );
+            if (pipeline_signature.has_value())
+            {
+                std::optional<std::uint32_t> const pipeline_active_parameter = find_function_call_active_parameter(
+                    parse_tree,
+                    position
+                );
+
+                return create_pipeline_signature_help(pipeline_signature.value(), pipeline_active_parameter.value_or(0));
+            }
+
             std::optional<Signature_help_name> const name = find_function_call_module_and_function_name(
                 declaration_database,
                 parse_tree,
@@ -2161,11 +2453,20 @@ namespace iris::language_server
                 name->module_name,
                 name->declaration_name
             );
-            if (!declaration.has_value() ||
-                !std::holds_alternative<iris::Function_declaration const*>(declaration->data))
-            {
+            if (!declaration.has_value())
                 return nullptr;
+
+            if (std::holds_alternative<iris::Lambda_declaration const*>(declaration->data))
+            {
+                return compute_lambda_signature_help(
+                    core_module,
+                    *std::get<iris::Lambda_declaration const*>(declaration->data),
+                    active_parameter.value()
+                );
             }
+
+            if (!std::holds_alternative<iris::Function_declaration const*>(declaration->data))
+                return nullptr;
 
             iris::Function_declaration const& function_declaration =
                 *std::get<iris::Function_declaration const*>(declaration->data);

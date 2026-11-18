@@ -54,6 +54,13 @@ namespace iris::compiler
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
+    export std::pmr::vector<iris::compiler::Diagnostic> validate_alias_type_declaration(
+        iris::Module const& core_module,
+        iris::Alias_type_declaration const& declaration,
+        Declaration_database const& declaration_database,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     export std::pmr::vector<iris::compiler::Diagnostic> validate_enum_declaration(
         iris::Module const& core_module,
         iris::Enum_declaration const& declaration,
@@ -106,6 +113,31 @@ namespace iris::compiler
         std::span<iris::Statement const> const statements,
         Declaration_database const& declaration_database,
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    // The type an expression is expected to produce from where it sits in the statement:
+    // the declared type of the variable it initializes, the enclosing function's output type
+    // when it is returned, or the callee's parameter type when it is an argument.
+    export std::optional<iris::Type_reference> get_expected_expression_type(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope const& scope,
+        Declaration_database const& declaration_database,
+        iris::Statement const& statement,
+        std::optional<iris::Type_reference> const expected_statement_type,
+        std::size_t const expression_index
+    );
+
+    // Like visit_statements_using_scope, but it also walks the body of every lambda literal it meets,
+    // with the lambda's parameters added to the scope (typed from the lambda's resolved signature).
+    // Lambdas whose signature cannot be resolved are not entered.
+    export void visit_statements_using_scope_including_lambda_bodies(
+        std::string_view const module_name,
+        iris::Function_declaration const* const function_declaration,
+        Scope& scope,
+        std::span<iris::Statement const> const statements,
+        Declaration_database const& declaration_database,
+        std::function<void(iris::Statement const&, Scope const&)> const& callback
     );
 
     export std::pmr::vector<iris::compiler::Diagnostic> validate_statement(
@@ -203,9 +235,27 @@ namespace iris::compiler
         std::optional<iris::Source_range> const& source_range
     );
 
+    std::pmr::vector<iris::compiler::Diagnostic> validate_for_each_expression(
+        Validate_expression_parameters const& parameters,
+        iris::For_each_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    );
+
+    std::pmr::vector<iris::compiler::Diagnostic> validate_range_expression(
+        Validate_expression_parameters const& parameters,
+        iris::Range_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    );
+
     std::pmr::vector<iris::compiler::Diagnostic> validate_for_loop_expression(
         Validate_expression_parameters const& parameters,
         iris::For_loop_expression const& expression,
+        std::optional<iris::Source_range> const& source_range
+    );
+
+    std::pmr::vector<iris::compiler::Diagnostic> validate_pipeline_expression(
+        Validate_expression_parameters const& parameters,
+        iris::Pipeline_expression const& expression,
         std::optional<iris::Source_range> const& source_range
     );
 

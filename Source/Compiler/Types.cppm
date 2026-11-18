@@ -184,6 +184,10 @@ namespace iris::compiler
         std::uint64_t array_length
     );
 
+    export llvm::StructType* create_lambda_llvm_type(
+        llvm::LLVMContext& llvm_context
+    );
+
     export llvm::FunctionType* create_llvm_function_type(
         llvm::LLVMContext& llvm_context,
         llvm::DataLayout const& llvm_data_layout,

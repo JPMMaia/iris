@@ -1,0 +1,13 @@
+module crashrepro.a_first;
+
+@test
+function test_a_one() -> ()
+{
+    check(1u32 == 1u32);
+}
+
+@test
+function test_a_two() -> ()
+{
+    check(2u32 == 2u32);
+}

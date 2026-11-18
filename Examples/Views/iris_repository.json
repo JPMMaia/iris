@@ -1,0 +1,9 @@
+{
+    "name": "Views",
+    "artifacts": [
+        {
+            "name": "views",
+            "location": "app/iris_artifact.json"
+        }
+    ]
+}

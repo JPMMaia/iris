@@ -78,6 +78,13 @@ namespace iris
             visit_expressions_recursively(statement, statement.expressions[data.expression.expression_index], predicate);
         }
         
+        if (std::holds_alternative<For_each_expression>(expression.data))
+        {
+            For_each_expression const& data = std::get<For_each_expression>(expression.data);
+
+            visit_expressions_recursively(statement, statement.expressions[data.range_expression.expression_index], predicate);
+        }
+        
         if (std::holds_alternative<For_loop_expression>(expression.data))
         {
             For_loop_expression const& data = std::get<For_loop_expression>(expression.data);
@@ -115,6 +122,14 @@ namespace iris
 
             if (data.expression.has_value())
                 visit_expressions_recursively(statement, statement.expressions[data.expression->expression_index], predicate);
+        }
+        
+        if (std::holds_alternative<Range_expression>(expression.data))
+        {
+            Range_expression const& data = std::get<Range_expression>(expression.data);
+
+            visit_expressions_recursively(statement, statement.expressions[data.begin.expression_index], predicate);
+            visit_expressions_recursively(statement, statement.expressions[data.end.expression_index], predicate);
         }
         
         if (std::holds_alternative<Switch_expression>(expression.data))

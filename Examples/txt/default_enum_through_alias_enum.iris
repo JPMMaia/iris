@@ -1,0 +1,7 @@
+module Default_enum_through_alias_enum;
+
+export enum Mouse_button
+{
+    Left = 1,
+    Right = 3,
+}

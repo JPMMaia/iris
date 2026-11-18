@@ -1,0 +1,13 @@
+module crashrepro.c_last;
+
+@test
+function test_c_never_runs_one() -> ()
+{
+    check(1u32 == 1u32);
+}
+
+@test
+function test_c_never_runs_two() -> ()
+{
+    check(1u32 == 1u32);
+}

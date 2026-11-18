@@ -154,6 +154,16 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
+    iris::Lambda_declaration node_to_lambda_declaration(
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::optional<std::string_view> const unique_name,
+        std::optional<std::pmr::string> const& comment,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     iris::Union_declaration node_to_union_declaration(
         Module_info const& module_info,
         Parse_tree const& tree,
@@ -297,7 +307,7 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
-    iris::Comment_expression node_to_expression_comment(
+    iris::Statement comment_node_to_statement(
         Parse_tree const& tree,
         Parse_node const& node,
         std::pmr::polymorphic_allocator<> const& output_allocator,
@@ -327,6 +337,15 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
+    iris::For_each_expression node_to_expression_for_each(
+        iris::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     iris::For_loop_expression node_to_expression_for_loop(
         iris::Statement& statement,
         Module_info const& module_info,
@@ -336,7 +355,24 @@ namespace iris::parser
         std::pmr::polymorphic_allocator<> const& temporaries_allocator
     );
 
+    iris::Pipeline_expression node_to_expression_pipeline(
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
     iris::Function_expression node_to_expression_function(
+        iris::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
+
+    iris::Lambda_expression node_to_expression_lambda(
         iris::Statement& statement,
         Module_info const& module_info,
         Parse_tree const& tree,
@@ -373,6 +409,15 @@ namespace iris::parser
     );
 
     iris::Null_pointer_expression node_to_expression_null_pointer();
+
+    iris::Range_expression node_to_expression_range(
+        iris::Statement& statement,
+        Module_info const& module_info,
+        Parse_tree const& tree,
+        Parse_node const& node,
+        std::pmr::polymorphic_allocator<> const& output_allocator,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    );
 
     iris::Parenthesis_expression node_to_expression_parenthesis(
         iris::Statement& statement,

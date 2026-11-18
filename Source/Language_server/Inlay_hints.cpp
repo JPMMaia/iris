@@ -3,6 +3,7 @@ module;
 #include <format>
 #include <memory_resource>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include <lsp/types.h>
@@ -10,14 +11,161 @@ module;
 module iris.language_server.inlay_hints;
 
 import iris.compiler.analysis;
+import iris.compiler.validation;
 import iris.core;
 import iris.core.declarations;
 import iris.core.formatter;
 import iris.core.types;
 import iris.language_server.core;
+import iris.language_server.location;
 
 namespace iris::language_server
 {
+    // A lambda literal writes the types it wants to leave out: a parameter without an annotation and
+    // an omitted return type both get a hint showing what they were resolved to.
+    static void add_lambda_inlay_hints(
+        std::pmr::vector<lsp::InlayHint>& output,
+        iris::Module const& core_module,
+        iris::Function_declaration const& function_declaration,
+        iris::Declaration_database const& declaration_database,
+        iris::compiler::Scope const& scope,
+        iris::Statement const& statement,
+        std::size_t const expression_index,
+        iris::Lambda_expression const& lambda_expression,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        std::optional<iris::Type_reference> const expected_type = iris::compiler::get_expected_expression_type(
+            core_module.name,
+            &function_declaration,
+            scope,
+            declaration_database,
+            statement,
+            std::nullopt,
+            expression_index
+        );
+
+        std::optional<iris::compiler::Type_info> const type_info = iris::compiler::get_expression_type_info(
+            core_module.name,
+            &function_declaration,
+            scope,
+            statement,
+            statement.expressions[expression_index],
+            expected_type,
+            declaration_database
+        );
+        if (!type_info.has_value())
+            return;
+
+        std::optional<iris::Lambda_type> const lambda_type = iris::compiler::resolve_lambda_type(declaration_database, type_info->type);
+        if (!lambda_type.has_value())
+            return;
+
+        if (lambda_type->input_parameter_types.size() != lambda_expression.parameter_names.size())
+            return;
+
+        if (lambda_expression.parameter_source_positions.size() == lambda_expression.parameter_names.size())
+        {
+            for (std::size_t index = 0; index < lambda_expression.parameter_names.size(); ++index)
+            {
+                if (index < lambda_expression.parameter_types.size() && lambda_expression.parameter_types[index].has_value())
+                    continue;
+
+                iris::Source_position const& parameter_position = lambda_expression.parameter_source_positions[index];
+
+                lsp::Position const position
+                {
+                    .line = parameter_position.line - 1,
+                    .character = parameter_position.column - 1 + static_cast<std::uint32_t>(lambda_expression.parameter_names[index].size()),
+                };
+
+                std::vector<lsp::InlayHintLabelPart> label = create_inlay_hint_variable_type_label(
+                    core_module,
+                    declaration_database,
+                    lambda_type->input_parameter_types[index],
+                    temporaries_allocator
+                );
+
+                output.push_back(
+                    lsp::InlayHint
+                    {
+                        .position = position,
+                        .label = std::move(label),
+                        .kind = lsp::InlayHintKind::Type,
+                        .textEdits = std::nullopt,
+                        .tooltip = std::nullopt,
+                    }
+                );
+            }
+        }
+
+        if (lambda_expression.return_type.has_value() ||
+            !lambda_expression.input_parameters_source_range.has_value() ||
+            lambda_type->output_parameter_types.size() != 1)
+        {
+            return;
+        }
+
+        iris::Source_position const& parameters_end = lambda_expression.input_parameters_source_range->end;
+
+        lsp::Position const position
+        {
+            .line = parameters_end.line - 1,
+            .character = parameters_end.column - 1,
+        };
+
+        std::vector<lsp::InlayHintLabelPart> label;
+        label.push_back(lsp::InlayHintLabelPart{ .value = "-> " });
+
+        create_inlay_hint_variable_type_label_aux(
+            label,
+            core_module,
+            declaration_database,
+            lambda_type->output_parameter_types[0],
+            temporaries_allocator
+        );
+
+        output.push_back(
+            lsp::InlayHint
+            {
+                .position = position,
+                .label = std::move(label),
+                .kind = lsp::InlayHintKind::Type,
+                .textEdits = std::nullopt,
+                .tooltip = std::nullopt,
+            }
+        );
+    }
+
+    // `: <type>` right after a name written at `name_position`.
+    static void add_name_type_inlay_hint(
+        std::pmr::vector<lsp::InlayHint>& output,
+        iris::Module const& core_module,
+        iris::Declaration_database const& declaration_database,
+        iris::Source_position const& name_position,
+        std::string_view const name,
+        iris::Type_reference const& type,
+        std::pmr::polymorphic_allocator<> const& temporaries_allocator
+    )
+    {
+        lsp::Position const position
+        {
+            .line = name_position.line - 1,
+            .character = name_position.column - 1 + static_cast<std::uint32_t>(name.size()),
+        };
+
+        output.push_back(
+            lsp::InlayHint
+            {
+                .position = position,
+                .label = create_inlay_hint_variable_type_label(core_module, declaration_database, type, temporaries_allocator),
+                .kind = lsp::InlayHintKind::Type,
+                .textEdits = std::nullopt,
+                .tooltip = std::nullopt,
+            }
+        );
+    }
+
     std::pmr::vector<lsp::InlayHint> create_function_inlay_hints(
         iris::Module const& core_module,
         iris::Function_declaration const& function_declaration,
@@ -40,11 +188,30 @@ namespace iris::language_server
             function_declaration.type.input_parameter_types,
             function_declaration.input_parameter_source_positions
         );
+        iris::compiler::add_module_pipelines_to_scope(scope, core_module);
 
         auto const process_statement = [&](iris::Statement const& statement, iris::compiler::Scope const& scope) -> void
         {
             if (statement.expressions.empty())
                 return;
+
+            for (std::size_t index = 0; index < statement.expressions.size(); ++index)
+            {
+                if (!std::holds_alternative<iris::Lambda_expression>(statement.expressions[index].data))
+                    continue;
+
+                add_lambda_inlay_hints(
+                    output,
+                    core_module,
+                    function_declaration,
+                    declaration_database,
+                    scope,
+                    statement,
+                    index,
+                    std::get<iris::Lambda_expression>(statement.expressions[index].data),
+                    temporaries_allocator
+                );
+            }
 
             iris::Expression const& expression = statement.expressions[0];
 
@@ -96,14 +263,79 @@ namespace iris::language_server
 
                 output.push_back(std::move(inlay_hint));
             }
+            else if (std::holds_alternative<iris::Pipeline_expression>(expression.data))
+            {
+                iris::Pipeline_expression const& pipeline = std::get<iris::Pipeline_expression>(expression.data);
+
+                // Each map binding gets the type it was deduced to, after its name. Enumerate
+                // bindings are always Uint64 and parameters are always annotated.
+                iris::compiler::Scope binding_scope = scope;
+                iris::compiler::add_pipeline_parameters_to_scope(binding_scope, pipeline);
+
+                for (iris::Pipeline_stage const& stage : pipeline.stages)
+                {
+                    std::size_t const variable_count = binding_scope.variables.size();
+                    iris::compiler::add_pipeline_stage_binding_to_scope(core_module.name, &function_declaration, binding_scope, stage, declaration_database);
+
+                    if (stage.kind != iris::Pipeline_stage_kind::Map || !stage.binding_name.has_value() || !stage.binding_name_source_position.has_value())
+                        continue;
+
+                    if (binding_scope.variables.size() == variable_count)
+                        continue;
+
+                    add_name_type_inlay_hint(
+                        output,
+                        core_module,
+                        declaration_database,
+                        stage.binding_name_source_position.value(),
+                        stage.binding_name.value(),
+                        binding_scope.variables.back().type,
+                        temporaries_allocator
+                    );
+                }
+            }
+            else if (std::holds_alternative<iris::For_each_expression>(expression.data))
+            {
+                iris::For_each_expression const& for_each_expression = std::get<iris::For_each_expression>(expression.data);
+                if (!for_each_expression.variable_name_source_position.has_value())
+                    return;
+
+                iris::Pipeline_expression const* const pipeline = iris::compiler::get_pipeline_from_call_expression(
+                    scope,
+                    statement,
+                    statement.expressions[for_each_expression.range_expression.expression_index]
+                );
+                if (pipeline == nullptr)
+                    return;
+
+                std::optional<iris::Type_reference> const type = iris::compiler::get_pipeline_output_type(
+                    core_module.name,
+                    &function_declaration,
+                    scope,
+                    *pipeline,
+                    declaration_database
+                );
+                if (!type.has_value())
+                    return;
+
+                add_name_type_inlay_hint(
+                    output,
+                    core_module,
+                    declaration_database,
+                    for_each_expression.variable_name_source_position.value(),
+                    for_each_expression.variable_name,
+                    type.value(),
+                    temporaries_allocator
+                );
+            }
         };
 
-        iris::compiler::visit_statements_using_scope(
-            core_module.name,
+        visit_statements_using_scope_including_lambda_bodies(
+            declaration_database,
+            core_module,
             &function_declaration,
             scope,
             function_definition.statements,
-            declaration_database,
             process_statement
         );
 
@@ -232,6 +464,34 @@ namespace iris::language_server
                 lsp::InlayHintLabelPart
                 {
                     .value = std::format(", {}>", constant_array_type.size),
+                }
+            );
+        }
+        else if (std::holds_alternative<iris::Fixed_capacity_array_type>(type.data))
+        {
+            iris::Fixed_capacity_array_type const& fixed_capacity_array_type = std::get<iris::Fixed_capacity_array_type>(type.data);
+            if (fixed_capacity_array_type.value_type.empty())
+                return;
+
+            parts.push_back(
+                lsp::InlayHintLabelPart
+                {
+                    .value = "Fixed_capacity_array::<",
+                }
+            );
+
+            create_inlay_hint_variable_type_label_aux(
+                parts,
+                core_module,
+                declaration_database,
+                fixed_capacity_array_type.value_type[0],
+                temporaries_allocator
+            );
+
+            parts.push_back(
+                lsp::InlayHintLabelPart
+                {
+                    .value = std::format(", {}>", fixed_capacity_array_type.capacity),
                 }
             );
         }

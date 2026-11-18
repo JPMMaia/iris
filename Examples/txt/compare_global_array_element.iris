@@ -1,0 +1,19 @@
+module Compare_global_array_element;
+
+mutable g_text: Constant_array::<C_char, 8> = [];
+mutable g_numbers: Constant_array::<Int32, 4> = [];
+
+export function text_is_empty() -> (result: Bool)
+{
+    return g_text[0u64] == (0 as C_char);
+}
+
+export function second_is_positive() -> (result: Bool)
+{
+    return g_numbers[1u64] > 0i32;
+}
+
+export function first_text() -> (result: *C_char)
+{
+    return &g_text[0u64];
+}

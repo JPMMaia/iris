@@ -3,7 +3,7 @@ add_library(Iris::C_header_importer ALIAS Iris_C_header_importer)
 
 target_compile_features(Iris_C_header_importer PUBLIC cxx_std_23)
 
-target_link_libraries(Iris_C_header_importer PUBLIC Iris::Binary_serializer Iris::Common Iris::Core)
+target_link_libraries(Iris_C_header_importer PUBLIC Iris::Binary_serializer Iris::Common Iris::Core Iris::Parser)
 
 ## LLVM ##
 

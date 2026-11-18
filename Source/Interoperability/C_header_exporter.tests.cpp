@@ -184,6 +184,90 @@ namespace iris::c
         CHECK(exported_cpp_header.content == full_expected_content);
     }
 
+    TEST_CASE("Export Optional type", "[C_header_exporter][Optional]")
+    {
+        std::string_view const source = R"RAW(module my.namespace;
+
+export struct My_struct
+{
+    a: Optional::<Int32> = {};
+    b: Optional::<*Int32> = {};
+    c: *Int32 = null;
+}
+)RAW";
+
+        std::string_view const expected = R"RAW(
+struct Optional_Int32
+{
+    int32_t value;
+    bool has_value;
+};
+
+/** IRIS_META v=1 module=my.namespace name=My_struct kind=struct raw_pointer_members=c */
+struct my_namespace_My_struct
+{
+    struct Optional_Int32 a;
+    int32_t const* b;
+    int32_t const* c;
+};
+
+struct Array_slice_my_namespace_My_struct
+{
+    struct my_namespace_My_struct* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(source, {}, {}, expected);
+    }
+
+    TEST_CASE("Export Fixed_capacity_array type", "[C_header_exporter][Fixed_capacity_array]")
+    {
+        std::string_view const source = R"RAW(module my.namespace;
+
+export struct My_struct
+{
+    a: Fixed_capacity_array::<Int32, 4> = {};
+    b: Fixed_capacity_array::<Optional::<Int32>, 2> = {};
+}
+)RAW";
+
+        std::string_view const expected = R"RAW(
+struct Fixed_capacity_array_Int32_4
+{
+    int32_t values[4];
+    uint64_t length;
+};
+
+struct Optional_Int32
+{
+    int32_t value;
+    bool has_value;
+};
+
+struct Fixed_capacity_array_Optional_Int32_2
+{
+    struct Optional_Int32 values[2];
+    uint64_t length;
+};
+
+/** IRIS_META v=1 module=my.namespace name=My_struct kind=struct */
+struct my_namespace_My_struct
+{
+    struct Fixed_capacity_array_Int32_4 a;
+    struct Fixed_capacity_array_Optional_Int32_2 b;
+};
+
+struct Array_slice_my_namespace_My_struct
+{
+    struct my_namespace_My_struct* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(source, {}, {}, expected);
+    }
+
     TEST_CASE("Export structs")
     {
         std::string_view const input = R"RAW(module my.namespace;
@@ -400,7 +484,7 @@ export struct My_struct_b
 )RAW";
 
         std::string_view const expected = R"RAW(
-/** IRIS_META v=1 module=my.namespace name=My_node kind=struct */
+/** IRIS_META v=1 module=my.namespace name=My_node kind=struct raw_pointer_members=parent */
 struct my_namespace_My_node
 {
     struct my_namespace_My_node const* parent;
@@ -913,5 +997,237 @@ namespace my::namespace
 )RAW";
 
         test_cpp_exporter(input, "input.h", cpp_expected);
+    }
+
+    TEST_CASE("Export Lambda — Lambda declaration exports as struct with function pointer and user_data", "[C_header_exporter][Lambda]")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Comparator kind=lambda data=(a: Int32, b: Int32) -> (result: Int32) */
+struct my_namespace_Comparator
+{
+    int32_t (*function_pointer)(int32_t a, int32_t b, void* user_data);
+    void* user_data;
+};
+
+struct Array_slice_my_namespace_Comparator
+{
+    struct my_namespace_Comparator* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Export Lambda — Lambda with multiple parameter types exports correctly", "[C_header_exporter][Lambda]")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export lambda Predicate(value: Float32, name: String) -> (result: Bool);
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Predicate kind=lambda data=(value: Float32, name: String) -> (result: Bool) */
+struct my_namespace_Predicate
+{
+    bool (*function_pointer)(float value, String name, void* user_data);
+    void* user_data;
+};
+
+struct Array_slice_my_namespace_Predicate
+{
+    struct my_namespace_Predicate* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Export Lambda — Lambda with no parameters and no return type exports correctly", "[C_header_exporter][Lambda]")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export lambda Callback() -> ();
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Callback kind=lambda data=() -> () */
+struct my_namespace_Callback
+{
+    void (*function_pointer)(void* user_data);
+    void* user_data;
+};
+
+struct Array_slice_my_namespace_Callback
+{
+    struct my_namespace_Callback* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Export Lambda — Functions accepting lambda types generate proper C signatures", "[C_header_exporter][Lambda]")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export function filter(values: *Int32, count: Uint64, predicate: Comparator) -> ();
+export function apply(cmp: Comparator, x: Int32, y: Int32) -> (result: Int32);
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Comparator kind=lambda data=(a: Int32, b: Int32) -> (result: Int32) */
+struct my_namespace_Comparator
+{
+    int32_t (*function_pointer)(int32_t a, int32_t b, void* user_data);
+    void* user_data;
+};
+
+struct Array_slice_my_namespace_Comparator
+{
+    struct my_namespace_Comparator* data;
+    uint64_t size;
+};
+
+/** IRIS_META v=1 module=my.namespace name=filter kind=function */
+void my_namespace_filter(int32_t const* values, uint64_t count, struct my_namespace_Comparator predicate);
+/** IRIS_META v=1 module=my.namespace name=apply kind=function */
+int32_t my_namespace_apply(struct my_namespace_Comparator cmp, int32_t x, int32_t y);
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Export Lambda — Multiple lambda declarations with different signatures", "[C_header_exporter][Lambda]")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+export lambda Predicate(value: Float32) -> (result: Bool);
+export lambda Callback() -> ();
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Comparator kind=lambda data=(a: Int32, b: Int32) -> (result: Int32) */
+struct my_namespace_Comparator
+{
+    int32_t (*function_pointer)(int32_t a, int32_t b, void* user_data);
+    void* user_data;
+};
+
+struct Array_slice_my_namespace_Comparator
+{
+    struct my_namespace_Comparator* data;
+    uint64_t size;
+};
+
+/** IRIS_META v=1 module=my.namespace name=Predicate kind=lambda data=(value: Float32) -> (result: Bool) */
+struct my_namespace_Predicate
+{
+    bool (*function_pointer)(float value, void* user_data);
+    void* user_data;
+};
+
+struct Array_slice_my_namespace_Predicate
+{
+    struct my_namespace_Predicate* data;
+    uint64_t size;
+};
+
+/** IRIS_META v=1 module=my.namespace name=Callback kind=lambda data=() -> () */
+struct my_namespace_Callback
+{
+    void (*function_pointer)(void* user_data);
+    void* user_data;
+};
+
+struct Array_slice_my_namespace_Callback
+{
+    struct my_namespace_Callback* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Export Lambda — Lambda in struct member exports correctly", "[C_header_exporter][Lambda]")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export lambda Comparator(a: Int32, b: Int32) -> (result: Int32);
+
+export struct Sorter
+{
+    compare: Comparator = null;
+    data: *Int32 = null;
+    count: Uint64 = 0u64;
+}
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Comparator kind=lambda data=(a: Int32, b: Int32) -> (result: Int32) */
+struct my_namespace_Comparator
+{
+    int32_t (*function_pointer)(int32_t a, int32_t b, void* user_data);
+    void* user_data;
+};
+
+struct Array_slice_my_namespace_Comparator
+{
+    struct my_namespace_Comparator* data;
+    uint64_t size;
+};
+
+/** IRIS_META v=1 module=my.namespace name=Sorter kind=struct raw_pointer_members=data */
+struct my_namespace_Sorter
+{
+    struct my_namespace_Comparator compare;
+    int32_t const* data;
+    uint64_t count;
+};
+
+struct Array_slice_my_namespace_Sorter
+{
+    struct my_namespace_Sorter* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
+    }
+
+    TEST_CASE("Export Lambda — Lambda with pointer and reference parameter types", "[C_header_exporter][Lambda]")
+    {
+        std::string_view const input = R"RAW(module my.namespace;
+
+export lambda Processor(value: *Int32, count: Uint64) -> (result: Bool);
+)RAW";
+
+        std::string_view const expected = R"RAW(
+/** IRIS_META v=1 module=my.namespace name=Processor kind=lambda data=(value: *Int32, count: Uint64) -> (result: Bool) */
+struct my_namespace_Processor
+{
+    bool (*function_pointer)(int32_t const* value, uint64_t count, void* user_data);
+    void* user_data;
+};
+
+struct Array_slice_my_namespace_Processor
+{
+    struct my_namespace_Processor* data;
+    uint64_t size;
+};
+)RAW";
+
+        test_c_exporter(input, {}, {}, expected);
     }
 }
